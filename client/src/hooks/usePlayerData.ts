@@ -182,6 +182,15 @@ export const usePlayerData = (
 
   const currentEpisode = episodeNumber || uiState.initialEpisode
 
+  const previousEpisodeRef = useRef(currentEpisode)
+
+  useEffect(() => {
+    if (previousEpisodeRef.current !== currentEpisode) {
+      previousEpisodeRef.current = currentEpisode
+      dispatch({ type: 'SET_STATE', payload: { selectedSource: null, selectedLink: null } })
+    }
+  }, [currentEpisode, dispatch])
+
   useEffect(() => {
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (
@@ -427,6 +436,10 @@ export const usePlayerData = (
     const errorMessage = error ? (error as Error).message : null
     const finalError = errorMessage === 'AUTH_REQUIRED' ? null : errorMessage
 
+    const videoDataForEpisode =
+      videoData && videoData.fetchedEpisodeNumber === currentEpisode ? videoData : null
+    const videoDataMismatched = !!videoData && !videoDataForEpisode
+
     return {
       ...uiState,
       currentEpisode,
@@ -438,18 +451,18 @@ export const usePlayerData = (
       watchedEpisodes: playerData?.watchedEpisodes || [],
       inWatchlist: !!playerData?.inWatchlist,
       watchlistStatus: playerData?.watchlistStatus ?? uiState.watchlistStatus ?? null,
-      videoSources: videoData?.videoSources || [],
-      selectedSource: uiState.selectedSource || videoData?.selectedSource || null,
-      selectedLink: uiState.selectedLink || videoData?.selectedLink || null,
-      resumeTime: videoData?.resumeTime || 0,
-      resumeDuration: videoData?.resumeDuration || 0,
-      showResumeModal: uiState.showResumeModal && (videoData?.showResumeModal ?? false),
-      skipIntervals: videoData?.skipIntervals || [],
+      videoSources: videoDataForEpisode?.videoSources || [],
+      selectedSource: uiState.selectedSource || videoDataForEpisode?.selectedSource || null,
+      selectedLink: uiState.selectedLink || videoDataForEpisode?.selectedLink || null,
+      resumeTime: videoDataForEpisode?.resumeTime || 0,
+      resumeDuration: videoDataForEpisode?.resumeDuration || 0,
+      showResumeModal: uiState.showResumeModal && (videoDataForEpisode?.showResumeModal ?? false),
+      skipIntervals: videoDataForEpisode?.skipIntervals || [],
       loadingShowData,
-      loadingVideo,
+      loadingVideo: loadingVideo || videoDataMismatched,
       loadingDetails,
       error: finalError,
-      fetchedEpisodeNumber: videoData?.fetchedEpisodeNumber,
+      fetchedEpisodeNumber: videoDataForEpisode?.fetchedEpisodeNumber,
     }
   }, [
     uiState,
@@ -468,6 +481,7 @@ export const usePlayerData = (
     (episodeNumber: string, targetShowId?: string) => {
       const id = targetShowId || showId
       if (!id || !episodeNumber) return
+      if (id === showId && episodeNumber === currentEpisode) return
 
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       const provider =
@@ -475,8 +489,12 @@ export const usePlayerData = (
           ? 'animepahe'
           : uiState.selectedProvider
 
+      const queryKey = ['video-sources', id, episodeNumber, provider, uiState.currentMode] as const
+
+      if (queryClient.getQueryState(queryKey)?.status === 'success') return
+
       void queryClient.prefetchQuery({
-        queryKey: ['video-sources', id, episodeNumber, provider, uiState.currentMode],
+        queryKey,
         queryFn: () =>
           fetchVideoSources(
             id,
@@ -489,7 +507,7 @@ export const usePlayerData = (
         gcTime: 30 * 60 * 1000,
       })
     },
-    [showId, queryClient, uiState, dispatch]
+    [showId, currentEpisode, queryClient, uiState, dispatch]
   )
 
   return {

@@ -40,7 +40,8 @@ export function createDataRouter(
     '/schedule/:date',
     makeCacheMiddleware(
       apiCache,
-      (req) => `schedule-${req.params.date}-${req.query.format || 'TV'}`
+      (req) => `schedule-${req.params.date}-${req.query.format || 'TV'}`,
+      1800
     ),
     controller.getSchedule
   )

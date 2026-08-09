@@ -69,6 +69,13 @@ interface WatchlistFilterOptions {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Background discovery (5-minute timer and mount nudge) runs at a slow, shared
+// pace to keep AniList usage low. User-triggered discovery (bell button ->
+// /discovery/refresh, force=true) runs faster.
+const BACKGROUND_DISCOVERY_INTERVAL_MS = 5 * 60 * 1000
+const NUDGE_THROTTLE_MS = 120 * 1000
+const SLOW_MAX_RUN_MS = 5 * 60 * 1000
+
 export class WatchlistController {
   private activeTypeFetches = new Set<string>()
   private lastFinishedStatusCheckAt = 0
@@ -140,7 +147,7 @@ export class WatchlistController {
       return null
     }
 
-    const runDiscovery = async (): Promise<void> => {
+    const runDiscovery = async (fast = false): Promise<void> => {
       if (this.discoveryBusy || this.stopped) return
       this.discoveryBusy = true
       this.discoveryState = 'running'
@@ -154,7 +161,7 @@ export class WatchlistController {
       }
 
       const startedAt = Date.now()
-      const MAX_RUN_MS = 90000
+      const MAX_RUN_MS = fast ? 90000 : SLOW_MAX_RUN_MS
 
       try {
         const watchingShows = await WatchlistRepository.getWatchingShows(db)
@@ -165,7 +172,7 @@ export class WatchlistController {
         }
 
         const showIdMap = new Map<string, number>()
-        const MAP_CONCURRENCY = 4
+        const MAP_CONCURRENCY = fast ? 4 : 2
         const anilistResults: { show: (typeof watchingShows)[number]; id: number | null }[] = []
         let nextIndex = 0
         const worker = async (): Promise<void> => {
@@ -213,7 +220,8 @@ export class WatchlistController {
 
         const finishedShowIds = new Set<number>()
         const refreshFinishedStatuses =
-          Date.now() - this.lastFinishedStatusCheckAt >= 60 * 60 * 1000
+          fast && Date.now() - this.lastFinishedStatusCheckAt >= 60 * 60 * 1000
+        let persistedFinishedStatuses = 0
         for (const [watchlistId, anilistId] of showIdMap.entries()) {
           const localMeta = (await ShowsMetaRepository.getById(db, watchlistId)) as {
             status?: string
@@ -225,11 +233,16 @@ export class WatchlistController {
               const meta = await getShowMetaById(String(anilistId))
               if (meta?.status === 'FINISHED') {
                 finishedShowIds.add(anilistId)
+                await ShowsMetaRepository.upsert(db, { id: watchlistId, status: 'FINISHED' })
+                persistedFinishedStatuses += 1
               }
             } catch {
               // ignore AniList lookup failure
             }
           }
+        }
+        if (persistedFinishedStatuses > 0) {
+          db.scheduleSave()
         }
         if (refreshFinishedStatuses) {
           this.lastFinishedStatusCheckAt = Date.now()
@@ -331,15 +344,15 @@ export class WatchlistController {
     this.triggerDiscovery = (force = false) => {
       if (this.stopped || this.discoveryBusy) return false
       const now = Date.now()
-      if (!force && now - this.lastExternalDiscoveryAt < 120000) return false
+      if (!force && now - this.lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
       this.lastExternalDiscoveryAt = now
-      runDiscovery()
+      runDiscovery(force)
       return true
     }
 
     this.discoveryIntervalId = setInterval(() => {
-      if (!this.stopped) runDiscovery()
-    }, 300000)
+      if (!this.stopped) runDiscovery(false)
+    }, BACKGROUND_DISCOVERY_INTERVAL_MS)
   }
 
   private getProviderForId(showId: string): AnimePaheProvider | null {

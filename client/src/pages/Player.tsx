@@ -123,6 +123,15 @@ const Player: React.FC = () => {
     nextItem: QueueItem | null
     playedItem: QueueItem | null
   } | null>(null)
+  const episodeParamRef = useRef(episodeNumber)
+
+  useEffect(() => {
+    if (episodeParamRef.current !== episodeNumber) {
+      episodeParamRef.current = episodeNumber
+      setPendingQueueTransition(null)
+      setQueueCountdown(null)
+    }
+  }, [episodeNumber])
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastInteractionTimeRef = useRef(0)

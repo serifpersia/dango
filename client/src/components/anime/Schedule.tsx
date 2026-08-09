@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
@@ -32,6 +32,28 @@ const Schedule: React.FC = () => {
     return localStorage.getItem('schedule_format') || 'TV'
   })
   const carouselRef = useRef<HTMLDivElement>(null)
+  const [canScroll, setCanScroll] = useState(false)
+
+  const updateArrowState = useCallback(() => {
+    const el = carouselRef.current
+    if (!el) return
+    setCanScroll(el.scrollWidth > el.clientWidth + 1)
+  }, [])
+
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el) return
+    updateArrowState()
+    el.addEventListener('scroll', updateArrowState, { passive: true })
+    window.addEventListener('resize', updateArrowState)
+    const observer = new ResizeObserver(updateArrowState)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateArrowState)
+      window.removeEventListener('resize', updateArrowState)
+      observer.disconnect()
+    }
+  }, [scheduleData, loading, updateArrowState])
 
   useEffect(() => {
     localStorage.setItem('schedule_format', format)
@@ -42,10 +64,7 @@ const Schedule: React.FC = () => {
       setLoading(true)
       setError(null)
       try {
-        const url =
-          format && format !== 'ALL'
-            ? `/api/schedule/${date}?format=${format}`
-            : `/api/schedule/${date}`
+        const url = `/api/schedule/${date}?format=${format}`
         const response = await fetch(url)
         if (!response.ok) throw new Error('Failed to fetch episode schedule')
         const data = await response.json()
@@ -99,7 +118,8 @@ const Schedule: React.FC = () => {
     if (carouselRef.current) {
       carouselRef.current.scrollLeft = 0
     }
-  }, [selectedDate])
+    updateArrowState()
+  }, [selectedDate, updateArrowState])
 
   const formatOptions = [
     { value: 'TV', label: 'TV' },
@@ -116,7 +136,7 @@ const Schedule: React.FC = () => {
           <h2 className="section-title" style={{ marginBottom: 0 }}>
             Episode Schedule
           </h2>
-          {scheduleData.length > 0 && (
+          {scheduleData.length > 0 && canScroll && (
             <div className={styles.navArrows}>
               <button
                 className={styles.navButton}
