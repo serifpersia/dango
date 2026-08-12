@@ -1,6 +1,11 @@
 import { Show } from '../providers/provider.interface'
 import logger from '../logger'
 import { findTmdbDefaultBackdrop } from './tmdb'
+import {
+  getScheduleFromAniSchedule,
+  getAiredEpisodesFromAniScheduleFeed,
+  withScheduleFields,
+} from './anischedule'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
@@ -730,10 +735,20 @@ export async function getAiredEpisodesForShows(
   const cached = getCachedAiredEpisodes(cacheKey)
   if (cached) return cached
 
+  try {
+    const results = await getAiredEpisodesFromAniScheduleFeed(ids, dayStart, dayEnd)
+    setCachedAiredEpisodes(cacheKey, results)
+    return results
+  } catch (e) {
+    logger.warn(
+      { err: e },
+      'AniSchedule episode feed failed, falling back to AniList aired episodes'
+    )
+  }
+
   const now = Math.floor(Date.now() / 1000)
   const results: { mediaId: number; episode: number; airingAt: number }[] = []
   const seen = new Set<string>()
-  const idSet = new Set(ids)
   const BATCH = 5
 
   for (let i = 0; i < ids.length; i += BATCH) {
@@ -808,7 +823,38 @@ export async function getAiredEpisodesForShow(
   return schedules.filter((s) => s.airingAt <= now).map((s) => s.episode)
 }
 
-export async function getSchedule(date: Date, format?: string): Promise<Show[]> {
+export async function getSchedule(date: Date, format?: string, adult = false): Promise<Show[]> {
+  if (format === 'ADULT') {
+    adult = true
+    format = undefined
+  }
+  try {
+    const result = await getScheduleFromAniSchedule(date, format, adult)
+    const shows = result.entries
+      .filter((e) => e.show)
+      .map((e) => withScheduleFields(e.show as Show, e.episode, e.airingAt))
+
+    if (result.missingMeta.length > 0) {
+      for (const entry of result.missingMeta) {
+        try {
+          const meta = await getShowMetaById(String(entry.id))
+          if (!meta) continue
+          if (adult ? !meta.isAdult : meta.isAdult) continue
+          shows.push(withScheduleFields(meta, entry.episode, entry.airingAt))
+        } catch {
+          // keep going without this show
+        }
+      }
+    }
+
+    return shows
+  } catch (e) {
+    logger.warn({ err: e }, 'AniSchedule schedule failed, falling back to AniList')
+    return getScheduleFromAnilist(date, format, adult)
+  }
+}
+
+async function getScheduleFromAnilist(date: Date, format?: string, adult = false): Promise<Show[]> {
   const dayStart = Math.floor(date.getTime() / 1000)
   const dayEnd = dayStart + 86400
 
@@ -843,16 +889,17 @@ export async function getSchedule(date: Date, format?: string): Promise<Show[]> 
   const results: Show[] = []
   const now = Math.floor(Date.now() / 1000)
   for (const entry of schedules) {
-    if (entry.airingAt > now) continue
     const media = entry.media
     if (!media) continue
     if (format && format !== 'ALL' && media.format !== format) continue
-    if (media.isAdult) continue
+    const isAdultShow = !!media.isAdult
+    if (adult ? !isAdultShow : isAdultShow) continue
     const key = media.idMal ?? media.id
     if (seen.has(key)) continue
     seen.add(key)
     const show = fromAnilistMedia(media)
     show.episodeNumber = entry.episode
+    show.aired = entry.airingAt <= now
     show.nextAiring = {
       episode: entry.episode,
       timeUntilAiring: entry.airingAt - now,

@@ -73,17 +73,22 @@
 
 @media (max-width: 600px) {
   .daySelector {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    overflow-x: hidden;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    gap: 0;
     padding: var(--space-1) 0;
   }
 
   .dayBtn {
+    flex: 0 0 14.2857%;
     min-width: 0 !important;
-    padding: var(--space-1) 2px !important;
+    padding: var(--space-1) 0 !important;
     border-radius: var(--radius-md) !important;
+    scroll-snap-align: start;
   }
 
   .dayMonth {

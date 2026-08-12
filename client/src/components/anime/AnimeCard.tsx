@@ -47,6 +47,8 @@ interface Anime {
   rating?: string
   rank?: number
   airTime?: string
+  aired?: boolean
+  nextEpisodeAirDate?: string
 }
 
 interface AnimeCardConfig {
@@ -329,6 +331,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
                   <div className={styles.epBadge}>
                     {progressString ? progressString : `EP ${anime.episodeNumber}`}
                     {anime.airTime && <span className={styles.airTime}>{anime.airTime}</span>}
+                    {anime.aired === false && anime.nextEpisodeAirDate && (
+                      <span className={styles.airTime}>
+                        &nbsp;· {anime.nextEpisodeAirDate.split(',')[0]}
+                      </span>
+                    )}
                   </div>
                 )}
               </>
@@ -337,6 +344,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {showAdultBadge && adultContent && (
               <div className={`${styles.adultBadge} ${shouldBlur ? styles.gated : ''}`}>18+</div>
             )}
+
+            {anime.aired === false && <div className={styles.notAiredBadge}>NOT AIRED</div>}
 
             {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
 

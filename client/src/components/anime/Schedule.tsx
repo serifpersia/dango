@@ -32,6 +32,7 @@ const Schedule: React.FC = () => {
     return localStorage.getItem('schedule_format') || 'TV'
   })
   const carouselRef = useRef<HTMLDivElement>(null)
+  const dayRef = useRef<HTMLDivElement>(null)
   const [canScroll, setCanScroll] = useState(false)
 
   const updateArrowState = useCallback(() => {
@@ -95,7 +96,7 @@ const Schedule: React.FC = () => {
     const today = new Date()
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-    for (let i = -6; i <= 0; i++) {
+    for (let i = -6; i <= 6; i++) {
       const date = new Date()
       date.setDate(today.getDate() + i)
       days.push(date)
@@ -115,6 +116,15 @@ const Schedule: React.FC = () => {
   }
 
   useEffect(() => {
+    const el = dayRef.current
+    if (!el) return
+    const active = el.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
+    if (!active) return
+    const inline = window.innerWidth <= 600 ? 'center' : 'nearest'
+    active.scrollIntoView({ behavior: 'smooth', inline, block: 'nearest' })
+  }, [selectedDate])
+
+  useEffect(() => {
     if (carouselRef.current) {
       carouselRef.current.scrollLeft = 0
     }
@@ -127,6 +137,7 @@ const Schedule: React.FC = () => {
     { value: 'OVA', label: 'OVA' },
     { value: 'MOVIE', label: 'Movie' },
     { value: 'ALL', label: 'All' },
+    { value: 'ADULT', label: 'Mature' },
   ]
 
   return (
@@ -172,11 +183,12 @@ const Schedule: React.FC = () => {
       </div>
 
       <div className={styles.daySelectorContainer}>
-        <div className={styles.daySelector}>
+        <div className={styles.daySelector} ref={dayRef}>
           {getDayButtons().map((dayButton) => (
             <button
               key={dayButton.dateString}
               type="button"
+              data-date={dayButton.dateString}
               className={`${styles.dayBtn} ${
                 selectedDate === dayButton.dateString ? styles.active : ''
               }`}

@@ -49,6 +49,7 @@ export interface Show {
   }
   nextEpisodeAirDate?: string
   airTime?: string
+  aired?: boolean
 }
 
 export interface VideoLink {

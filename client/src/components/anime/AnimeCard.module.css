@@ -222,6 +222,21 @@
   color: #ff4a5a !important;
 }
 
+.notAiredBadge {
+  composes: badge;
+  top: var(--space-2);
+  right: var(--space-2);
+  background-color: rgba(201, 155, 22, 0.92);
+  color: white;
+  border: none;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  z-index: 11;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 .rankBadge {
   position: absolute;
   top: 6px;

@@ -27,6 +27,8 @@ export interface Anime {
   episodeCount?: number
   isAdult?: boolean
   rating?: string
+  aired?: boolean
+  nextEpisodeAirDate?: string
   season?: { title?: string }
   nextAiring?: { episode: number; timeUntilAiring: number }
   studios?: { name: string }[]

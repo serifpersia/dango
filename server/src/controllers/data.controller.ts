@@ -64,7 +64,8 @@ export class DataController {
     try {
       const date = new Date(req.params.date + 'T00:00:00.000Z')
       const format = (req.query.format as string) || undefined
-      const data = await getSchedule(date, format)
+      const adult = format === 'ADULT'
+      const data = await getSchedule(date, adult ? undefined : format, adult)
       res.set('Cache-Control', 'public, max-age=300').json(data)
     } catch (e) {
       logger.error({ err: e, date: req.params.date }, 'Schedule fetch failed')
