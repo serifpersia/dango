@@ -132,8 +132,11 @@
   color: var(--text-muted) !important;
 }
 
-.tabButton:hover {
-  color: var(--text-primary) !important;
+.tabButton:hover:not(:disabled) {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .tabButton:active {
@@ -147,11 +150,10 @@
 }
 
 .tabActive:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%) !important;
-  box-shadow:
-    0 0 0 2px var(--accent-glow),
-    0 6px 20px var(--accent-glow) !important;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px var(--accent-glow) !important;
+  transform: none !important;
 }
 
 @media (max-width: 600px) {

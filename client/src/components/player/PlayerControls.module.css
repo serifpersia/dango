@@ -24,18 +24,6 @@
   cursor: none;
 }
 
-.controlsOverlay.hidden .topControls {
-  transform: translateY(-20px);
-}
-
-.controlsOverlay.hidden .bottomControls {
-  transform: translateY(20px);
-}
-
-.controlsOverlay.hidden .centerControls {
-  transform: translate(-50%, -50%) scale(0.9);
-}
-
 .topControls {
   position: absolute;
   top: 0;
@@ -110,16 +98,13 @@
   z-index: 10;
   pointer-events: auto;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-  background: rgba(0, 0, 0, 0.25);
-  padding: 1rem 1.5rem;
-  border-radius: 9999px;
 }
 
 .centerSkipBtn {
   background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  border: none;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   width: 56px;
   height: 56px;
   font-size: 1.8rem;
@@ -127,14 +112,14 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
 }
 
 .centerSkipBtn:hover {
-  background: rgba(15, 15, 17, 0.7);
   color: white;
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: scale(1.1);
+  transform: scale(1.15);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 14px var(--accent-glow));
 }
 
 .centerPlayPause {
@@ -142,20 +127,20 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  border: none;
   border-radius: 50%;
   color: white;
   width: 76px;
   height: 76px;
   font-size: 2.2rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
 }
 
 .centerPlayPause:hover {
-  background: rgba(15, 15, 17, 0.75);
-  border-color: rgba(255, 255, 255, 0.6);
-  transform: scale(1.1);
+  transform: scale(1.08);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px var(--accent-glow));
 }
 
 .playIconOffset {
@@ -465,17 +450,12 @@
   transition: none !important;
 }
 
-:global(body.low-end) .centerPlayPause,
 :global(body.low-end) .bottomControls {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: #1a1a1c;
   box-shadow: none !important;
   transition: none !important;
-}
-
-:global(body.low-end) .centerPlayPause:hover {
-  background: #000 !important;
 }
 
 :global(body.low-end) .controlBtn.active {

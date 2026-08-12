@@ -120,7 +120,10 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   if (!loading && animeList.length === 0 && !emptyState) return null
 
   return (
-    <section style={{ marginBottom: '2.5rem' }}>
+    <section
+      className={continueWatching ? styles['continue-watching'] : undefined}
+      style={{ marginBottom: '2.5rem' }}
+    >
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
           {titleLink ? (

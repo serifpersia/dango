@@ -55,7 +55,10 @@
 
 .title-link:hover {
   color: var(--accent);
-  transform: translateX(4px);
+}
+
+.continue-watching .title-link:hover :global(.section-title) {
+  color: var(--accent);
 }
 
 @media (max-width: 600px) {

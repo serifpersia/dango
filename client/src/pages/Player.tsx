@@ -1217,6 +1217,10 @@ const Player: React.FC = () => {
                 <video
                   ref={refs.videoRef}
                   controls={player.state.useNativeControls}
+                  playsInline
+                  webkit-playsinline="true"
+                  disablePictureInPicture
+                  disableRemotePlayback
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}

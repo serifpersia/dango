@@ -76,6 +76,26 @@ select:focus-visible,
     transform var(--transition-fast);
 }
 
+/* Remove default browser focus ring on mouse click / tap (keep keyboard focus) */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove mobile tap highlight flash */
+a,
+button,
+input,
+select,
+textarea,
+[tabindex] {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* TV / Large Screen Scale Feedback */
 @media (min-width: 1200px) {
   a:focus-visible,
