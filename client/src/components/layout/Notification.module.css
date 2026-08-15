@@ -221,6 +221,23 @@
   font-weight: 600;
 }
 
+.systemItemMeta {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.systemItemMeta:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .removeItem {
   background: none;
   border: none;

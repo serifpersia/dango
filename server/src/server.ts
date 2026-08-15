@@ -31,6 +31,7 @@ import { createInsightsRouter } from './routes/insights.routes'
 import { discordRPCService } from './discord-rpc'
 import { SettingsRepository } from './repositories/settings.repository'
 import { requestContext } from './utils/request-context'
+import { checkAnilistStatus } from './lib/anilist'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -210,6 +211,8 @@ async function main() {
   const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
   const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
   await discordRPCService.setEnabled(isRpcEnabled)
+
+  checkAnilistStatus().catch(() => {})
 
   await runSyncSequence(db)
 

@@ -11,6 +11,9 @@ import {
   searchAnilist,
   setCachedAnilist,
   getSpotlightBanners,
+  anilistUnavailable,
+  wasAnilistDownAtBoot,
+  checkAnilistStatus,
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
@@ -398,6 +401,38 @@ export class DataController {
 
   getGenresAndTags = (_req: Request, res: Response) => {
     res.json({ genres, tags, studios })
+  }
+
+  getAnilistStatus = async (_req: Request, res: Response) => {
+    const available = !anilistUnavailable()
+    if (!available) {
+      checkAnilistStatus().catch(() => {})
+    }
+    res.json({ available, wasDownAtBoot: wasAnilistDownAtBoot() })
+  }
+
+  getSystemNotifications = async (_req: Request, res: Response) => {
+    interface SystemNotification {
+      id: string
+      type: string
+      title: string
+      message: string
+      icon: string
+      createdAt: number
+    }
+    const notifications: SystemNotification[] = []
+    if (wasAnilistDownAtBoot() && anilistUnavailable()) {
+      notifications.push({
+        id: 'system-anilist-down',
+        type: 'system',
+        title: 'AniList API',
+        message:
+          'AniList metadata API is currently down. ani-web is experiencing degraded performance. Kitsu is being used as a fallback in the meantime. Some features may be limited until service is restored.',
+        icon: 'warning',
+        createdAt: Date.now(),
+      })
+    }
+    res.json(notifications)
   }
 
   private tryProviderEpisodesFallback = async (

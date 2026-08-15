@@ -10,19 +10,49 @@ interface TrendingListProps {
   title: string
 }
 
-const sortOptions = [
-  { value: 'TRENDING_DESC', label: 'Trending' },
-  { value: 'POPULARITY_DESC', label: 'All Time' },
-]
-
+const SORT_TRENDING = 'TRENDING_DESC'
+const SORT_ALL_TIME = 'POPULARITY_DESC'
 const PAGE_SIZE = 10
 
 export default function TrendingList({ title }: TrendingListProps) {
   const { lowEndMode } = useLowEndMode()
   const [sort, setSort] = useState(() => {
-    return localStorage.getItem('trending_sort') || 'TRENDING_DESC'
+    return localStorage.getItem('trending_sort') || SORT_TRENDING
   })
+  const [anilistAvailable, setAnilistAvailable] = useState<boolean | null>(null)
   const carouselRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/anilist-status')
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setAnilistAvailable(j.available)
+      })
+      .catch(() => {
+        if (!cancelled) setAnilistAvailable(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (anilistAvailable === false && sort === SORT_TRENDING) {
+      setSort(SORT_ALL_TIME)
+    }
+  }, [anilistAvailable, sort])
+
+  useEffect(() => {
+    localStorage.setItem('trending_sort', sort)
+  }, [sort])
+
+  const showTrendingOption = anilistAvailable !== false
+
+  const sortOptions = [
+    ...(showTrendingOption ? [{ value: SORT_TRENDING, label: 'Trending' }] : []),
+    { value: SORT_ALL_TIME, label: 'All Time' },
+  ]
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
     useInfiniteTrendingList(sort, PAGE_SIZE)
@@ -30,10 +60,6 @@ export default function TrendingList({ title }: TrendingListProps) {
   const trendingList = useMemo(() => {
     return data?.pages.flatMap((page) => page) || []
   }, [data])
-
-  useEffect(() => {
-    localStorage.setItem('trending_sort', sort)
-  }, [sort])
 
   const handleScroll = useCallback(() => {
     if (!carouselRef.current || !hasNextPage || isFetchingNextPage || isLoading) return

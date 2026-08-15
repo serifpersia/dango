@@ -7,6 +7,7 @@ import {
   useDiscoveryStatus,
   useTriggerDiscovery,
   useNudgeDiscovery,
+  useSystemNotifications,
 } from '../../hooks/useAnimeData'
 import styles from './Notification.module.css'
 
@@ -18,8 +19,9 @@ const NotificationBell: React.FC = () => {
   const { mutate: nudgeDiscovery } = useNudgeDiscovery()
 
   const { data: notifications = [] } = useNotifications()
+  const { data: systemNotifications = [] } = useSystemNotifications()
   const { data: discoveryStatus } = useDiscoveryStatus()
-  const count = notifications.length
+  const count = notifications.length + systemNotifications.length
 
   const displayCount = count > 5 ? '5+' : count
 

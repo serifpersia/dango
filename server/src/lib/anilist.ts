@@ -6,8 +6,78 @@ import {
   getAiredEpisodesFromAniScheduleFeed,
   withScheduleFields,
 } from './anischedule'
+import {
+  kitsuSearchAnime,
+  kitsuTrending,
+  kitsuSeasonal,
+  kitsuMetaByAnilistId,
+  kitsuMetaByMalId,
+  kitsuEpisodes,
+} from './kitsu'
 
 const ANILIST_API = 'https://graphql.anilist.co'
+
+let anilistDownUntil = 0
+let anilistRateLimited = false
+let anilistWasDownAtBoot = false
+const DOWN_COOLDOWN_MS = 10 * 60 * 1000
+const NETWORK_COOLDOWN_MS = 2 * 60 * 1000
+const RATE_LIMIT_FALLBACK_THRESHOLD_MS = 30 * 1000
+
+export function anilistUnavailable(): boolean {
+  if (anilistDownUntil > Date.now()) return true
+  if (anilistRateLimited && anilistCooldownUntil - Date.now() > RATE_LIMIT_FALLBACK_THRESHOLD_MS) {
+    return true
+  }
+  return false
+}
+
+export function anilistIsDown(): boolean {
+  return anilistDownUntil > Date.now()
+}
+
+export function markAnilistDownAtBoot(): void {
+  anilistWasDownAtBoot = anilistUnavailable()
+}
+
+export async function checkAnilistStatus(): Promise<boolean> {
+  const available = await performAnilistStatusCheck()
+  if (!available) {
+    anilistWasDownAtBoot = true
+  }
+  return available
+}
+
+async function performAnilistStatusCheck(): Promise<boolean> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
+    const response = await fetch(ANILIST_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ query: 'query { __typename }' }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const available = response.ok
+    if (!available) {
+      anilistDownUntil = Date.now() + DOWN_COOLDOWN_MS
+      anilistRateLimited = false
+    } else {
+      anilistDownUntil = 0
+      anilistRateLimited = false
+    }
+    return available
+  } catch {
+    anilistDownUntil = Date.now() + DOWN_COOLDOWN_MS
+    anilistRateLimited = false
+    return false
+  }
+}
+
+export function wasAnilistDownAtBoot(): boolean {
+  return anilistWasDownAtBoot
+}
 
 const BURST_CAPACITY = 8
 const DEFAULT_REFILL_INTERVAL_MS = 1500
@@ -211,7 +281,11 @@ async function performAnilistRequest<T>(
 
     applyRateLimitHeaders(response.headers)
 
-    if (response.status === 429 && retryCount < 5) {
+    if (response.status === 429) {
+      anilistRateLimited = true
+      if (retryCount >= 5) {
+        return { data: null, errors: [{ message: 'AniList rate limited' }] }
+      }
       const retryAfterHeader = Number.parseInt(response.headers.get('Retry-After') || '', 10)
       const retryAfter =
         Number.isFinite(retryAfterHeader) && retryAfterHeader >= 0 ? retryAfterHeader : 5
@@ -220,6 +294,14 @@ async function performAnilistRequest<T>(
       refillIntervalMs = Math.min(60000, Math.max(refillIntervalMs, 1500) * 1.15)
       logger.warn({ retryAfter, retryCount }, 'AniList rate limited, retrying')
       return performAnilistRequest(query, variables, retryCount + 1)
+    }
+
+    if (response.status === 403 || response.status >= 500) {
+      anilistDownUntil = Date.now() + DOWN_COOLDOWN_MS
+      anilistRateLimited = false
+    } else if (response.status >= 200 && response.status < 300) {
+      anilistDownUntil = 0
+      anilistRateLimited = false
     }
 
     const json = (await response.json()) as {
@@ -233,6 +315,7 @@ async function performAnilistRequest<T>(
 
     return { data: json.data ?? null, errors: json.errors }
   } catch (err) {
+    anilistDownUntil = Math.max(anilistDownUntil, Date.now() + NETWORK_COOLDOWN_MS)
     logger.error({ err }, 'AniList request error')
     return null
   }
@@ -242,6 +325,9 @@ export function anilistRequest<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<AnilistResponse<T>> {
+  if (anilistUnavailable()) {
+    return Promise.resolve({ data: null, errors: [{ message: 'AniList unavailable' }] })
+  }
   const cacheKey = getAnilistCacheKey(query, variables)
   const existing = inFlightAnilistRequests.get(cacheKey)
   if (existing) return existing as Promise<AnilistResponse<T>>
@@ -299,7 +385,7 @@ export function fromAnilistMedia(m: AnilistMedia): Show {
     thumbnail: m.coverImage?.extraLarge || m.coverImage?.large || '',
     bannerImage: m.bannerImage || undefined,
     description: stripHtml(m.description),
-    genres: m.genres?.map((g) => ({ name: g })),
+    genres: (m.genres?.slice(0, 6) || []).map((g) => ({ name: g })),
     score: m.averageScore != null ? Number((m.averageScore / 10).toFixed(1)) : undefined,
     type: m.format,
     status: m.status,
@@ -352,6 +438,7 @@ export async function getLatestReleases(
   const accumulated: Show[] = []
   const seen = new Set<number>()
   let anilistPage = 1
+  let apiFailed = false
 
   while (accumulated.length < needed && anilistPage <= 10) {
     const query = `
@@ -380,6 +467,11 @@ export async function getLatestReleases(
       }
     }>(query, { page: anilistPage, perPage: 50, airingAtLt: now, airingAtGt: thirtyDaysAgo })
 
+    if (!result?.data) {
+      apiFailed = true
+      break
+    }
+
     const schedules = result?.data?.Page?.airingSchedules
     if (!schedules || schedules.length === 0) break
 
@@ -395,6 +487,10 @@ export async function getLatestReleases(
 
     if (!result.data?.Page?.pageInfo?.hasNextPage) break
     anilistPage++
+  }
+
+  if (apiFailed) {
+    return []
   }
 
   const start = (page - 1) * size
@@ -419,6 +515,10 @@ async function getAdultLatest(page: number, size: number): Promise<Show[]> {
       media?: AnilistMedia[]
     }
   }>(query, { page, perPage: size })
+
+  if (!result?.data) {
+    return []
+  }
 
   const media = result?.data?.Page?.media
   if (!media) return []
@@ -460,6 +560,13 @@ export async function getSeasonal(
     }
   }>(query, { page, perPage: size, season: currentSeason, seasonYear: year, format: formatVar })
 
+  if (!result?.data) {
+    if (anilistIsDown()) {
+      return (await kitsuSeasonal(currentSeason, year, format, page, size)).map(fromAnilistMedia)
+    }
+    return []
+  }
+
   const media = result?.data?.Page?.media
   if (!media) return []
 
@@ -472,25 +579,17 @@ export async function getTrending(
   sort: AnilistSort = 'TRENDING_DESC',
   status?: string
 ): Promise<Show[]> {
-  const statusFilter = status ? `status: ${status},` : ''
-  const query = `
-    query ($page: Int, $perPage: Int) {
-      Page(page: $page, perPage: $perPage) {
-        media(sort: ${sort}, type: ANIME, isAdult: false, ${statusFilter}) {
-          ${mediaFields()}
-        }
-      }
-    }
-  `
+  const media = await fetchAnilistMedia(page, perPage, sort, status)
+  if (media && media.length > 0) {
+    return media.map(fromAnilistMedia)
+  }
 
-  const result = await anilistRequest<{ Page: { media?: AnilistMedia[] } }>(query, {
-    page,
-    perPage,
-  })
-  const media = result?.data?.Page?.media
-  if (!media) return []
+  if (anilistIsDown()) {
+    const kitsuMedia = await kitsuTrending(page, perPage)
+    return kitsuMedia.map(fromAnilistMedia)
+  }
 
-  return media.map(fromAnilistMedia)
+  return []
 }
 
 async function fetchAnilistMedia(
@@ -498,7 +597,7 @@ async function fetchAnilistMedia(
   perPage: number = 20,
   sort: AnilistSort = 'TRENDING_DESC',
   status?: string
-): Promise<AnilistMedia[]> {
+): Promise<AnilistMedia[] | null> {
   const statusFilter = status ? `status: ${status},` : ''
   const query = `
     query ($page: Int, $perPage: Int) {
@@ -514,38 +613,58 @@ async function fetchAnilistMedia(
     page,
     perPage,
   })
+  if (!result?.data) return null
   return result?.data?.Page?.media ?? []
 }
 
 export async function getSpotlightBanners(page: number = 1, perPage: number = 20): Promise<Show[]> {
   const media = await fetchAnilistMedia(page, perPage)
+  const source = media ?? null
+
+  if (!source) {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const currentSeason =
+      month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
+    const kitsuMedia = await kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
+    if (!kitsuMedia || kitsuMedia.length === 0) {
+      return []
+    }
+    const shuffled = kitsuMedia.sort(() => Math.random() - 0.5)
+    const results: Show[] = []
+    for (const m of shuffled) {
+      if (results.length >= 6) break
+      const tmdbBackdrop = await findTmdbDefaultBackdrop({
+        english: m.title?.english,
+        romaji: m.title?.romaji,
+        native: m.title?.native,
+      })
+      if (tmdbBackdrop) {
+        results.push({
+          ...fromAnilistMedia(m),
+          bannerImage: tmdbBackdrop,
+        })
+      }
+    }
+    return results
+  }
+
   const results: Show[] = []
-
-  for (const m of media) {
+  for (const m of source) {
     if (results.length >= 6) break
-
-    let bannerImage: string | undefined
-
     const tmdbBackdrop = await findTmdbDefaultBackdrop({
       english: m.title?.english,
       romaji: m.title?.romaji,
       native: m.title?.native,
     })
-
     if (tmdbBackdrop) {
-      bannerImage = tmdbBackdrop
-    } else if (m.bannerImage) {
-      bannerImage = m.bannerImage
-    } else {
-      continue
+      results.push({
+        ...fromAnilistMedia(m),
+        bannerImage: tmdbBackdrop,
+      })
     }
-
-    results.push({
-      ...fromAnilistMedia(m),
-      bannerImage,
-    })
   }
-
   return results
 }
 
@@ -573,6 +692,16 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
     const show = fromAnilistMedia(byMal.data.Media)
     setCachedAnilist(cacheKey, show)
     return show
+  }
+
+  const apiFailed = !byId?.data && !byMal?.data
+  if (apiFailed && anilistIsDown()) {
+    const fb = (await kitsuMetaByAnilistId(numericId)) ?? (await kitsuMetaByMalId(numericId))
+    if (fb) {
+      const show = fromAnilistMedia(fb)
+      setCachedAnilist(cacheKey, show)
+      return show
+    }
   }
 
   return null
@@ -610,6 +739,16 @@ export async function getAnilistEpisodes(id: string): Promise<string[]> {
         airingSchedule?: { nodes?: { episode: number; airingAt: number }[] }
       } | null
     }>(queryMal, { id: numericId })
+    if (!byMal?.data) {
+      if (anilistIsDown()) {
+        const episodes = await kitsuEpisodes(numericId, numericId)
+        if (episodes.length > 0) {
+          setCachedAnilist(cacheKey, episodes)
+          return episodes
+        }
+      }
+      return []
+    }
     if (!byMal?.data?.Media) return []
     const episodes = extractEpisodes(byMal.data.Media)
     setCachedAnilist(cacheKey, episodes)
@@ -677,6 +816,7 @@ export async function searchAnilistByTitle(
   let media:
     | { id: number; title: { romaji?: string; english?: string; native?: string } }[]
     | undefined
+  let anyFailed = false
 
   for (const searchTerm of searchTerms) {
     const result = await anilistRequest<{
@@ -684,11 +824,24 @@ export async function searchAnilistByTitle(
         media?: { id: number; title: { romaji?: string; english?: string; native?: string } }[]
       }
     }>(query, { search: searchTerm })
+    if (!result?.data) {
+      anyFailed = true
+      break
+    }
     media = result?.data?.Page?.media
     if (media?.length) break
   }
 
-  if (!media || media.length === 0) return null
+  if (!media || media.length === 0) {
+    if (anyFailed && anilistIsDown()) {
+      const fb = await kitsuSearchAnime({ query: title, page: 1, perPage: 5 })
+      if (fb.length > 0) {
+        const best = fb[0]
+        return { id: Math.abs(best.id), title: best.title ?? {} }
+      }
+    }
+    return null
+  }
 
   const lowerTitle = title.toLowerCase()
   const exactMatch = media.find(
@@ -1015,6 +1168,35 @@ export async function searchAnilist(options: AnilistSearchOptions = {}): Promise
       media?: AnilistMedia[]
     }
   }>(queryStr, searchVars)
+
+  if (!result?.data) {
+    if (anilistIsDown()) {
+      const fb = await kitsuSearchAnime({
+        query,
+        page,
+        perPage,
+        format: format && format !== 'ALL' && format !== 'ADULT' ? format : undefined,
+        status,
+        season,
+        seasonYear,
+        genre,
+        genre_not_in,
+        averageScore_greater,
+        episodes_greater,
+        isAdult: format === 'ADULT' ? true : isAdult,
+        sort,
+      })
+      const seen = new Set<number>()
+      const results: Show[] = []
+      for (const m of fb) {
+        if (!m.id || seen.has(m.id)) continue
+        seen.add(m.id)
+        results.push(fromAnilistMedia(m))
+      }
+      return results
+    }
+    return []
+  }
 
   const media = result?.data?.Page?.media
   if (!media || media.length === 0) return []

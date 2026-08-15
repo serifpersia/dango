@@ -505,10 +505,28 @@ export interface Notification {
   id: string
 }
 
+export interface SystemNotification {
+  id: string
+  type: 'system'
+  title: string
+  message: string
+  icon: 'warning' | 'error' | 'info'
+  createdAt: number
+}
+
 export const useNotifications = (enabled: boolean = true) => {
   return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: () => fetchApi('/api/notifications'),
+    enabled,
+    refetchInterval: 30000,
+  })
+}
+
+export const useSystemNotifications = (enabled: boolean = true) => {
+  return useQuery<SystemNotification[]>({
+    queryKey: ['system-notifications'],
+    queryFn: () => fetchApi('/api/system-notifications'),
     enabled,
     refetchInterval: 30000,
   })
