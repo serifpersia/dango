@@ -769,7 +769,21 @@ const Watchlist: React.FC = () => {
 
       {!isLoading && sortedList.length === 0 && (
         <div className={styles.emptyState}>
-          <p>No anime found in this list.</p>
+          <h3 className={styles.emptyTitle}>Your watchlist is looking a bit lonely</h3>
+          <p className={styles.emptyText}>
+            {filterBy !== 'All' ||
+            query ||
+            type !== 'ALL' ||
+            season !== 'ALL' ||
+            year !== 'ALL' ||
+            Object.keys(genreStates).length > 0
+              ? 'No anime match these filters. Try adjusting them to see more titles.'
+              : "Let's find something to watch!"}
+          </p>
+          <button className={styles.emptyBtn} onClick={() => navigate('/search')}>
+            <FaSearch size={14} />
+            <span>Browse Anime</span>
+          </button>
         </div>
       )}
 

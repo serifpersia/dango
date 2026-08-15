@@ -32,9 +32,9 @@
   --header-bg: rgba(12, 12, 15, 0.82);
 
   --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-  --text-muted: #a1a1aa;
+  --text-secondary: #b4b4bd;
+  --text-tertiary: #8f8f98;
+  --text-muted: #b4b4bd;
 
   /* ===== COLOR: BORDER ===== */
   --border-primary: rgba(255, 255, 255, 0.08);
@@ -103,7 +103,7 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
   /* ===== LAYOUT ===== */
-  --header-height: 90px;
+  --header-height: 64px;
   --max-width: 1600px;
   --sidebar-width: 280px;
 

@@ -49,7 +49,9 @@
   transform: translateY(-6px);
   border-color: var(--border-accent);
   background-color: var(--bg-tertiary);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.4),
+    0 0 24px -6px var(--accent-glow);
 }
 
 .cardWrapper:focus-within {
@@ -137,7 +139,7 @@
 }
 
 .cardWrapper:hover .posterImg {
-  transform: scale(1.08) translateZ(0);
+  transform: scale(1.05);
 }
 
 .info {
@@ -198,7 +200,7 @@
 
 .airTime {
   margin-left: 6px;
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.85;
   font-weight: 500;
 }
@@ -226,10 +228,10 @@
   composes: badge;
   top: var(--space-2);
   right: var(--space-2);
-  background-color: rgba(201, 155, 22, 0.92);
+  background-color: #0369a1;
   color: white;
   border: none;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   padding: 4px 8px;

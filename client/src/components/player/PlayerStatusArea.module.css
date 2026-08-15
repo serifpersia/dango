@@ -1,6 +1,8 @@
 .statusArea {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   padding: 0.5rem 1rem;
@@ -11,9 +13,34 @@
   box-shadow: var(--shadow-lg);
   width: fit-content;
   max-width: 100%;
-  pointer-events: none;
   user-select: none;
   flex-wrap: wrap;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+  pointer-events: auto;
+}
+
+.toggleBtn:hover {
+  color: var(--text-primary);
+}
+
+.toggleBtn svg {
+  color: var(--accent);
 }
 
 .shortcuts {
@@ -21,6 +48,9 @@
   gap: 1.5rem;
   align-items: center;
   flex-wrap: wrap;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-primary);
+  width: 100%;
 }
 
 .shortcutGroup {
@@ -44,7 +74,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 800;
   color: var(--text-primary);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   min-width: 1.4rem;
   height: 1.4rem;
   display: flex;
@@ -60,7 +90,7 @@
 
 .label {
   color: var(--text-tertiary);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;

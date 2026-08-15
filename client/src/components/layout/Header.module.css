@@ -1,5 +1,6 @@
 .header {
   height: var(--header-height);
+  --logo-height: 46px;
   background: transparent;
   border-bottom: 1px solid transparent;
   position: fixed;
@@ -251,7 +252,7 @@
 
 @media (max-width: 768px) {
   .header {
-    height: 70px;
+    height: 56px;
     padding: 0 var(--space-4);
   }
 

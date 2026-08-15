@@ -92,7 +92,7 @@
   }
 
   .dayMonth {
-    font-size: 8px !important;
+    font-size: 10px !important;
   }
 
   .dayNum {
@@ -100,7 +100,7 @@
   }
 
   .dayName {
-    font-size: 8px !important;
+    font-size: 10px !important;
   }
 
   .dayBtn.active {
@@ -140,7 +140,7 @@
 }
 
 .dayMonth {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -154,7 +154,7 @@
 }
 
 .dayName {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;

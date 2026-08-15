@@ -40,7 +40,7 @@
 }
 
 .personaLabel {
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 1.5px;
   color: var(--text-tertiary);
@@ -66,21 +66,25 @@
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(138, 79, 255, 0.12);
   border-radius: var(--radius-xl);
   padding: var(--space-6);
   display: flex;
   align-items: center;
   gap: var(--space-5);
   transition: all var(--transition-base);
-  box-shadow: var(--glass-shadow);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 28px -12px var(--accent-glow);
 }
 
 .statCard:hover {
   transform: translateY(-5px);
   border-color: var(--border-accent);
   background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 20px 40px -10px rgba(0, 0, 0, 0.5),
+    0 0 40px -8px var(--accent-glow);
 }
 
 .statIcon {
@@ -188,7 +192,7 @@
   display: grid;
   grid-template-rows: repeat(7, 14px);
   gap: 4px;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-tertiary);
   align-items: center;
   padding-right: 6px;
@@ -243,24 +247,26 @@
 }
 
 .level0 {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(138, 79, 255, 0.06);
 }
 .level1 {
-  background: rgba(138, 79, 255, 0.25);
-  border-color: rgba(138, 79, 255, 0.3);
+  background: rgba(109, 40, 217, 0.4);
+  border-color: rgba(109, 40, 217, 0.5);
 }
 .level2 {
-  background: rgba(138, 79, 255, 0.5);
-  border-color: rgba(138, 79, 255, 0.6);
+  background: rgba(139, 92, 246, 0.6);
+  border-color: rgba(139, 92, 246, 0.7);
 }
 .level3 {
-  background: rgba(138, 79, 255, 0.75);
-  border-color: rgba(138, 79, 255, 0.9);
+  background: rgba(168, 85, 247, 0.8);
+  border-color: rgba(168, 85, 247, 0.9);
 }
 .level4 {
-  background: var(--accent);
-  border-color: var(--accent-light);
-  box-shadow: 0 0 10px var(--accent-glow);
+  background: #c084fc;
+  border-color: #e9d5ff;
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    0 0 4px rgba(192, 132, 252, 0.8);
 }
 
 .heatmapFooter {
@@ -350,7 +356,7 @@
 }
 
 .hourlyLabel {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-tertiary);
   margin-top: 8px;
   font-weight: 700;
@@ -441,7 +447,7 @@
 }
 
 .seasonalLabel {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-tertiary);
   margin-top: 10px;
   font-weight: 700;
