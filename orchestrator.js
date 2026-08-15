@@ -208,7 +208,13 @@ const log = (prefix, color, data) => {
   }
 }
 
-const spawnOpts = (cwd) => ({ stdio: 'pipe', shell: isWin, cwd, detached: true })
+const spawnOpts = (cwd) => ({
+  stdio: 'pipe',
+  shell: isWin,
+  cwd,
+  detached: !isWin,
+  windowsHide: true,
+})
 let serverProcess, clientProcess
 let isShuttingDown = false
 
