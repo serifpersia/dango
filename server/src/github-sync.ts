@@ -9,7 +9,7 @@ const log = logger.child({ module: 'GitHubSync' })
 const REPO_NAME = 'dango-sync-data'
 const LEGACY_REPO_NAME = 'aniweb-sync-data'
 const DEFAULT_CLIENT_ID = 'Ov23liT1ZtPk7XtN9PZk'
-const GITHUB_SCOPES = ['repo']
+const GITHUB_SCOPES = ['repo', 'delete_repo']
 const GITHUB_API_HEADERS = {
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2026-03-10',
