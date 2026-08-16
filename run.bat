@@ -13,9 +13,9 @@ if not "%1"=="" (
 powershell -NoProfile -Command ^
     "Write-Host '';" ^
     "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
-    "Write-Host '                ani-web' -ForegroundColor Cyan;" ^
+    "Write-Host '                dango' -ForegroundColor Cyan;" ^
     "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
-    "Write-Host 'https://github.com/serifpersia/ani-web' -ForegroundColor Blue;" ^
+    "Write-Host 'https://github.com/serifpersia/dango' -ForegroundColor Blue;" ^
     "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
     "Write-Host '';" ^
     "Write-Host 'Please choose a mode to run:' -ForegroundColor Yellow"

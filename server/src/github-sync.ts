@@ -6,7 +6,8 @@ import { CONFIG } from './config'
 
 const log = logger.child({ module: 'GitHubSync' })
 
-const REPO_NAME = 'aniweb-sync-data'
+const REPO_NAME = 'dango-sync-data'
+const LEGACY_REPO_NAME = 'aniweb-sync-data'
 const DEFAULT_CLIENT_ID = 'Ov23liT1ZtPk7XtN9PZk'
 const GITHUB_SCOPES = ['repo']
 const GITHUB_API_HEADERS = {
@@ -69,6 +70,18 @@ type OctokitInstance = {
         private: boolean
         auto_init: boolean
         description: string
+        headers?: typeof GITHUB_API_HEADERS
+      }) => Promise<unknown>
+      update: (params: {
+        owner: string
+        repo: string
+        name?: string
+        description?: string
+        headers?: typeof GITHUB_API_HEADERS
+      }) => Promise<unknown>
+      delete: (params: {
+        owner: string
+        repo: string
         headers?: typeof GITHUB_API_HEADERS
       }) => Promise<unknown>
       createOrUpdateFileContents: (params: {
@@ -150,6 +163,64 @@ class GitHubSyncService {
 
   isAuthenticated() {
     return !!process.env.GITHUB_TOKEN
+  }
+
+  async migrateFromAniWebSync(): Promise<void> {
+    if (!this.isAuthenticated()) return
+
+    try {
+      const octokit = await this.getOctokit()
+      const { data: user } = await octokit.rest.users.getAuthenticated({
+        headers: GITHUB_API_HEADERS,
+      })
+
+      try {
+        await octokit.rest.repos.get({
+          owner: user.login,
+          repo: LEGACY_REPO_NAME,
+          headers: GITHUB_API_HEADERS,
+        })
+      } catch (err) {
+        if (getErrorStatus(err) === 404) {
+          log.info('No legacy aniweb-sync-data repo found. Skipping migration.')
+          return
+        }
+        throw err
+      }
+
+      log.info('Found legacy aniweb-sync-data repo. Renaming to dango-sync-data...')
+
+      const existingNew = await octokit.rest.repos
+        .get({
+          owner: user.login,
+          repo: REPO_NAME,
+          headers: GITHUB_API_HEADERS,
+        })
+        .catch(() => null)
+
+      if (existingNew) {
+        log.info('dango-sync-data repo already exists. Deleting legacy repo.')
+        await octokit.rest.repos.delete({
+          owner: user.login,
+          repo: LEGACY_REPO_NAME,
+          headers: GITHUB_API_HEADERS,
+        })
+        log.info('Deleted legacy aniweb-sync-data repo.')
+        return
+      }
+
+      await octokit.rest.repos.update({
+        owner: user.login,
+        repo: LEGACY_REPO_NAME,
+        name: REPO_NAME,
+        description: 'Private dango synchronization data.',
+        headers: GITHUB_API_HEADERS,
+      })
+
+      log.info('Renamed aniweb-sync-data to dango-sync-data.')
+    } catch (err) {
+      log.error({ err }, 'GitHub sync migration failed')
+    }
   }
 
   getDeviceState(): DeviceFlowState {
@@ -242,7 +313,7 @@ class GitHubSyncService {
       owner,
       repo: REPO_NAME,
       path: getSyncFilename(),
-      message: `Sync ani-web data v${payload.version}`,
+      message: `Sync dango data v${payload.version}`,
       content,
       sha: existing?.sha,
       headers: GITHUB_API_HEADERS,
@@ -343,7 +414,7 @@ class GitHubSyncService {
         name: REPO_NAME,
         private: true,
         auto_init: true,
-        description: 'Private ani-web synchronization data.',
+        description: 'Private dango synchronization data.',
         headers: GITHUB_API_HEADERS,
       })
     }

@@ -235,12 +235,12 @@ class DiscordRPCService {
           largeImageKey: imageKey,
           largeImageText: data.title,
           smallImageKey: 'logo',
-          smallImageText: 'ani-web',
+          smallImageText: 'dango',
           type: 3,
           buttons: [
             {
               label: 'Learn More',
-              url: 'https://github.com/serifpersia/ani-web',
+              url: 'https://github.com/serifpersia/dango',
             },
           ],
         })
@@ -266,12 +266,12 @@ class DiscordRPCService {
         largeImageKey: imageKey,
         largeImageText: data.title,
         smallImageKey: 'logo',
-        smallImageText: 'ani-web',
+        smallImageText: 'dango',
         type: 3,
         buttons: [
           {
             label: 'Learn More',
-            url: 'https://github.com/serifpersia/ani-web',
+            url: 'https://github.com/serifpersia/dango',
           },
         ],
       }
@@ -314,12 +314,12 @@ class DiscordRPCService {
         details: label.details,
         state: label.state,
         largeImageKey: 'logo',
-        largeImageText: 'ani-web',
+        largeImageText: 'dango',
         type: 3,
         buttons: [
           {
             label: 'Learn More',
-            url: 'https://github.com/serifpersia/ani-web',
+            url: 'https://github.com/serifpersia/dango',
           },
         ],
       })

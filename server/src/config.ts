@@ -8,18 +8,18 @@ const PACKAGE_ROOT = path.resolve(SERVER_ROOT, '..')
 
 function resolveDataRoot() {
   if (process.platform === 'win32' && process.env.APPDATA) {
-    return path.join(process.env.APPDATA, 'ani-web')
+    return path.join(process.env.APPDATA, 'dango')
   }
 
   if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', 'ani-web')
+    return path.join(os.homedir(), 'Library', 'Application Support', 'dango')
   }
 
   if (process.env.XDG_DATA_HOME) {
-    return path.join(process.env.XDG_DATA_HOME, 'ani-web')
+    return path.join(process.env.XDG_DATA_HOME, 'dango')
   }
 
-  return path.join(os.homedir(), '.local', 'share', 'ani-web')
+  return path.join(os.homedir(), '.local', 'share', 'dango')
 }
 
 function moveFileIfNeeded(sourcePath: string, destinationPath: string) {
@@ -56,10 +56,52 @@ function migrateLegacyData(packageServerRoot: string, dataRoot: string) {
   }
 }
 
+function resolveLegacyDataRoot() {
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, 'ani-web')
+  }
+
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'ani-web')
+  }
+
+  if (process.env.XDG_DATA_HOME) {
+    return path.join(process.env.XDG_DATA_HOME, 'ani-web')
+  }
+
+  return path.join(os.homedir(), '.local', 'share', 'ani-web')
+}
+
+function migrateFromAniWeb(dataRoot: string) {
+  const legacyRoot = resolveLegacyDataRoot()
+  if (legacyRoot === dataRoot) return
+  if (!fs.existsSync(legacyRoot)) return
+
+  const filesToMigrate = [
+    '.env',
+    'google_tokens.json',
+    'sync_manifest.json',
+    'sync_manifest.dev.json',
+    'anime.db',
+    'anime.db-shm',
+    'anime.db-wal',
+    'anime.dev.db',
+    'anime.dev.db-shm',
+    'anime.dev.db-wal',
+  ]
+
+  fs.mkdirSync(dataRoot, { recursive: true })
+
+  for (const filename of filesToMigrate) {
+    moveFileIfNeeded(path.join(legacyRoot, filename), path.join(dataRoot, filename))
+  }
+}
+
 const DATA_ROOT = resolveDataRoot()
 const ENV_PATH = path.join(DATA_ROOT, '.env')
 
 migrateLegacyData(SERVER_ROOT, DATA_ROOT)
+migrateFromAniWeb(DATA_ROOT)
 
 dotenv.config({ path: path.join(SERVER_ROOT, '.env') })
 dotenv.config({ path: ENV_PATH, override: true })
@@ -82,8 +124,8 @@ export const CONFIG = {
   ),
   DB_NAME_PROD: 'anime.db',
   DB_NAME_DEV: 'anime.dev.db',
-  REMOTE_FOLDER_PROD: 'aniweb_db',
-  REMOTE_FOLDER_DEV: 'aniweb_dev_db',
+  REMOTE_FOLDER_PROD: 'dango_db',
+  REMOTE_FOLDER_DEV: 'dango_dev_db',
   MANIFEST_FILENAME: IS_DEV ? 'sync_manifest.dev.json' : 'sync_manifest.json',
   GOOGLE_SCOPES: [
     'https://www.googleapis.com/auth/drive',

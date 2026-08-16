@@ -19,52 +19,8 @@ const colors = {
 
 if (mode === '--version' || mode === '-v') {
   const pkg = require('./package.json')
-  console.log(`ani-web version ${pkg.version}`)
+  console.log(`dango version ${pkg.version}`)
   process.exit(0)
-}
-
-async function showDeprecationNotice() {
-  const pkg = require('./package.json')
-  console.log('')
-  console.log(
-    `${colors.system}[Deprecated]${colors.reset} ani-web has been rebranded to ${colors.client}dango${colors.reset}`
-  )
-  console.log('')
-  console.log(`  This is the final release of ani-web (v${pkg.version}).`)
-  console.log(`  To continue receiving updates, install dango:`)
-  console.log('')
-  console.log(`    ${colors.client}npm install -g @serifpersia/dango${colors.reset}`)
-  console.log('')
-  console.log(`  Once dango is working, you can remove ani-web:`)
-  console.log('')
-  console.log(`    ${colors.client}npm uninstall -g ani-web${colors.reset}`)
-  console.log('')
-
-  if (!process.stdin.isTTY) {
-    console.log(`${colors.system}[System]${colors.reset} Non-interactive mode. Exiting.`)
-    process.exit(0)
-  }
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  const answer = await new Promise((resolve) => {
-    rl.question(
-      `${colors.system}[System]${colors.reset} Continue using ani-web v${pkg.version}? (y/N) `,
-      (ans) => {
-        rl.close()
-        resolve(ans.toLowerCase())
-      }
-    )
-  })
-
-  if (answer !== 'y' && answer !== 'yes') {
-    console.log(`\n${colors.system}[System]${colors.reset} Exiting. Install dango to continue:\n`)
-    console.log(`  ${colors.client}npm install -g @serifpersia/dango${colors.reset}\n`)
-    process.exit(0)
-  }
-
-  console.log(
-    `\n${colors.system}[System]${colors.reset} Continuing with ani-web v${pkg.version} (no further updates)...\n`
-  )
 }
 
 async function checkForUpdates() {
@@ -81,9 +37,9 @@ async function checkForUpdates() {
     const current = pkg.version
 
     if (isGlobalInstall) {
-      const { data } = await axios.get('https://registry.npmjs.org/ani-web/latest', {
+      const { data } = await axios.get('https://registry.npmjs.org/@serifpersia/dango/latest', {
         timeout: 3000,
-        headers: { 'User-Agent': 'ani-web-cli' },
+        headers: { 'User-Agent': 'dango-cli' },
       })
       const latest = data.version
 
@@ -106,13 +62,13 @@ async function checkForUpdates() {
           })
 
           if (answer === 'y' || answer === 'yes') {
-            console.log(`${colors.system}[Update]${colors.reset} Updating ani-web...`)
+            console.log(`${colors.system}[Update]${colors.reset} Updating dango...`)
             try {
-              require('child_process').execSync(`${npmCmd} install -g ani-web@latest`, {
+              require('child_process').execSync(`${npmCmd} install -g @serifpersia/dango@latest`, {
                 stdio: 'inherit',
               })
               console.log(
-                `\n${colors.system}[Update]${colors.reset} Update successful! Please restart ani-web to apply changes.`
+                `\n${colors.system}[Update]${colors.reset} Update successful! Please restart dango to apply changes.`
               )
               process.exit(0)
             } catch (err) {
@@ -124,7 +80,7 @@ async function checkForUpdates() {
                   `${colors.system}[Update]${colors.reset} Hint: You might need to run with sudo:`
                 )
                 console.log(
-                  `${colors.system}[Update]${colors.reset} ${colors.client}sudo ani-web${colors.reset}\n`
+                  `${colors.system}[Update]${colors.reset} ${colors.client}sudo dango${colors.reset}\n`
                 )
               }
               console.log(
@@ -139,13 +95,13 @@ async function checkForUpdates() {
           if (process.stdin.isTTY) process.stdin.resume()
         } else {
           console.log(
-            `${colors.system}[Update]${colors.reset} Run: npm install -g ani-web to update.\n`
+            `${colors.system}[Update]${colors.reset} Run: npm install -g @serifpersia/dango to update.\n`
           )
         }
       }
     } else {
       const { data } = await axios.get(
-        'https://api.github.com/repos/serifpersia/ani-web/releases/latest',
+        'https://api.github.com/repos/serifpersia/dango/releases/latest',
         { timeout: 3000 }
       )
       const latestDate = new Date(data.published_at)
@@ -264,7 +220,7 @@ let isShuttingDown = false
 
 async function main() {
   console.log(
-    `${colors.system}[System]${colors.reset} Starting ani-web in ${mode.toUpperCase()} mode...`
+    `${colors.system}[System]${colors.reset} Starting dango in ${mode.toUpperCase()} mode...`
   )
   console.log(
     `${colors.system}[System]${colors.reset} Press 'q' or 'Ctrl+C' to cleanly exit and sync data.\n`
@@ -374,6 +330,6 @@ process.on('SIGINT', () => {
   shutdown()
 })
 ;(async () => {
-  await showDeprecationNotice()
+  await checkForUpdates()
   main()
 })()

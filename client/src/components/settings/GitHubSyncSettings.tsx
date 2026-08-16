@@ -182,7 +182,7 @@ const GitHubSyncSettings: React.FC = () => {
           </Button>
           {usingDefaultClientId && (
             <p className={styles.warning}>
-              Using the bundled ani-web GitHub OAuth app. Set GITHUB_CLIENT_ID in the server
+              Using the bundled dango GitHub OAuth app. Set GITHUB_CLIENT_ID in the server
               environment to use your own OAuth app instead.
             </p>
           )}

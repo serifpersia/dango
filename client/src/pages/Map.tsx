@@ -27,7 +27,7 @@ const Map: React.FC = () => {
   const { lowEndMode } = useLowEndMode()
 
   useEffect(() => {
-    document.title = 'Map - ani-web'
+    document.title = 'Map - dango'
   }, [])
 
   useEffect(() => {

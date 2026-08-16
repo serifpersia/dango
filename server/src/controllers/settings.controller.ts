@@ -58,11 +58,11 @@ export class SettingsController {
   }
 
   backupDatabase = (req: Request, res: Response) => {
-    const backupPath = path.join(CONFIG.ROOT, 'ani-web-backup.db')
+    const backupPath = path.join(CONFIG.ROOT, 'dango-backup.db')
 
     try {
       req.db.backup(backupPath)
-      res.download(backupPath, 'ani-web-backup.db', () => {
+      res.download(backupPath, 'dango-backup.db', () => {
         fs.unlink(backupPath, () => {})
       })
     } catch (err) {

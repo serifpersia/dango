@@ -106,7 +106,7 @@ const Settings: React.FC = () => {
   }
 
   React.useEffect(() => {
-    document.title = 'Settings - ani-web'
+    document.title = 'Settings - dango'
   }, [])
 
   React.useEffect(() => {
@@ -130,7 +130,7 @@ const Settings: React.FC = () => {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = 'ani-web-backup.db'
+        a.download = 'dango-backup.db'
         document.body.appendChild(a)
         a.click()
         a.remove()

@@ -55,7 +55,7 @@ async function fetchJson<T>(url: string): Promise<T> {
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'ani-web' },
+      headers: { 'User-Agent': 'dango' },
     })
     if (!response.ok) {
       throw new Error(`AniSchedule fetch failed with status ${response.status}`)

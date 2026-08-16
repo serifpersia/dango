@@ -5,7 +5,8 @@
   right: 50%;
   margin-left: -50vw;
   margin-right: -50vw;
-  padding: var(--space-12) var(--space-8) var(--space-8);
+  padding: 0 var(--space-8) var(--space-8);
+  overflow: visible;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: auto;
   background: linear-gradient(180deg, rgba(10, 10, 12, 0.6) 0%, rgba(5, 5, 7, 0.95) 100%);
@@ -35,7 +36,8 @@
   text-align: left;
   max-width: 320px;
   position: relative;
-  padding-top: 90px;
+  padding-top: 0px;
+  margin-top: -60px;
 }
 
 .logoRow {
@@ -59,7 +61,7 @@
 }
 
 .logoText {
-  height: 40px;
+  height: 105px;
   width: auto;
   display: block;
 }
@@ -195,7 +197,7 @@
 
 @media (max-width: 768px) {
   .footer {
-    padding: var(--space-8) var(--space-4) var(--space-6);
+    padding: 0 var(--space-4) var(--space-6);
   }
 
   .footerInner {
@@ -209,8 +211,9 @@
     grid-column: 1;
     align-items: center;
     text-align: center;
-    padding-top: 60px;
+    padding-top: 0;
     justify-content: center;
+    margin-top: -40px;
   }
 
   .mascotContainer {
@@ -231,7 +234,7 @@
   }
 
   .logoText {
-    height: 30px;
+    height: 84px;
   }
 
   .brandMeta {

@@ -8,7 +8,7 @@ const MAL: React.FC = () => {
   const { setIsOpen } = useSidebar()
 
   React.useEffect(() => {
-    document.title = 'MyAnimeList Import - ani-web'
+    document.title = 'MyAnimeList Import - dango'
   }, [])
 
   const [importStatus, setImportStatus] = useState<string>('')
@@ -70,7 +70,7 @@ const MAL: React.FC = () => {
     <div className="page-container">
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>MyAnimeList Import</h1>
-        <p className={styles.pageSubtitle}>Transfer your anime list seamlessly to ani-web</p>
+        <p className={styles.pageSubtitle}>Transfer your anime list seamlessly to dango</p>
       </div>
 
       <div className={styles.importCard}>
@@ -111,7 +111,7 @@ const MAL: React.FC = () => {
             <div className={styles.optionText}>
               <span className={styles.optionTitle}>Erase current watchlist</span>
               <span className={styles.optionDesc}>
-                Warning: This will permanently delete your existing ani-web watchlist before
+                Warning: This will permanently delete your existing dango watchlist before
                 importing.
               </span>
             </div>

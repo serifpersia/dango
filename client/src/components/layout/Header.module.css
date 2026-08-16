@@ -1,6 +1,6 @@
 .header {
   height: var(--header-height);
-  --logo-height: 52px;
+  --logo-height: 60px;
   background: transparent;
   border-bottom: 1px solid transparent;
   position: fixed;
@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 4px 8px 8px;
   border-radius: var(--radius-md);
   transition: opacity var(--transition-base);
 }
@@ -252,7 +252,7 @@
 
 @media (max-width: 768px) {
   .header {
-    height: 62px;
+    height: 70px;
     padding: 0 var(--space-4);
   }
 

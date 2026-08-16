@@ -2,7 +2,7 @@ import type { AnilistMedia } from './anilist'
 import logger from '../logger'
 
 const KITSU_BASE = 'https://kitsu.app/api/edge'
-const KITSU_HEADERS = { Accept: 'application/vnd.api+json', 'User-Agent': 'ani-web' }
+const KITSU_HEADERS = { Accept: 'application/vnd.api+json', 'User-Agent': 'dango' }
 const REQUEST_TIMEOUT_MS = 15000
 const MAX_RETRIES = 3
 

@@ -20,8 +20,16 @@ import { HnProvider } from './providers/hn.provider'
 import { AnilightProvider } from './providers/anilight.provider'
 import { AnidbProvider } from './providers/anidb.provider'
 import { googleDriveService } from './google'
+import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
-import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider, waitForSync } from './sync'
+import {
+  initializeDatabase,
+  syncDownOnBoot,
+  syncUp,
+  initSyncProvider,
+  waitForSync,
+  getActiveProvider,
+} from './sync'
 import { createAuthRouter } from './routes/auth.routes'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
@@ -86,6 +94,28 @@ async function runSyncSequence(
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
   await initSyncProvider(preferredProvider)
+
+  if (getActiveProvider() === 'google' && googleDriveService.isAuthenticated()) {
+    const legacyFolder = CONFIG.IS_DEV ? 'aniweb_dev_db' : 'aniweb_db'
+    try {
+      await googleDriveService.migrateFromAniWebDb(
+        legacyFolder,
+        remoteFolder,
+        dbName,
+        CONFIG.MANIFEST_FILENAME
+      )
+    } catch (err) {
+      logger.error({ err }, 'Google Drive migration from ani-web failed')
+    }
+  }
+
+  if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
+    try {
+      await githubSyncService.migrateFromAniWebSync()
+    } catch (err) {
+      logger.error({ err }, 'GitHub sync migration from ani-web failed')
+    }
+  }
 
   const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
     return new Promise<void>((resolve) => {

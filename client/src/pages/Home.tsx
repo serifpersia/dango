@@ -50,7 +50,7 @@ const Home: React.FC = () => {
   const reorderQueue = useReorderQueue()
 
   useEffect(() => {
-    document.title = 'Home - ani-web'
+    document.title = 'Home - dango'
   }, [])
 
   const { data: thisWeekList, isLoading: loadingThisWeek } = useThisWeekSchedule()
