@@ -36,6 +36,10 @@ export function anilistIsDown(): boolean {
   return anilistDownUntil > Date.now()
 }
 
+export function isAnilistRateLimited(): boolean {
+  return anilistRateLimited && anilistCooldownUntil > Date.now()
+}
+
 export function markAnilistDownAtBoot(): void {
   anilistWasDownAtBoot = anilistUnavailable()
 }

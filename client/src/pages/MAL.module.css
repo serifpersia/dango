@@ -183,6 +183,7 @@
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-3);
   border-top: 1px solid var(--border-primary);
   padding-top: var(--space-6);
 }
@@ -191,6 +192,20 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.cancelBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.cancelBtn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .statusMessage {
@@ -213,6 +228,87 @@
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.progressSection {
+  margin-top: var(--space-6);
+  animation: fadeIn 0.3s ease;
+}
+
+.progressBar {
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progressInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.progressCount {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.progressTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+}
+
+.progressTitle > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.sourceBadge.anilist {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.sourceBadge.kitsu {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.skipped {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 @keyframes fadeIn {
