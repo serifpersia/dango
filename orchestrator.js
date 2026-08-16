@@ -23,6 +23,50 @@ if (mode === '--version' || mode === '-v') {
   process.exit(0)
 }
 
+async function showDeprecationNotice() {
+  const pkg = require('./package.json')
+  console.log('')
+  console.log(
+    `${colors.system}[Deprecated]${colors.reset} ani-web has been rebranded to ${colors.client}dango${colors.reset}`
+  )
+  console.log('')
+  console.log(`  This is the final release of ani-web (v${pkg.version}).`)
+  console.log(`  To continue receiving updates, install dango:`)
+  console.log('')
+  console.log(`    ${colors.client}npm install -g @serifpersia/dango${colors.reset}`)
+  console.log('')
+  console.log(`  Once dango is working, you can remove ani-web:`)
+  console.log('')
+  console.log(`    ${colors.client}npm uninstall -g ani-web${colors.reset}`)
+  console.log('')
+
+  if (!process.stdin.isTTY) {
+    console.log(`${colors.system}[System]${colors.reset} Non-interactive mode. Exiting.`)
+    process.exit(0)
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  const answer = await new Promise((resolve) => {
+    rl.question(
+      `${colors.system}[System]${colors.reset} Continue using ani-web v${pkg.version}? (y/N) `,
+      (ans) => {
+        rl.close()
+        resolve(ans.toLowerCase())
+      }
+    )
+  })
+
+  if (answer !== 'y' && answer !== 'yes') {
+    console.log(`\n${colors.system}[System]${colors.reset} Exiting. Install dango to continue:\n`)
+    console.log(`  ${colors.client}npm install -g @serifpersia/dango${colors.reset}\n`)
+    process.exit(0)
+  }
+
+  console.log(
+    `\n${colors.system}[System]${colors.reset} Continuing with ani-web v${pkg.version} (no further updates)...\n`
+  )
+}
+
 async function checkForUpdates() {
   if (process.argv.includes('--no-update') || mode === 'dev') return
 
@@ -330,6 +374,6 @@ process.on('SIGINT', () => {
   shutdown()
 })
 ;(async () => {
-  await checkForUpdates()
+  await showDeprecationNotice()
   main()
 })()
