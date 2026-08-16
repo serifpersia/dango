@@ -1,14 +1,14 @@
 {
-  "name": "ani-web",
-  "version": "2.4.5",
+  "name": "@serifpersia/dango",
+  "version": "2.4.7",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/serifpersia/ani-web.git"
+    "url": "git+https://github.com/serifpersia/dango.git"
   },
   "bin": {
-    "ani-web": "orchestrator.js"
+    "dango": "orchestrator.js"
   },
   "engines": {
     "node": ">=22.5.0"

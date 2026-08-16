@@ -6,9 +6,9 @@ if [ -n "$1" ]; then
 else
     while true; do
         echo -e "\033[1;33m-----------------------------------------------\033[0m"
-        echo -e "                    \033[1;36mani-web\033[0m"
+        echo -e "                    \033[1;36mdango\033[0m"
         echo -e "\033[1;33m-----------------------------------------------\033[0m"
-        echo -e "    \033[1;34mhttps://github.com/serifpersia/ani-web\033[0m"
+        echo -e "    \033[1;34mhttps://github.com/serifpersia/dango\033[0m"
         echo -e "\033[1;33m-----------------------------------------------\033[0m"
         echo
 

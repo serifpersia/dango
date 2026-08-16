@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="client/public/logo.png" alt="ani-web logo" width="400"/>
+<img src="client/public/logo.png" alt="dango logo" width="400"/>
 
 _A local-first anime media client focused on performance, privacy, and personal library tracking._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
-![Github stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/ani--web-2.4.5-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
+![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=8b5cf6)
+[![App version](https://img.shields.io/badge/dango-2.4.7-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://ani-web-users-badge-v3.ramiserifpersia.workers.dev)
 
@@ -16,16 +16,16 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 ---
 
-**ani-web** is a lightweight Node.js application for browsing anime metadata, managing a personal
+**dango** is a lightweight Node.js application for browsing anime metadata, managing a personal
 watchlist, and tracking viewing progress through a clean frontend running on your own machine.
 
 <div align="center">
-  <sub>If ani-web is useful to you, consider giving the repo a ⭐. It helps others find the project.</sub>
+  <sub>If dango is useful to you, consider giving the repo a ⭐. It helps others find the project.</sub>
 </div>
 
 ## Features
 
-Based on a lightweight architecture, ani-web includes:
+Based on a lightweight architecture, dango includes:
 
 - **Performance First:** Designed specifically to run smoothly on low-end hardware.
 - **Built-in Search & Discovery:** Explore trending and popular anime metadata.
@@ -33,9 +33,9 @@ Based on a lightweight architecture, ani-web includes:
 - **User Insights:** View personal library and progress statistics.
 - **MAL Integration:** Seamlessly import your lists from MyAnimeList.
 
-## Join ani-web Discord server
+## Join dango Discord server
 
-Be part of the ani-web Discord Server Community where you can connect with fellow users, ask questions, and share your experiences:
+Be part of the dango Discord Server Community where you can connect with fellow users, ask questions, and share your experiences:
 
 ## [![Discord](https://invidget.switchblade.xyz/2FTSPXCsvn)](https://discord.gg/2FTSPXCsvn)
 
@@ -50,14 +50,14 @@ Be part of the ani-web Discord Server Community where you can connect with fello
 Open a terminal and run:
 
 ```bash
-npm install -g ani-web
+npm install -g @serifpersia/dango
 ```
 
-> **Note:** After the one-time setup, you can start the application anytime, from any directory, by simply opening a terminal and typing `ani-web`.
+> **Note:** After the one-time setup, you can start the application anytime, from any directory, by simply opening a terminal and typing `dango`.
 
 ### 📱 Android Installation (Termux)
 
-You can run **ani-web** on your Android device using the [Termux](https://termux.dev/) app. No root is required.
+You can run **dango** on your Android device using the [Termux](https://termux.dev/) app. No root is required.
 
 1. **Install Termux:** Download and install it from [F-Droid](https://f-droid.org/en/packages/com.termux/) or the [Termux website](https://termux.dev/).
 2. **Update packages:**
@@ -70,13 +70,13 @@ You can run **ani-web** on your Android device using the [Termux](https://termux
    pkg install nodejs
    ```
    _Press `y` and `Enter` when prompted._
-4. **Install ani-web:**
+4. **Install dango:**
    ```bash
-   npm install -g ani-web
+   npm install -g @serifpersia/dango
    ```
 5. **Run the app:**
    ```bash
-   ani-web
+   dango
    ```
 
 Once running, you can access the interface by navigating to `http://localhost:3000/` in your mobile browser.
@@ -88,10 +88,10 @@ Once running, you can access the interface by navigating to `http://localhost:30
 If you need to remove the application from your system, simply open a terminal and run:
 
 ```bash
-npm uninstall -g ani-web
+npm uninstall -g @serifpersia/dango
 ```
 
-_This safely deletes the application files and removes the `ani-web` command from your system's PATH._
+_This safely deletes the application files and removes the `dango` command from your system's PATH._
 
 ---
 
@@ -102,8 +102,8 @@ Want to poke around the source code or contribute? You can build the project man
 **1. Clone the repository:**
 
 ```bash
-git clone https://github.com/serifpersia/ani-web.git
-cd ani-web
+git clone https://github.com/serifpersia/dango.git
+cd dango
 ```
 
 **2. Install, Build, and Run:**
@@ -130,16 +130,16 @@ run.bat
 
 Once installed globally, you can use the following commands:
 
-- `ani-web` - Start the application.
-- `ani-web --version` (or `-v`) - Check your installed version.
+- `dango` - Start the application.
+- `dango --version` (or `-v`) - Check your installed version.
 
 ### Data Location
 
-ani-web stores your persistent files in your OS app-data folder instead of inside the globally installed npm package:
+dango stores your persistent files in your OS app-data folder instead of inside the globally installed npm package:
 
-- **Windows:** `%APPDATA%\ani-web`
-- **macOS:** `~/Library/Application Support/ani-web`
-- **Linux:** `$XDG_DATA_HOME/ani-web` or `~/.local/share/ani-web`
+- **Windows:** `%APPDATA%\dango`
+- **macOS:** `~/Library/Application Support/dango`
+- **Linux:** `$XDG_DATA_HOME/dango` or `~/.local/share/dango`
 
 This folder contains your `.env`, database files, sync manifests, and Google token file. Existing installs will automatically migrate legacy files from the old `server/` folder on first launch when those files are still present.
 
@@ -147,7 +147,7 @@ This folder contains your `.env`, database files, sync manifests, and Google tok
 
 ## Cloud Sync (Optional)
 
-**ani-web** can automatically sync your local data to the cloud. The app stays local-first: your
+**dango** can automatically sync your local data to the cloud. The app stays local-first: your
 main database is a local SQLite file, and cloud sync exports/imports the app data as JSON when
 needed.
 
@@ -165,19 +165,19 @@ legacy sync options.
 GitHub Cloud Sync is the recommended setup. It uses GitHub's device login flow, so users do not
 need to create a Google Cloud project, manage client secrets, or install external sync tools.
 
-1. Open **ani-web**.
+1. Open **dango**.
 2. Go to **Settings** -> **Synchronization**.
 3. Click **Sign in with GitHub**.
 4. Open the shown GitHub device URL, enter the code, and approve access.
 
-ani-web will create a private GitHub repository named `aniweb-sync-data` in your account and store
+dango will create a private GitHub repository named `aniweb-sync-data` in your account and store
 your sync data in JSON:
 
 - Production mode uses `sync.json`.
 - Development mode uses `sync.dev.json`.
 
 The app requests GitHub repository access because it needs to create and update this private sync
-repository. The GitHub token is stored locally in your ani-web app-data `.env` file.
+repository. The GitHub token is stored locally in your dango app-data `.env` file.
 
 ### 2. Google Drive Sync
 
@@ -189,7 +189,7 @@ credentials:
 3. Configure the **OAuth Consent Screen** (set it to "External" and add yourself as a test user).
 4. Create **OAuth 2.0 Client IDs** (Application type: "Web application").
 5. Add `http://localhost:3000/api/auth/google/callback` to the **Authorized redirect URIs**.
-6. Open **ani-web**, go to **Settings** -> **Synchronization**, and enter your **Client ID** and
+6. Open **dango**, go to **Settings** -> **Synchronization**, and enter your **Client ID** and
    **Client Secret** in the Google authentication section.
 
 ### 3. Rclone Sync
@@ -198,7 +198,7 @@ If you prefer using **Mega**, **Dropbox**, or other providers, you can use [Rclo
 
 1. Install Rclone on your system and ensure it's in your PATH.
 2. Configure a remote using `rclone config`.
-3. In **ani-web**, go to **Settings** -> **Synchronization** and select your remote name from the
+3. In **dango**, go to **Settings** -> **Synchronization** and select your remote name from the
    Rclone dropdown.
 
 Rclone is used only when GitHub and Google Drive sync are not active.
@@ -207,7 +207,7 @@ Rclone is used only when GitHub and Google Drive sync are not active.
 
 ## Disclaimer
 
-ani-web is a local-first media client. It does not host, upload, store, or distribute copyrighted
+dango is a local-first media client. It does not host, upload, store, or distribute copyrighted
 video content.
 
 Users are responsible for configuring and using the application in compliance with applicable laws

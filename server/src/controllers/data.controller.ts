@@ -427,7 +427,7 @@ export class DataController {
         type: 'system',
         title: 'AniList API',
         message:
-          'AniList metadata API is currently down. ani-web is experiencing degraded performance. Kitsu is being used as a fallback in the meantime. Some features may be limited until service is restored.',
+          'AniList metadata API is currently down. dango is experiencing degraded performance. Kitsu is being used as a fallback in the meantime. Some features may be limited until service is restored.',
         icon: 'warning',
         createdAt: Date.now(),
       })

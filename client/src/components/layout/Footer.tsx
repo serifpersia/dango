@@ -16,10 +16,7 @@ const Footer: React.FC = () => {
       <div className={styles.footerInner}>
         <div className={styles.brandSection}>
           <div className={styles.logoRow}>
-            <div className={styles.mascotContainer}>
-              <img src="/ani-web-mascot.png" className={styles.mascot} alt="ani-web mascot" />
-            </div>
-            <img src="/ani-web-text.png" className={styles.logoText} alt="ani-web" />
+            <img src="/logo.png" className={styles.logoText} alt="dango" />
           </div>
           <div className={styles.brandMeta}>
             <div className={styles.statusPill}>
@@ -51,7 +48,7 @@ const Footer: React.FC = () => {
               <FaDiscord style={{ marginRight: '6px' }} /> Discord
             </a>
             <a
-              href="https://github.com/serifpersia/ani-web"
+              href="https://github.com/serifpersia/dango"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -62,14 +59,14 @@ const Footer: React.FC = () => {
           <div className={styles.linkColumn}>
             <h4 className={styles.columnTitle}>Project</h4>
             <a
-              href="https://github.com/serifpersia/ani-web/releases"
+              href="https://github.com/serifpersia/dango/releases"
               target="_blank"
               rel="noopener noreferrer"
             >
               Releases
             </a>
             <a
-              href="https://github.com/serifpersia/ani-web/issues"
+              href="https://github.com/serifpersia/dango/issues"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -81,7 +78,7 @@ const Footer: React.FC = () => {
 
       <div className={styles.bottomBar}>
         <p className={styles.copyright}>
-          © {currentYear} <span className={styles.brand}>ani-web</span> • Crafted with{' '}
+          © {currentYear} <span className={styles.brand}>dango</span> • Crafted with{' '}
           <FaHeart className={styles.heartIcon} /> by{' '}
           <a href="https://github.com/serifpersia" target="_blank" rel="noopener noreferrer">
             serifpersia

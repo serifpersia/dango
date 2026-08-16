@@ -49,8 +49,8 @@ function updateFile(filePath) {
       console.log(`✅ Updated ${filePath}`)
     }
   } else if (filePath.endsWith('.md')) {
-    const badgeRegex = /img\.shields\.io\/badge\/ani--web-(\d+\.\d+\.\d+)-/
-    const newContent = content.replace(badgeRegex, `img.shields.io/badge/ani--web-${newVersion}-`)
+    const badgeRegex = /img\.shields\.io\/badge\/dango-(\d+\.\d+\.\d+)-/
+    const newContent = content.replace(badgeRegex, `img.shields.io/badge/dango-${newVersion}-`)
 
     if (content !== newContent) {
       fs.writeFileSync(filePath, newContent)

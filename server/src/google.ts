@@ -1,4 +1,5 @@
 import fs from 'fs'
+import path from 'path'
 import http from 'http'
 import https from 'https'
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
@@ -246,6 +247,96 @@ export class GoogleDriveService {
       logger.error({ err: error }, `Failed to create folder ${folderName}`)
       throw error
     }
+  }
+
+  public async listFiles(folderId: string): Promise<GoogleDriveFile[]> {
+    if (!this.isAuthenticated()) return []
+
+    try {
+      const res = await this.googleRequest<{ files?: GoogleDriveFile[] }>({
+        method: 'GET',
+        url: 'https://www.googleapis.com/drive/v3/files',
+        params: {
+          q: `'${folderId}' in parents and trashed = false`,
+          fields: 'files(id, name)',
+          spaces: 'drive',
+        },
+      })
+      return res.data.files || []
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to list files in folder')
+      return []
+    }
+  }
+
+  public async deleteFile(fileId: string): Promise<void> {
+    if (!this.isAuthenticated()) return
+
+    try {
+      await this.googleRequest({
+        method: 'DELETE',
+        url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+      })
+    } catch (error) {
+      logger.warn({ err: error }, `Failed to delete file ${fileId}`)
+    }
+  }
+
+  public async migrateFromAniWebDb(
+    oldFolderName: string,
+    newFolderName: string,
+    dbName: string,
+    manifestFilename: string
+  ): Promise<void> {
+    if (!this.isAuthenticated()) return
+
+    const oldFolder = await this.findFile(
+      oldFolderName,
+      undefined,
+      'application/vnd.google-apps.folder'
+    )
+    if (!oldFolder) {
+      logger.info(`No legacy '${oldFolderName}' folder found on Google Drive. Skipping migration.`)
+      return
+    }
+
+    logger.info(`Found legacy '${oldFolderName}' folder. Migrating to '${newFolderName}'...`)
+
+    const newFolderId = await this.ensureFolder(newFolderName)
+    const oldFolderId = oldFolder.id
+
+    const oldFiles = await this.listFiles(oldFolderId)
+    if (oldFiles.length === 0) {
+      logger.info(`Legacy folder '${oldFolderName}' is empty. Deleting.`)
+      await this.deleteFile(oldFolderId)
+      return
+    }
+
+    for (const file of oldFiles) {
+      const tempPath = path.join(CONFIG.ROOT, `temp_migration_${file.name}`)
+      try {
+        await this.downloadFile(file.id, tempPath)
+        const existing = await this.findFile(file.name, newFolderId)
+        await this.uploadFile(
+          tempPath,
+          file.name,
+          file.name.endsWith('.json') ? 'application/json' : 'application/x-sqlite3',
+          newFolderId,
+          existing?.id
+        )
+        logger.info(`Migrated '${file.name}' from '${oldFolderName}' to '${newFolderName}'.`)
+      } catch (err) {
+        logger.error({ err, file: file.name }, `Failed to migrate file '${file.name}'.`)
+      } finally {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath)
+        }
+      }
+    }
+
+    await this.deleteFile(oldFolderId)
+    logger.info(`Migration complete. Deleted legacy '${oldFolderName}' folder.`)
+    this.folderIdCache.delete(oldFolderName)
   }
 
   public async findFile(

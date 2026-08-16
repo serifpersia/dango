@@ -42,7 +42,7 @@ jobs:
           echo "" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Manual Setup" >> release_notes.md
-          echo "1. Download and extract 'ani-web.zip'" >> release_notes.md
+          echo "1. Download and extract 'dango.zip'" >> release_notes.md
           echo "2. Run 'npm install --omit=dev' inside the folder" >> release_notes.md
           echo "3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
 
@@ -108,13 +108,13 @@ jobs:
           chmod +x release-package/run.sh
 
           cd release-package
-          zip -r ../ani-web.zip .
+          zip -r ../dango.zip .
 
       - name: Create New Latest Release
         run: |
           VERSION=$(node -p "require('./package.json').version")
           gh release create "latest" \
-            "ani-web.zip" \
+            "dango.zip" \
             --title "latest (v$VERSION)" \
             --notes-file release_notes.md \
             --target ${{ github.sha }}
