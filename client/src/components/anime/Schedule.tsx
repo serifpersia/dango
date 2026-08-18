@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
 import ErrorMessage from '../common/ErrorMessage'
+import { useCarousel } from '../../hooks/useCarousel'
 
 interface Anime {
   _id: string
@@ -31,30 +32,8 @@ const Schedule: React.FC = () => {
   const [format, setFormat] = useState(() => {
     return localStorage.getItem('schedule_format') || 'TV'
   })
-  const carouselRef = useRef<HTMLDivElement>(null)
+  const { emblaRef, canScroll, stepBy, scrollToStart } = useCarousel()
   const dayRef = useRef<HTMLDivElement>(null)
-  const [canScroll, setCanScroll] = useState(false)
-
-  const updateArrowState = useCallback(() => {
-    const el = carouselRef.current
-    if (!el) return
-    setCanScroll(el.scrollWidth > el.clientWidth + 1)
-  }, [])
-
-  useEffect(() => {
-    const el = carouselRef.current
-    if (!el) return
-    updateArrowState()
-    el.addEventListener('scroll', updateArrowState, { passive: true })
-    window.addEventListener('resize', updateArrowState)
-    const observer = new ResizeObserver(updateArrowState)
-    observer.observe(el)
-    return () => {
-      el.removeEventListener('scroll', updateArrowState)
-      window.removeEventListener('resize', updateArrowState)
-      observer.disconnect()
-    }
-  }, [scheduleData, loading, updateArrowState])
 
   useEffect(() => {
     localStorage.setItem('schedule_format', format)
@@ -81,16 +60,6 @@ const Schedule: React.FC = () => {
     fetchEpisodeSchedule(selectedDate)
   }, [selectedDate, format])
 
-  const scroll = (direction: 'left' | 'right') => {
-    if (!carouselRef.current) return
-    const { scrollLeft, clientWidth } = carouselRef.current
-    const offset = clientWidth * 0.8
-    carouselRef.current.scrollTo({
-      left: direction === 'left' ? scrollLeft - offset : scrollLeft + offset,
-      behavior: 'smooth',
-    })
-  }
-
   const getDayButtons = () => {
     const days = []
     const today = new Date()
@@ -116,20 +85,18 @@ const Schedule: React.FC = () => {
   }
 
   useEffect(() => {
-    const el = dayRef.current
-    if (!el) return
-    const active = el.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
-    if (!active) return
-    const inline = window.innerWidth <= 600 ? 'center' : 'nearest'
-    active.scrollIntoView({ behavior: 'smooth', inline, block: 'nearest' })
+    if (dayRef.current) {
+      const active = dayRef.current.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
+      if (active) {
+        const inline = window.innerWidth <= 600 ? 'center' : 'nearest'
+        active.scrollIntoView({ behavior: 'smooth', inline, block: 'nearest' })
+      }
+    }
   }, [selectedDate])
 
   useEffect(() => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollLeft = 0
-    }
-    updateArrowState()
-  }, [selectedDate, updateArrowState])
+    scrollToStart(true)
+  }, [selectedDate, scrollToStart])
 
   const formatOptions = [
     { value: 'TV', label: 'TV' },
@@ -151,14 +118,14 @@ const Schedule: React.FC = () => {
             <div className={styles.navArrows}>
               <button
                 className={styles.navButton}
-                onClick={() => scroll('left')}
+                onClick={() => stepBy('left')}
                 aria-label="Scroll left"
               >
                 <FaChevronLeft />
               </button>
               <button
                 className={styles.navButton}
-                onClick={() => scroll('right')}
+                onClick={() => stepBy('right')}
                 aria-label="Scroll right"
               >
                 <FaChevronRight />
@@ -203,33 +170,35 @@ const Schedule: React.FC = () => {
       </div>
 
       <div className={styles.carouselContainer}>
-        <div className={styles.carousel} ref={carouselRef}>
-          {loading ? (
-            Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className={styles.carouselCard}>
-                <AnimeCardSkeleton layout="vertical" />
+        <div className={styles.carousel} ref={emblaRef}>
+          <div className={styles.carouselInner}>
+            {loading ? (
+              Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className={styles.carouselCard}>
+                  <AnimeCardSkeleton layout="vertical" />
+                </div>
+              ))
+            ) : error ? (
+              <div style={{ width: '100%' }}>
+                <ErrorMessage message={error} />
               </div>
-            ))
-          ) : error ? (
-            <div style={{ width: '100%' }}>
-              <ErrorMessage message={error} />
-            </div>
-          ) : scheduleData.length === 0 ? (
-            <p style={{ textAlign: 'center', marginTop: '1rem', width: '100%' }}>
-              No episodes scheduled for this day.
-            </p>
-          ) : (
-            scheduleData.map((anime) => (
-              <div key={anime._id} className={styles.carouselCard}>
-                <AnimeCard
-                  key={anime._id}
-                  anime={anime}
-                  continueWatching={false}
-                  layout="vertical"
-                />
-              </div>
-            ))
-          )}
+            ) : scheduleData.length === 0 ? (
+              <p style={{ textAlign: 'center', marginTop: '1rem', width: '100%' }}>
+                No episodes scheduled for this day.
+              </p>
+            ) : (
+              scheduleData.map((anime) => (
+                <div key={anime._id} className={styles.carouselCard}>
+                  <AnimeCard
+                    key={anime._id}
+                    anime={anime}
+                    continueWatching={false}
+                    layout="vertical"
+                  />
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

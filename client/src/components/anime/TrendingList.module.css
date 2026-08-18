@@ -106,20 +106,14 @@
 }
 
 .carousel {
-  display: flex;
-  gap: 15px;
-  overflow-x: auto;
-  width: 100%;
-  scrollbar-width: none;
+  overflow: hidden;
   padding: 10px 0; /* Add padding to prevent hover transform clipping */
   margin: -10px 0;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory;
-  overflow-anchor: none;
 }
 
-.carousel::-webkit-scrollbar {
-  display: none;
+.carouselInner {
+  display: flex;
+  gap: 15px;
 }
 
 .carouselItem {
@@ -128,7 +122,6 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  scroll-snap-align: start;
 }
 
 @media (max-width: 1200px) {
@@ -155,7 +148,7 @@
     min-width: 100px;
   }
 
-  .carousel {
+  .carouselInner {
     gap: 10px;
     align-items: flex-start;
   }

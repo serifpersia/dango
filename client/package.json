@@ -1,7 +1,7 @@
 {
   "name": "dango",
   "private": true,
-  "version": "2.4.8",
+  "version": "2.5.0",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -16,12 +16,13 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.20",
     "@preact/preset-vite": "^2.10.5",
-    "@tanstack/query-sync-storage-persister": "^5.99.2",
+    "@radix-ui/react-dialog": "^1.1.23",
     "@tanstack/react-query": "^5.99.2",
-    "@tanstack/react-query-persist-client": "^5.99.2",
     "@types/nprogress": "^0.2.3",
     "@types/uuid": "^10.0.0",
+    "embla-carousel-react": "^8.6.0",
     "nprogress": "^0.2.0",
     "preact": "^10.29.1",
     "react": "^19.2.5",
@@ -35,19 +36,14 @@
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.0.0",
-    "baseline-browser-mapping": "^2.10.20",
     "eslint": "^10.2.1",
-    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "prettier": "^3.8.3",
-    "rimraf": "^6.1.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.58.2",
-    "vite": "^7.3.1",
-    "vite-plugin-compression": "^0.5.1"
+    "vite": "^7.3.1"
   },
   "overrides": {
     "vite": {

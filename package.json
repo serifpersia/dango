@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "2.4.8",
+  "version": "2.5.0",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
@@ -61,7 +61,6 @@
     "chokidar": "^5.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "crypto-js": "^4.2.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
     "freekeys": "^0.0.4",
@@ -81,7 +80,6 @@
     "@eslint/js": "^10.0.1",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
-    "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.5.0",

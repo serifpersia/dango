@@ -1,5 +1,5 @@
 import React from 'react'
-import { useEffect } from 'preact/hooks'
+import * as Dialog from '@radix-ui/react-dialog'
 import './Modal.css'
 
 interface Props {
@@ -12,47 +12,16 @@ interface Props {
 }
 
 export function Modal({ isOpen, onClose, title, children, footer, width = 'md' }: Props) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) onClose()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc)
-      document.body.style.overflow = ''
-    }
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
-
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal-content modal-${width}`} onClick={(e) => e.stopPropagation()}>
-        {title && <h2 className="modal-title">{title}</h2>}
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
-      </div>
-    </div>
-  )
-}
-
-export function ModalOverlay({
-  isOpen,
-  onClose,
-  children,
-}: {
-  isOpen: boolean
-  onClose?: () => void
-  children: ComponentChildren
-}) {
-  if (!isOpen) return null
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      {children}
-    </div>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose?.()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="modal-overlay" />
+        <Dialog.Content className={`modal-content modal-${width}`}>
+          {title && <Dialog.Title className="modal-title">{title}</Dialog.Title>}
+          <div className="modal-body">{children}</div>
+          {footer && <div className="modal-footer">{footer}</div>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFloating, useDismiss, autoUpdate, flip, shift, offset } from '@floating-ui/react'
 import { FaCheck, FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -11,7 +12,6 @@ import {
 import { getSuggestedEpisode } from '../../lib/queue'
 import styles from './QueueOptionsButton.module.css'
 
-const MENU_WIDTH = 240
 const MENU_VERTICAL_GAP = 8
 
 interface QueueOptionsButtonProps {
@@ -24,6 +24,7 @@ interface QueueOptionsButtonProps {
   className?: string
   activeClassName?: string
   align?: 'left' | 'right'
+  onMenuOpenChange?: (open: boolean) => void
 }
 
 const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
@@ -36,14 +37,32 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
   className = '',
   activeClassName = '',
   align = 'right',
+  onMenuOpenChange,
 }) => {
   const { data: queue = [] } = useQueue()
   const addBatch = useAddToQueueBatch()
   const removeBatch = useRemoveFromQueueBatch()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+
+  const { refs, floatingStyles, context } = useFloating({
+    open: menuOpen,
+    onOpenChange: (open) => {
+      if (!open) {
+        setMenuOpen(false)
+        onMenuOpenChange?.(false)
+      }
+    },
+    placement: align === 'left' ? 'bottom-start' : 'bottom-end',
+    middleware: [offset(MENU_VERTICAL_GAP), flip({ padding: 8 }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  })
+
+  const dismiss = useDismiss(context, {
+    outsidePress: true,
+    escapeKey: true,
+    scroll: true,
+    referencePress: false,
+  })
 
   const queuedItems = useMemo(() => queue.filter((item) => item.showId === showId), [queue, showId])
 
@@ -60,58 +79,14 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
   const remaining = useMemo(() => remainingData?.episodes || [], [remainingData])
 
   const openMenu = useCallback(() => {
-    const wrapperEl = wrapperRef.current
-    if (!wrapperEl) return
-    const rect = wrapperEl.getBoundingClientRect()
-    const viewportPadding = 8
-
-    let left =
-      align === 'left'
-        ? rect.left
-        : Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - viewportPadding)
-    left = Math.max(viewportPadding, left)
-
-    let top = rect.bottom + MENU_VERTICAL_GAP
-    if (top + MENU_WIDTH > window.innerHeight - viewportPadding) {
-      top = Math.max(viewportPadding, rect.top - MENU_WIDTH - MENU_VERTICAL_GAP)
-    }
-
-    setMenuPos({ top, left })
     setMenuOpen(true)
-  }, [align])
+    onMenuOpenChange?.(true)
+  }, [onMenuOpenChange])
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false)
-    setMenuPos(null)
-  }, [])
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node
-      const insideMenu = menuRef.current && menuRef.current.contains(target)
-      const insideTrigger = wrapperRef.current && wrapperRef.current.contains(target)
-      if (!insideMenu && !insideTrigger) {
-        closeMenu()
-      }
-    }
-    const handleScroll = () => closeMenu()
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMenu()
-    }
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('touchstart', handlePointerDown, { passive: true })
-    window.addEventListener('scroll', handleScroll, true)
-    window.addEventListener('resize', closeMenu)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('touchstart', handlePointerDown)
-      window.removeEventListener('scroll', handleScroll, true)
-      window.removeEventListener('resize', closeMenu)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [menuOpen, closeMenu])
+    onMenuOpenChange?.(false)
+  }, [onMenuOpenChange])
 
   const isQueued = queuedItems.length > 0
   const hasRemaining = remaining.length > 0
@@ -165,7 +140,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
   const suggestedId = suggestedEpisode?.episodeNumber
 
   const trigger = (
-    <div className={styles.trigger} ref={wrapperRef}>
+    <div className={styles.trigger} ref={refs.setReference}>
       <span
         className={`${styles.triggerBtn} ${className} ${isQueued ? activeClassName : ''}`}
         role="button"
@@ -205,13 +180,13 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
     <>
       {trigger}
       {menuOpen &&
-        menuPos &&
         createPortal(
           <div
-            ref={menuRef}
+            ref={refs.setFloating}
             className={styles.menu}
-            style={{ top: menuPos.top, left: menuPos.left }}
+            style={floatingStyles}
             role="menu"
+            {...dismiss}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.preventDefault()

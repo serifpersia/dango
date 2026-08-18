@@ -78,24 +78,16 @@ const Home: React.FC = () => {
     isFetchingNextPage: fetchingMoreContinueWatching,
   } = useAllContinueWatching()
 
-  const handleContinueWatchingScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMoreContinueWatching || fetchingMoreContinueWatching || loadingContinueWatching) {
-        return
-      }
-
-      const { scrollLeft, clientWidth, scrollWidth } = e.currentTarget
-      if (scrollLeft + clientWidth > scrollWidth * 0.7) {
-        fetchMoreContinueWatching()
-      }
-    },
-    [
-      hasMoreContinueWatching,
-      fetchingMoreContinueWatching,
-      loadingContinueWatching,
-      fetchMoreContinueWatching,
-    ]
-  )
+  const handleReachContinueWatchingThreshold = useCallback(() => {
+    if (hasMoreContinueWatching && !fetchingMoreContinueWatching && !loadingContinueWatching) {
+      fetchMoreContinueWatching()
+    }
+  }, [
+    hasMoreContinueWatching,
+    fetchingMoreContinueWatching,
+    loadingContinueWatching,
+    fetchMoreContinueWatching,
+  ])
 
   const { data: spotlightAnime } = useSpotlightBanners()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
@@ -264,7 +256,6 @@ const Home: React.FC = () => {
             animeList={thisWeekList || []}
             continueWatching={false}
             carousel
-            onScroll={() => {}}
             loading={loadingThisWeek}
           />
         )
@@ -305,7 +296,8 @@ const Home: React.FC = () => {
         defaultExpanded={cwList.length > 0}
         onRemove={handleRemove}
         loading={loadingContinueWatching}
-        onScroll={handleContinueWatchingScroll}
+        onReachThreshold={handleReachContinueWatchingThreshold}
+        scrollThreshold={0.7}
         isFetchingNextPage={fetchingMoreContinueWatching}
         emptyState={
           <div className={styles.emptyState}>

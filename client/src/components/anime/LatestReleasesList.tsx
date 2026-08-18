@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import ErrorMessage from '../common/ErrorMessage'
 import { useInfiniteLatestReleases } from '../../hooks/useAnimeData'
 import styles from './TrendingList.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
+import { useCarousel } from '../../hooks/useCarousel'
 
 const formatOptions = [
   { value: 'TV', label: 'TV' },
@@ -22,7 +23,6 @@ export default function LatestReleasesList() {
   const [format, setFormat] = useState(() => {
     return localStorage.getItem('latest_releases_format') || 'TV'
   })
-  const carouselRef = useRef<HTMLDivElement>(null)
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
     useInfiniteLatestReleases(format, PAGE_SIZE)
@@ -35,36 +35,13 @@ export default function LatestReleasesList() {
     localStorage.setItem('latest_releases_format', format)
   }, [format])
 
-  const handleScroll = useCallback(() => {
-    if (!carouselRef.current || !hasNextPage || isFetchingNextPage || isLoading) return
-
-    const { scrollLeft, clientWidth, scrollWidth } = carouselRef.current
-    if (scrollLeft + clientWidth > scrollWidth * 0.6) {
+  const handleReachThreshold = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage && !isLoading) {
       fetchNextPage()
     }
   }, [hasNextPage, isFetchingNextPage, isLoading, fetchNextPage])
 
-  const scroll = useCallback(
-    (direction: 'left' | 'right') => {
-      const container = carouselRef.current
-      if (!container) return
-
-      const { scrollLeft, clientWidth, scrollWidth } = container
-      const offset = clientWidth * 0.8
-
-      if (direction === 'right' && hasNextPage && !isFetchingNextPage) {
-        if (scrollLeft + clientWidth > scrollWidth - 100) {
-          fetchNextPage()
-        }
-      }
-
-      container.scrollTo({
-        left: direction === 'left' ? scrollLeft - offset : scrollLeft + offset,
-        behavior: lowEndMode ? 'auto' : 'smooth',
-      })
-    },
-    [lowEndMode, hasNextPage, isFetchingNextPage, fetchNextPage]
-  )
+  const { emblaRef, stepBy } = useCarousel({ onReachThreshold: handleReachThreshold })
 
   return (
     <section style={{ marginBottom: '2.5rem' }}>
@@ -79,7 +56,7 @@ export default function LatestReleasesList() {
               type="button"
               onClick={(e) => {
                 e.preventDefault()
-                scroll('left')
+                stepBy('left', lowEndMode)
               }}
               aria-label="Scroll left"
             >
@@ -90,7 +67,7 @@ export default function LatestReleasesList() {
               type="button"
               onClick={(e) => {
                 e.preventDefault()
-                scroll('right')
+                stepBy('right', lowEndMode)
               }}
               aria-label="Scroll right"
             >
@@ -115,13 +92,17 @@ export default function LatestReleasesList() {
       </div>
 
       {isLoading ? (
-        <div className={styles.carousel}>
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className={styles.carouselItem}>
-              <div className={styles.skeletonPoster} />
-              <div className={styles.skeletonText} />
+        <div className={styles.carouselContainer}>
+          <div className={styles.carousel}>
+            <div className={styles.carouselInner}>
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className={styles.carouselItem}>
+                  <div className={styles.skeletonPoster} />
+                  <div className={styles.skeletonText} />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       ) : isError ? (
         <ErrorMessage
@@ -129,25 +110,27 @@ export default function LatestReleasesList() {
         />
       ) : (
         <div className={styles.carouselContainer}>
-          <div className={styles.carousel} ref={carouselRef} onScroll={handleScroll}>
-            {animeList.map((item) => (
-              <div key={item._id} className={styles.carouselItem}>
-                <AnimeCard anime={item} />
-              </div>
-            ))}
-            {isFetchingNextPage && (
-              <div
-                className={styles.carouselItem}
-                style={{
-                  minWidth: '150px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <div className={styles.skeletonPoster} />
-              </div>
-            )}
+          <div className={styles.carousel} ref={emblaRef}>
+            <div className={styles.carouselInner}>
+              {animeList.map((item) => (
+                <div key={item._id} className={styles.carouselItem}>
+                  <AnimeCard anime={item} />
+                </div>
+              ))}
+              {isFetchingNextPage && (
+                <div
+                  className={styles.carouselItem}
+                  style={{
+                    minWidth: '150px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div className={styles.skeletonPoster} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

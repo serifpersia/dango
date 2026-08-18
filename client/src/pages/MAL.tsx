@@ -206,10 +206,7 @@ const MAL: React.FC = () => {
         {importing && progress && (
           <div className={styles.progressSection}>
             <div className={styles.progressBar}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${progressPercent}%` }}
-              />
+              <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
             </div>
             <div className={styles.progressInfo}>
               <span className={styles.progressCount}>
@@ -219,7 +216,9 @@ const MAL: React.FC = () => {
                 {progress.found ? (
                   <>
                     {progress.matchedTitle}
-                    <span className={`${styles.sourceBadge} ${styles[progress.source || 'anilist']}`}>
+                    <span
+                      className={`${styles.sourceBadge} ${styles[progress.source || 'anilist']}`}
+                    >
                       {progress.source === 'kitsu' ? 'Kitsu' : 'AniList'}
                     </span>
                   </>
@@ -237,11 +236,7 @@ const MAL: React.FC = () => {
           </div>
         )}
 
-        {error && (
-          <div className={`${styles.statusMessage} ${styles.error}`}>
-            {error}
-          </div>
-        )}
+        {error && <div className={`${styles.statusMessage} ${styles.error}`}>{error}</div>}
       </div>
     </div>
   )

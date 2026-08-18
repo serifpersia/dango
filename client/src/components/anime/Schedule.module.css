@@ -206,17 +206,14 @@
 }
 
 .carousel {
-  display: flex;
-  gap: 15px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
+  overflow: hidden;
   padding-bottom: 10px;
   min-height: 260px;
 }
 
-.carousel::-webkit-scrollbar {
-  display: none;
+.carouselInner {
+  display: flex;
+  gap: 15px;
 }
 
 .carouselCard {
@@ -260,7 +257,7 @@
     min-width: 0;
   }
 
-  .carousel {
+  .carouselInner {
     gap: 10px;
     align-items: flex-start;
   }

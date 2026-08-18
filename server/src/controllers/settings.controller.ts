@@ -36,9 +36,7 @@ function mapMalStatus(malStatus: string): string {
   }
 }
 
-async function searchByTitleForMal(
-  title: string
-): Promise<{
+async function searchByTitleForMal(title: string): Promise<{
   id: number
   title: { romaji?: string; english?: string; native?: string }
   source: 'anilist' | 'kitsu'
@@ -196,7 +194,6 @@ export class SettingsController {
     }
 
     let skippedCount = 0
-    let importedCount = 0
     const showsToInsert: ShowToInsert[] = []
     const metaToSave: { id: string; thumbnail?: string; type?: string }[] = []
 
@@ -236,15 +233,17 @@ export class SettingsController {
           })
 
           metaPromises.push(
-            getShowMetaById(String(show.id)).then((meta) => {
-              if (meta) {
-                metaToSave.push({
-                  id: String(show.id),
-                  thumbnail: meta.thumbnail || undefined,
-                  type: meta.type || undefined,
-                })
-              }
-            }).catch(() => {})
+            getShowMetaById(String(show.id))
+              .then((meta) => {
+                if (meta) {
+                  metaToSave.push({
+                    id: String(show.id),
+                    thumbnail: meta.thumbnail || undefined,
+                    type: meta.type || undefined,
+                  })
+                }
+              })
+              .catch(() => {})
           )
         } else {
           skippedCount++
@@ -277,9 +276,7 @@ export class SettingsController {
       }
     })
 
-    importedCount = showsToInsert.length
-
-    sendEvent('complete', { imported: importedCount, skipped: skippedCount })
+    sendEvent('complete', { imported: showsToInsert.length, skipped: skippedCount })
     res.end()
   }
 

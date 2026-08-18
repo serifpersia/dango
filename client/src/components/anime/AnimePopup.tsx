@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFloating, flip, shift, autoUpdate } from '@floating-ui/react'
 import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
 import { Link } from 'react-router'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
@@ -31,37 +32,48 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
     return showMeta.name
   }, [showMeta, titlePreference])
 
-  const position = useMemo(() => {
-    const popupWidth = 320
+  const virtualEl = useMemo(
+    () => ({
+      getBoundingClientRect: () => anchorRect,
+    }),
+    [anchorRect]
+  )
 
-    const padding = 20
-    const screenWidth = window.innerWidth
+  const { refs, floatingStyles } = useFloating({
+    elements: { reference: virtualEl },
+    placement: 'right-start',
+    middleware: [flip({ fallbackAxisSideDirection: 'start' }), shift({ padding: 20 })],
+    whileElementsMounted: autoUpdate,
+  })
 
-    let left = anchorRect.right + 10
-    let top = anchorRect.top
+  const [queueMenuOpen, setQueueMenuOpen] = useState(false)
+  const mouseInsideRef = useRef(false)
 
-    // If it overflows on the right, show it on the left
-    if (left + popupWidth > screenWidth - padding) {
-      left = anchorRect.left - popupWidth - 10
+  const handlePopupMouseEnter = () => {
+    mouseInsideRef.current = true
+    onMouseEnter()
+  }
+
+  const handlePopupMouseLeave = () => {
+    mouseInsideRef.current = false
+    if (queueMenuOpen) return
+    onMouseLeave()
+  }
+
+  const handleQueueMenuOpenChange = (open: boolean) => {
+    setQueueMenuOpen(open)
+    if (!open && !mouseInsideRef.current) {
+      onMouseLeave()
     }
-
-    // Vertical adjustment if it goes off bottom
-    const popupHeight = 400 // Estimate
-    if (top + popupHeight > window.innerHeight - padding) {
-      top = window.innerHeight - popupHeight - padding
-    }
-
-    if (top < padding) top = padding
-
-    return { left, top }
-  }, [anchorRect])
+  }
 
   const content = (
     <div
+      ref={refs.setFloating}
       className={styles.popupPortal}
-      style={{ left: position.left, top: position.top }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      style={floatingStyles}
+      onMouseEnter={handlePopupMouseEnter}
+      onMouseLeave={handlePopupMouseLeave}
     >
       <div className={styles.popupContent}>
         {loadingMeta ? (
@@ -151,6 +163,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                   className={styles.watchlistBtn}
                   activeClassName={styles.active}
                   align="left"
+                  onMenuOpenChange={handleQueueMenuOpenChange}
                 />
                 <Link to={`/anime/${showMeta?.id || showId}`} className={styles.detailsBtn}>
                   Read more

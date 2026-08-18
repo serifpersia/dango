@@ -124,24 +124,19 @@
 }
 
 .carousel {
-  display: flex;
-  gap: 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: hidden;
   padding: 4px;
   margin: -4px;
-  scroll-snap-type: x mandatory;
-  overflow-anchor: none;
 }
 
-.carousel::-webkit-scrollbar {
-  display: none;
+.carousel-inner {
+  display: flex;
+  gap: 20px;
 }
 
 .carousel-card {
   flex: 0 0 calc((100% - (6 * 20px)) / 7);
   min-width: 150px;
-  scroll-snap-align: start;
 }
 
 @media (max-width: 1400px) {
@@ -164,7 +159,7 @@
 }
 
 @media (max-width: 768px) {
-  .carousel {
+  .carousel-inner {
     gap: 12px;
   }
   .carousel-card {
