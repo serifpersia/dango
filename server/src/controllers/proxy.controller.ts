@@ -55,11 +55,14 @@ export class ProxyController {
     '.nukitashith.top',
     '.aniwatchtv.site',
   ]
+  private static readonly HANIME_HOSTS = new Set(['r2.1hanime.com', '1.1hanime.com'])
+  private static readonly OPPAI_HOSTS = new Set(['myspacecat.pictures'])
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
       const host = new URL(urlStr).hostname.toLowerCase()
       if (ProxyController.GOT_SCRAPING_HOSTS.has(host)) return true
+      if (ProxyController.HANIME_HOSTS.has(host)) return true
       return ProxyController.GOT_SCRAPING_SUFFIXES.some((s) => host.endsWith(s))
     } catch {
       return false
@@ -105,6 +108,10 @@ export class ProxyController {
       const isVaultCdn = Array.from(ProxyController.VAULT_CDN_HOSTS).some((host) =>
         urlStr.includes(host)
       )
+      const isHanime = Array.from(ProxyController.HANIME_HOSTS).some((host) =>
+        urlStr.includes(host)
+      )
+      const isOppai = Array.from(ProxyController.OPPAI_HOSTS).some((host) => urlStr.includes(host))
       const headers: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
@@ -114,6 +121,14 @@ export class ProxyController {
         headers['Origin'] = refererStr || ProxyController.ANIMEPAHE_URL
         const cookieHeader = buildCfClearanceCookie(cookieStr)
         if (cookieHeader) headers['Cookie'] = cookieHeader
+      }
+      if (isHanime) {
+        if (!headers['Referer']) headers['Referer'] = refererStr || 'https://nhplayer.com/'
+        headers['Origin'] = 'https://nhplayer.com'
+      }
+      if (isOppai) {
+        if (!headers['Referer']) headers['Referer'] = refererStr || 'https://oppai.stream/'
+        headers['Origin'] = 'https://oppai.stream'
       }
       if (req.headers.range) headers['Range'] = req.headers.range as string
 
@@ -433,6 +448,8 @@ export class ProxyController {
         refererValue = 'https://gogoanime.lu/'
       } else if (targetUrl.includes('animeya.cc')) {
         refererValue = 'https://animeya.cc/'
+      } else if (targetUrl.includes('myspacecat.pictures')) {
+        refererValue = 'https://oppai.stream/'
       }
 
       headers['Referer'] = refererValue

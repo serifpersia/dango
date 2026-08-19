@@ -19,6 +19,8 @@ import { WhProvider } from './providers/wh.provider'
 import { HnProvider } from './providers/hn.provider'
 import { AnilightProvider } from './providers/anilight.provider'
 import { AnidbProvider } from './providers/anidb.provider'
+import { HtProvider } from './providers/ht.provider'
+import { OpProvider } from './providers/op.provider'
 import { googleDriveService } from './google'
 import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
@@ -70,6 +72,8 @@ const whProvider = new WhProvider(apiCache)
 const hnProvider = new HnProvider()
 const anilightProvider = new AnilightProvider(apiCache)
 const anidbProvider = new AnidbProvider(apiCache)
+const htProvider = new HtProvider(apiCache)
+const opProvider = new OpProvider(apiCache)
 
 const providers = {
   '123anime': _123AnimeProvider,
@@ -80,6 +84,8 @@ const providers = {
   hn: hnProvider,
   anilight: anilightProvider,
   anidb: anidbProvider,
+  ht: htProvider,
+  op: opProvider,
 }
 
 let db: DatabaseWrapper

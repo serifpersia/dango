@@ -12,8 +12,20 @@ interface ProviderSelectorProps {
     | 'hn'
     | 'anilight'
     | 'anidb'
+    | 'ht'
+    | 'op'
   onProviderChange: (
-    provider: 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh' | 'hn' | 'anilight' | 'anidb'
+    provider:
+      | 'animepahe'
+      | '123anime'
+      | 'animeya'
+      | 'megaplay'
+      | 'wh'
+      | 'hn'
+      | 'anilight'
+      | 'anidb'
+      | 'ht'
+      | 'op'
   ) => void
 }
 
@@ -38,6 +50,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               | 'hn'
               | 'anilight'
               | 'anidb'
+              | 'ht'
+              | 'op'
           )
         }
       >
@@ -49,6 +63,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         <option value="123anime">123Anime</option>
         <option value="wh">WH</option>
         <option value="hn">HN</option>
+        <option value="ht">HT</option>
+        <option value="op">OP</option>
       </select>
     </div>
   )

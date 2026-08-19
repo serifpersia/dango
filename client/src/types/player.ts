@@ -127,6 +127,8 @@ export interface PlayerState {
     | 'hn'
     | 'anilight'
     | 'anidb'
+    | 'ht'
+    | 'op'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

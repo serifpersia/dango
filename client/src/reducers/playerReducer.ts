@@ -14,6 +14,8 @@ export type Action =
         | 'hn'
         | 'anilight'
         | 'anidb'
+        | 'ht'
+        | 'op'
     }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
@@ -32,6 +34,8 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
     'wh',
     'hn',
     'anilight',
+    'ht',
+    'op',
   ]
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']
