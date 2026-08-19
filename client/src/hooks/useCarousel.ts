@@ -17,7 +17,7 @@ export function useCarousel({
   threshold = 0.6,
   onReachThreshold,
 }: UseCarouselOptions = {}) {
-  const [emblaRef, api] = useEmblaCarousel({ align, containScroll })
+  const [emblaRef, api] = useEmblaCarousel({ align, containScroll, dragFree: true })
   const [canScroll, setCanScroll] = useState(false)
   const optionsRef = useRef({ scrollFraction, threshold, onReachThreshold })
   const thresholdCrossed = useRef(false)

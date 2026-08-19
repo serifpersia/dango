@@ -125,8 +125,6 @@
 
 .carousel {
   overflow: hidden;
-  padding: 4px;
-  margin: -4px;
 }
 
 .carousel-inner {
