@@ -153,9 +153,23 @@ main {
   z-index: 1;
 }
 
-@media (max-width: 768px) {
+.main-content {
+  padding-top: var(--header-height);
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    padding-top: calc(var(--header-height) + 52px);
+  }
+}
+
+@media (max-width: 848px) {
   main {
     padding: 0 var(--space-4) var(--space-8);
+  }
+
+  .main-content {
+    padding-top: calc(64px + 52px);
   }
 }
 

@@ -244,44 +244,132 @@
   transform: scale(0.95);
 }
 
-@media (max-width: 880px) {
+.mobileSearchBar {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .searchInput {
+    display: none;
+  }
+
+  .searchWrapper:focus-within .searchInput {
+    display: none;
+  }
+
+  .mobileSearchBar {
+    display: block;
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: rgba(12, 12, 15, 0.5);
+    padding: var(--space-2) var(--space-3);
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .mobileSearchInner {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-full);
+    padding: 0 var(--space-4);
+    height: 40px;
+  }
+
+  .mobileSearchIcon {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    margin-right: var(--space-2);
+  }
+
+  .mobileSearchInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    height: 100%;
+  }
+
+  .mobileSearchInput::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .mobileSearchInput:focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+}
+
+@media (max-width: 848px) {
+  .header {
+    height: 64px;
+    padding: 0 var(--space-3);
+  }
+
+  .headerInner {
+    padding: 0;
+    max-width: none;
+  }
+
+  .leftSection {
+    gap: var(--space-1);
+  }
+
+  .hamburgerBtn {
+    height: 36px;
+    width: 36px;
+    font-size: 0.9rem;
+  }
+
+  .logo {
+    padding: 2px;
+    transform: scale(0.8);
+  }
+
+  .searchButton {
+    width: 36px;
+    height: 36px;
+  }
+
+  .rightSection {
+    gap: 2px;
+  }
+
+  .profileBtn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mobileSearchBar {
+    top: 64px;
+  }
+}
+
+@media (max-width: 700px) {
   .desktopNav {
     display: none;
   }
 }
 
-@media (max-width: 768px) {
-  .header {
-    height: 70px;
-    padding: 0 var(--space-4);
-  }
-
-  .headerInner {
-    padding: 0 var(--space-4);
-  }
-
-  .leftSection {
-    gap: var(--space-2);
-  }
-
-  .logo {
-    display: none;
-  }
-
-  .rightSection {
-    gap: var(--space-2);
-  }
-
-  .searchWrapper:focus-within .searchInput {
-    width: 140px;
-  }
-}
-
 @media (max-width: 480px) {
-  .searchWrapper:focus-within .searchInput {
-    width: 120px;
-  }
-
   .rightSection {
     gap: var(--space-2);
   }

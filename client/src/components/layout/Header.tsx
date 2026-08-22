@@ -60,9 +60,12 @@ const Header: React.FC = () => {
   const [visible, setVisible] = useState(true)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [isAtTop, setIsAtTop] = useState(true)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const autoHideTimer = useRef<number | null>(null)
+  const mobileSearchRef = useRef<HTMLDivElement>(null)
+  const mobileInputRef = useRef<HTMLInputElement>(null)
   const isHome = location.pathname === '/'
 
   const { data: user } = useQuery<UserProfile | null>({
@@ -118,11 +121,22 @@ const Header: React.FC = () => {
 
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
+  const isMobile = () => window.innerWidth <= 1024
+
   const handleSearchButtonClick = () => {
-    if (document.activeElement === searchInputRef.current && query.trim()) {
+    if (isMobile()) {
+      setMobileSearchOpen(true)
+      setTimeout(() => mobileInputRef.current?.focus(), 50)
+    } else if (document.activeElement === searchInputRef.current && query.trim()) {
       handleSearch()
     } else {
       searchInputRef.current?.focus()
+    }
+  }
+
+  const handleMobileSearchBlur = (e: React.FocusEvent) => {
+    if (!mobileSearchRef.current?.contains(e.relatedTarget as Node)) {
+      setMobileSearchOpen(false)
     }
   }
 
@@ -135,93 +149,123 @@ const Header: React.FC = () => {
   }
 
   return (
-    <header
-      className={`${styles.header} ${!visible ? styles.hidden : ''} ${!isAtTop ? styles.scrolled : ''}`}
-    >
-      <div className={styles.headerInner}>
-        <div className={styles.leftSection}>
-          <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
-            <FaBars />
-          </button>
-          <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
-            <Logo />
-          </Link>
-          <nav className={styles.desktopNav}>
-            <Link
-              to="/"
-              className={`${styles.navLink} ${location.pathname === '/' ? styles.navLinkActive : ''}`}
-            >
-              Home
+    <>
+      <header
+        className={`${styles.header} ${!visible ? styles.hidden : ''} ${!isAtTop ? styles.scrolled : ''}`}
+      >
+        <div className={styles.headerInner}>
+          <div className={styles.leftSection}>
+            <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
+              <FaBars />
+            </button>
+            <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
+              <Logo />
             </Link>
-            <Link
-              to="/watchlist"
-              className={`${styles.navLink} ${location.pathname === '/watchlist' ? styles.navLinkActive : ''}`}
-            >
-              Watchlist
-            </Link>
-            <Link
-              to="/insights"
-              className={`${styles.navLink} ${location.pathname === '/insights' ? styles.navLinkActive : ''}`}
-            >
-              Insights
-            </Link>
-            <Link
-              to="/settings"
-              className={`${styles.navLink} ${location.pathname.startsWith('/settings') ? styles.navLinkActive : ''}`}
-            >
-              Settings
-            </Link>
-          </nav>
-        </div>
+            <nav className={styles.desktopNav}>
+              <Link
+                to="/"
+                className={`${styles.navLink} ${location.pathname === '/' ? styles.navLinkActive : ''}`}
+              >
+                Home
+              </Link>
+              <Link
+                to="/watchlist"
+                className={`${styles.navLink} ${location.pathname === '/watchlist' ? styles.navLinkActive : ''}`}
+              >
+                Watchlist
+              </Link>
+              <Link
+                to="/insights"
+                className={`${styles.navLink} ${location.pathname === '/insights' ? styles.navLinkActive : ''}`}
+              >
+                Insights
+              </Link>
+              <Link
+                to="/settings"
+                className={`${styles.navLink} ${location.pathname.startsWith('/settings') ? styles.navLinkActive : ''}`}
+              >
+                Settings
+              </Link>
+            </nav>
+          </div>
 
-        <div className={styles.rightSection}>
-          <div className={styles.searchWrapper}>
+          <div className={styles.rightSection}>
+            <div className={styles.searchWrapper}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                data-virtual-keyboard="true"
+                className={styles.searchInput}
+                placeholder="Search anime..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch()
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.searchButton}
+                aria-label="Search"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleSearchButtonClick}
+              >
+                <FaSearch className={styles.searchIcon} />
+              </button>
+            </div>
+
+            <NotificationBell />
+
+            <Link to="/settings?tab=sync" className={styles.profileBtn} aria-label="Sync settings">
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className={styles.profileImg}
+                  referrerPolicy="no-referrer"
+                />
+              ) : user?.provider === 'github' ? (
+                <FaGithub />
+              ) : (
+                <FaCloud />
+              )}
+            </Link>
+          </div>
+        </div>
+      </header>
+      {mobileSearchOpen && (
+        <div
+          className={styles.mobileSearchBar}
+          ref={mobileSearchRef}
+          onBlur={handleMobileSearchBlur}
+        >
+          <div className={styles.mobileSearchInner}>
+            <FaSearch className={styles.mobileSearchIcon} />
             <input
-              ref={searchInputRef}
+              ref={mobileInputRef}
               type="text"
               data-virtual-keyboard="true"
-              className={styles.searchInput}
+              className={styles.mobileSearchInput}
               placeholder="Search anime..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSearch()
+                  setMobileSearchOpen(false)
+                } else if (e.key === 'Escape') {
+                  setMobileSearchOpen(false)
                 }
               }}
             />
-            <button
-              type="button"
-              className={styles.searchButton}
-              aria-label="Search"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleSearchButtonClick}
-            >
-              <FaSearch className={styles.searchIcon} />
-            </button>
           </div>
-
-          <NotificationBell />
-
-          <Link to="/settings?tab=sync" className={styles.profileBtn} aria-label="Sync settings">
-            {user?.picture ? (
-              <img
-                src={user.picture}
-                alt={user.name}
-                className={styles.profileImg}
-                referrerPolicy="no-referrer"
-              />
-            ) : user?.provider === 'github' ? (
-              <FaGithub />
-            ) : (
-              <FaCloud />
-            )}
-          </Link>
         </div>
-      </div>
-    </header>
+      )}
+    </>
   )
 }
 
