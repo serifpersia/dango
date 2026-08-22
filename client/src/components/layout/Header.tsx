@@ -119,7 +119,11 @@ const Header: React.FC = () => {
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
   const handleSearchButtonClick = () => {
-    searchInputRef.current?.focus()
+    if (document.activeElement === searchInputRef.current && query.trim()) {
+      handleSearch()
+    } else {
+      searchInputRef.current?.focus()
+    }
   }
 
   const handleSearch = (e?: React.FormEvent) => {
