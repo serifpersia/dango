@@ -346,6 +346,15 @@ export class AnilightProvider implements Provider {
           if (provider.id === 'misa') {
             proxyUrl = `${ANILIGHT_API}/lb/misa/proxy?url=${encodeURIComponent(rawUrl)}`
           }
+          if (provider.id === 'mello') {
+            proxyUrl = `${ANILIGHT_API}/lb/mello/proxy?url=${encodeURIComponent(rawUrl)}`
+          }
+          if (provider.id === 'misora') {
+            proxyUrl = `${ANILIGHT_API}/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://anilight.live/')}`
+          }
+          if (provider.id === 'ryu') {
+            proxyUrl = `${ANILIGHT_API}/proxy/ryu?url=${encodeURIComponent(rawUrl)}`
+          }
 
           const qualityLabel =
             source.quality && source.quality !== 'auto'
