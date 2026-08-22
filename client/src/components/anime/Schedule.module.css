@@ -60,11 +60,12 @@
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-8);
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  justify-content: center;
+  justify-content: safe center;
   width: 100%;
+  scroll-behavior: smooth;
 }
 
 .daySelector::-webkit-scrollbar {
@@ -75,12 +76,12 @@
   .daySelector {
     display: flex;
     overflow-x: auto;
-    scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    justify-content: flex-start;
+    justify-content: safe center;
     gap: 0;
-    padding: var(--space-1) 0;
+    padding: var(--space-1) var(--space-4);
+    scroll-behavior: smooth;
   }
 
   .dayBtn {
@@ -88,7 +89,6 @@
     min-width: 0 !important;
     padding: var(--space-1) 0 !important;
     border-radius: var(--radius-md) !important;
-    scroll-snap-align: start;
   }
 
   .dayMonth {

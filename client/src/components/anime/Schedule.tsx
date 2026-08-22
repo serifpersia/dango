@@ -88,7 +88,7 @@ const Schedule: React.FC = () => {
     if (dayRef.current) {
       const active = dayRef.current.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
       if (active) {
-        const inline = window.innerWidth <= 600 ? 'center' : 'nearest'
+        const inline = 'center'
         active.scrollIntoView({ behavior: 'smooth', inline, block: 'nearest' })
       }
     }
