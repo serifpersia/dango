@@ -19,27 +19,24 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
-  padding: var(--space-4);
-  overflow-x: auto;
+  padding: var(--space-2);
+  overflow: hidden;
+  margin-bottom: var(--space-16);
   animation: slideUpIn 0.8s var(--ease-smooth);
 }
 
 .canvasWrap {
   position: relative;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto;
+  width: 100%;
 }
 
-.canvas {
-  display: block;
-  width: 1200px;
+.mapSvg {
+  width: 100%;
   height: auto;
-  max-width: 100%;
+  display: block;
 }
 
 .tooltip {
-  position: absolute;
   pointer-events: none;
   background: rgba(10, 10, 14, 0.92);
   border: 1px solid var(--border-accent);
@@ -64,22 +61,26 @@
 }
 
 .statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-4);
-  margin-top: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 10;
 }
 
 .statCard {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   background: var(--glass-bg);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   box-shadow: var(--glass-shadow);
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-3) var(--space-4);
   transition: all var(--transition-base);
+  white-space: nowrap;
 }
 
 .statCard:hover {
@@ -88,7 +89,7 @@
 }
 
 .statCard > svg {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   color: var(--accent);
 }
 
@@ -119,4 +120,45 @@
   text-align: center;
   color: var(--color-danger);
   animation: fadeIn 0.6s var(--ease-smooth);
+}
+
+@media (max-width: 600px) {
+  .statsGrid {
+    flex-direction: row;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .statCard {
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .statCard > svg {
+    font-size: 0.9rem;
+  }
+
+  .statValue {
+    font-size: var(--font-size-sm);
+  }
+
+  .statLabel {
+    font-size: 0.6rem;
+  }
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.glow {
+  animation: glowPulse 3s ease-in-out infinite;
+  filter: blur(2px);
 }

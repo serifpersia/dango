@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps'
 import { FaUsers, FaUserClock } from 'react-icons/fa'
 import styles from './Map.module.css'
-import { WORLD_GRID, WORLD_GRID_W, WORLD_GRID_H } from '../lib/worldGrid'
-import { getTimezoneGridCoords } from '../lib/timezoneGrid'
-import { useLowEndMode } from '../contexts/LowEndModeContext'
+import { TIMEZONE_COORDS } from '../lib/timezoneGrid'
 
 const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL
 
@@ -13,18 +12,21 @@ interface MapData {
   active: number
 }
 
-const CELL = 10
-const RADIUS = 2.6
+interface Spot {
+  tz: string
+  count: number
+  coordinates: [number, number]
+  r: number
+}
+
+const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 
 const Map: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [data, setData] = useState<MapData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [hover, setHover] = useState<{ tz: string; count: number; x: number; y: number } | null>(
-    null
-  )
-  const { lowEndMode } = useLowEndMode()
+  const [hover, setHover] = useState<Spot | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
 
   useEffect(() => {
     document.title = 'Map - dango'
@@ -49,7 +51,7 @@ const Map: React.FC = () => {
         const locations: Record<string, number> = {}
         for (const [tz, count] of Object.entries(raw)) {
           if (!tz || tz === 'Unknown') continue
-          if (!getTimezoneGridCoords(tz)) continue
+          if (!TIMEZONE_COORDS[tz]) continue
           locations[tz] = count as number
         }
         setData({
@@ -68,140 +70,16 @@ const Map: React.FC = () => {
     fetchMap()
   }, [])
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const dpr = window.devicePixelRatio || 1
-    const w = WORLD_GRID_W * CELL
-    const h = WORLD_GRID_H * CELL
-    canvas.width = w * dpr
-    canvas.height = h * dpr
-    canvas.style.width = `${w}px`
-    canvas.style.height = `${h}px`
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.scale(dpr, dpr)
-
-    // static background layer (grid + land + base halos), drawn once
-    const bg = document.createElement('canvas')
-    bg.width = w
-    bg.height = h
-    const bctx = bg.getContext('2d')
-    if (!bctx) return
-    bctx.fillStyle = '#0a0a0c'
-    bctx.fillRect(0, 0, w, h)
-
-    // faint grid
-    bctx.strokeStyle = 'rgba(255,255,255,0.015)'
-    bctx.lineWidth = 1
-    for (let x = 0; x <= WORLD_GRID_W; x++) {
-      bctx.beginPath()
-      bctx.moveTo(x * CELL, 0)
-      bctx.lineTo(x * CELL, h)
-      bctx.stroke()
+  const spots: Spot[] = []
+  if (data) {
+    const maxCount = Math.max(1, ...Object.values(data.locations))
+    for (const [tz, count] of Object.entries(data.locations)) {
+      const pos = TIMEZONE_COORDS[tz]
+      if (!pos) continue
+      const r = 1.5 + Math.min(3, Math.sqrt(count + 1) * 0.6 - 0.8)
+      spots.push({ tz, count, coordinates: pos, r })
     }
-    for (let y = 0; y <= WORLD_GRID_H; y++) {
-      bctx.beginPath()
-      bctx.moveTo(0, y * CELL)
-      bctx.lineTo(w, y * CELL)
-      bctx.stroke()
-    }
-
-    // land dots
-    for (let y = 0; y < WORLD_GRID_H; y++) {
-      const row = WORLD_GRID[y]
-      for (let x = 0; x < WORLD_GRID_W; x++) {
-        if (row[x] === '1') {
-          bctx.beginPath()
-          bctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, RADIUS, 0, Math.PI * 2)
-          bctx.fillStyle = 'rgba(139, 92, 246, 0.16)'
-          bctx.fill()
-        }
-      }
-    }
-
-    // user dots grouped by timezone
-    const spots: { tz: string; count: number; x: number; y: number; r: number }[] = []
-    if (data) {
-      const counts = Object.values(data.locations)
-      const cntMax = Math.max(1, ...counts)
-      for (const [tz, count] of Object.entries(data.locations)) {
-        const pos = getTimezoneGridCoords(tz)
-        if (!pos) continue
-        const [gx, gy] = pos
-        const r = RADIUS + Math.min(5, Math.sqrt(count + 1) * 1.4 - 1)
-        const x = gx * CELL + CELL / 2
-        const y = gy * CELL + CELL / 2
-        spots.push({ tz, count, x, y, r })
-
-        bctx.beginPath()
-        bctx.arc(x, y, r * 1.7, 0, Math.PI * 2)
-        bctx.fillStyle = 'rgba(139, 92, 246, 0.18)'
-        bctx.fill()
-      }
-    }
-
-    const drawSpot = (s: { x: number; y: number; r: number }, pulse: number) => {
-      const haloR = s.r * (1.6 + pulse * 1.3)
-      const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, haloR)
-      grad.addColorStop(0, `rgba(168, 85, 247, ${0.4 * (1 - pulse * 0.4)})`)
-      grad.addColorStop(1, 'rgba(168, 85, 247, 0)')
-      ctx.beginPath()
-      ctx.arc(s.x, s.y, haloR, 0, Math.PI * 2)
-      ctx.fillStyle = grad
-      ctx.fill()
-
-      ctx.beginPath()
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
-      ctx.fillStyle = '#a855f7'
-      ctx.shadowColor = '#a855f7'
-      ctx.shadowBlur = s.r * 2 + 4
-      ctx.fill()
-      ctx.shadowBlur = 0
-    }
-
-    const reducedMotion =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    if (lowEndMode || reducedMotion || spots.length === 0) {
-      ctx.drawImage(bg, 0, 0)
-      for (const s of spots) drawSpot(s, 0)
-    } else {
-      const start = performance.now()
-      let raf = 0
-      const render = (t: number) => {
-        ctx.clearRect(0, 0, w, h)
-        ctx.drawImage(bg, 0, 0)
-        const phase = (t - start) / 1000
-        spots.forEach((s, i) => {
-          const pulse = (Math.sin(phase * 2 + i * 0.8) + 1) / 2
-          drawSpot(s, pulse)
-        })
-        raf = requestAnimationFrame(render)
-      }
-      render(start)
-      return () => cancelAnimationFrame(raf)
-    }
-
-    const onMove = (ev: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      const scale = rect.width / w
-      const mx = (ev.clientX - rect.left) / scale
-      const my = (ev.clientY - rect.top) / scale
-      const found = spots.find((s) => Math.hypot(mx - s.x, my - s.y) <= s.r + 3)
-      setHover(found ? { tz: found.tz, count: found.count, x: found.x, y: found.y } : null)
-    }
-    const onLeave = () => setHover(null)
-    canvas.addEventListener('mousemove', onMove)
-    canvas.addEventListener('mouseleave', onLeave)
-    return () => {
-      canvas.removeEventListener('mousemove', onMove)
-      canvas.removeEventListener('mouseleave', onLeave)
-    }
-  }, [data, lowEndMode])
+  }
 
   if (loading) return <div className={styles.loading}>Loading global map...</div>
   if (error) return <div className={styles.error}>{error}</div>
@@ -221,31 +99,82 @@ const Map: React.FC = () => {
 
       <div className={styles.mapCard}>
         <div className={styles.canvasWrap}>
-          <canvas ref={canvasRef} className={styles.canvas} />
+          <ComposableMap
+            projection="geoEqualEarth"
+            projectionConfig={{
+              rotate: [0, 0, 0],
+              scale: 105,
+            }}
+            className={styles.mapSvg}
+          >
+            <Geographies geography={GEO_URL}>
+              {({ geographies }) =>
+                geographies.map((geo) => (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    fill="#1a1a2e"
+                    stroke="#2a2a4a"
+                    strokeWidth={0.5}
+                    style={{
+                      default: { outline: 'none' },
+                      hover: { outline: 'none', fill: '#252545' },
+                      pressed: { outline: 'none' },
+                    }}
+                  />
+                ))
+              }
+            </Geographies>
+            {spots.map((spot) => (
+              <Marker
+                key={spot.tz}
+                coordinates={spot.coordinates}
+                onMouseEnter={(e) => {
+                  setHover(spot)
+                  setTooltipPos({ x: e.clientX, y: e.clientY })
+                }}
+                onMouseMove={(e) => {
+                  setTooltipPos({ x: e.clientX, y: e.clientY })
+                }}
+                onMouseLeave={() => setHover(null)}
+              >
+                <circle r={spot.r + 3} fill="#a855f7" className={styles.glow} />
+                <circle r={spot.r} fill="#a855f7" stroke="#a855f7" strokeWidth={0.8} />
+              </Marker>
+            ))}
+          </ComposableMap>
+
           {hover && (
-            <div className={styles.tooltip} style={{ left: hover.x + 14, top: hover.y + 10 }}>
+            <div
+              className={styles.tooltip}
+              style={{
+                left: tooltipPos.x + 14,
+                top: tooltipPos.y - 40,
+                position: 'fixed',
+              }}
+            >
               <strong>{hover.tz}</strong>
               <span>
                 {hover.count} user{hover.count === 1 ? '' : 's'}
               </span>
             </div>
           )}
-        </div>
-      </div>
 
-      <div className={styles.statsGrid}>
-        <div className={styles.statCard}>
-          <FaUsers />
-          <div>
-            <span className={styles.statValue}>{data.total}</span>
-            <span className={styles.statLabel}>Total Users</span>
-          </div>
-        </div>
-        <div className={styles.statCard}>
-          <FaUserClock />
-          <div>
-            <span className={styles.statValue}>{data.active}</span>
-            <span className={styles.statLabel}>Active (24h)</span>
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <FaUsers />
+              <div>
+                <span className={styles.statValue}>{data.total}</span>
+                <span className={styles.statLabel}>Total Users</span>
+              </div>
+            </div>
+            <div className={styles.statCard}>
+              <FaUserClock />
+              <div>
+                <span className={styles.statValue}>{data.active}</span>
+                <span className={styles.statLabel}>Active (24h)</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -289,10 +289,10 @@ const Settings: React.FC = () => {
                         color: 'var(--text-secondary)',
                       }}
                     >
-                      Share anonymous installation data to help track active users and location.
+                      Share anonymous installation data to help track active users and timezone.
                       Collected: Hardware-based Anonymous ID, App Version, First Seen/Last Seen
-                      timestamps, User Agent string, and coarse location (timezone only, e.g.
-                      'Europe/Berlin'). No other personal information or usage habits are collected.
+                      timestamps, User Agent string, and timezone (e.g. 'Europe/Berlin'). No other
+                      personal information or usage habits are collected.
                     </p>
                   </div>
                   <ToggleSwitch
