@@ -88,8 +88,7 @@ const Schedule: React.FC = () => {
     if (dayRef.current) {
       const active = dayRef.current.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
       if (active) {
-        const inline = 'center'
-        active.scrollIntoView({ behavior: 'smooth', inline, block: 'nearest' })
+        active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
       }
     }
   }, [selectedDate])
@@ -151,21 +150,23 @@ const Schedule: React.FC = () => {
 
       <div className={styles.daySelectorContainer}>
         <div className={styles.daySelector} ref={dayRef}>
-          {getDayButtons().map((dayButton) => (
-            <button
-              key={dayButton.dateString}
-              type="button"
-              data-date={dayButton.dateString}
-              className={`${styles.dayBtn} ${
-                selectedDate === dayButton.dateString ? styles.active : ''
-              }`}
-              onClick={() => setSelectedDate(dayButton.dateString)}
-            >
-              <span className={styles.dayMonth}>{dayButton.monthName}</span>
-              <span className={styles.dayNum}>{dayButton.dayNum}</span>
-              <span className={styles.dayName}>{dayButton.dayLabel}</span>
-            </button>
-          ))}
+          <div className={styles.daySelectorInner}>
+            {getDayButtons().map((dayButton) => (
+              <button
+                key={dayButton.dateString}
+                type="button"
+                data-date={dayButton.dateString}
+                className={`${styles.dayBtn} ${
+                  selectedDate === dayButton.dateString ? styles.active : ''
+                }`}
+                onClick={() => setSelectedDate(dayButton.dateString)}
+              >
+                <span className={styles.dayMonth}>{dayButton.monthName}</span>
+                <span className={styles.dayNum}>{dayButton.dayNum}</span>
+                <span className={styles.dayName}>{dayButton.dayLabel}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
