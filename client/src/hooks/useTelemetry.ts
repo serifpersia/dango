@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import toast from 'react-hot-toast'
 import packageJson from '../../package.json'
 
 const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL
@@ -33,6 +34,25 @@ export const deleteTelemetryData = async () => {
 export const useTelemetry = () => {
   useEffect(() => {
     const isTelemetryEnabled = localStorage.getItem('telemetry_enabled') !== 'false'
+
+    if (isTelemetryEnabled) {
+      const noticeShown = localStorage.getItem('telemetry_notice_shown')
+      if (!noticeShown) {
+        localStorage.setItem('telemetry_notice_shown', 'true')
+        setTimeout(() => {
+          toast('Optional install data is collected. You can opt out in Settings.', {
+            duration: 8000,
+            icon: 'ℹ️',
+            style: {
+              background: '#1a3a5c',
+              color: '#fff',
+              border: '1px solid #2a5a8c',
+            },
+          })
+        }, 3000)
+      }
+    }
+
     if (!isTelemetryEnabled || !TELEMETRY_URL) return
 
     const lastPing = localStorage.getItem('last_telemetry_ping')
