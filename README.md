@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/dango-2.5.4-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-2.5.5-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -89,10 +89,12 @@ A standalone Android app that bundles Node.js + dango with a WebView UI — no T
 2. **Install** the APK on your Android device (enable "Install from unknown sources" if prompted).
 
 Features:
+
 - Auto-installs everything on first launch
 - Checks for dango updates on each launch
 
 **Build from source:**
+
 ```bash
 # 1. Prepare payload (downloads Termux Node.js + npm)
 cd android-app

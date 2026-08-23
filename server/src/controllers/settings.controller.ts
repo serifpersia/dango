@@ -103,7 +103,13 @@ export class SettingsController {
 
     try {
       req.db.backup(backupPath)
-      res.download(backupPath, 'dango-backup.db', () => {
+      res.download(backupPath, 'dango-backup.db', (err) => {
+        if (err) {
+          logger.error({ err }, 'res.download failed during database backup')
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Download failed' })
+          }
+        }
         fs.unlink(backupPath, () => {})
       })
     } catch (err) {

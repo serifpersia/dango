@@ -121,28 +121,17 @@ const Settings: React.FC = () => {
     setSearchParams(tab === 'general' ? {} : { tab })
   }
 
-  const handleBackup = async () => {
-    setStatusMessage('Backing up database...')
-    try {
-      const response = await fetch('/api/backup-db')
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'dango-backup.db'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        window.URL.revokeObjectURL(url)
-        setStatusMessage('Database backup successful!')
-      } else {
-        const errorData = await response.json()
-        setStatusMessage(`Backup failed: ${errorData.error}`)
-      }
-    } catch (_error) {
-      setStatusMessage('Backup failed: An unexpected error occurred.')
-    }
+  const handleBackup = () => {
+    setStatusMessage('Downloading database backup...')
+    const a = document.createElement('a')
+    a.href = '/api/backup-db'
+    a.download = 'dango-backup.db'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => {
+      setStatusMessage('Database backup downloaded!')
+    }, 1500)
   }
 
   const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
