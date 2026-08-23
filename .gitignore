@@ -12,3 +12,17 @@
 server/.env
 server/google_tokens.json
 server/sync_manifest*.json
+
+# Android
+android-app/local.properties
+android-app/dango-debug.keystore
+android-app/.gradle/
+android-app/.kotlin/
+android-app/build/
+android-app/app/build/
+android-app/debs/
+/android-app/app/src/main/assets/payload/
+/android-app/app/src/main/assets/payload-old/
+/android-app/build-release.log
+/android-app/payload
+android-app/app/src/main/jniLibs/arm64-v8a/libnode.so

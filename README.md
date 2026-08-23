@@ -81,6 +81,32 @@ You can run **dango** on your Android device using the [Termux](https://termux.d
 
 Once running, you can access the interface by navigating to `http://localhost:3000/` in your mobile browser.
 
+### Android APK (No Termux Required)
+
+A standalone Android app that bundles Node.js + dango with a WebView UI — no Termux, no terminal commands needed.
+
+1. **Download** the APK from [Releases](https://github.com/serifpersia/dango/releases) or build it yourself.
+2. **Install** the APK on your Android device (enable "Install from unknown sources" if prompted).
+
+Features:
+- Auto-installs everything on first launch
+- Checks for dango updates on each launch
+
+**Build from source:**
+```bash
+# 1. Prepare payload (downloads Termux Node.js + npm)
+cd android-app
+python fetch-termux-node.py
+
+# 2. Build APK
+# Windows:
+build-debug.bat
+# Linux/macOS:
+chmod +x build-debug.sh && ./build-debug.sh
+```
+
+Requires: Python 3, Java 17+, Android SDK (build-tools 36.0.0, platform android-36).
+
 ---
 
 ## Uninstalling

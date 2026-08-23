@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.serifpersia.dango.DangoSwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/swipeRefreshLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0f0f0f">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/fullscreenContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#000000"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/shutdownConfirmOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#EE0f0f0f"
+            android:clickable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/shutdownConfirmArrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=">"
+                android:textColor="#8b5cf6"
+                android:textSize="42sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/shutdownConfirmText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="Shut down dango?"
+                android:textColor="#f3f4f6"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/shutdownConfirmSubtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:text="You swiped from the edge. Confirm to stop the server and return to setup."
+                android:textColor="#d1d5db"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/shutdownConfirmCancel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:backgroundTint="#374151"
+                    android:text="Cancel"
+                    android:textColor="#f3f4f6" />
+
+                <Button
+                    android:id="@+id/shutdownConfirmAccept"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#8b5cf6"
+                    android:text="Shut down"
+                    android:textColor="#ffffff" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp">
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Starting server..."
+                android:textColor="#8b5cf6"
+                android:textSize="16sp" />
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyle"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:indeterminate="true"
+                android:indeterminateTint="#8b5cf6" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/shutdownOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#CC0f0f0f"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ProgressBar
+                style="?android:attr/progressBarStyle"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginBottom="16dp"
+                android:indeterminate="true"
+                android:indeterminateTint="#8b5cf6" />
+
+            <TextView
+                android:id="@+id/shutdownText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Syncing and shutting down..."
+                android:textColor="#8b5cf6"
+                android:textSize="16sp" />
+
+        </LinearLayout>
+    </FrameLayout>
+</com.serifpersia.dango.DangoSwipeRefreshLayout>

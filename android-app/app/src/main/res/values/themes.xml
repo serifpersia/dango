@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Dango" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">#0f0f0f</item>
+        <item name="android:navigationBarColor">#0f0f0f</item>
+        <item name="android:windowBackground">#0f0f0f</item>
+    </style>
+</resources>
