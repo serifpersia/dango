@@ -83,7 +83,7 @@ Once running, you can access the interface by navigating to `http://localhost:30
 
 ### Android APK (No Termux Required)
 
-A standalone Android app that bundles Node.js + dango with a WebView UI — no Termux, no terminal commands needed.
+A standalone Android app that bundles Node.js + dango with a WebView UI.
 
 1. **Download** the APK from [Releases](https://github.com/serifpersia/dango/releases) or build it yourself.
 2. **Install** the APK on your Android device (enable "Install from unknown sources" if prompted).
@@ -96,11 +96,9 @@ Features:
 **Build from source:**
 
 ```bash
-# 1. Prepare payload (downloads Termux Node.js + npm)
 cd android-app
 python fetch-termux-node.py
 
-# 2. Build APK
 # Windows:
 build-debug.bat
 # Linux/macOS:
