@@ -9,16 +9,24 @@ echo === Dango: Building Release APK ===
 cd /d "%~dp0"
 
 REM Check payload exists
-if not exist "payload\bin\node" (
+set HAS_NODE=0
+if exist "payload\arm64-v8a\bin\node" set HAS_NODE=1
+if exist "payload\bin\node" set HAS_NODE=1
+
+set HAS_NPM=0
+if exist "payload\common\npm\bin\npm-cli.js" set HAS_NPM=1
+if exist "payload\npm\bin\npm-cli.js" set HAS_NPM=1
+
+if "%HAS_NODE%"=="0" (
     echo.
-    echo [!] Incomplete payload. Run: python fetch-termux-node.py
+    echo [!] Incomplete payload: node binary missing. Run: python fetch-termux-node.py
     echo.
     exit /b 1
 )
 
-if not exist "payload\npm\bin\npm-cli.js" (
+if "%HAS_NPM%"=="0" (
     echo.
-    echo [!] Incomplete payload. Run: python fetch-termux-node.py
+    echo [!] Incomplete payload: npm missing. Run: python fetch-termux-node.py
     echo.
     exit /b 1
 )
@@ -34,7 +42,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/2] Done!
-echo APK: android-app\app\build\outputs\apk\release\app-release.apk
+echo APK: android-app\app\build\outputs\apk\release\com.serifpersia.dango-universal.apk
 echo.
-echo Install: adb install -r android-app\app\build\outputs\apk\release\app-release.apk
+echo Install: adb install -r android-app\app\build\outputs\apk\release\com.serifpersia.dango-universal.apk
 echo.

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 Downloads Termux nodejs + dependency .deb packages, npm, and prepares
-the complete payload for embedding in an Android APK.
+the multi-architecture payload (arm64-v8a, armeabi-v7a) for embedding in an Android APK.
 
-Usage: python fetch-termux-node.py [--clean] [--skip-debs] [--skip-npm]
+Usage: python fetch-termux-node.py [--clean] [--skip-debs] [--skip-npm] [--arch arm64-v8a,armeabi-v7a]
 """
 import os
 import sys
 import struct
-import subprocess
 import hashlib
 import urllib.request
 import tempfile
@@ -19,7 +18,11 @@ import tarfile
 import shutil
 from pathlib import Path
 
-ARCH = "aarch64"
+SUPPORTED_ABIS = {
+    "arm64-v8a": "aarch64",
+    "armeabi-v7a": "arm",
+}
+
 REPO = "https://packages.termux.dev/apt/termux-main"
 NPM_REGISTRY = "https://registry.npmjs.org/npm/-/npm-11.19.0.tgz"
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -141,43 +144,57 @@ def extract_deb_ar(data: bytes) -> bytes | None:
     return None
 
 
-def extract_deb_to_payload(deb_data: bytes, payload_dir: Path):
+def extract_deb_to_payload(deb_data: bytes, target_dir: Path):
     archive_data = extract_deb_ar(deb_data)
     if not archive_data:
         print("  ERROR: Could not find data.tar in .deb")
         return False
 
-    with tempfile.NamedTemporaryFile(suffix=".tar.xz", delete=False) as tmp:
-        tmp.write(archive_data)
-        tmp_path = tmp.name
+    prefix = "data/data/com.termux/files/usr/"
+    symlinks = {}
 
     try:
-        result = subprocess.run(
-            ["tar", "xf", tmp_path, "-C", str(payload_dir), "--strip-components=6"],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            gz_path = tmp_path + ".gz"
-            os.rename(tmp_path, gz_path)
-            tmp_path = gz_path
-            result = subprocess.run(
-                ["tar", "xzf", tmp_path, "-C", str(payload_dir), "--strip-components=6"],
-                capture_output=True, text=True, timeout=30
-            )
-            if result.returncode != 0:
-                print(f"  ERROR extracting: {result.stderr}")
-                return False
+        with tarfile.open(fileobj=io.BytesIO(archive_data), mode="r:*") as tf:
+            for m in tf.getmembers():
+                name = m.name.lstrip("./")
+                if not name.startswith(prefix):
+                    continue
+                rel = name[len(prefix):]
+                if not rel:
+                    continue
+
+                out_path = target_dir / rel
+
+                if m.isdir():
+                    out_path.mkdir(parents=True, exist_ok=True)
+                elif m.issym() or m.islnk():
+                    symlinks[rel] = m.linkname
+                elif m.isfile():
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    src = tf.extractfile(m)
+                    if src:
+                        out_path.write_bytes(src.read())
+
+            # Resolve symlinks as copies for cross-platform compatibility
+            for rel, linkname in symlinks.items():
+                out_path = target_dir / rel
+                base_dir = os.path.dirname(rel)
+                target_rel = os.path.normpath(os.path.join(base_dir, linkname)).replace("\\", "/")
+                target_path = target_dir / target_rel
+
+                if target_path.exists() and target_path.is_file():
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(target_path, out_path)
+
         return True
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+    except Exception as e:
+        print(f"  ERROR extracting deb: {e}")
+        return False
 
 
-def download_npm(payload_dir: Path):
-    print("\n[5/7] Downloading npm...")
-    npm_dir = payload_dir / "npm"
+def download_npm(common_dir: Path):
+    print("\n[+] Downloading npm...")
+    npm_dir = common_dir / "npm"
 
     if npm_dir.exists() and (npm_dir / "bin" / "npm-cli.js").exists():
         print("  npm already present, skipping")
@@ -250,9 +267,9 @@ def download_npm(payload_dir: Path):
             pass
 
 
-def patch_npm_sigstore(payload_dir: Path):
-    print("\n[6/7] Patching npm sigstore for Android compatibility...")
-    protobuf_specs = payload_dir / "npm" / "node_modules" / "@sigstore" / "protobuf-specs" / "dist"
+def patch_npm_sigstore(common_dir: Path):
+    print("\n[+] Patching npm sigstore for Android compatibility...")
+    protobuf_specs = common_dir / "npm" / "node_modules" / "@sigstore" / "protobuf-specs" / "dist"
     generated = protobuf_specs / "__generated__"
 
     if not generated.exists():
@@ -273,11 +290,10 @@ def patch_npm_sigstore(payload_dir: Path):
             print(f"  Patched: {js_file.relative_to(protobuf_specs)}")
 
 
-def create_symlinks(payload_dir: Path):
-    print("\n[7/7] Creating soname aliases...")
-    lib_dir = payload_dir / "lib"
+def create_soname_aliases(abi_dir: Path):
+    lib_dir = abi_dir / "lib"
     if not lib_dir.exists():
-        print("  No lib/ directory found, skipping")
+        print(f"  No lib/ directory found in {abi_dir}, skipping soname aliases")
         return
 
     removed = 0
@@ -301,8 +317,17 @@ def create_symlinks(payload_dir: Path):
             created += 1
         except OSError as e:
             print(f"  WARNING: Could not create alias {alias_name}: {e}")
-    print(f"  Removed {removed} obsolete aliases")
-    print(f"  Created {created} aliases")
+    print(f"  [{abi_dir.name}] Removed {removed} obsolete aliases, created {created} aliases")
+
+
+def clean_unneeded_dirs(abi_dir: Path):
+    for dir_name in ["include", "share", "cmake", "pkgconfig"]:
+        p = abi_dir / dir_name
+        if p.exists():
+            shutil.rmtree(p)
+        lib_sub = abi_dir / "lib" / dir_name
+        if lib_sub.exists():
+            shutil.rmtree(lib_sub)
 
 
 def create_manifest(payload_dir: Path):
@@ -314,49 +339,51 @@ def create_manifest(payload_dir: Path):
         if f.is_file() and f.name != "manifest.txt"
     )
     manifest_path.write_text("\n".join(files), encoding='utf-8')
-    print(f"  Manifest: {len(files)} files")
+    print(f"  Manifest: {len(files)} files written to {manifest_path}")
 
 
-def main():
-    print("=== Dango Mobile: Payload Fetcher ===\n")
+def process_abi(abi: str, termux_arch: str, skip_debs: bool):
+    print(f"\n==========================================")
+    print(f"=== Processing ABI: {abi} ({termux_arch}) ===")
+    print(f"==========================================")
 
-    skip_debs = "--skip-debs" in sys.argv
-    skip_npm = "--skip-npm" in sys.argv
+    abi_payload_dir = PAYLOAD_DIR / abi
+    abi_debs_dir = DEBS_DIR / abi
 
     if not skip_debs:
-        print("[1/7] Fetching Packages index...")
-        packages_url = f"{REPO}/dists/stable/main/binary-{ARCH}/Packages"
+        print(f"[{abi} 1/4] Fetching Packages index for {termux_arch}...")
+        packages_url = f"{REPO}/dists/stable/main/binary-{termux_arch}/Packages"
         packages_data = fetch_url(packages_url)
         index = parse_packages_index(packages_data)
         print(f"  Parsed {len(index)} packages\n")
 
-        print("[2/7] Resolving packages...")
+        print(f"[{abi} 2/4] Resolving packages...")
         to_download = []
         for pkg_name in PACKAGES:
-            found = find_package(index, pkg_name, ARCH)
+            found = find_package(index, pkg_name, termux_arch)
             if not found:
-                print(f"  WARNING: Package '{pkg_name}' not found, skipping")
+                print(f"  WARNING: Package '{pkg_name}' not found for {termux_arch}, skipping")
                 continue
             to_download.append(found)
             print(f"  Found: {found['Package']} {found.get('Version', '?')}")
 
-        nodejs_pkg = find_package(index, "nodejs", ARCH)
+        nodejs_pkg = find_package(index, "nodejs", termux_arch)
         if nodejs_pkg:
-            transitive = resolve_deps(index, nodejs_pkg, ARCH)
+            transitive = resolve_deps(index, nodejs_pkg, termux_arch)
             for t in transitive:
                 if t["Package"] not in [d["Package"] for d in to_download]:
                     to_download.append(t)
                     print(f"  Dep:   {t['Package']} {t.get('Version', '?')}")
 
-        DEBS_DIR.mkdir(parents=True, exist_ok=True)
+        abi_debs_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"\n[3/7] Downloading {len(to_download)} packages...")
+        print(f"\n[{abi} 3/4] Downloading {len(to_download)} packages...")
         for pkg in to_download:
             filename = pkg.get("Filename", "")
             if not filename:
                 continue
-            deb_name = filename.split("/")[-1]
-            deb_path = DEBS_DIR / deb_name
+            deb_name = filename.split("/")[-1].replace(":", "_")
+            deb_path = abi_debs_dir / deb_name
             if deb_path.exists():
                 print(f"  Cached: {deb_name}")
                 continue
@@ -365,55 +392,88 @@ def main():
             deb_path.write_bytes(data)
             print(f"  Saved:  {deb_name} ({len(data) / 1024 / 1024:.1f} MB)")
 
-        print(f"\n[4/7] Extracting into {PAYLOAD_DIR}...")
-        PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"\n[{abi} 4/4] Extracting into {abi_payload_dir}...")
+        abi_payload_dir.mkdir(parents=True, exist_ok=True)
         for pkg in to_download:
             filename = pkg.get("Filename", "")
             if not filename:
                 continue
-            deb_name = filename.split("/")[-1]
-            deb_path = DEBS_DIR / deb_name
+            deb_name = filename.split("/")[-1].replace(":", "_")
+            deb_path = abi_debs_dir / deb_name
             if not deb_path.exists():
                 continue
             print(f"  Extracting: {deb_name}")
             data = deb_path.read_bytes()
-            extract_deb_to_payload(data, PAYLOAD_DIR)
+            extract_deb_to_payload(data, abi_payload_dir)
     else:
-        print("[1-4/7] Skipped (using existing payload)")
+        print(f"[{abi}] Skipped deb download/extraction")
 
-    if not skip_npm:
-        download_npm(PAYLOAD_DIR)
-    else:
-        print("[5/7] Skipped npm")
+    # If etc/tls exists in abi_payload_dir, copy to common/etc/tls
+    abi_etc_tls = abi_payload_dir / "etc" / "tls"
+    common_etc_tls = PAYLOAD_DIR / "common" / "etc" / "tls"
+    if abi_etc_tls.exists():
+        common_etc_tls.mkdir(parents=True, exist_ok=True)
+        for f in abi_etc_tls.glob("*"):
+            if f.is_file():
+                shutil.copy2(f, common_etc_tls / f.name)
+        shutil.rmtree(abi_payload_dir / "etc", ignore_errors=True)
 
-    patch_npm_sigstore(PAYLOAD_DIR)
-    create_symlinks(PAYLOAD_DIR)
-    create_manifest(PAYLOAD_DIR)
+    create_soname_aliases(abi_payload_dir)
+    clean_unneeded_dirs(abi_payload_dir)
 
-    node_bin = PAYLOAD_DIR / "bin" / "node"
+    node_bin = abi_payload_dir / "bin" / "node"
     if node_bin.exists():
-        print(f"\n=== DONE ===")
-        print(f"  node: {node_bin} ({node_bin.stat().st_size / 1024 / 1024:.1f} MB)")
+        print(f"  [{abi}] node binary: {node_bin} ({node_bin.stat().st_size / 1024 / 1024:.1f} MB)")
     else:
-        print(f"\n  WARNING: node binary not found at {node_bin}")
+        print(f"  WARNING: [{abi}] node binary not found at {node_bin}")
 
-    npm_cli = PAYLOAD_DIR / "npm" / "bin" / "npm-cli.js"
-    if npm_cli.exists():
-        print(f"  npm:  present")
-    else:
-        print(f"  WARNING: npm not found")
-
-    lib_dir = PAYLOAD_DIR / "lib"
+    lib_dir = abi_payload_dir / "lib"
     if lib_dir.exists():
         libs = list(lib_dir.glob("*.so*"))
-        print(f"  libs: {len(libs)} files")
+        print(f"  [{abi}] libs: {len(libs)} files")
 
-    manifest = PAYLOAD_DIR / "manifest.txt"
-    if manifest.exists():
-        count = len(manifest.read_text().strip().split("\n"))
-        print(f"  manifest: {count} files")
 
-    print(f"\n  Payload ready at: {PAYLOAD_DIR}")
+def main():
+    print("=== Dango Mobile: Multi-Architecture Payload Fetcher ===\n")
+
+    skip_debs = "--skip-debs" in sys.argv
+    skip_npm = "--skip-npm" in sys.argv
+
+    target_abis = list(SUPPORTED_ABIS.keys())
+    for arg in sys.argv:
+        if arg.startswith("--arch="):
+            target_abis = [a.strip() for a in arg.split("=", 1)[1].split(",")]
+        elif arg == "--arch" and sys.argv.index(arg) + 1 < len(sys.argv):
+            target_abis = [a.strip() for a in sys.argv[sys.argv.index(arg) + 1].split(",")]
+
+    print(f"Target ABIs: {', '.join(target_abis)}")
+
+    PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    common_dir = PAYLOAD_DIR / "common"
+    common_dir.mkdir(parents=True, exist_ok=True)
+
+    for abi in target_abis:
+        if abi not in SUPPORTED_ABIS:
+            print(f"WARNING: Unsupported ABI '{abi}'. Supported ABIs: {list(SUPPORTED_ABIS.keys())}")
+            continue
+        termux_arch = SUPPORTED_ABIS[abi]
+        process_abi(abi, termux_arch, skip_debs)
+
+    if not skip_npm:
+        download_npm(common_dir)
+    else:
+        print("\n[+] Skipped npm")
+
+    patch_npm_sigstore(common_dir)
+    create_manifest(PAYLOAD_DIR)
+
+    print("\n=== SUMMARY ===")
+    for abi in target_abis:
+        node_bin = PAYLOAD_DIR / abi / "bin" / "node"
+        print(f"  {abi} node: {'EXISTS' if node_bin.exists() else 'MISSING'} ({node_bin})")
+    npm_cli = common_dir / "npm" / "bin" / "npm-cli.js"
+    print(f"  common npm: {'EXISTS' if npm_cli.exists() else 'MISSING'}")
+    print(f"\nPayload successfully prepared at: {PAYLOAD_DIR}\n")
 
 
 if __name__ == "__main__":

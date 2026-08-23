@@ -25,4 +25,4 @@ android-app/debs/
 /android-app/app/src/main/assets/payload-old/
 /android-app/build-release.log
 /android-app/payload
-android-app/app/src/main/jniLibs/arm64-v8a/libnode.so
+android-app/app/src/main/jniLibs/

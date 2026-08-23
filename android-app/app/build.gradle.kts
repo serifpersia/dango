@@ -13,6 +13,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+        }
     }
 
     signingConfigs {
@@ -49,44 +53,85 @@ android {
             jniLibs.srcDir(layout.buildDirectory.dir("generated/nodeLib"))
         }
     }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            if (buildType.name == "release") {
+                output?.outputFileName = "com.serifpersia.dango-universal.apk"
+            } else if (buildType.name == "debug") {
+                output?.outputFileName = "com.serifpersia.dango-universal-debug.apk"
+            }
+        }
+    }
 }
 
-val nodeSource = rootProject.projectDir.toPath().resolve("payload/bin/node")
-val generatedNodeLibDir = layout.buildDirectory.dir("generated/nodeLib/arm64-v8a")
-
 tasks.register("syncPayload") {
-    val payloadDir = rootProject.projectDir.toPath().resolve("payload")
-    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload")
+    val payloadDir = rootProject.projectDir.toPath().resolve("payload").toFile()
+    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload").toFile()
     description = "Copy Termux node payload into APK assets"
     group = "dango"
 
-    onlyIf { payloadDir.toFile().exists() }
+    onlyIf { payloadDir.exists() }
 
     doLast {
-        assetsPayloadDir.toFile().deleteRecursively()
-        payloadDir.toFile().copyRecursively(assetsPayloadDir.toFile())
+        assetsPayloadDir.deleteRecursively()
+        assetsPayloadDir.mkdirs()
+        payloadDir.copyRecursively(assetsPayloadDir, overwrite = true)
+        
+        // Remove only ABI bin directories since node binary is packaged via jniLibs as libnode.so
+        // (Do NOT delete common/npm/bin!)
+        listOf("arm64-v8a", "armeabi-v7a").forEach { abi ->
+            File(assetsPayloadDir, "$abi/bin").deleteRecursively()
+        }
+        File(assetsPayloadDir, "bin").deleteRecursively()
+        
         println("Payload synced: ${payloadDir} -> ${assetsPayloadDir}")
     }
 }
 
-tasks.register<Copy>("syncNodeBinary") {
+tasks.register("syncNodeBinary") {
     dependsOn("syncPayload")
-    description = "Copy the Termux node binary into generated jniLibs as libnode.so"
+    description = "Copy Termux node binaries into generated jniLibs as libnode.so"
     group = "dango"
 
-    from(nodeSource)
-    into(generatedNodeLibDir)
-    rename { "libnode.so" }
-
-    onlyIf { nodeSource.toFile().exists() }
+    val generatedNodeLibDir = layout.buildDirectory.dir("generated/nodeLib")
+    val payloadDir = rootProject.projectDir.toPath().resolve("payload").toFile()
 
     doFirst {
         generatedNodeLibDir.get().asFile.deleteRecursively()
+        generatedNodeLibDir.get().asFile.mkdirs()
+    }
+
+    doLast {
+        val destDir = generatedNodeLibDir.get().asFile
+        val abis = listOf("arm64-v8a", "armeabi-v7a")
+        var copiedAny = false
+
+        for (abi in abis) {
+            val nodeBin = File(payloadDir, "$abi/bin/node")
+            if (nodeBin.exists()) {
+                val targetDir = File(destDir, abi)
+                targetDir.mkdirs()
+                nodeBin.copyTo(File(targetDir, "libnode.so"), overwrite = true)
+                println("Copied node binary for $abi -> ${targetDir}/libnode.so")
+                copiedAny = true
+            }
+        }
+
+        // Fallback for legacy single-arch payload structure
+        val legacyNodeBin = File(payloadDir, "bin/node")
+        if (!copiedAny && legacyNodeBin.exists()) {
+            val targetDir = File(destDir, "arm64-v8a")
+            targetDir.mkdirs()
+            legacyNodeBin.copyTo(File(targetDir, "libnode.so"), overwrite = true)
+            println("Copied legacy node binary -> ${targetDir}/libnode.so")
+        }
     }
 }
 
 tasks.register("generateManifest") {
-    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload")
+    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload").toFile()
     val manifestFile = assetsPayloadDir.resolve("manifest.txt")
     description = "Generate manifest.txt listing all payload files (workaround for assets.list() __-prefix bug)"
     group = "dango"
@@ -96,12 +141,12 @@ tasks.register("generateManifest") {
     outputs.file(manifestFile)
 
     doLast {
-        val files = assetsPayloadDir.toFile().walkTopDown()
-            .filter { it.isFile }
-            .map { "payload/" + it.relativeTo(assetsPayloadDir.toFile()).path.replace('\\', '/') }
+        val files = assetsPayloadDir.walkTopDown()
+            .filter { it.isFile && it.name != "manifest.txt" && !it.name.startsWith(".") && !it.name.startsWith("_") }
+            .map { "payload/" + it.relativeTo(assetsPayloadDir).path.replace('\\', '/') }
             .sorted()
             .toList()
-        manifestFile.toFile().writeText(files.joinToString("\n"))
+        manifestFile.writeText(files.joinToString("\n"))
         println("Manifest generated: ${files.size} files -> $manifestFile")
     }
 }

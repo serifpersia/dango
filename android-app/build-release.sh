@@ -6,9 +6,15 @@ cd "$(dirname "$0")"
 
 echo "=== Dango: Building Release APK ==="
 
-if [ ! -f "payload/bin/node" ] || [ ! -f "payload/npm/bin/npm-cli.js" ]; then
+if [ ! -f "payload/arm64-v8a/bin/node" ] && [ ! -f "payload/bin/node" ]; then
     echo ""
-    echo "[!] Incomplete payload. Run: python3 fetch-termux-node.py"
+    echo "[!] Incomplete payload: node binary missing. Run: python3 fetch-termux-node.py"
+    exit 1
+fi
+
+if [ ! -f "payload/common/npm/bin/npm-cli.js" ] && [ ! -f "payload/npm/bin/npm-cli.js" ]; then
+    echo ""
+    echo "[!] Incomplete payload: npm missing. Run: python3 fetch-termux-node.py"
     exit 1
 fi
 
@@ -18,6 +24,6 @@ echo "[1/2] Building release APK..."
 
 echo ""
 echo "[2/2] Done!"
-echo "APK: app/build/outputs/apk/release/app-release.apk"
+echo "APK: app/build/outputs/apk/release/com.serifpersia.dango-universal.apk"
 echo ""
-echo "Install: adb install -r app/build/outputs/apk/release/app-release.apk"
+echo "Install: adb install -r app/build/outputs/apk/release/com.serifpersia.dango-universal.apk"

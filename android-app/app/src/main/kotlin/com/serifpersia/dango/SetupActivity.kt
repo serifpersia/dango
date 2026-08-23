@@ -238,8 +238,20 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
+    private fun getDeviceAbi(): String {
+        for (abi in android.os.Build.SUPPORTED_ABIS) {
+            if (abi == "arm64-v8a" || abi == "armeabi-v7a") {
+                return abi
+            }
+        }
+        return "arm64-v8a"
+    }
+
     private fun extractPayload(targetDir: File) {
         targetDir.mkdirs()
+
+        val deviceAbi = getDeviceAbi()
+        Log.i(TAG, "extractPayload: device ABI is $deviceAbi (supported: ${android.os.Build.SUPPORTED_ABIS.joinToString()})")
 
         val files = mutableListOf<String>()
 
@@ -257,11 +269,27 @@ class SetupActivity : AppCompatActivity() {
             } catch (_: Exception) {}
         }
 
-        Log.i(TAG, "extractPayload: ${files.size} files to extract")
+        Log.i(TAG, "extractPayload: ${files.size} total asset files indexed")
         var extracted = 0
+        val abis = listOf("arm64-v8a", "armeabi-v7a")
+
         for (assetPath in files) {
             try {
-                val rel = assetPath.removePrefix("payload/")
+                val rel = when {
+                    // Common assets (npm, etc/tls)
+                    assetPath.startsWith("payload/common/") ->
+                        assetPath.removePrefix("payload/common/")
+                    // ABI-specific libraries for current device
+                    assetPath.startsWith("payload/$deviceAbi/lib/") ->
+                        "lib/" + assetPath.removePrefix("payload/$deviceAbi/lib/")
+                    // Skip libraries for other ABIs
+                    abis.any { assetPath.startsWith("payload/$it/") } ->
+                        continue
+                    // Fallback for legacy single-arch flat payload
+                    else ->
+                        assetPath.removePrefix("payload/")
+                }
+
                 val outFile = File(targetDir, rel)
                 outFile.parentFile?.mkdirs()
                 assets.open(assetPath).use { input ->
@@ -274,7 +302,7 @@ class SetupActivity : AppCompatActivity() {
                 Log.w(TAG, "extractPayload: failed to extract $assetPath: ${e.message}")
             }
         }
-        Log.i(TAG, "extractPayload: extracted $extracted/${files.size} files")
+        Log.i(TAG, "extractPayload: extracted $extracted files for $deviceAbi")
     }
 
     private fun scanAssets(path: String, out: MutableList<String>) {
