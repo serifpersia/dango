@@ -148,7 +148,7 @@ main {
   width: 100%;
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 var(--space-8) var(--space-12);
+  padding: 0 var(--space-8) var(--space-16);
   position: relative;
   z-index: 1;
 }
@@ -165,7 +165,7 @@ main {
 
 @media (max-width: 848px) {
   main {
-    padding: 0 var(--space-4) var(--space-8);
+    padding: 0 var(--space-4) var(--space-12);
   }
 
   .main-content {

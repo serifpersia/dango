@@ -311,3 +311,11 @@
     padding: 0 3px;
   }
 }
+
+@media (max-width: 480px) {
+  .bellBtn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
+}

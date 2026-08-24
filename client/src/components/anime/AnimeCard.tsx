@@ -356,13 +356,22 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
           </div>
 
-          <div className={styles.info}>
-            {infoEls?.title !== false && (
-              <div className={styles.title} title={displayTitle}>
-                {displayTitle}
+          {showProgress && (continueWatching || lowEndMode) && showAnyBar && (
+            <div className={styles.progressSection}>
+              <div className={styles.progressContainer}>
+                <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
               </div>
-            )}
+              {hasProgress ? (
+                <div className={styles.timestamp}>
+                  {formatTime(ct)} / {formatTime(dur)}
+                </div>
+              ) : (
+                <div className={styles.timestamp}>Watched</div>
+              )}
+            </div>
+          )}
 
+          <div className={styles.titleSection}>
             {isMobile && showMobileBadges && (
               <div className={styles.mobileBadges}>
                 <span className={styles.mobileType}>{anime.type || 'TV'}</span>
@@ -374,18 +383,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </div>
             )}
 
-            {showProgress && (continueWatching || lowEndMode) && showAnyBar && (
-              <div>
-                <div className={styles.progressContainer}>
-                  <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
-                </div>
-                {hasProgress ? (
-                  <div className={styles.timestamp}>
-                    {formatTime(ct)} / {formatTime(dur)}
-                  </div>
-                ) : (
-                  <div className={styles.timestamp}>Watched</div>
-                )}
+            {infoEls?.title !== false && (
+              <div className={styles.title} title={displayTitle}>
+                <span className={styles.titleText}>{displayTitle}</span>
               </div>
             )}
 

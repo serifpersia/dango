@@ -7,6 +7,7 @@
   transition: z-index var(--transition-fast);
   content-visibility: auto;
   contain-intrinsic-size: 200px 300px;
+  border-radius: var(--radius-md);
 }
 
 .cardWrapper:hover {
@@ -23,9 +24,7 @@
   min-width: 0;
   box-shadow: none;
   border: 1px solid var(--border-secondary);
-  will-change: transform;
   transition:
-    transform var(--transition-base),
     border-color var(--transition-base),
     background-color var(--transition-base);
 }
@@ -46,7 +45,6 @@
 
 .cardWrapper:hover .card,
 .cardWrapper:focus-within .card {
-  transform: translateY(-6px);
   border-color: var(--border-accent);
   background-color: var(--bg-tertiary);
   box-shadow:
@@ -71,6 +69,7 @@
   transition: opacity 0.3s ease;
   pointer-events: none;
   z-index: 8;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .cardWrapper:hover .hoverOverlay,
@@ -94,6 +93,7 @@
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background: var(--bg-tertiary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .posterImg {
@@ -105,6 +105,7 @@
     opacity 0.4s ease,
     transform var(--transition-base),
     filter var(--transition-base);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .posterImg.blurred {
@@ -138,15 +139,37 @@
   opacity: 1;
 }
 
+.posterGradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.5) 40%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 3;
+}
+
 .cardWrapper:hover .posterImg {
   transform: scale(1.05);
 }
 
-.info {
-  padding: var(--space-3);
+.progressSection {
+  padding: var(--space-2) var(--space-3);
   display: flex;
   flex-direction: column;
-  height: 100px;
+  gap: 2px;
+}
+
+.titleSection {
+  padding: var(--space-3) var(--space-3) 0;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
 }
 
@@ -154,11 +177,7 @@
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
   line-height: 1.3;
-  color: var(--text-primary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: #e2e8f0;
   height: 2.6em;
   margin-bottom: 0;
   transition: color var(--transition-base);
@@ -166,8 +185,16 @@
   min-width: 0;
 }
 
+.titleText {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 2.6em;
+}
+
 .cardWrapper:hover .title {
-  color: var(--accent-light);
+  color: #c084fc;
 }
 
 .badge {
@@ -214,7 +241,7 @@
   border: none;
   font-size: 14px;
   padding: 5px 10px;
-  z-index: 11;
+  z-index: 5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
@@ -235,7 +262,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   padding: 4px 8px;
-  z-index: 11;
+  z-index: 5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
@@ -258,7 +285,7 @@
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-size-xs);
-  color: var(--text-secondary);
+  color: #94a3b8;
   margin-top: auto;
   min-width: 0;
   height: 24px;
@@ -286,7 +313,6 @@
   height: 4px;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-sm);
-  margin-top: var(--space-2);
   overflow: hidden;
 }
 
@@ -300,7 +326,6 @@
 .timestamp {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
-  margin-top: var(--space-1);
 }
 
 .removeBtn,
@@ -387,29 +412,30 @@
     height: auto !important;
   }
 
-  .info {
-    height: auto !important;
-    padding: 8px 8px !important;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 4px;
+  .progressSection {
+    padding: 4px 8px;
+  }
+
+  .titleSection {
+    padding: 8px 8px 0;
   }
 
   .title {
-    height: auto !important;
-    min-height: 2.4em;
+    height: auto;
     max-height: 2.6em;
-    margin-bottom: 4px !important;
     font-size: 0.82rem !important;
     line-height: 1.25;
+    color: #e2e8f0;
+  }
+
+  .titleText {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    text-align: center;
     overflow: hidden;
+    max-height: 2.6em;
     word-break: break-word;
-    color: var(--text-primary);
+    color: #e2e8f0;
   }
 
   .removeBtn,
@@ -455,7 +481,11 @@
     flex-shrink: 0;
   }
 
-  .card.horizontal .info {
+  .card.horizontal .posterGradient {
+    display: none;
+  }
+
+  .card.horizontal .titleSection {
     padding: var(--space-2) var(--space-3) !important;
     justify-content: center;
     flex-grow: 1 !important;
@@ -466,7 +496,7 @@
     aspect-ratio: 3 / 4;
   }
 
-  .card.vertical .info {
+  .card.vertical .titleSection {
     align-items: center;
     text-align: center;
   }
