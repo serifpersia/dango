@@ -45,10 +45,20 @@ jobs:
           echo "1. Download and extract 'dango.zip'" >> release_notes.md
           echo "2. Run 'npm install --omit=dev' inside the folder" >> release_notes.md
           echo "3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Android APK" >> release_notes.md
+          echo "Universal APK is included in this release if available." >> release_notes.md
 
       - name: Inject Version Date
         run: |
           node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.versionDate = new Date().toISOString(); fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
+      - name: Download Existing APK
+        run: |
+          mkdir -p release-package
+          gh release download "latest" --pattern "*.apk" --dir release-package/ 2>/dev/null || echo "No existing APK found."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete Existing Latest Release
         run: |
@@ -113,8 +123,14 @@ jobs:
       - name: Create New Latest Release
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          APK_ARG=""
+          if ls release-package/*.apk 1>/dev/null 2>&1; then
+            APK_FILE=$(ls release-package/*.apk | head -1)
+            APK_ARG="$APK_FILE"
+          fi
           gh release create "latest" \
             "dango.zip" \
+            $APK_ARG \
             --title "latest (v$VERSION)" \
             --notes-file release_notes.md \
             --target ${{ github.sha }}
