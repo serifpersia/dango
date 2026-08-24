@@ -207,6 +207,7 @@ const Home: React.FC = () => {
                     }}
                     disabled={page === 1}
                     style={{ opacity: page === 1 ? 0.3 : 1 }}
+                    aria-label="Previous page"
                   >
                     <FaChevronLeft size={14} />
                   </button>
@@ -223,6 +224,7 @@ const Home: React.FC = () => {
                     }}
                     disabled={!canGoNext}
                     style={{ opacity: canGoNext ? 1 : 0.3 }}
+                    aria-label="Next page"
                   >
                     <FaChevronRight size={14} />
                   </button>

@@ -16,12 +16,15 @@
   user-select: none;
 }
 
-.chevron {
-  transition: transform 0.2s ease;
+.triggerBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-sm);
 }
 
 .chevron {
   margin-left: 2px;
+  transition: transform 0.2s ease;
 }
 
 .triggerBtn[aria-expanded='true'] .chevron {
@@ -39,7 +42,7 @@
   border-radius: 10px;
   padding: 6px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  z-index: 99999;
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   animation: queueMenuIn 0.12s ease-out;

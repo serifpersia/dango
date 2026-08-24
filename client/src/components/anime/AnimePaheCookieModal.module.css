@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  color: var(--text-color, #fff);
+  color: var(--text-primary);
   max-width: 400px;
 }
 
@@ -18,26 +18,46 @@
 }
 
 .textarea {
-  background: var(--bg-secondary, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  color: #fff;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
   padding: 0.5rem;
   border-radius: 4px;
   resize: vertical;
   font-family: inherit;
 }
 
+.textarea:hover {
+  border-color: var(--border-secondary);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-input-focus);
+}
+
 .input {
-  background: var(--bg-secondary, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  color: #fff;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
   padding: 0.6rem;
   border-radius: 4px;
 }
 
+.input:hover {
+  border-color: var(--border-secondary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-input-focus);
+}
+
 .button {
-  background: var(--accent-color, #007bff);
-  color: #fff;
+  background: var(--accent);
+  color: var(--text-primary);
   border: none;
   padding: 0.7rem;
   border-radius: 4px;
@@ -57,11 +77,19 @@
 
 .secondaryButton {
   background: transparent;
-  border: 1px solid var(--border-color, #444);
-  color: #fff;
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
   padding: 0.7rem;
   border-radius: 4px;
   cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.secondaryButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-secondary);
 }
 
 .actions {

@@ -1,6 +1,6 @@
 .keyboard {
   position: fixed;
-  z-index: 5000;
+  z-index: var(--z-overlay);
   width: min(var(--keyboard-width), calc(100vw - 24px));
   overflow: hidden;
   color: var(--text-primary);

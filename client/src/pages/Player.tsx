@@ -22,7 +22,9 @@ import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
 import PlayerStatusArea from '../components/player/PlayerStatusArea'
 import QueueRail from '../components/player/QueueRail'
+import QueueRailSkeleton from '../components/player/QueueRailSkeleton'
 import EpisodeList from '../components/player/EpisodeList'
+import EpisodeListSkeleton from '../components/player/EpisodeListSkeleton'
 import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
@@ -135,7 +137,7 @@ const Player: React.FC = () => {
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastInteractionTimeRef = useRef(0)
-  const { data: queue = [] } = useQueue()
+  const { data: queue = [], isLoading: isQueueLoading } = useQueue()
   const removeQueue = useRemoveFromQueue()
   const removeQueueRef = useRef(removeQueue)
   removeQueueRef.current = removeQueue
@@ -1079,9 +1081,7 @@ const Player: React.FC = () => {
       {!isTheaterMode && (
         <aside ref={episodeSidebarRef} className={layoutStyles.episodeSidebar}>
           {state.loadingShowData ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Loading Episodes...
-            </div>
+            <EpisodeListSkeleton variant="sidebar" />
           ) : (
             <EpisodeList
               episodes={state.episodes}
@@ -1253,30 +1253,34 @@ const Player: React.FC = () => {
 
         {!isTheaterMode && (
           <>
-            <QueueRail
-              title="Queue"
-              items={queue}
-              currentShowId={showId}
-              currentEpisode={state.currentEpisode}
-              onNextQueue={handleQueueTransition}
-              onRemove={(item) =>
-                removeQueue.mutate({
-                  showId: item.showId,
-                  episodeNumber: item.episodeNumber,
-                })
-              }
-              onClear={() => clearQueue.mutate()}
-              showClearAll
-              onReorder={(items) =>
-                reorderQueue.mutate(
-                  items.map((item) => ({
-                    id: item.id,
+            {isQueueLoading && queue.length === 0 ? (
+              <QueueRailSkeleton count={3} />
+            ) : (
+              <QueueRail
+                title="Queue"
+                items={queue}
+                currentShowId={showId}
+                currentEpisode={state.currentEpisode}
+                onNextQueue={handleQueueTransition}
+                onRemove={(item) =>
+                  removeQueue.mutate({
                     showId: item.showId,
                     episodeNumber: item.episodeNumber,
-                  }))
-                )
-              }
-            />
+                  })
+                }
+                onClear={() => clearQueue.mutate()}
+                showClearAll
+                onReorder={(items) =>
+                  reorderQueue.mutate(
+                    items.map((item) => ({
+                      id: item.id,
+                      showId: item.showId,
+                      episodeNumber: item.episodeNumber,
+                    }))
+                  )
+                }
+              />
+            )}
 
             <div className={styles.providerAndEpisodeRow}>
               <ProviderSelector

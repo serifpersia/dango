@@ -102,6 +102,18 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
+  /* ===== Z-INDEX ===== */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-sidebar: 400;
+  --z-header: 500;
+  --z-modal: 600;
+  --z-popover: 700;
+  --z-toast: 800;
+  --z-overlay: 900;
+
   /* ===== LAYOUT ===== */
   --header-height: 80px;
   --max-width: 1600px;

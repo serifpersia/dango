@@ -13,9 +13,8 @@
 
 .episodeListHeader {
   background: transparent;
-  padding: 1.5rem;
+  padding: var(--space-6);
   border-bottom: 1px solid var(--glass-border);
-  z-index: 10;
 }
 
 .drawerHeader {
@@ -27,31 +26,28 @@
 }
 
 .episodeListTitle {
-  margin: 0 0 1.25rem 0;
-  font-size: 1.25rem;
+  margin: 0 0 var(--space-5) 0;
+  font-size: 0.85rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--text-tertiary);
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  color: var(--text-tertiary);
+  gap: var(--space-3);
   letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .rangeSelector {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .rangeButton {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   font-size: 0.8rem;
   font-weight: 600;
@@ -65,6 +61,11 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.rangeButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .rangeButton.active {
   background: var(--accent);
   color: white;
@@ -75,7 +76,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  padding: var(--space-4);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
@@ -106,8 +107,8 @@
 }
 
 .episodeItem {
-  padding: 1rem 1.25rem;
-  margin-bottom: 0.5rem;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-2);
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all var(--transition-normal);
@@ -125,6 +126,11 @@
   color: var(--text-primary);
   transform: translateX(6px);
   border-color: var(--glass-border);
+}
+
+.episodeItem:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 .episodeItem.watched {
@@ -146,5 +152,5 @@
 .episodeItem span {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }

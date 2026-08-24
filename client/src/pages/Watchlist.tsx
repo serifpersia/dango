@@ -500,6 +500,7 @@ const Watchlist: React.FC = () => {
                 className={styles.pageBtn}
                 onClick={() => handlePageChange(page - 1)}
                 disabled={page === 1 || isLoading}
+                aria-label="Previous page"
               >
                 <FaChevronLeft size={14} />
               </button>
@@ -510,6 +511,7 @@ const Watchlist: React.FC = () => {
                 className={styles.pageBtn}
                 onClick={() => handlePageChange(page + 1)}
                 disabled={!canGoNext || isLoading}
+                aria-label="Next page"
               >
                 <FaChevronRight size={14} />
               </button>
@@ -755,6 +757,7 @@ const Watchlist: React.FC = () => {
                         className={styles.removeBtn}
                         onClick={() => handleRemove(item.id, item.name)}
                         title="Remove from Watchlist"
+                        aria-label="Remove from Watchlist"
                       >
                         <FaTrash size={12} />
                       </button>

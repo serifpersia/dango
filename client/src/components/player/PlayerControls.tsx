@@ -352,7 +352,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 
         <div className={styles.bottomControlsRow}>
           <div className={styles.leftControls}>
-            <button className={styles.controlBtn} onClick={actions.togglePlay}>
+            <button
+              className={styles.controlBtn}
+              onClick={actions.togglePlay}
+              aria-label={state.isPlaying ? 'Pause' : 'Play'}
+            >
               {state.isPlaying ? <FaPause /> : <FaPlay />}
             </button>
 
@@ -370,6 +374,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                     actions.toggleMute()
                   }
                 }}
+                aria-label={state.isMuted ? 'Unmute' : 'Mute'}
               >
                 {renderVolumeIcon()}
               </button>
@@ -473,7 +478,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               <FaTv />
             </button>
 
-            <button className={styles.controlBtn} onClick={actions.toggleFullscreen}>
+            <button
+              className={styles.controlBtn}
+              onClick={actions.toggleFullscreen}
+              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
               {state.isFullscreen ? <FaCompress /> : <FaExpand />}
             </button>
           </div>

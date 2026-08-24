@@ -1,5 +1,5 @@
 .popupPortal {
-  z-index: 9999;
+  z-index: var(--z-popover);
   pointer-events: none;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .scoreIcon {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .synopsis {

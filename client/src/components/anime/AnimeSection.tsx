@@ -161,11 +161,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
         <div className={styles['header-controls']}>
           {showSeeMore && (
             <div className={styles['header-actions']}>
-              <Link
-                to="/watchlist/Continue Watching"
-                className="btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
-              >
+              <Link to="/watchlist/Continue Watching" className={styles.viewAllLink}>
                 View All
               </Link>
             </div>

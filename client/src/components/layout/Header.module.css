@@ -7,7 +7,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: var(--z-header);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -263,7 +263,7 @@
     top: var(--header-height);
     left: 0;
     right: 0;
-    z-index: 999;
+    z-index: calc(var(--z-header) - 1);
     background: rgba(12, 12, 15, 0.5);
     padding: var(--space-2) var(--space-3);
     animation: slideDown 0.2s ease;
@@ -312,9 +312,10 @@
     color: rgba(255, 255, 255, 0.5);
   }
 
-  .mobileSearchInput:focus {
-    outline: none !important;
-    box-shadow: none !important;
+  .mobileSearchInput:focus,
+  input.mobileSearchInput:focus {
+    outline: none;
+    box-shadow: none;
   }
 }
 

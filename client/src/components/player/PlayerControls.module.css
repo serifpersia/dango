@@ -31,14 +31,14 @@
   right: 0;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--space-6);
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0.85) 0%,
     rgba(0, 0, 0, 0.45) 60%,
     transparent 100%
   );
-  padding: 32px 40px;
+  padding: var(--space-8) var(--space-10);
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 10;
   pointer-events: auto;
@@ -86,7 +86,6 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Netflix Style Center Controls */
 .centerControls {
   position: absolute;
   top: 50%;
@@ -94,7 +93,7 @@
   transform: translate(-50%, -50%) scale(1);
   display: flex;
   align-items: center;
-  gap: 3rem;
+  gap: var(--space-12);
   z-index: 10;
   pointer-events: auto;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -162,7 +161,7 @@
     rgba(0, 0, 0, 0.25) 80%,
     transparent 100%
   );
-  padding: 0 32px 24px 32px;
+  padding: 0 var(--space-8) var(--space-6) var(--space-8);
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -284,7 +283,7 @@
 .rightControls {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: var(--space-5);
 }
 
 .controlBtn {
@@ -307,6 +306,11 @@
   transform: translateY(-2px);
 }
 
+.controlBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .controlBtn.active {
   color: var(--accent);
 }
@@ -322,7 +326,7 @@
 .skipControls {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .skipBtn {
@@ -445,47 +449,56 @@
 }
 
 /* Low End Mode Overrides for Player Controls */
-:global(body.low-end) .controlsOverlay {
-  background: none !important;
-  transition: none !important;
+:global(body.low-end) .controlsOverlay,
+:global(body.low-end) div.controlsOverlay {
+  background: none;
+  transition: none;
 }
 
-:global(body.low-end) .bottomControls {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+:global(body.low-end) .bottomControls,
+:global(body.low-end) div.bottomControls {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   background: #1a1a1c;
-  box-shadow: none !important;
-  transition: none !important;
+  box-shadow: none;
+  transition: none;
 }
 
-:global(body.low-end) .controlBtn.active {
-  color: var(--accent) !important;
+:global(body.low-end) .controlBtn.active,
+:global(body.low-end) button.controlBtn.active {
+  color: var(--accent);
 }
 
-:global(body.low-end) .progressBar {
-  height: 4px !important;
-  transition: none !important;
+:global(body.low-end) .progressBar,
+:global(body.low-end) div.progressBar {
+  height: 4px;
+  transition: none;
 }
 
-:global(body.low-end) .watchedBar {
-  background: var(--accent) !important;
-  box-shadow: none !important;
+:global(body.low-end) .watchedBar,
+:global(body.low-end) div.watchedBar {
+  background: var(--accent);
+  box-shadow: none;
 }
 
-:global(body.low-end) .thumb {
-  transition: none !important;
-  box-shadow: none !important;
+:global(body.low-end) .thumb,
+:global(body.low-end) div.thumb {
+  transition: none;
+  box-shadow: none;
 }
 
 :global(body.low-end) .controlBtn:hover,
-:global(body.low-end) .nextEpisodeBtn:hover {
-  transform: none !important;
+:global(body.low-end) .nextEpisodeBtn:hover,
+:global(body.low-end) button.controlBtn:hover,
+:global(body.low-end) button.nextEpisodeBtn:hover {
+  transform: none;
 }
 
-:global(body.low-end) .timeBubble {
-  backdrop-filter: none !important;
-  background: #111 !important;
-  transition: none !important;
+:global(body.low-end) .timeBubble,
+:global(body.low-end) div.timeBubble {
+  backdrop-filter: none;
+  background: #111;
+  transition: none;
 }
 
 @media (max-width: 768px) {
@@ -569,7 +582,7 @@
     border: 1px solid var(--glass-border);
     padding: 4px 12px;
     border-radius: 16px;
-    z-index: 100;
+    z-index: var(--z-dropdown);
     pointer-events: none;
   }
 

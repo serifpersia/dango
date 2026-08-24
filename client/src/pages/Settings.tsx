@@ -303,7 +303,7 @@ const Settings: React.FC = () => {
                     </p>
                     <div
                       style={{
-                        background: '#1a1a1a',
+                        background: 'var(--bg-tertiary)',
                         padding: '0.5rem',
                         borderRadius: '4px',
                         wordBreak: 'break-all',

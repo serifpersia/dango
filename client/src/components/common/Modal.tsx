@@ -1,6 +1,6 @@
 import React from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import './Modal.css'
+import styles from './Modal.module.css'
 
 interface Props {
   isOpen: boolean
@@ -15,11 +15,11 @@ export function Modal({ isOpen, onClose, title, children, footer, width = 'md' }
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose?.()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className={`modal-content modal-${width}`}>
-          {title && <Dialog.Title className="modal-title">{title}</Dialog.Title>}
-          <div className="modal-body">{children}</div>
-          {footer && <div className="modal-footer">{footer}</div>}
+        <Dialog.Overlay className={styles.overlay} />
+        <Dialog.Content className={`${styles.content} ${styles[width]}`}>
+          {title && <Dialog.Title className={styles.title}>{title}</Dialog.Title>}
+          <div className={styles.body}>{children}</div>
+          {footer && <div className={styles.footer}>{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

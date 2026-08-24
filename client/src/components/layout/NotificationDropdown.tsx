@@ -10,6 +10,7 @@ import {
   FaTimes,
 } from 'react-icons/fa'
 import NotificationItem from './NotificationItem'
+import NotificationSkeleton from './NotificationSkeleton'
 import {
   useNotifications,
   useDiscoveryStatus,
@@ -90,7 +91,7 @@ const NotificationDropdown: React.FC = () => {
       </div>
       <div className={styles.list}>
         {isLoading && systemNotifications.length === 0 ? (
-          <div className={styles.emptyState}>Loading...</div>
+          <NotificationSkeleton count={4} />
         ) : (
           <>
             {systemNotifications.map((sn) => (

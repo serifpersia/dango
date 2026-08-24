@@ -17,8 +17,8 @@
   align-items: center;
   justify-content: center;
   transition:
-    transform 0.2s ease,
-    background 0.2s ease;
+    transform var(--transition-fast),
+    background var(--transition-fast);
   position: relative;
   width: 50px;
   height: 50px;
@@ -31,11 +31,16 @@
   transform: scale(1.05);
 }
 
+.bellBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .badge {
   position: absolute;
   top: 6px;
   right: 6px;
-  background-color: #ff4d4f;
+  background-color: var(--color-danger);
   color: white;
   font-size: 0.62rem;
   font-weight: bold;
@@ -73,17 +78,17 @@
 
 .dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + var(--space-2));
   right: 0;
   width: 320px;
   max-height: 480px;
-  background: rgba(20, 20, 20, 0.85);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  z-index: var(--z-header);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -103,28 +108,28 @@
 }
 
 .dropdownHeader {
-  padding: 1rem;
+  padding: var(--space-4);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .dropdownHeader h4 {
   margin: 0;
   font-size: 1rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .clearAllBtn {
   background: none;
   border: none;
   color: var(--primary-color);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
 }
 
 .clearAllBtn:hover {
@@ -134,16 +139,16 @@
 .discoveryStatusRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0.5rem 1rem;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   font-size: 0.72rem;
-  color: var(--text-muted, #9a9aa5);
+  color: var(--text-muted);
   background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .spinIcon {
-  color: var(--accent, #6c9fff);
+  color: var(--accent);
   animation: spin 0.9s linear infinite;
   flex-shrink: 0;
 }
@@ -167,18 +172,18 @@
 }
 
 .list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-secondary);
   border-radius: 2px;
 }
 
 .item {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  gap: 0.85rem;
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
   text-decoration: none;
-  transition: background 0.2s;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border-primary);
   position: relative;
 }
 
@@ -189,7 +194,7 @@
 .thumbnail {
   width: 48px;
   height: 64px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -204,11 +209,11 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #eee;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 
 .itemMeta {
@@ -217,7 +222,7 @@
   background: var(--primary-color);
   color: white;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
 }
 
@@ -227,11 +232,11 @@
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-secondary);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--transition-fast);
 }
 
 .systemItemMeta:hover {
@@ -241,17 +246,17 @@
 .removeItem {
   background: none;
   border: none;
-  color: #666;
-  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
   cursor: pointer;
-  padding: 0.5rem;
+  padding: var(--space-2);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   transition:
-    opacity 0.2s,
-    color 0.2s;
+    opacity var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .item:hover .removeItem {
@@ -265,7 +270,7 @@
 }
 
 .removeItem:hover {
-  color: #ff4d4f;
+  color: var(--color-danger);
 }
 
 .queueItem:hover {
@@ -273,9 +278,9 @@
 }
 
 .emptyState {
-  padding: 2.5rem 1rem;
+  padding: var(--space-10) var(--space-4);
   text-align: center;
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -287,7 +292,7 @@
     right: 0;
     width: 100vw;
     max-height: calc(100vh - var(--header-height, 60px));
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
   }
 
   .bellBtn {
@@ -297,7 +302,7 @@
   }
 
   .removeItem {
-    padding: 0.6rem;
+    padding: var(--space-2);
     min-width: 36px;
     min-height: 36px;
   }

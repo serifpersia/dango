@@ -1,6 +1,5 @@
 import React from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
-import styles from './GenericModal.module.css'
+import { Modal } from './Modal'
 
 interface GenericModalProps {
   isOpen: boolean
@@ -11,15 +10,9 @@ interface GenericModalProps {
 
 const GenericModal: React.FC<GenericModalProps> = ({ isOpen, onClose, children, title }) => {
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={styles.content} aria-label={title}>
-          {title && <Dialog.Title className={styles.title}>{title}</Dialog.Title>}
-          {children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+      {children}
+    </Modal>
   )
 }
 

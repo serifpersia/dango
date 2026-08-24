@@ -253,7 +253,7 @@
 }
 
 :global(body.low-end) .episodeSidebar {
-  background: #0a0a0c !important;
+  background: var(--bg-secondary) !important;
 }
 
 .theaterMode {
@@ -269,12 +269,12 @@
   max-width: none !important;
   padding: 2.5rem !important;
   margin: 0 !important;
-  background-color: #050507 !important;
+  background-color: var(--bg-main) !important;
   backdrop-filter: blur(24px) !important;
   -webkit-backdrop-filter: blur(24px) !important;
   animation: fadeIn 0.4s var(--ease-smooth) !important;
   overflow: hidden !important;
-  z-index: 9999 !important;
+  z-index: var(--z-overlay) !important;
 }
 
 .theaterMode .playerMain {
