@@ -55,8 +55,8 @@ jobs:
 
       - name: Download Existing APK
         run: |
-          mkdir -p release-package
-          gh release download "latest" --pattern "*.apk" --dir release-package/ 2>/dev/null || echo "No existing APK found."
+          mkdir -p apk-download
+          gh release download "latest" --pattern "*.apk" --dir apk-download/ 2>/dev/null || echo "No existing APK found."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -124,8 +124,8 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           APK_ARG=""
-          if ls release-package/*.apk 1>/dev/null 2>&1; then
-            APK_FILE=$(ls release-package/*.apk | head -1)
+          if ls apk-download/*.apk 1>/dev/null 2>&1; then
+            APK_FILE=$(ls apk-download/*.apk | head -1)
             APK_ARG="$APK_FILE"
           fi
           gh release create "latest" \
