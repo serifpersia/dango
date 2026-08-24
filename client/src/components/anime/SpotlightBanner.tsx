@@ -29,9 +29,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     const items = animeList.slice(0, 6)
     for (const anime of items) {
       if (!anime._id || !/^\d+$/.test(anime._id)) continue
-      const existing = queryClient.getQueryData(['show-meta', anime._id])
+      const existing = queryClient.getQueryData(['show-preview', anime._id])
       if (!existing) {
-        queryClient.setQueryData(['show-meta', anime._id], {
+        queryClient.setQueryData(['show-preview', anime._id], {
           id: anime._id,
           name: anime.name,
           nativeName: anime.nativeName,

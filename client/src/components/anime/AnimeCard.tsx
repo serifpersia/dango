@@ -192,8 +192,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const displayTitle = (anime[titlePreference as keyof Anime] as string) || anime.name
 
-    const progressRatio = (anime.currentTime || 0) / (anime.duration || 1)
-
     const episodeToPlay = anime.episodeNumber ?? anime.nextEpisodeToWatch
 
     const linkTarget = continueWatching

@@ -4,6 +4,7 @@ import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import { useTelemetry } from './hooks/useTelemetry'
+import { useSetting } from './hooks/useSettings'
 import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { useAnimePaheCookie } from './hooks/useAnimePaheCookie'
@@ -11,8 +12,11 @@ import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
 
 function useDiscordPageStatus() {
   const location = useLocation()
+  const { data: discordEnabled } = useSetting('discordRPCEnabled')
 
   useEffect(() => {
+    if (discordEnabled === false || discordEnabled === 'false') return
+
     const path = location.pathname
 
     if (path.startsWith('/watch/') || path.startsWith('/player/')) return
@@ -31,7 +35,7 @@ function useDiscordPageStatus() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page }),
     }).catch(() => {})
-  }, [location.pathname])
+  }, [location.pathname, discordEnabled])
 }
 
 const Home = lazy(() => import('./pages/Home'))
@@ -57,9 +61,14 @@ const PlayerRedirect = () => {
 function App() {
   const { isOpen, openModal, closeModal, onSuccess } = useAnimePaheCookie()
   const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
+  const location = useLocation()
   const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
   useDiscordPageStatus()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
 
   useEffect(() => {
     const handleAuthRequired = () => openModal()
@@ -95,9 +104,9 @@ function App() {
         position="top-center"
         toastOptions={{
           style: {
-            background: '#262829',
-            color: '#fff',
-            border: '1px solid #444',
+            background: 'var(--bg-elevated)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-primary)',
           },
           success: {
             style: {
@@ -111,7 +120,7 @@ function App() {
           },
           error: {
             style: {
-              background: '#992a2a',
+              background: 'rgba(153, 42, 42, 0.95)',
               color: '#fff',
             },
           },

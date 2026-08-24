@@ -1,9 +1,9 @@
-import { ComponentChildren } from 'preact'
+import React from 'react'
 import './Alert.css'
 
 interface Props {
   variant?: 'info' | 'success' | 'warning' | 'error'
-  children: ComponentChildren
+  children: React.ReactNode
   className?: string
 }
 

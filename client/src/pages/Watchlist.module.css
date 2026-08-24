@@ -254,6 +254,7 @@
 .filterItem select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .genreSection {
@@ -356,6 +357,24 @@
     padding: var(--space-4);
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: var(--space-2);
+  }
+
+  .filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filterBtn {
+    flex-shrink: 0;
+    scroll-snap-align: start;
   }
 
   .searchBarWrapper {
@@ -573,6 +592,7 @@
   padding: var(--space-16) var(--space-4);
   color: var(--text-tertiary);
   background: var(--glass-bg);
+  background-image: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
   border: 1px dashed var(--border-primary);
   border-radius: var(--radius-xl);
   font-size: var(--font-size-base);

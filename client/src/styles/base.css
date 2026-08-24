@@ -10,6 +10,7 @@
 html {
   scroll-behavior: smooth;
   color-scheme: dark;
+  scrollbar-gutter: stable;
 }
 
 body {

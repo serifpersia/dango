@@ -1,8 +1,8 @@
-import { ComponentChildren, JSX } from 'preact'
+import React from 'react'
 import './Layout.css'
 
 interface Props {
-  children: ComponentChildren
+  children: React.ReactNode
   size?: 'sm' | 'md' | 'lg' | 'full'
   className?: string
 }
@@ -20,7 +20,7 @@ export function Flex({
   direction = 'row',
   wrap,
 }: {
-  children: ComponentChildren
+  children: React.ReactNode
   className?: string
   gap?: string
   align?: 'start' | 'center' | 'end' | 'stretch'
@@ -52,7 +52,7 @@ export function Grid({
   gap,
   className = '',
 }: {
-  children: ComponentChildren
+  children: React.ReactNode
   cols?: number
   gap?: string
   className?: string
@@ -64,7 +64,7 @@ export function Grid({
         {
           '--grid-cols': cols,
           gap,
-        } as JSX.CSSProperties
+        } as React.CSSProperties
       }
     >
       {children}
@@ -77,7 +77,7 @@ export function Stack({
   gap,
   className = '',
 }: {
-  children: ComponentChildren
+  children: React.ReactNode
   gap?: string
   className?: string
 }) {

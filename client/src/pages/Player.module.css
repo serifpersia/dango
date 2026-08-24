@@ -928,7 +928,7 @@
   }
 
   .controls {
-    gap: 0.65rem;
+    gap: 0.5rem;
   }
 
   .watchBtn,
@@ -938,8 +938,11 @@
   .completeSeriesBtn,
   .nativeToggleBtn,
   .modeToggleBtn {
-    flex: 1 1 calc(50% - 0.35rem);
+    flex: 1 1 calc(50% - 0.25rem);
     min-width: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    gap: 0.4rem;
   }
 
   .watchBtn {
@@ -947,13 +950,19 @@
   }
 
   .episodeNavBtn {
-    flex: 1 1 calc(50% - 0.4rem);
+    flex: 1 1 calc(50% - 0.25rem);
     min-width: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+    min-height: 44px;
   }
 
   .episodePickerBtn {
     display: inline-flex;
     flex-basis: 100%;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    min-height: 44px;
   }
 
   .desktopEpisodeActions {

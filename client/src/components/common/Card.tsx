@@ -1,8 +1,8 @@
-import { ComponentChildren } from 'preact'
+import React from 'react'
 import './Card.css'
 
 interface Props {
-  children: ComponentChildren
+  children: React.ReactNode
   className?: string
   onClick?: () => void
 }
@@ -35,7 +35,7 @@ export function CardContent({
   children,
   className = '',
 }: {
-  children: ComponentChildren
+  children: React.ReactNode
   className?: string
 }) {
   return <div className={`card-content ${className}`}>{children}</div>
