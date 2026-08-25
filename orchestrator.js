@@ -240,7 +240,15 @@ async function main() {
     serverProcess.on('exit', (code) => {
       if (!isShuttingDown) {
         log('System', colors.system, `Server crashed or exited prematurely.`)
-        process.exit(code || 0)
+        if (clientProcess) {
+          if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+          else {
+            try {
+              process.kill(-clientProcess.pid, 'SIGTERM')
+            } catch {}
+          }
+        }
+        setTimeout(() => process.exit(code || 0), 500)
       }
     })
   }
