@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from 'react'
+import { useEffect, useRef, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -13,6 +13,41 @@ import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
 function useDiscordPageStatus() {
   const location = useLocation()
   const { data: discordEnabled } = useSetting('discordRPCEnabled')
+  const sessionIdRef = useRef<string>('')
+  if (!sessionIdRef.current) {
+    sessionIdRef.current =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }
+
+  useEffect(() => {
+    if (discordEnabled === false || discordEnabled === 'false') return
+
+    const sessionId = sessionIdRef.current
+    const heartbeat = () =>
+      fetch('/api/discord/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {})
+
+    heartbeat()
+    const interval = setInterval(heartbeat, 15000)
+
+    const handlePageHide = () => {
+      navigator.sendBeacon(
+        '/api/discord/heartbeat',
+        new Blob([JSON.stringify({ sessionId, bye: true })], { type: 'application/json' })
+      )
+    }
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [discordEnabled])
 
   useEffect(() => {
     if (discordEnabled === false || discordEnabled === 'false') return

@@ -25,15 +25,27 @@ class DiscordRPCService {
   private reconnectTimeout: NodeJS.Timeout | null = null
   private lastActivity: DiscordActivityData | null = null
   private currentSessionId: string | null = null
+  private hasPagePresence: boolean = false
+  private hasEverConnected: boolean = false
+  private permanentlyDisabled: boolean = false
+  private heartbeats: Map<string, number> = new Map()
+  private heartbeatTimer: NodeJS.Timeout | null = null
   private retryCount: number = 0
   private readonly MAX_RETRIES = 5
   private readonly INITIAL_RECONNECT_DELAY = 15000
   private readonly MAX_RECONNECT_DELAY = 300000
+  private readonly HEARTBEAT_TIMEOUT = 40000
+  private readonly HEARTBEAT_CHECK_INTERVAL = 10000
 
   public async setEnabled(enabled: boolean) {
     if (this.isEnabled === enabled) return
     this.isEnabled = enabled
     if (enabled) {
+      if (this.permanentlyDisabled) {
+        log.debug('Discord Rich Presence is unavailable on this device/session. Not retrying.')
+        this.isEnabled = false
+        return
+      }
       this.retryCount = 0
       this.connect()
     } else {
@@ -49,20 +61,67 @@ class DiscordRPCService {
     this.hideMature = hide
   }
 
+  public heartbeat(sessionId: string) {
+    this.heartbeats.set(sessionId, Date.now())
+    if (!this.heartbeatTimer && this.isEnabled) {
+      this.heartbeatTimer = setInterval(() => {
+        void this.checkHeartbeats()
+      }, this.HEARTBEAT_CHECK_INTERVAL)
+    }
+  }
+
+  public removeHeartbeat(sessionId: string) {
+    this.heartbeats.delete(sessionId)
+    void this.checkHeartbeats()
+  }
+
+  private async checkHeartbeats() {
+    if (!this.isEnabled) {
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer)
+        this.heartbeatTimer = null
+      }
+      return
+    }
+
+    const now = Date.now()
+    for (const [sessionId, lastSeen] of this.heartbeats) {
+      if (now - lastSeen > this.HEARTBEAT_TIMEOUT) {
+        this.heartbeats.delete(sessionId)
+      }
+    }
+
+    if (this.heartbeats.size === 0) {
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer)
+        this.heartbeatTimer = null
+      }
+      if (this.hasPagePresence || this.lastActivity || this.currentSessionId) {
+        this.lastActivity = null
+        this.currentSessionId = null
+        this.hasPagePresence = false
+        await this.setIdleStatus('idle')
+      }
+    }
+  }
+
   private async connect() {
-    if (!this.isEnabled || this.client) return
+    if (!this.isEnabled || this.client || this.permanentlyDisabled) return
 
     const isTermux = !!process.env.TERMUX_VERSION
     const isAndroid = process.platform === 'android'
     if (isTermux || isAndroid) {
       log.debug('Discord Rich Presence is not supported on Android/Termux. Skipping connection.')
       this.isEnabled = false
+      this.permanentlyDisabled = true
       return
     }
 
     const clientId = CONFIG.DISCORD_CLIENT_ID
     if (!clientId) {
       log.debug('DISCORD_CLIENT_ID is not configured. Discord Rich Presence is disabled.')
+      this.isEnabled = false
+      this.permanentlyDisabled = true
       return
     }
 
@@ -71,6 +130,7 @@ class DiscordRPCService {
 
       this.client.on('ready', () => {
         log.info('Connected to Discord client successfully')
+        this.hasEverConnected = true
         this.retryCount = 0
         if (this.lastActivity) {
           this.updatePresence(this.lastActivity)
@@ -88,12 +148,20 @@ class DiscordRPCService {
       this.client.on('ERROR', (err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err)
         if (errMsg.includes('ENOENT') || errMsg.includes('ECONNREFUSED')) {
+          this.cleanup()
+          if (!this.hasEverConnected) {
+            log.debug('Discord client not detected. Rich Presence disabled for this session.')
+            this.isEnabled = false
+            this.permanentlyDisabled = true
+            return
+          }
           log.debug('Discord client not running or connection refused.')
+          this.scheduleReconnect()
         } else {
           log.error({ err }, 'Discord RPC client error')
+          this.cleanup()
+          this.scheduleReconnect()
         }
-        this.cleanup()
-        this.scheduleReconnect()
       })
 
       const loginPromise = this.client.login()
@@ -102,14 +170,23 @@ class DiscordRPCService {
       )
 
       await Promise.race([loginPromise, timeoutPromise])
+      this.hasEverConnected = true
     } catch (err) {
       this.cleanup()
+      if (!this.hasEverConnected) {
+        log.debug(
+          'Discord client not available at startup. Rich Presence disabled for the rest of this session.'
+        )
+        this.isEnabled = false
+        this.permanentlyDisabled = true
+        return
+      }
       this.scheduleReconnect()
     }
   }
 
   private scheduleReconnect() {
-    if (!this.isEnabled || this.reconnectTimeout) return
+    if (!this.isEnabled || this.reconnectTimeout || this.permanentlyDisabled) return
 
     const delay = Math.min(
       this.INITIAL_RECONNECT_DELAY * Math.pow(1.5, this.retryCount),
@@ -161,6 +238,11 @@ class DiscordRPCService {
     this.cleanup()
     this.lastActivity = null
     this.currentSessionId = null
+    this.heartbeats.clear()
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer)
+      this.heartbeatTimer = null
+    }
   }
 
   private formatTime(seconds: number): string {
@@ -245,6 +327,7 @@ class DiscordRPCService {
             },
           ],
         })
+        this.hasPagePresence = false
         return
       }
 
@@ -288,6 +371,7 @@ class DiscordRPCService {
       }
 
       await this.client.user.setActivity(activity)
+      this.hasPagePresence = false
     } catch (err) {
       log.error({ err }, 'Failed to set Discord activity')
     }
@@ -328,6 +412,7 @@ class DiscordRPCService {
           },
         ],
       })
+      this.hasPagePresence = page in pageLabels
     } catch (err) {
       if ((err as Error).message === 'Closed by Discord') {
         log.warn('Discord connection ended, skipping idle status update')

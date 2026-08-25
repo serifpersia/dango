@@ -59,6 +59,19 @@ export function createWatchlistRouter(
     res.json({ success: true })
   })
 
+  router.post('/discord/heartbeat', (req, res) => {
+    const { sessionId, bye } = req.body ?? {}
+    if (typeof sessionId !== 'string' || !discordRPCService.isServiceEnabled) {
+      return res.json({ success: true })
+    }
+    if (bye) {
+      discordRPCService.removeHeartbeat(sessionId)
+    } else {
+      discordRPCService.heartbeat(sessionId)
+    }
+    res.json({ success: true })
+  })
+
   router.post('/discord/status', (req, res) => {
     const { page } = req.body
     if (typeof page !== 'string' || !discordRPCService.isServiceEnabled) {
