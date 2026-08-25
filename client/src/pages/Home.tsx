@@ -16,6 +16,7 @@ import {
   useAllContinueWatching,
   useRemoveFromWatchlist,
   useSpotlightBanners,
+  useBatchedHome,
   useQueue,
   useRemoveFromQueue,
   useClearQueue,
@@ -90,6 +91,7 @@ const Home: React.FC = () => {
   ])
 
   const { data: spotlightAnime } = useSpotlightBanners()
+  const { data: batchedHome } = useBatchedHome(seasonFormat)
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(

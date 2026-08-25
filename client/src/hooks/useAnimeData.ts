@@ -63,6 +63,20 @@ export const useSpotlightBanners = () => {
   })
 }
 
+export interface BatchedHomeData {
+  trending: Anime[]
+  seasonal: Anime[]
+  spotlight: Anime[]
+}
+
+export const useBatchedHome = (format: string = 'TV') => {
+  return useQuery<BatchedHomeData>({
+    queryKey: ['batchedHome', format],
+    queryFn: () => fetchApi(`/api/home?format=${format}`),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: number = 10) => {
   return useInfiniteQuery<Anime[]>({
     queryKey: ['trendingList', sort, size],

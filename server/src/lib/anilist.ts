@@ -220,6 +220,76 @@ export function mediaFields(): string {
   `
 }
 
+export function mediaFieldsLight(): string {
+  return `
+    id
+    title { romaji english native }
+    coverImage { extraLarge large }
+    status
+    averageScore
+    episodes
+    seasonYear
+    season
+    genres
+    isAdult
+    format
+    nextAiringEpisode { episode }
+  `
+}
+
+export interface BatchedHomeData {
+  trending: Show[]
+  seasonal: Show[]
+  spotlight: Show[]
+}
+
+export async function getBatchedHomeData(format?: string): Promise<BatchedHomeData> {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const currentSeason =
+    month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
+
+  const formatVar = format && format !== 'ALL' ? format.toUpperCase() : undefined
+  const formatFilter = formatVar ? `format: $seasonFormat,` : ''
+
+  const query = `
+    query ($season: MediaSeason, $seasonYear: Int, $seasonFormat: MediaFormat) {
+      trending: Page(perPage: 20) {
+        media(sort: TRENDING_DESC, type: ANIME, isAdult: false, status: RELEASING) {
+          ${mediaFieldsLight()}
+        }
+      }
+      seasonal: Page(perPage: 14) {
+        media(season: $season, seasonYear: $seasonYear, type: ANIME, isAdult: false, ${formatFilter} sort: [POPULARITY_DESC, SCORE_DESC]) {
+          ${mediaFieldsLight()}
+        }
+      }
+      spotlight: Page(perPage: 20) {
+        media(sort: TRENDING_DESC, type: ANIME, isAdult: false) {
+          ${mediaFields()}
+        }
+      }
+    }
+  `
+
+  const result = await anilistRequest<{
+    trending?: { media?: AnilistMedia[] }
+    seasonal?: { media?: AnilistMedia[] }
+    spotlight?: { media?: AnilistMedia[] }
+  }>(query, { season: currentSeason, seasonYear: year, seasonFormat: formatVar })
+
+  if (!result?.data) {
+    return { trending: [], seasonal: [], spotlight: [] }
+  }
+
+  return {
+    trending: (result.data.trending?.media ?? []).map(fromAnilistMedia),
+    seasonal: (result.data.seasonal?.media ?? []).map(fromAnilistMedia),
+    spotlight: (result.data.spotlight?.media ?? []).map(fromAnilistMedia),
+  }
+}
+
 function getAnilistCacheKey(query: string, variables?: Record<string, unknown>): string {
   return `${query}:${JSON.stringify(variables || {})}`
 }
@@ -452,7 +522,7 @@ export async function getLatestReleases(
           airingSchedules(sort: TIME_DESC, airingAt_lesser: $airingAtLt, airingAt_greater: $airingAtGt) {
             id episode airingAt
             media {
-              ${mediaFields()}
+              ${mediaFieldsLight()}
             }
           }
         }
@@ -507,7 +577,7 @@ async function getAdultLatest(page: number, size: number): Promise<Show[]> {
       Page(page: $page, perPage: $perPage) {
         pageInfo { total hasNextPage }
         media(sort: [START_DATE_DESC, ID_DESC], type: ANIME, isAdult: true) {
-          ${mediaFields()}
+          ${mediaFieldsLight()}
         }
       }
     }
@@ -550,7 +620,7 @@ export async function getSeasonal(
       Page(page: $page, perPage: $perPage) {
         pageInfo { hasNextPage total }
         media(season: $season, seasonYear: $seasonYear, type: ANIME, format: $format, isAdult: false, sort: [POPULARITY_DESC, SCORE_DESC]) {
-          ${mediaFields()}
+          ${mediaFieldsLight()}
         }
       }
     }
@@ -711,6 +781,56 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
   return null
 }
 
+export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, string>> {
+  const result = new Map<number, string>()
+  if (ids.length === 0) return result
+
+  if (!isAnilistRateLimited()) {
+    const BATCH = 10
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH)
+      const aliases = batch
+        .map((id, idx) => `a${idx}: Media(id: $id${idx}, type: ANIME) { id status }`)
+        .join('\n')
+      const variables: Record<string, unknown> = {}
+      batch.forEach((id, idx) => {
+        variables[`id${idx}`] = id
+      })
+
+      try {
+        const resp = await anilistRequest<Record<string, { id: number; status: string }>>(
+          `query (${batch.map((_, idx) => `$id${idx}: Int`).join(', ')}) { ${aliases} }`,
+          variables
+        )
+
+        for (let j = 0; j < batch.length; j++) {
+          const alias = `a${j}`
+          const media = resp?.data?.[alias]
+          if (media?.status) result.set(media.id, media.status)
+        }
+      } catch {
+        break
+      }
+    }
+    if (result.size === ids.length) return result
+  }
+
+  const missing = ids.filter((id) => !result.has(id))
+  if (missing.length > 0) {
+    try {
+      const { kitsuBatchGetStatuses } = await import('./kitsu')
+      const kitsuStatuses = await kitsuBatchGetStatuses(missing)
+      for (const [id, status] of kitsuStatuses) {
+        result.set(id, status)
+      }
+    } catch {
+      // Kitsu fallback failed
+    }
+  }
+
+  return result
+}
+
 export async function getAnilistEpisodes(id: string): Promise<string[]> {
   const numericId = parseInt(id)
   if (isNaN(numericId)) return []
@@ -769,14 +889,21 @@ function extractEpisodes(result: {
   nextAiringEpisode?: { episode: number; airingAt: number } | null
   airingSchedule?: { nodes?: { episode: number; airingAt: number }[] }
 }): string[] {
-  const { status, episodes: total, airingSchedule } = result
-  const now = Date.now() / 1000
+  const { status, episodes: total, nextAiringEpisode, airingSchedule } = result
 
   if (status === 'FINISHED' && total) {
     return Array.from({ length: total }, (_, i) => (i + 1).toString())
   }
 
+  if (status === 'RELEASING' && nextAiringEpisode?.episode) {
+    const airedCount = nextAiringEpisode.episode - 1
+    if (airedCount > 0) {
+      return Array.from({ length: airedCount }, (_, i) => (i + 1).toString())
+    }
+  }
+
   if (airingSchedule?.nodes) {
+    const now = Date.now() / 1000
     const aired = airingSchedule.nodes.filter((n) => n.airingAt < now)
     if (aired.length > 0) {
       const max = Math.max(...aired.map((n) => n.episode))
@@ -903,6 +1030,10 @@ export async function getAiredEpisodesForShows(
     )
   }
 
+  if (isAnilistRateLimited()) {
+    return []
+  }
+
   const now = Math.floor(Date.now() / 1000)
   const results: { mediaId: number; episode: number; airingAt: number }[] = []
   const seen = new Set<string>()
@@ -1007,6 +1138,7 @@ export async function getSchedule(date: Date, format?: string, adult = false): P
     return shows
   } catch (e) {
     logger.warn({ err: e }, 'AniSchedule schedule failed, falling back to AniList')
+    if (isAnilistRateLimited()) return []
     return getScheduleFromAnilist(date, format, adult)
   }
 }
@@ -1160,7 +1292,7 @@ export async function searchAnilist(options: AnilistSearchOptions = {}): Promise
           isAdult: $isAdult,
           sort: $sort
         ) {
-          ${mediaFields()}
+          ${mediaFieldsLight()}
         }
       }
     }

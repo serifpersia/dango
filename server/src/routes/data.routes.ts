@@ -113,6 +113,12 @@ export function createDataRouter(
     controller.getSpotlight
   )
 
+  router.get(
+    '/home',
+    makeCacheMiddleware(apiCache, (req) => `home-${req.query.format || 'TV'}`, 300),
+    controller.getBatchedHome
+  )
+
   router.get('/genres-and-tags', controller.getGenresAndTags)
   router.get('/anilist-status', controller.getAnilistStatus)
   router.get('/system-notifications', controller.getSystemNotifications)

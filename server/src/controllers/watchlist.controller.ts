@@ -22,9 +22,11 @@ import {
   searchAnilist,
   searchAnilistByTitle,
   getAiredEpisodesForShows,
-  getShowMetaById,
   getAnilistEpisodes,
+  isAnilistRateLimited,
+  batchGetShowStatuses,
 } from '../lib/anilist'
+import { kitsuSearchAnime } from '../lib/kitsu'
 import { getMigratedId } from '../lib/migration'
 
 interface CombinedContinueWatchingShow {
@@ -78,7 +80,6 @@ const SLOW_MAX_RUN_MS = 5 * 60 * 1000
 
 export class WatchlistController {
   private activeTypeFetches = new Set<string>()
-  private lastFinishedStatusCheckAt = 0
   private animePahe?: AnimePaheProvider
   triggerDiscovery?: (force?: boolean) => boolean
   private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
@@ -131,19 +132,13 @@ export class WatchlistController {
         return meta.anilistId
       }
 
-      const result = await searchAnilistByTitle(showName)
-      const id = result?.id || null
-      anilistIdCache.set(showId, id)
-      if (id && db && !db.isClosedCheck()) {
-        ShowsMetaRepository.upsert(db, { id: showId, anilistId: id })
-        db.scheduleSave()
-      }
-      if (id) return id
-
       if (/^\d+$/.test(showId)) {
-        return parseInt(showId)
+        const numericId = parseInt(showId)
+        anilistIdCache.set(showId, numericId)
+        return numericId
       }
 
+      anilistIdCache.set(showId, null)
       return null
     }
 
@@ -219,33 +214,33 @@ export class WatchlistController {
         }
 
         const finishedShowIds = new Set<number>()
-        const refreshFinishedStatuses =
-          fast && Date.now() - this.lastFinishedStatusCheckAt >= 60 * 60 * 1000
-        let persistedFinishedStatuses = 0
+        const unresolvedStatus: { watchlistId: string; anilistId: number }[] = []
         for (const [watchlistId, anilistId] of showIdMap.entries()) {
           const localMeta = (await ShowsMetaRepository.getById(db, watchlistId)) as {
             status?: string
           } | null
           if (localMeta?.status === 'FINISHED') {
             finishedShowIds.add(anilistId)
-          } else if (refreshFinishedStatuses) {
-            try {
-              const meta = await getShowMetaById(String(anilistId))
-              if (meta?.status === 'FINISHED') {
-                finishedShowIds.add(anilistId)
-                await ShowsMetaRepository.upsert(db, { id: watchlistId, status: 'FINISHED' })
-                persistedFinishedStatuses += 1
-              }
-            } catch {
-              // ignore AniList lookup failure
-            }
+          } else if (!localMeta?.status) {
+            unresolvedStatus.push({ watchlistId, anilistId })
           }
         }
-        if (persistedFinishedStatuses > 0) {
-          db.scheduleSave()
-        }
-        if (refreshFinishedStatuses) {
-          this.lastFinishedStatusCheckAt = Date.now()
+
+        if (unresolvedStatus.length > 0 && !isAnilistRateLimited()) {
+          const statuses = await batchGetShowStatuses(unresolvedStatus.map((s) => s.anilistId))
+          let persisted = 0
+          for (const { watchlistId, anilistId } of unresolvedStatus) {
+            const status = statuses.get(anilistId)
+            if (status === 'FINISHED') {
+              finishedShowIds.add(anilistId)
+              await ShowsMetaRepository.upsert(db, { id: watchlistId, status: 'FINISHED' })
+              persisted++
+            } else if (status) {
+              await ShowsMetaRepository.upsert(db, { id: watchlistId, status })
+              persisted++
+            }
+          }
+          if (persisted > 0) db.scheduleSave()
         }
 
         if (finishedShowIds.size > 0) {
@@ -1124,14 +1119,27 @@ export class WatchlistController {
     await req.db.saveNow()
 
     if (name && !/^\d+$/.test(id)) {
-      searchAnilistByTitle(name)
-        .then((result) => {
+      const resolveAndSave = async (): Promise<void> => {
+        if (!isAnilistRateLimited()) {
+          const result = await searchAnilistByTitle(name)
           if (result?.id) {
             ShowsMetaRepository.upsert(req.db, { id, anilistId: result.id })
             req.db.scheduleSave()
+            return
           }
-        })
-        .catch(() => {})
+        }
+        try {
+          const kitsuResults = await kitsuSearchAnime({ query: name, page: 1, perPage: 3 })
+          if (kitsuResults.length > 0) {
+            const anilistId = Math.abs(kitsuResults[0].id)
+            ShowsMetaRepository.upsert(req.db, { id, anilistId })
+            req.db.scheduleSave()
+          }
+        } catch {
+          // Kitsu failed, show will be skipped in discovery
+        }
+      }
+      resolveAndSave().catch(() => {})
     }
 
     res.json({ success: true })

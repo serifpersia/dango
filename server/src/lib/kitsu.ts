@@ -371,6 +371,41 @@ async function kitsuIdByAnilistId(anilistId: number): Promise<string | null> {
   return mappingItem(entries[0], json?.included ?? [])?.id ?? null
 }
 
+const KITSU_STATUS_MAP: Record<string, string> = {
+  current: 'RELEASING',
+  finished: 'FINISHED',
+  upcoming: 'NOT_YET_RELEASED',
+  unreleased: 'NOT_YET_RELEASED',
+  tba: 'NOT_YET_RELEASED',
+}
+
+export async function kitsuBatchGetStatuses(anilistIds: number[]): Promise<Map<number, string>> {
+  const result = new Map<number, string>()
+  for (const id of anilistIds) {
+    try {
+      const json = await kitsuFetch(
+        `/mappings?filter[externalSite]=anilist%2Fanime&filter[externalId]=${id}&include=item`
+      )
+      const entries = asArray(json?.data)
+      if (entries.length === 0) continue
+      const included = json?.included ?? []
+      const entry = entries[0]
+      const rel = entry.relationships?.item?.data
+      if (!rel) continue
+      const relSingle = Array.isArray(rel) ? rel[0] : rel
+      if (!relSingle) continue
+      const anime = included.find((i) => i.id === relSingle.id && i.type === 'anime')
+      if (!anime) continue
+      const raw = (anime.attributes?.status as string | undefined)?.toLowerCase()
+      const status = raw ? (KITSU_STATUS_MAP[raw] ?? raw.toUpperCase()) : undefined
+      if (status) result.set(id, status)
+    } catch {
+      // skip failed lookups
+    }
+  }
+  return result
+}
+
 /** Fetches full detail (genres + studios) for a Kitsu anime id. */
 async function kitsuDetail(
   kitsuId: string,

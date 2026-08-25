@@ -11,6 +11,7 @@ import {
   searchAnilist,
   setCachedAnilist,
   getSpotlightBanners,
+  getBatchedHomeData,
   anilistUnavailable,
   wasAnilistDownAtBoot,
   checkAnilistStatus,
@@ -433,6 +434,17 @@ export class DataController {
       })
     }
     res.json(notifications)
+  }
+
+  getBatchedHome = async (req: Request, res: Response) => {
+    try {
+      const format = (req.query.format as string) || undefined
+      const data = await getBatchedHomeData(format)
+      res.set('Cache-Control', 'public, max-age=300').json(data)
+    } catch (e) {
+      logger.error({ err: e }, 'Batched home fetch failed')
+      res.json({ trending: [], seasonal: [], spotlight: [] })
+    }
   }
 
   private tryProviderEpisodesFallback = async (

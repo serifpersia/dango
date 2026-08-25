@@ -6,7 +6,6 @@ import {
   useNotifications,
   useDiscoveryStatus,
   useTriggerDiscovery,
-  useNudgeDiscovery,
   useSystemNotifications,
 } from '../../hooks/useAnimeData'
 import styles from './Notification.module.css'
@@ -16,7 +15,6 @@ const NotificationBell: React.FC = () => {
   const bellRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const triggerDiscovery = useTriggerDiscovery()
-  const { mutate: nudgeDiscovery } = useNudgeDiscovery()
 
   const { data: notifications = [] } = useNotifications()
   const { data: systemNotifications = [] } = useSystemNotifications()
@@ -36,10 +34,6 @@ const NotificationBell: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  useEffect(() => {
-    nudgeDiscovery()
-  }, [nudgeDiscovery])
 
   useEffect(() => {
     const running = !!discoveryStatus?.running
