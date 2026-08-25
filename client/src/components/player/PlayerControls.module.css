@@ -230,7 +230,7 @@
 
 .timeBubble {
   position: absolute;
-  bottom: 40px;
+  bottom: 24px;
   transform: translateX(-50%);
   background: rgba(15, 15, 17, 0.95);
   backdrop-filter: blur(8px);
@@ -245,6 +245,16 @@
   pointer-events: none;
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
+}
+
+.timeBubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(15, 15, 17, 0.95);
 }
 
 .progressBarContainer:hover .timeBubble {

@@ -81,6 +81,8 @@
   -webkit-overflow-scrolling: touch;
   min-height: 0;
   touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 .drawerList {
@@ -90,7 +92,7 @@
 }
 
 .episodeList::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 
 .episodeList::-webkit-scrollbar-track {
@@ -98,12 +100,18 @@
 }
 
 .episodeList::-webkit-scrollbar-thumb {
-  background: var(--glass-border);
+  background: rgba(255, 255, 255, 0.14);
+  background-clip: padding-box;
   border-radius: var(--radius-full);
+  border: 2px solid transparent;
+}
+
+.episodeList:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.28);
 }
 
 .episodeList::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background-color: var(--accent);
 }
 
 .episodeItem {

@@ -17,7 +17,7 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   position: sticky;
   top: calc(var(--header-height) + 2rem);
   overflow: visible;

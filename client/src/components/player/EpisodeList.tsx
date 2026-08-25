@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import styles from './EpisodeList.module.css'
 
 interface EpisodeListProps {
@@ -17,6 +17,30 @@ const EpisodeList = ({
   variant = 'sidebar',
 }: EpisodeListProps) => {
   const [selectedRange, setSelectedRange] = useState(0)
+  const activeItemRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const item = activeItemRef.current
+    if (!item) return
+
+    let scroller: HTMLElement | null = item.parentElement
+    while (scroller) {
+      const style = window.getComputedStyle(scroller)
+      if (
+        (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+        scroller.scrollHeight > scroller.clientHeight
+      ) {
+        break
+      }
+      scroller = scroller.parentElement
+    }
+    if (!scroller) return
+
+    const scrollerRect = scroller.getBoundingClientRect()
+    const itemRect = item.getBoundingClientRect()
+    scroller.scrollTop +=
+      itemRect.top + itemRect.height / 2 - (scrollerRect.top + scroller.clientHeight / 2)
+  }, [currentEpisode, selectedRange])
 
   const episodeRanges = useMemo(() => {
     if (episodes.length <= 100) return []
@@ -64,6 +88,7 @@ const EpisodeList = ({
         {filteredEpisodes.map((ep) => (
           <div
             key={ep}
+            ref={ep === currentEpisode ? activeItemRef : undefined}
             className={`${styles.episodeItem} ${watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === currentEpisode ? styles.active : ''}`}
             onClick={() => onEpisodeClick(ep)}
           >

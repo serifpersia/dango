@@ -24,7 +24,7 @@
   width: min(100vw, 100%);
   max-height: 86vh;
   background: rgba(12, 12, 15, 0.98);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   border: 1px solid var(--glass-border);
   border-bottom: none;
   display: flex;
