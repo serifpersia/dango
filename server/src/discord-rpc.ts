@@ -1,4 +1,4 @@
-import { Client } from '@xhayper/discord-rpc'
+import { Client, StatusDisplayType } from '@xhayper/discord-rpc'
 import logger from './logger'
 import { CONFIG } from './config'
 
@@ -75,7 +75,7 @@ class DiscordRPCService {
         if (this.lastActivity) {
           this.updatePresence(this.lastActivity)
         } else {
-          this.setIdleStatus('home')
+          this.setIdleStatus('idle')
         }
       })
 
@@ -237,6 +237,7 @@ class DiscordRPCService {
           smallImageKey: 'logo',
           smallImageText: 'dango',
           type: 3,
+          statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
             {
               label: 'Learn More',
@@ -259,6 +260,7 @@ class DiscordRPCService {
         smallImageKey: string
         smallImageText: string
         type: number
+        statusDisplayType?: number
         buttons: { label: string; url: string }[]
       } = {
         details: data.title,
@@ -268,6 +270,7 @@ class DiscordRPCService {
         smallImageKey: 'logo',
         smallImageText: 'dango',
         type: 3,
+        statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
             label: 'Learn More',
@@ -294,16 +297,17 @@ class DiscordRPCService {
     if (!this.isEnabled || !this.client || !this.client.user) return
 
     const pageLabels: Record<string, { details: string; state: string }> = {
-      home: { details: 'Browsing Anime', state: 'On the Home page' },
-      search: { details: 'Searching for Anime', state: 'Exploring titles...' },
-      watchlist: { details: 'Managing Watchlist', state: 'Reviewing anime list' },
-      anime: { details: 'Viewing Anime Info', state: 'Reading show details' },
-      insights: { details: 'Checking Insights', state: 'Reviewing stats' },
-      settings: { details: 'In Settings', state: 'Tweaking preferences' },
+      home: { details: 'Home', state: 'Browsing anime' },
+      search: { details: 'Search', state: 'Exploring titles...' },
+      watchlist: { details: 'Watchlist', state: 'Reviewing your anime list' },
+      anime: { details: 'Anime Info', state: 'Reading show details' },
+      insights: { details: 'Insights', state: 'Reviewing stats' },
+      settings: { details: 'Settings', state: 'Tweaking preferences' },
       mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
+      map: { details: 'Map', state: 'Exploring the global user map' },
     }
 
-    const label = pageLabels[page] ?? { details: 'Browsing Anime', state: 'Idle' }
+    const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }
 
     try {
       if (!this.client || !this.client.user) {
@@ -316,6 +320,7 @@ class DiscordRPCService {
         largeImageKey: 'logo',
         largeImageText: 'dango',
         type: 3,
+        statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
             label: 'Learn More',
@@ -340,7 +345,7 @@ class DiscordRPCService {
     this.lastActivity = null
     this.currentSessionId = null
 
-    await this.setIdleStatus('home')
+    await this.setIdleStatus('idle')
   }
 }
 
