@@ -157,14 +157,61 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       schedulePopupClose()
     }
 
-    const handleContextMenu = (e: React.MouseEvent) => {
-      if (shouldBlur) return
-      if (isMobile) return
+    const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+    const longPressFiredRef = React.useRef(false)
+    const longPressStartRef = React.useRef({ x: 0, y: 0 })
+    const activePointerTypeRef = React.useRef<string | null>(null)
 
+    const cancelLongPress = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+    }
+
+    const openPopupFromCard = (rect: DOMRect, viaHold = false) => {
+      longPressFiredRef.current = viaHold
+      openPopup(rect)
+    }
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
+      if (shouldBlur || e.pointerType === 'mouse') return
+      activePointerTypeRef.current = e.pointerType
+      longPressFiredRef.current = false
+      longPressStartRef.current = { x: e.clientX, y: e.clientY }
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      cancelLongPress()
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null
+        openPopupFromCard(rect, true)
+      }, 500)
+    }
+
+    const handlePointerMove = (e: React.PointerEvent<HTMLAnchorElement>) => {
+      if (!longPressTimerRef.current) return
+      const dx = Math.abs(e.clientX - longPressStartRef.current.x)
+      const dy = Math.abs(e.clientY - longPressStartRef.current.y)
+      if (dx > 20 || dy > 20) cancelLongPress()
+    }
+
+    const handlePointerUpOrCancel = () => {
+      cancelLongPress()
+      activePointerTypeRef.current = null
+    }
+
+    const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      // Use the card's rect for context menu trigger to be consistent
-      openPopup((e.currentTarget as HTMLElement).getBoundingClientRect())
+
+      if (activePointerTypeRef.current === 'touch') {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current)
+          longPressTimerRef.current = null
+          openPopupFromCard((e.currentTarget as HTMLElement).getBoundingClientRect(), true)
+        }
+      } else if (!shouldBlur && !longPressFiredRef.current) {
+        openPopupFromCard((e.currentTarget as HTMLElement).getBoundingClientRect())
+      }
     }
 
     const mergedConfig = {
@@ -281,6 +328,12 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const shouldBlur = adultContent && !isAgreedToViewMature
     const handleCardClick = (e: React.MouseEvent) => {
+      if (longPressFiredRef.current) {
+        e.preventDefault()
+        e.stopPropagation()
+        longPressFiredRef.current = false
+        return
+      }
       if (shouldBlur) {
         e.preventDefault()
         e.stopPropagation()
@@ -306,6 +359,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           className={`${styles.card} ${styles[layout]} ${shouldBlur ? styles.cardButton : ''}`}
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUpOrCancel}
+          onPointerCancel={handlePointerUpOrCancel}
         >
           <div className={styles.posterContainer}>
             {shouldBlur && (
@@ -460,6 +517,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             anchorRect={anchorRect}
             onMouseEnter={handlePopupMouseEnter}
             onMouseLeave={handlePopupMouseLeave}
+            onRequestClose={closePopup}
           />
         )}
       </div>

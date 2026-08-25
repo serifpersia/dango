@@ -13,6 +13,7 @@ interface AnimePopupProps {
   anchorRect: DOMRect
   onMouseEnter: () => void
   onMouseLeave: () => void
+  onRequestClose?: () => void
 }
 
 const AnimePopup: React.FC<AnimePopupProps> = ({
@@ -20,7 +21,9 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   anchorRect,
   onMouseEnter,
   onMouseLeave,
+  onRequestClose,
 }) => {
+  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches)
   const { showMeta, loadingMeta, inWatchlist, toggleWatchlist } = useAnimeInfoData(showId)
   const { titlePreference } = useTitlePreference()
 
@@ -49,6 +52,15 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   const [queueMenuOpen, setQueueMenuOpen] = useState(false)
   const mouseInsideRef = useRef(false)
 
+  React.useEffect(() => {
+    if (!isTouch) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isTouch])
+
   const handlePopupMouseEnter = () => {
     mouseInsideRef.current = true
     onMouseEnter()
@@ -68,114 +80,117 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   }
 
   const content = (
-    <div
-      ref={refs.setFloating}
-      className={styles.popupPortal}
-      style={floatingStyles}
-      onMouseEnter={handlePopupMouseEnter}
-      onMouseLeave={handlePopupMouseLeave}
-    >
-      <div className={styles.popupContent}>
-        {loadingMeta ? (
-          <div className={styles.loading}>
-            <div className={styles.spinner} />
-            <span>Fetching details...</span>
-          </div>
-        ) : showMeta ? (
-          <>
-            <div className={styles.header}>
-              <div className={styles.title}>{displayTitle}</div>
+    <>
+      {isTouch && <div className={styles.popupBackdrop} onClick={() => onRequestClose?.()} />}
+      <div
+        ref={isTouch ? undefined : refs.setFloating}
+        className={`${styles.popupPortal} ${isTouch ? styles.mobile : ''}`}
+        style={isTouch ? undefined : floatingStyles}
+        onMouseEnter={handlePopupMouseEnter}
+        onMouseLeave={handlePopupMouseLeave}
+      >
+        <div className={styles.popupContent}>
+          {loadingMeta ? (
+            <div className={styles.loading}>
+              <div className={styles.spinner} />
+              <span>Fetching details...</span>
             </div>
-
-            <div className={styles.body}>
-              <div className={styles.metaRow}>
-                {showMeta.score && (
-                  <div className={styles.metaItem}>
-                    <FaStar className={styles.scoreIcon} size={14} />
-                    <span>{showMeta.score}</span>
-                  </div>
-                )}
-                {showMeta.status && (
-                  <div className={styles.metaItem}>
-                    <FaTv size={14} />
-                    <span>{showMeta.status}</span>
-                  </div>
-                )}
+          ) : showMeta ? (
+            <>
+              <div className={styles.header}>
+                <div className={styles.title}>{displayTitle}</div>
               </div>
 
-              <div className={styles.synopsis}>
-                {showMeta.description
-                  ? showMeta.description.replace(/<[^>]*>?/gm, '')
-                  : 'No synopsis available.'}
+              <div className={styles.body}>
+                <div className={styles.metaRow}>
+                  {showMeta.score && (
+                    <div className={styles.metaItem}>
+                      <FaStar className={styles.scoreIcon} size={14} />
+                      <span>{showMeta.score}</span>
+                    </div>
+                  )}
+                  {showMeta.status && (
+                    <div className={styles.metaItem}>
+                      <FaTv size={14} />
+                      <span>{showMeta.status}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.synopsis}>
+                  {showMeta.description
+                    ? showMeta.description.replace(/<[^>]*>?/gm, '')
+                    : 'No synopsis available.'}
+                </div>
+
+                <div className={styles.details}>
+                  {showMeta.nextEpisodeAirDate && (
+                    <div className={styles.detailItem}>
+                      <strong>Aired:</strong> {showMeta.nextEpisodeAirDate}
+                    </div>
+                  )}
+                  {Array.isArray(showMeta.genres) && showMeta.genres.length > 0 && (
+                    <div className={styles.genres}>
+                      {Array.isArray(showMeta.genres) &&
+                        showMeta.genres
+                          .filter(Boolean)
+                          .slice(0, 4)
+                          .map((g) => {
+                            const genreName = typeof g === 'string' ? g : g?.name
+                            return (
+                              <span key={genreName} className={styles.genre}>
+                                {genreName}
+                              </span>
+                            )
+                          })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className={styles.details}>
-                {showMeta.nextEpisodeAirDate && (
-                  <div className={styles.detailItem}>
-                    <strong>Aired:</strong> {showMeta.nextEpisodeAirDate}
-                  </div>
-                )}
-                {Array.isArray(showMeta.genres) && showMeta.genres.length > 0 && (
-                  <div className={styles.genres}>
-                    {Array.isArray(showMeta.genres) &&
-                      showMeta.genres
-                        .filter(Boolean)
-                        .slice(0, 4)
-                        .map((g) => {
-                          const genreName = typeof g === 'string' ? g : g?.name
-                          return (
-                            <span key={genreName} className={styles.genre}>
-                              {genreName}
-                            </span>
-                          )
-                        })}
-                  </div>
-                )}
+              <div className={styles.footer}>
+                <div className={styles.primaryAction}>
+                  <Link to={`/watch/${showMeta?.id || showId}`} className={styles.watchBtn}>
+                    <FaPlay size={14} />
+                    Watch now
+                  </Link>
+                </div>
+                <div className={styles.secondaryActions}>
+                  <button
+                    className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleWatchlist()
+                    }}
+                  >
+                    {inWatchlist ? <FaCheck size={12} /> : <FaPlus size={12} />}
+                    <span>{inWatchlist ? 'Remove' : 'Watchlist'}</span>
+                  </button>
+                  <QueueOptionsButton
+                    showId={showId}
+                    showName={showMeta.name || showMeta.names?.romaji}
+                    showThumbnail={showMeta.thumbnail}
+                    nativeName={showMeta.names?.native}
+                    englishName={showMeta.names?.english}
+                    showType={showMeta.type}
+                    className={styles.watchlistBtn}
+                    activeClassName={styles.active}
+                    align="left"
+                    onMenuOpenChange={handleQueueMenuOpenChange}
+                  />
+                  <Link to={`/anime/${showMeta?.id || showId}`} className={styles.detailsBtn}>
+                    Read more
+                  </Link>
+                </div>
               </div>
-            </div>
-
-            <div className={styles.footer}>
-              <div className={styles.primaryAction}>
-                <Link to={`/watch/${showMeta?.id || showId}`} className={styles.watchBtn}>
-                  <FaPlay size={14} />
-                  Watch now
-                </Link>
-              </div>
-              <div className={styles.secondaryActions}>
-                <button
-                  className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    toggleWatchlist()
-                  }}
-                >
-                  {inWatchlist ? <FaCheck size={12} /> : <FaPlus size={12} />}
-                  <span>{inWatchlist ? 'Remove' : 'Watchlist'}</span>
-                </button>
-                <QueueOptionsButton
-                  showId={showId}
-                  showName={showMeta.name || showMeta.names?.romaji}
-                  showThumbnail={showMeta.thumbnail}
-                  nativeName={showMeta.names?.native}
-                  englishName={showMeta.names?.english}
-                  showType={showMeta.type}
-                  className={styles.watchlistBtn}
-                  activeClassName={styles.active}
-                  align="left"
-                  onMenuOpenChange={handleQueueMenuOpenChange}
-                />
-                <Link to={`/anime/${showMeta?.id || showId}`} className={styles.detailsBtn}>
-                  Read more
-                </Link>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className={styles.loading}>Failed to load info.</div>
-        )}
+            </>
+          ) : (
+            <div className={styles.loading}>Failed to load info.</div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 
   return createPortal(content, document.body)

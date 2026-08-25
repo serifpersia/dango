@@ -28,6 +28,37 @@
   }
 }
 
+.popupBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-popover);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.popupPortal.mobile {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--z-popover) + 1);
+  pointer-events: auto;
+}
+
+.popupPortal.mobile .popupContent {
+  width: min(340px, calc(100vw - 32px));
+  max-height: 85svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .popupPortal.mobile .popupContent {
+    width: min(460px, calc(100vw - 24px));
+    max-height: calc(100svh - 16px);
+  }
+}
+
 .header {
   padding: var(--space-4);
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), transparent);

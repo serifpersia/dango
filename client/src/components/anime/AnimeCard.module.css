@@ -27,6 +27,9 @@
   transition:
     border-color var(--transition-base),
     background-color var(--transition-base);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .cardButton {
