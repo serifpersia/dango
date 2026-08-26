@@ -13,6 +13,10 @@ html {
   scrollbar-gutter: stable;
 }
 
+html:has(:fullscreen) {
+  scrollbar-gutter: auto;
+}
+
 body {
   margin: 0;
   padding: 0;

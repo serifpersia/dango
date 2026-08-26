@@ -1351,6 +1351,11 @@
   border-radius: 0;
 }
 
+.videoContainer:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
 .skipIndicatorContainer {
   position: absolute;
   top: 0;
