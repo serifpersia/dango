@@ -498,43 +498,10 @@ const useVideoPlayer = ({
 
   useEffect(() => {
     const sessionId = sessionIdRef.current
-    const sendClear = () => {
+    return () => {
       const payload = JSON.stringify({ sessionId })
       const blob = new Blob([payload], { type: 'application/json' })
-      try {
-        navigator.sendBeacon('/api/discord/clear', blob)
-      } catch {
-        // ignore
-      }
-      try {
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {})
-        fetch('/api/discord/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, bye: true }),
-          keepalive: true,
-        }).catch(() => {})
-      } catch {
-        // ignore
-      }
-    }
-    const handlePageHide = () => sendClear()
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') sendClear()
-    }
-    window.addEventListener('pagehide', handlePageHide)
-    window.addEventListener('beforeunload', handlePageHide)
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide)
-      window.removeEventListener('beforeunload', handlePageHide)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      sendClear()
+      navigator.sendBeacon('/api/discord/clear', blob)
     }
   }, [showId, episodeNumber])
 

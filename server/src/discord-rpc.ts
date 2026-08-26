@@ -72,11 +72,6 @@ class DiscordRPCService {
 
   public removeHeartbeat(sessionId: string) {
     this.heartbeats.delete(sessionId)
-    if (sessionId && sessionId === this.currentSessionId) {
-      this.lastActivity = null
-      this.currentSessionId = null
-      void this.setIdleStatus('idle')
-    }
     void this.checkHeartbeats()
   }
 

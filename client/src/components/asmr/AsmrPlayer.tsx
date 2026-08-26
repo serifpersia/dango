@@ -70,8 +70,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   const [loadedImages, setLoadedImages] = useState<ReadonlySet<string>>(new Set())
   const [showChapterPanel, setShowChapterPanel] = useState(false)
   const [showControls, setShowControls] = useState(true)
-  const touchStartX = useRef<number>(0)
-  const suppressClickRef = useRef(false)
   const sessionIdRef = useRef<string>('')
   if (!sessionIdRef.current) {
     sessionIdRef.current =
@@ -258,26 +256,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       if (el && el.complete && el.naturalWidth > 0) handleImgLoad(src)
     },
     [handleImgLoad]
-  )
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-  }, [])
-
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      const deltaX = e.changedTouches[0].clientX - touchStartX.current
-      if (Math.abs(deltaX) > 50) {
-        suppressClickRef.current = true
-        window.setTimeout(() => {
-          suppressClickRef.current = false
-        }, 400)
-        if (deltaX > 0) setImageIndex((i) => Math.max(0, i - 1))
-        else setImageIndex((i) => Math.min(images.length - 1, i + 1))
-        setShowControls(true)
-      }
-    },
-    [images.length]
   )
 
   useEffect(() => {
@@ -516,122 +494,113 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   const currentPending = showArt && hasImages && !!currentSrc && !loadedImages.has(currentSrc)
 
   return createPortal(
-    <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
+    <>
       {audioEl}
+      <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
+        <div
+          className={`${styles.npStage} ${!showArt || !hasImages ? styles.npStageBlank : ''}`}
+          onClick={() => setShowControls((v) => !v)}
+        >
+          {showArt && hasImages && (
+            <>
+              <div className={styles.sliderViewport}>
+                <div
+                  className={styles.sliderTrack}
+                  style={{ transform: `translateX(-${safeIndex * 100}%)` }}
+                >
+                  {images.map((src) => (
+                    <div key={src} className={styles.slide}>
+                      <img
+                        ref={(el) => attachImgRef(el, src)}
+                        src={src}
+                        alt={`${t ? t(title) : title} — work image`}
+                        draggable={false}
+                        onLoad={() => handleImgLoad(src)}
+                        onError={() => handleImgLoad(src)}
+                        className={`${styles.slideImg} ${
+                          loadedImages.has(src) ? styles.slideImgLoaded : ''
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {currentPending && (
+                  <span className={styles.slideSpinner} aria-label="Loading image" />
+                )}
+              </div>
 
-      <div
-        className={`${styles.npStage} ${!showArt || !hasImages ? styles.npStageBlank : ''}`}
-        onClick={() => {
-          if (suppressClickRef.current) {
-            suppressClickRef.current = false
-            return
-          }
-          setShowControls((v) => !v)
-        }}
-      >
-        {showArt && hasImages && (
-          <>
-            <div
-              className={styles.sliderViewport}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              <div
-                className={styles.sliderTrack}
-                style={{ transform: `translateX(-${safeIndex * 100}%)` }}
-              >
-                {images.map((src) => (
-                  <div key={src} className={styles.slide}>
-                    <img
-                      ref={(el) => attachImgRef(el, src)}
-                      src={src}
-                      alt={`${t ? t(title) : title} — work image`}
-                      draggable={false}
-                      onLoad={() => handleImgLoad(src)}
-                      onError={() => handleImgLoad(src)}
-                      className={`${styles.slideImg} ${
-                        loadedImages.has(src) ? styles.slideImgLoaded : ''
-                      }`}
-                    />
-                  </div>
+              {images.length > 1 && (
+                <>
+                  <button
+                    className={`${styles.npArrow} ${styles.npArrowLeft}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setImageIndex((i) => Math.max(0, i - 1))
+                      setShowControls(true)
+                    }}
+                    disabled={safeIndex === 0}
+                    aria-label="Previous image"
+                  >
+                    <FaChevronLeft />
+                  </button>
+                  <button
+                    className={`${styles.npArrow} ${styles.npArrowRight}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setImageIndex((i) => Math.min(images.length - 1, i + 1))
+                      setShowControls(true)
+                    }}
+                    disabled={safeIndex === images.length - 1}
+                    aria-label="Next image"
+                  >
+                    <FaChevronRight />
+                  </button>
+                  <span className={styles.npImageCount} onClick={(e) => e.stopPropagation()}>
+                    {safeIndex + 1} / {images.length}
+                  </span>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        <div
+          className={`${styles.playerBar} ${styles.playerBarDocked} ${!showControls ? styles.playerBarDockedHidden : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {barContent}
+
+          {showChapterPanel && (
+            <>
+              <div className={styles.npBackdrop} onClick={() => setShowChapterPanel(false)} />
+              <div className={styles.chapterPanel}>
+                {chapters.map((chapter, i) => (
+                  <button
+                    key={`${chapter.time}-${i}`}
+                    className={`${styles.chapterRow} ${
+                      i === activeChapter ? styles.chapterRowActive : ''
+                    }`}
+                    title={t ? t(chapter.label) : chapter.label}
+                    onClick={() => {
+                      seekTo(chapter.time)
+                      setShowChapterPanel(false)
+                    }}
+                  >
+                    <span className={styles.chapterRowTime}>{formatTime(chapter.time)}</span>
+                    <span
+                      className={styles.chapterRowLabel}
+                      title={t ? t(chapter.label) : chapter.label}
+                    >
+                      {t ? t(chapter.label) : chapter.label}
+                    </span>
+                  </button>
                 ))}
               </div>
-              {currentPending && (
-                <span className={styles.slideSpinner} aria-label="Loading image" />
-              )}
-            </div>
-
-            {images.length > 1 && (
-              <>
-                <button
-                  className={`${styles.npArrow} ${styles.npArrowLeft}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setImageIndex((i) => Math.max(0, i - 1))
-                    setShowControls(true)
-                  }}
-                  disabled={safeIndex === 0}
-                  aria-label="Previous image"
-                >
-                  <FaChevronLeft />
-                </button>
-                <button
-                  className={`${styles.npArrow} ${styles.npArrowRight}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setImageIndex((i) => Math.min(images.length - 1, i + 1))
-                    setShowControls(true)
-                  }}
-                  disabled={safeIndex === images.length - 1}
-                  aria-label="Next image"
-                >
-                  <FaChevronRight />
-                </button>
-                <span className={styles.npImageCount} onClick={(e) => e.stopPropagation()}>
-                  {safeIndex + 1} / {images.length}
-                </span>
-              </>
-            )}
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
-
-      <div
-        className={`${styles.playerBar} ${styles.playerBarDocked} ${!showControls ? styles.playerBarDockedHidden : ''}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {barContent}
-
-        {showChapterPanel && (
-          <>
-            <div className={styles.npBackdrop} onClick={() => setShowChapterPanel(false)} />
-            <div className={styles.chapterPanel}>
-              {chapters.map((chapter, i) => (
-                <button
-                  key={`${chapter.time}-${i}`}
-                  className={`${styles.chapterRow} ${
-                    i === activeChapter ? styles.chapterRowActive : ''
-                  }`}
-                  title={t ? t(chapter.label) : chapter.label}
-                  onClick={() => {
-                    seekTo(chapter.time)
-                    setShowChapterPanel(false)
-                  }}
-                >
-                  <span className={styles.chapterRowTime}>{formatTime(chapter.time)}</span>
-                  <span
-                    className={styles.chapterRowLabel}
-                    title={t ? t(chapter.label) : chapter.label}
-                  >
-                    {t ? t(chapter.label) : chapter.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    </div>,
+    </>,
     document.body
   )
 }

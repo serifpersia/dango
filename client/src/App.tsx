@@ -25,17 +25,6 @@ function useDiscordPageStatus() {
     if (discordEnabled === false || discordEnabled === 'false') return
 
     const sessionId = sessionIdRef.current
-    const path = location.pathname
-    let page = 'home'
-    if (path.startsWith('/search')) page = 'search'
-    else if (path.startsWith('/watchlist')) page = 'watchlist'
-    else if (path.startsWith('/anime/')) page = 'anime'
-    else if (path.startsWith('/insights')) page = 'insights'
-    else if (path.startsWith('/settings')) page = 'settings'
-    else if (path.startsWith('/map')) page = 'map'
-    else if (path.startsWith('/mal')) page = 'mal'
-    else if (path.startsWith('/asmr')) page = 'asmr'
-
     const heartbeat = () =>
       fetch('/api/discord/heartbeat', {
         method: 'POST',
@@ -43,70 +32,22 @@ function useDiscordPageStatus() {
         body: JSON.stringify({ sessionId }),
       }).catch(() => {})
 
-    const sendStatus = () =>
-      fetch('/api/discord/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page }),
-      }).catch(() => {})
-
     heartbeat()
-    const interval = setInterval(() => {
-      heartbeat()
-      sendStatus()
-    }, 15000)
+    const interval = setInterval(heartbeat, 15000)
 
-    const sendBye = () => {
-      const hbPayload = JSON.stringify({ sessionId, bye: true })
-      const clearPayload = JSON.stringify({ sessionId })
-      if (navigator.sendBeacon) {
-        try {
-          navigator.sendBeacon(
-            '/api/discord/heartbeat',
-            new Blob([hbPayload], { type: 'application/json' })
-          )
-          navigator.sendBeacon(
-            '/api/discord/clear',
-            new Blob([clearPayload], { type: 'application/json' })
-          )
-        } catch {
-          // ignore
-        }
-      }
-      try {
-        fetch('/api/discord/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: hbPayload,
-          keepalive: true,
-        }).catch(() => {})
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: clearPayload,
-          keepalive: true,
-        }).catch(() => {})
-      } catch {
-        // ignore
-      }
+    const handlePageHide = () => {
+      navigator.sendBeacon(
+        '/api/discord/heartbeat',
+        new Blob([JSON.stringify({ sessionId, bye: true })], { type: 'application/json' })
+      )
     }
-
-    const handlePageHide = () => sendBye()
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') sendBye()
-    }
-
     window.addEventListener('pagehide', handlePageHide)
-    window.addEventListener('beforeunload', handlePageHide)
-    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       clearInterval(interval)
       window.removeEventListener('pagehide', handlePageHide)
-      window.removeEventListener('beforeunload', handlePageHide)
-      document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [discordEnabled, location.pathname])
+  }, [discordEnabled])
 
   useEffect(() => {
     if (discordEnabled === false || discordEnabled === 'false') return
@@ -123,7 +64,6 @@ function useDiscordPageStatus() {
     else if (path.startsWith('/settings')) page = 'settings'
     else if (path.startsWith('/map')) page = 'map'
     else if (path.startsWith('/mal')) page = 'mal'
-    else if (path.startsWith('/asmr')) page = 'asmr'
 
     fetch('/api/discord/status', {
       method: 'POST',
