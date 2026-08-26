@@ -86,6 +86,9 @@ export interface EpisodeDetails {
 
 export interface SearchOptions {
   query?: string
+  page?: number
+  sort?: string
+  rating?: string
 }
 
 export interface Provider {

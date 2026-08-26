@@ -2,7 +2,15 @@ import React from 'react'
 import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
-import { FaHome, FaSearch, FaClock, FaFileImport, FaCog, FaChartPie } from 'react-icons/fa'
+import {
+  FaHome,
+  FaSearch,
+  FaClock,
+  FaFileImport,
+  FaCog,
+  FaChartPie,
+  FaHeadphones,
+} from 'react-icons/fa'
 import Logo from '../common/Logo'
 import packageJson from '../../../package.json'
 
@@ -19,6 +27,7 @@ const Sidebar: React.FC = () => {
     { to: '/watchlist', icon: <FaClock />, label: 'Watchlist' },
     { to: '/insights', icon: <FaChartPie />, label: 'Insights' },
     { to: '/mal', icon: <FaFileImport />, label: 'MAL Import' },
+    { to: '/asmr', icon: <FaHeadphones />, label: 'ASMR' },
     { to: '/settings', icon: <FaCog />, label: 'Settings' },
   ]
 

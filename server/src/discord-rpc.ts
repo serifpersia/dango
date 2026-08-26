@@ -72,6 +72,11 @@ class DiscordRPCService {
 
   public removeHeartbeat(sessionId: string) {
     this.heartbeats.delete(sessionId)
+    if (sessionId && sessionId === this.currentSessionId) {
+      this.lastActivity = null
+      this.currentSessionId = null
+      void this.setIdleStatus('idle')
+    }
     void this.checkHeartbeats()
   }
 
@@ -284,7 +289,14 @@ class DiscordRPCService {
       if (url.includes('s4.anilist.co') || url.includes('anilistcdn')) {
         return true
       }
-      const blockedDomains = ['youtube-anime.com', 'animepahe', 'animeya.cc', 'gogocdn.net']
+      const blockedDomains = [
+        'youtube-anime.com',
+        'animepahe',
+        'animeya.cc',
+        'gogocdn.net',
+        'weeabo0.xyz',
+        'japaneseasmr.com',
+      ]
       return !blockedDomains.some((domain) => url.includes(domain))
     }
 
@@ -389,6 +401,7 @@ class DiscordRPCService {
       settings: { details: 'Settings', state: 'Tweaking preferences' },
       mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
       map: { details: 'Map', state: 'Exploring the global user map' },
+      asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }

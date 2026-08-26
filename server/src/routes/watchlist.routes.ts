@@ -4,6 +4,32 @@ import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
 
+const dlsitePosterCache = new Map<string, { url: string; ts: number }>()
+
+async function getDlsitePoster(rjCode: string): Promise<string | null> {
+  const key = String(rjCode).trim().toUpperCase()
+  if (!/^RJ\d{5,}$/.test(key)) return null
+  const cached = dlsitePosterCache.get(key)
+  if (cached && Date.now() - cached.ts < 3600_000) return cached.url
+  try {
+    const res = await fetch(`https://www.dlsite.com/maniax/product/info/ajax?product_id=${key}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (await res.json()) as Record<string, any>
+    const entry = data[key] || data
+    const img: string | undefined = entry?.work_image
+    if (!img) return null
+    const url = img.startsWith('//') ? `https:${img}` : img
+    dlsitePosterCache.set(key, { url, ts: Date.now() })
+    return url
+  } catch {
+    return null
+  }
+}
+
 export function createWatchlistRouter(
   animePahe: AnimePaheProvider,
   getDb: () => DatabaseWrapper
@@ -78,6 +104,49 @@ export function createWatchlistRouter(
       return res.json({ success: true })
     }
     discordRPCService.setIdleStatus(page)
+    res.json({ success: true })
+  })
+
+  router.post('/discord/asmr', async (req, res) => {
+    const {
+      title,
+      trackLabel,
+      isPlaying,
+      thumbnail,
+      thumbnails,
+      currentTime,
+      duration,
+      isAdult,
+      sessionId,
+      rjCode,
+    } = req.body ?? {}
+    if (!discordRPCService.isServiceEnabled) return res.json({ success: true })
+    if (typeof sessionId === 'string') discordRPCService.heartbeat(sessionId)
+    let thumb = String(thumbnail || '')
+    const thumbs = Array.isArray(thumbnails) ? thumbnails.map(String).filter(Boolean) : undefined
+    // ASMR thumbs from japaneseasmr/weeabo0 require Referer and will 403 on Discord's fetch.
+    // Try DLSite's direct img.dlsite.jp poster which is public (no Referer needed).
+    const needsDlsite =
+      !thumb || thumb.includes('weeabo0.xyz') || thumb.includes('japaneseasmr.com')
+    if (needsDlsite && rjCode) {
+      const dlsiteThumb = await getDlsitePoster(String(rjCode))
+      if (dlsiteThumb) thumb = dlsiteThumb
+    }
+    // fallback to logo if still proxied/weeabo0 (Discord can't fetch localhost or 403)
+    if (thumb.includes('/api/image-proxy') || thumb.includes('weeabo0.xyz')) thumb = ''
+    discordRPCService.updatePresence({
+      title: String(title || 'ASMR').slice(0, 128),
+      episode: String(trackLabel || '').slice(0, 64),
+      totalEpisodes: '',
+      currentTime: Number(currentTime) || 0,
+      duration: Number(duration) || 0,
+      thumbnail: thumb,
+      thumbnails: thumbs,
+      isPlaying: !!isPlaying,
+      providerName: 'ASMR',
+      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+      isAdult: !!isAdult,
+    })
     res.json({ success: true })
   })
 

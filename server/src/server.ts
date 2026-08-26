@@ -20,6 +20,7 @@ import { HnProvider } from './providers/hn.provider'
 import { AnilightProvider } from './providers/anilight.provider'
 import { AnidbProvider } from './providers/anidb.provider'
 import { HtProvider } from './providers/ht.provider'
+import { JasmrProvider } from './providers/jasmr.provider'
 import { OpProvider } from './providers/op.provider'
 import { googleDriveService } from './google'
 import { githubSyncService } from './github-sync'
@@ -35,9 +36,11 @@ import {
 import { createAuthRouter } from './routes/auth.routes'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
+import { createAsmrRouter } from './routes/asmr.routes'
 import { createProxyRouter } from './routes/proxy.routes'
 import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
+import { createTranslateRouter } from './routes/translate.routes'
 import { discordRPCService } from './discord-rpc'
 import { SettingsRepository } from './repositories/settings.repository'
 import { requestContext } from './utils/request-context'
@@ -73,6 +76,7 @@ const hnProvider = new HnProvider()
 const anilightProvider = new AnilightProvider(apiCache)
 const anidbProvider = new AnidbProvider(apiCache)
 const htProvider = new HtProvider(apiCache)
+const jasmrProvider = new JasmrProvider(apiCache)
 const opProvider = new OpProvider(apiCache)
 
 const providers = {
@@ -85,6 +89,7 @@ const providers = {
   anilight: anilightProvider,
   anidb: anidbProvider,
   ht: htProvider,
+  jasmr: jasmrProvider,
   op: opProvider,
 }
 
@@ -186,8 +191,10 @@ const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
 )
 app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
+app.use('/api', createAsmrRouter(apiCache, jasmrProvider))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter())
+app.use('/api', createTranslateRouter())
 app.use(
   '/api',
   createSettingsRouter(

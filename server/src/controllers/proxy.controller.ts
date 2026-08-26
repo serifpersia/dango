@@ -450,6 +450,8 @@ export class ProxyController {
         refererValue = 'https://animeya.cc/'
       } else if (targetUrl.includes('myspacecat.pictures')) {
         refererValue = 'https://oppai.stream/'
+      } else if (targetUrl.includes('weeabo0.xyz')) {
+        refererValue = 'https://japaneseasmr.com/'
       }
 
       headers['Referer'] = refererValue
