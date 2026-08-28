@@ -19,6 +19,7 @@ import {
   VIRTUAL_KEYBOARD_ENABLED_KEY,
 } from '../hooks/useVirtualKeyboard'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
+import { Alert } from '../components/common/Alert'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -62,6 +63,25 @@ const Settings: React.FC = () => {
 
   const [discordHideMature, setDiscordHideMature] = useState(true)
   const { data: discordHideMatureSetting } = useSetting('discordRPCHideMature')
+
+  const [discordGatewayToken, setDiscordGatewayToken] = useState('')
+  const [discordGatewayStatus, setDiscordGatewayStatus] = useState<{
+    hasToken: boolean
+    masked: string | null
+    enabled: boolean
+  } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/discord/gateway/status')
+      .then((res) => res.json())
+      .then((data) => {
+        setDiscordGatewayStatus(data)
+        if (data.masked && data.masked !== 'none') {
+          setDiscordGatewayToken(data.masked)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (discordSetting !== undefined) {
@@ -266,6 +286,122 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div
+                className={styles.settingItem}
+                style={{
+                  marginTop: '1.5rem',
+                  background: 'var(--bg-tertiary)',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div className={styles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                      Discord Mobile Presence (Gateway)
+                    </h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Paste your Discord authentication token to enable presence on mobile devices.
+                      If no token is saved, the default desktop Rich Presence is used. The token is
+                      stored locally in your configuration and never shared.
+                    </p>
+                  </div>
+                </div>
+
+                <Alert variant="warning" style={{ marginTop: '0.75rem' }}>
+                  <strong>Use at your own risk.</strong> This feature uses the Discord Gateway API
+                  with your user token, which violates Discord's Terms of Service. Discord may
+                  detect this usage and take action against your account, including phone number
+                  locks, temporary suspensions, or permanent bans. While the risk is generally low,
+                  it is not zero. Only use this if you understand and accept the risks.
+                </Alert>
+
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <input
+                    type="password"
+                    value={discordGatewayToken}
+                    onChange={(e) => setDiscordGatewayToken(e.target.value)}
+                    placeholder="Paste Discord token here..."
+                    style={{
+                      flex: '1 1 200px',
+                      padding: '0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontFamily: 'monospace',
+                      minWidth: 0,
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={async () => {
+                      const res = await fetch('/api/discord/gateway/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: discordGatewayToken }),
+                      })
+                      const data = await res.json()
+                      if (res.ok) {
+                        setDiscordGatewayStatus({
+                          hasToken: true,
+                          masked: data.masked,
+                          enabled: true,
+                        })
+                        setDiscordGatewayToken(data.masked)
+                      } else {
+                        alert(data.error || 'Failed to save token')
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      await fetch('/api/discord/gateway/remove', { method: 'POST' })
+                      setDiscordGatewayToken('')
+                      setDiscordGatewayStatus({ hasToken: false, masked: null, enabled: false })
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+
+                {discordGatewayStatus && (
+                  <p
+                    style={{
+                      marginTop: '0.5rem',
+                      fontSize: '0.8rem',
+                      color: discordGatewayStatus.hasToken ? 'green' : 'var(--text-secondary)',
+                    }}
+                  >
+                    Status:{' '}
+                    {discordGatewayStatus.hasToken
+                      ? `Token saved (${discordGatewayStatus.masked})`
+                      : 'No token saved'}
+                    {discordGatewayStatus.enabled ? ' - Gateway active' : ''}
+                  </p>
+                )}
+              </div>
 
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                 <div className={styles.settingRow}>

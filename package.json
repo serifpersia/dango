@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "2.6.2",
+  "version": "2.6.5",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
@@ -69,6 +69,7 @@
     "node-cache": "^5.1.2",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.1",
+    "ws": "^8.18.0",
     "xml2js": "^0.6.2"
   },
   "overrides": {
@@ -83,6 +84,7 @@
     "@types/express": "^5.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.5.0",
+    "@types/ws": "^8.5.10",
     "@types/xml2js": "^0.4.14",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",

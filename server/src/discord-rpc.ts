@@ -1,6 +1,7 @@
 import { Client, StatusDisplayType } from '@xhayper/discord-rpc'
 import logger from './logger'
 import { CONFIG } from './config'
+import { discordGatewayService } from './discord-gateway'
 
 const log = logger.child({ module: 'DiscordRPC' })
 
@@ -47,14 +48,18 @@ class DiscordRPCService {
         return
       }
       this.retryCount = 0
-      this.connect()
+      discordGatewayService.setEnabled(true)
+      if (!discordGatewayService.serviceEnabled) {
+        this.connect()
+      }
     } else {
       await this.disconnect()
+      discordGatewayService.setEnabled(false)
     }
   }
 
   public get isServiceEnabled(): boolean {
-    return this.isEnabled
+    return this.isEnabled && (this.client !== null || discordGatewayService.serviceEnabled)
   }
 
   public setHideMature(hide: boolean) {
@@ -107,6 +112,11 @@ class DiscordRPCService {
 
   private async connect() {
     if (!this.isEnabled || this.client || this.permanentlyDisabled) return
+
+    if (discordGatewayService.serviceEnabled) {
+      log.debug('Using Discord Gateway for presence (token configured). Skipping local RPC.')
+      return
+    }
 
     const isTermux = !!process.env.TERMUX_VERSION
     const isAndroid = process.platform === 'android'
@@ -243,6 +253,7 @@ class DiscordRPCService {
       clearInterval(this.heartbeatTimer)
       this.heartbeatTimer = null
     }
+    discordGatewayService.disconnect()
   }
 
   private formatTime(seconds: number): string {
@@ -264,15 +275,27 @@ class DiscordRPCService {
     if (data.sessionId) {
       this.currentSessionId = data.sessionId
     }
-    if (!this.isEnabled || !this.client || !this.client.user) return
+    if (!this.isEnabled) return
+
     if (this.hideMature && data.isAdult) {
-      try {
-        await this.client.user.clearActivity()
-      } catch {
-        // ignore
+      if (discordGatewayService.serviceEnabled) {
+        discordGatewayService.clearPresence()
+      } else if (this.client?.user) {
+        try {
+          await this.client.user.clearActivity()
+        } catch {
+          // ignore
+        }
       }
       return
     }
+
+    if (discordGatewayService.serviceEnabled) {
+      discordGatewayService.updatePresence(data)
+      return
+    }
+
+    if (!this.client || !this.client.user) return
 
     const isSafeUrl = (url: string): boolean => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -385,7 +408,17 @@ class DiscordRPCService {
   }
 
   public async setIdleStatus(page: string) {
-    if (!this.isEnabled || !this.client || !this.client.user) return
+    if (!this.isEnabled) return
+
+    if (discordGatewayService.serviceEnabled) {
+      discordGatewayService.setIdleStatus(page)
+      return
+    }
+
+    if (!this.client || !this.client.user) {
+      log.warn('Discord client not connected, skipping idle status update')
+      return
+    }
 
     const pageLabels: Record<string, { details: string; state: string }> = {
       home: { details: 'Home', state: 'Browsing anime' },
@@ -437,6 +470,11 @@ class DiscordRPCService {
 
     this.lastActivity = null
     this.currentSessionId = null
+
+    if (discordGatewayService.serviceEnabled) {
+      discordGatewayService.clearPresence()
+      return
+    }
 
     await this.setIdleStatus('idle')
   }

@@ -41,7 +41,9 @@ import { createProxyRouter } from './routes/proxy.routes'
 import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
 import { createTranslateRouter } from './routes/translate.routes'
+import { createDiscordGatewayRouter } from './routes/discord-gateway.routes'
 import { discordRPCService } from './discord-rpc'
+import { discordGatewayService } from './discord-gateway'
 import { SettingsRepository } from './repositories/settings.repository'
 import { requestContext } from './utils/request-context'
 import { checkAnilistStatus } from './lib/anilist'
@@ -195,6 +197,7 @@ app.use('/api', createAsmrRouter(apiCache, jasmrProvider))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter())
 app.use('/api', createTranslateRouter())
+app.use('/api', createDiscordGatewayRouter())
 app.use(
   '/api',
   createSettingsRouter(
@@ -254,6 +257,7 @@ async function main() {
   const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
   const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
   await discordRPCService.setEnabled(isRpcEnabled)
+  discordGatewayService.setEnabled(isRpcEnabled)
 
   checkAnilistStatus().catch(() => {})
 
@@ -297,6 +301,7 @@ async function main() {
     stopDiscovery()
     clearInterval(syncInterval)
     discordRPCService.disconnect()
+    discordGatewayService.disconnect()
     await watcher.close()
 
     if (expressServer) {
