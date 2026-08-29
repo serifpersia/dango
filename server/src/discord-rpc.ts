@@ -348,7 +348,7 @@ class DiscordRPCService {
           largeImageText: data.title,
           smallImageKey: 'logo',
           smallImageText: 'dango',
-          type: 3,
+          type: data.providerName === 'ASMR' ? 2 : 3,
           statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
             {
@@ -382,7 +382,7 @@ class DiscordRPCService {
         largeImageText: data.title,
         smallImageKey: 'logo',
         smallImageText: 'dango',
-        type: 3,
+        type: data.providerName === 'ASMR' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
@@ -444,7 +444,7 @@ class DiscordRPCService {
         state: label.state,
         largeImageKey: 'logo',
         largeImageText: 'dango',
-        type: 3,
+        type: page === 'asmr' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {

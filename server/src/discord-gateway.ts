@@ -141,7 +141,7 @@ class DiscordGatewayService {
     const name = 'dango'
     const details = data.title
     const state = `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`
-    const type = 3
+    const type = data.providerName === 'ASMR' ? 2 : 3
 
     const imageUrl = this.resolveImageUrl(data)
     let assets:
@@ -247,7 +247,7 @@ class DiscordGatewayService {
             activities: [
               {
                 name: 'dango',
-                type: 3,
+                type: page === 'asmr' ? 2 : 3,
                 state: label.state,
                 details: label.details,
                 ...(CONFIG.DISCORD_CLIENT_ID ? { application_id: CONFIG.DISCORD_CLIENT_ID } : {}),
