@@ -14,6 +14,7 @@ interface TmdbSearchItem {
   media_type?: string
   poster_path?: string | null
   vote_average?: number
+  adult?: boolean
 }
 
 interface TmdbSeason {
@@ -38,6 +39,7 @@ interface TmdbDetailsResult {
   year: string
   poster: string
   backdrop: string
+  adult: boolean
   seasons?: TmdbSeason[]
   number_of_seasons?: number
 }
@@ -69,7 +71,7 @@ export function createTvRouter(apiCache: NodeCache): Router {
     if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
     try {
       const r = await fetch(
-        `${TMDB_BASE}/search/multi?api_key=${key}&query=${encodeURIComponent(query)}&page=${page}`,
+        `${TMDB_BASE}/search/multi?api_key=${key}&query=${encodeURIComponent(query)}&page=${page}&include_adult=true`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
       if (!r.ok) return res.status(500).json({ error: 'TMDB search failed' })
@@ -83,6 +85,7 @@ export function createTvRouter(apiCache: NodeCache): Router {
           type: item.media_type,
           image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
           vote_average: item.vote_average,
+          adult: item.adult === true,
         }))
       apiCache.set(cacheKey, results, 3600)
       res.json(results)
@@ -111,6 +114,7 @@ export function createTvRouter(apiCache: NodeCache): Router {
         year: (d.release_date || d.first_air_date || '').split('-')[0],
         poster: d.poster_path ? `${TMDB_IMAGE}/w500${d.poster_path}` : '',
         backdrop: d.backdrop_path ? `${TMDB_IMAGE}/original${d.backdrop_path}` : '',
+        adult: d.adult === true,
       }
       if (type === 'tv') {
         result.seasons = (d.seasons || [])

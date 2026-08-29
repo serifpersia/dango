@@ -397,7 +397,8 @@ const Asmr: React.FC = () => {
           <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
             <p>This section contains mature content intended for adult audiences.</p>
             <p>
-              By proceeding, you confirm that you are of legal age and wish to view this content.
+              By proceeding, you confirm that you are <strong>18 years of age or older</strong> (or
+              the age of majority in your jurisdiction) and wish to view this content.
             </p>
             <p
               style={{
@@ -419,7 +420,7 @@ const Asmr: React.FC = () => {
               <Button variant="secondary" onClick={handleDeclineMature}>
                 Go Back
               </Button>
-              <Button onClick={handleAcceptMature}>I Agree</Button>
+              <Button onClick={handleAcceptMature}>I'm 18+, Continue</Button>
             </div>
           </div>
         </GenericModal>

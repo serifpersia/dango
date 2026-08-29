@@ -14,6 +14,9 @@ import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { fixThumbnailUrl } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import GenericModal from '../common/GenericModal'
+import { Button } from '../common/Button'
+import { useMatureConsent } from '../../hooks/useMatureConsent'
 import styles from './AnimeInfo.module.css'
 import AnimeMetaDetails from './AnimeMetaDetails'
 import SynopsisText from './SynopsisText'
@@ -26,6 +29,7 @@ export default function AnimeInfo() {
   const [showDetails, setShowDetails] = useState(false)
 
   const { showMeta, loadingMeta, toggleWatchlist, inWatchlist } = useAnimeInfoData(showId)
+  const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
 
   useEffect(() => {
     if (showId && showMeta?.id && showMeta.id !== showId) {
@@ -70,8 +74,17 @@ export default function AnimeInfo() {
     )
   }
 
+  const matureBlocked = showMeta.isAdult === true && !hasMatureConsent
+
   return (
-    <div className={styles.container}>
+    <div
+      className={styles.container}
+      style={
+        matureBlocked
+          ? { filter: 'blur(14px)', pointerEvents: 'none', userSelect: 'none' }
+          : undefined
+      }
+    >
       <div className={styles.heroSection}>
         <div className={styles.bannerContainer}>
           <div className={styles.banner} style={{ backgroundImage: `url(${bannerUrl})` }} />
@@ -181,6 +194,31 @@ export default function AnimeInfo() {
           </div>
         )}
       </div>
+
+      {matureBlocked && (
+        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/home')}>
+          <div style={{ padding: '1rem', textAlign: 'center' }}>
+            <p>This title contains mature content intended for adult audiences.</p>
+            <p>
+              By proceeding, you confirm that you are <strong>18 years of age or older</strong> (or
+              the age of majority in your jurisdiction) and wish to view this content.
+            </p>
+            <div
+              style={{
+                marginTop: '1rem',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center',
+              }}
+            >
+              <Button variant="secondary" onClick={() => navigate('/home')}>
+                Go Back
+              </Button>
+              <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
+            </div>
+          </div>
+        </GenericModal>
+      )}
     </div>
   )
 }

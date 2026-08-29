@@ -16,6 +16,9 @@ import {
   FaListUl,
 } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
+import GenericModal from '../components/common/GenericModal'
+import { Button } from '../components/common/Button'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 import ResumeModal from '../components/common/ResumeModal'
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
@@ -44,6 +47,7 @@ const Player: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
 
   const {
     state,
@@ -56,7 +60,9 @@ const Player: React.FC = () => {
     prefetchEpisodeSources,
     isMarkingWatched,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null)
+  } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
+    hasMatureConsent,
+  })
 
   useEffect(() => {
     if (showId && state.showMeta?.id && state.showMeta.id !== showId) {
@@ -1050,6 +1056,37 @@ const Player: React.FC = () => {
     }
   }
 
+  const matureBlocked = state.showMeta?.isAdult === true && !hasMatureConsent
+
+  if (matureBlocked) {
+    return (
+      <div className={layoutStyles.playerPageLayout}>
+        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/home')}>
+          <div style={{ padding: '1rem', textAlign: 'center' }}>
+            <p>This title contains mature content intended for adult audiences.</p>
+            <p>
+              By proceeding, you confirm that you are <strong>18 years of age or older</strong> (or
+              the age of majority in your jurisdiction) and wish to view this content.
+            </p>
+            <div
+              style={{
+                marginTop: '1rem',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center',
+              }}
+            >
+              <Button variant="secondary" onClick={() => navigate('/home')}>
+                Go Back
+              </Button>
+              <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
+            </div>
+          </div>
+        </GenericModal>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`${layoutStyles.playerPageLayout} ${isTheaterMode ? layoutStyles.theaterMode : ''}`}
@@ -1288,6 +1325,7 @@ const Player: React.FC = () => {
             <div className={styles.providerAndEpisodeRow}>
               <ProviderSelector
                 selectedProvider={state.selectedProvider}
+                isAdult={state.showMeta?.isAdult}
                 onProviderChange={(newProvider) => {
                   dispatch({
                     type: 'SET_STATE',

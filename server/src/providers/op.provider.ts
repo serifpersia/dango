@@ -15,10 +15,14 @@ async function fetchText(url: string): Promise<string> {
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.5',
     },
+    redirect: 'manual',
     signal: AbortSignal.timeout(30000),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`)
-  return res.text()
+  const text = await res.text()
+  const isRedirect =
+    res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308
+  if (!res.ok && !isRedirect) throw new Error(`HTTP ${res.status}: ${url}`)
+  return text
 }
 
 interface SearchEntry {

@@ -2,69 +2,60 @@ import React from 'react'
 import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
 
+type ProviderId =
+  | 'anidb'
+  | 'anilight'
+  | 'megaplay'
+  | 'animepahe'
+  | 'animeya'
+  | '123anime'
+  | 'wh'
+  | 'hn'
+  | 'ht'
+  | 'op'
+
+const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
+  { value: 'anidb', label: 'AniDB', mature: false },
+  { value: 'anilight', label: 'Anilight', mature: false },
+  { value: 'megaplay', label: 'MegaPlay', mature: false },
+  { value: 'animepahe', label: 'AnimePahe', mature: false },
+  { value: 'animeya', label: 'Animeya', mature: false },
+  { value: '123anime', label: '123Anime', mature: false },
+  { value: 'wh', label: 'WH', mature: true },
+  { value: 'hn', label: 'HN', mature: true },
+  { value: 'ht', label: 'HT', mature: true },
+  { value: 'op', label: 'OP', mature: true },
+]
+
 interface ProviderSelectorProps {
-  selectedProvider:
-    | 'animepahe'
-    | '123anime'
-    | 'animeya'
-    | 'megaplay'
-    | 'wh'
-    | 'hn'
-    | 'anilight'
-    | 'anidb'
-    | 'ht'
-    | 'op'
-  onProviderChange: (
-    provider:
-      | 'animepahe'
-      | '123anime'
-      | 'animeya'
-      | 'megaplay'
-      | 'wh'
-      | 'hn'
-      | 'anilight'
-      | 'anidb'
-      | 'ht'
-      | 'op'
-  ) => void
+  selectedProvider: ProviderId
+  onProviderChange: (provider: ProviderId) => void
+  isAdult?: boolean
 }
 
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   selectedProvider,
   onProviderChange,
+  isAdult,
 }) => {
+  const visibleProviders =
+    isAdult === undefined
+      ? PROVIDER_OPTIONS
+      : PROVIDER_OPTIONS.filter((option) => option.mature === isAdult)
+
   return (
     <div className={styles.providerSelectContainer}>
       <h4>Provider</h4>
       <select
         className={styles.providerSelect}
         value={selectedProvider}
-        onChange={(e) =>
-          onProviderChange(
-            e.target.value as
-              | 'animepahe'
-              | '123anime'
-              | 'animeya'
-              | 'megaplay'
-              | 'wh'
-              | 'hn'
-              | 'anilight'
-              | 'anidb'
-              | 'ht'
-              | 'op'
-          )
-        }
+        onChange={(e) => onProviderChange(e.target.value as ProviderId)}
       >
-        <option value="anidb">AniDB</option>
-        <option value="anilight">Anilight</option>
-        <option value="megaplay">MegaPlay</option>
-        <option value="animepahe">AnimePahe</option>
-        <option value="animeya">Animeya</option>
-        <option value="123anime">123Anime</option>
-        <option value="wh">WH</option>
-        <option value="hn">HN</option>
-        <option value="ht">HT</option>
-        <option value="op">OP</option>
+        {visibleProviders.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
       </select>
     </div>
   )

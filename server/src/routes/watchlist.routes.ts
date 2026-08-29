@@ -151,7 +151,7 @@ export function createWatchlistRouter(
   })
 
   router.post('/discord/tv', (req, res) => {
-    const { title, episodeLabel, isPlaying, thumbnail, currentTime, duration, sessionId } =
+    const { title, episodeLabel, isPlaying, thumbnail, currentTime, duration, sessionId, isAdult } =
       req.body ?? {}
     if (!discordRPCService.isServiceEnabled) return res.json({ success: true })
     if (typeof sessionId === 'string') discordRPCService.heartbeat(sessionId)
@@ -172,6 +172,7 @@ export function createWatchlistRouter(
       isPlaying: !!isPlaying,
       providerName: 'TV',
       sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+      isAdult: isAdult === true,
     })
     res.json({ success: true })
   })

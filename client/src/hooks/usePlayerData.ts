@@ -158,7 +158,8 @@ async function fetchVideoSources(
 export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined,
-  initialMeta?: Record<string, unknown> | null
+  initialMeta?: Record<string, unknown> | null,
+  options?: { hasMatureConsent?: boolean }
 ): UsePlayerDataReturn => {
   const [uiState, dispatch] = useReducer(playerReducer, initialMeta, (meta) => ({
     ...createInitialState(),
@@ -257,14 +258,20 @@ export const usePlayerData = (
   }, [playerData, episodeNumber])
 
   useEffect(() => {
-    if (
-      showMeta?.isAdult &&
-      uiState.selectedProvider !== 'wh' &&
-      uiState.selectedProvider !== 'hn' &&
-      hasForcedAdultProvider.current !== showId
-    ) {
+    if (showMeta?.isAdult === undefined) return
+    const matureProvider =
+      uiState.selectedProvider === 'wh' ||
+      uiState.selectedProvider === 'hn' ||
+      uiState.selectedProvider === 'ht' ||
+      uiState.selectedProvider === 'op'
+    if (hasForcedAdultProvider.current === showId) return
+    if (showMeta.isAdult && !matureProvider) {
       hasForcedAdultProvider.current = showId
       dispatch({ type: 'SET_PROVIDER', payload: 'wh' })
+    }
+    if (!showMeta.isAdult && matureProvider) {
+      hasForcedAdultProvider.current = showId
+      dispatch({ type: 'SET_PROVIDER', payload: 'animepahe' })
     }
   }, [showMeta?.isAdult, uiState.selectedProvider, showId])
 
@@ -281,7 +288,10 @@ export const usePlayerData = (
       uiState.currentMode,
     ],
     queryFn: () => fetchVideoSources(showId, currentEpisode, uiState, dispatch),
-    enabled: !!showId && !!currentEpisode,
+    enabled:
+      !!showId &&
+      !!currentEpisode &&
+      !(uiState.showMeta?.isAdult === true && !options?.hasMatureConsent),
   })
 
   const loadingDetails = false

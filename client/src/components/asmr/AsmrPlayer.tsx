@@ -158,8 +158,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       const t = tracks[trackIndex]
       const trackLabel = t ? `${t.resolutionStr} (${trackIndex + 1}/${tracks.length})` : ''
       const audio = audioRef.current
-      const cur = audio ? audio.currentTime : currentTime
-      const dur = audio ? audio.duration || duration : duration
+      const cur = audio ? audio.currentTime : 0
+      const dur = audio ? audio.duration || 0 : 0
       const poster = images[0] || ''
       fetch('/api/discord/asmr', {
         method: 'POST',
@@ -183,7 +183,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         body: JSON.stringify({ sessionId: sessionIdRef.current }),
       }).catch(() => {})
     },
-    [title, tracks, trackIndex, images, currentTime, duration, isAdult, rjCode]
+    [title, tracks, trackIndex, images, isAdult, rjCode]
   )
 
   useEffect(() => {

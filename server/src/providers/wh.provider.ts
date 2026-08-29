@@ -52,6 +52,18 @@ function cleanUrl(raw: string): string {
   }
 }
 
+function whDecodeMediaUrl(encoded: string): string {
+  const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=')
+  const bytes = Buffer.from(padded, 'base64')
+  let xored = ''
+  for (let i = 0; i < bytes.length; i++) {
+    xored += String.fromCharCode(bytes[i] ^ ((13 + (i % 17)) & 255))
+  }
+  const reversed = xored.split('').reverse().join('')
+  return Buffer.from(reversed, 'base64').toString('utf8')
+}
+
 function extractDirectSrc(playerUrl: string): string {
   const clean = playerUrl.replace(/&amp;/g, '&')
   try {
@@ -328,7 +340,7 @@ export class WhProvider implements Provider {
         const slug = link.replace(/^\/videos\//, '').replace(/\/$/, '')
         const numM = slug.match(/episode[-\s]?(\d+)/i)
         const num = numM ? numM[1] : ''
-        if (num && slug) {
+        if (num && slug && !episodeMap[num]) {
           episodeMap[num] = slug
           episodeNumbers.push(num)
         }
@@ -434,15 +446,24 @@ export class WhProvider implements Provider {
       const watchUrl = `${BASE_URL}/videos/${episodeSlug}/`
       const watchHtml = await fetchText(watchUrl)
 
+      const plyrUrlMatch = watchHtml.match(
+        /https:\/\/watchhentai\.net\/player\/\d+\/\d+\/(?:mp4|gdrive)\/?/
+      )
       const jwUrlMatch = watchHtml.match(/https:\/\/watchhentai\.net\/jwplayer\/\?[^'")\s]+/)
       let playerHtml = watchHtml
       let directFallback = ''
+      let playerUrl = ''
 
-      if (jwUrlMatch) {
-        const jwUrl = cleanUrl(jwUrlMatch[0])
-        directFallback = extractDirectSrc(jwUrl)
+      if (plyrUrlMatch) {
+        playerUrl = cleanUrl(plyrUrlMatch[0])
+      } else if (jwUrlMatch) {
+        playerUrl = cleanUrl(jwUrlMatch[0])
+        directFallback = extractDirectSrc(playerUrl)
+      }
+
+      if (playerUrl) {
         try {
-          const res = await fetch(jwUrl, {
+          const res = await fetch(playerUrl, {
             headers: {
               'User-Agent': UA,
               Referer: watchUrl,
@@ -453,14 +474,56 @@ export class WhProvider implements Provider {
           })
           if (res.ok) playerHtml = await res.text()
         } catch {
-          // use watchHtml or directFallback
+          // fall back to watch page html
         }
       }
 
-      const playerData = extractPlayerData(playerHtml)
       const links: VideoLink[] = []
 
-      if (playerData.sources.length > 0) {
+      if (plyrUrlMatch) {
+        const jwSourcesMatch = playerHtml.match(/var\s+whJwSources\s*=\s*(\[[\s\S]*?\])\s*;/)
+        if (jwSourcesMatch) {
+          try {
+            const entries = JSON.parse(jwSourcesMatch[1]) as {
+              file?: string
+              label?: string
+            }[]
+            for (const entry of entries) {
+              if (!entry.file) continue
+              const url = whDecodeMediaUrl(entry.file)
+              if (!/^https?:\/\//.test(url)) continue
+              links.push({
+                resolutionStr: entry.label || 'Auto',
+                link: url,
+                hls: url.includes('.m3u8'),
+                headers: { Referer: BASE_URL + '/' },
+              })
+            }
+          } catch {
+            // fall back to plain URL extraction
+          }
+        }
+
+        if (links.length === 0) {
+          const seen = new Set<string>()
+          const urlRe = /https?:\/\/[^"' ]+\.(?:mp4|m3u8)[^"' ]*/gi
+          let vm: RegExpExecArray | null
+          while ((vm = urlRe.exec(playerHtml)) !== null) {
+            const url = cleanUrl(vm[0])
+            if (seen.has(url)) continue
+            seen.add(url)
+            links.push({
+              resolutionStr: url.match(/[_-](\d{3,4}p)\./)?.[1] ?? 'Auto',
+              link: url,
+              hls: url.includes('.m3u8'),
+              headers: { Referer: BASE_URL + '/' },
+            })
+          }
+        }
+      }
+
+      if (links.length === 0) {
+        const playerData = extractPlayerData(playerHtml)
         for (const src of playerData.sources) {
           links.push({
             resolutionStr: src.label || 'Auto',
@@ -472,14 +535,18 @@ export class WhProvider implements Provider {
             headers: { Referer: BASE_URL + '/' },
           })
         }
-      } else if (directFallback) {
+      }
+
+      if (links.length === 0 && directFallback) {
         links.push({
           resolutionStr: directFallback.match(/_(\d+p)\./)?.[1] ?? 'Auto',
           link: directFallback,
           hls: directFallback.includes('.m3u8'),
           headers: { Referer: BASE_URL + '/' },
         })
-      } else {
+      }
+
+      if (links.length === 0) {
         return null
       }
 
@@ -492,11 +559,10 @@ export class WhProvider implements Provider {
         },
       ]
 
-      if (jwUrlMatch) {
-        const iframeUrl = cleanUrl(jwUrlMatch[0])
+      if (playerUrl) {
         result.push({
           sourceName: 'WH (Iframe)',
-          links: [{ resolutionStr: 'Auto', link: iframeUrl, hls: false }],
+          links: [{ resolutionStr: 'Auto', link: playerUrl, hls: false }],
           type: 'iframe',
           actualEpisodeNumber: targetEpisode,
         })

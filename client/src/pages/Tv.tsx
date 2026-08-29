@@ -3,6 +3,9 @@ import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { FaSearch, FaPlay, FaFilm, FaTv, FaArrowLeft, FaSpinner } from 'react-icons/fa'
 import TvCard from '../components/tv/TvCard'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
+import GenericModal from '../components/common/GenericModal'
+import { Button } from '../components/common/Button'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 import styles from './Tv.module.css'
 
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
@@ -14,6 +17,7 @@ interface TvSearchResult {
   type: MediaType
   image: string
   vote_average?: number
+  adult?: boolean
 }
 
 interface TvDetails {
@@ -25,6 +29,7 @@ interface TvDetails {
   poster: string
   backdrop: string
   imdb_id?: string
+  adult?: boolean
   seasons?: { season_number: number; episode_count: number }[]
   number_of_seasons?: number
 }
@@ -144,6 +149,7 @@ const Tv: React.FC = () => {
   const fallbackAttemptedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<HlsJsInstance | null>(null)
+  const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const discordSessionRef = useRef<string>('')
   if (!discordSessionRef.current) {
     discordSessionRef.current = `tv-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -248,6 +254,7 @@ const Tv: React.FC = () => {
 
   const loadStreams = useCallback(async () => {
     if (!details || !id || isEmbedProvider) return
+    if (details.adult && !hasMatureConsent) return
     setStreamLoading(true)
     setStreamError('')
     setStreams([])
@@ -318,7 +325,7 @@ const Tv: React.FC = () => {
       setStreamLoading(false)
       setStreamError('Failed to load streams.')
     }
-  }, [details, id, source, season, episode, isMovie, isEmbedProvider])
+  }, [details, id, source, season, episode, isMovie, isEmbedProvider, hasMatureConsent])
 
   useEffect(() => {
     if (source && details && !isEmbedProvider) {
@@ -441,6 +448,7 @@ const Tv: React.FC = () => {
         thumbnail: details.poster,
         currentTime: video ? video.currentTime : 0,
         duration: video ? video.duration || 0 : 0,
+        isAdult: details.adult === true,
         sessionId: discordSessionRef.current,
       }),
     }).catch(() => {})
@@ -630,7 +638,14 @@ const Tv: React.FC = () => {
       )}
 
       {details && (
-        <div className={styles.playerSection}>
+        <div
+          className={styles.playerSection}
+          style={
+            details.adult && !hasMatureConsent
+              ? { filter: 'blur(14px)', pointerEvents: 'none', userSelect: 'none' }
+              : undefined
+          }
+        >
           {streamLoading && !isEmbedProvider && (
             <div className={styles.statusMsg}>
               <FaSpinner className={styles.spinner} /> Loading stream...
@@ -680,6 +695,31 @@ const Tv: React.FC = () => {
             </TvPlayerControls>
           ) : null}
         </div>
+      )}
+
+      {details?.adult && !hasMatureConsent && (
+        <GenericModal isOpen title="Content Warning" onClose={handleBack}>
+          <div style={{ padding: '1rem', textAlign: 'center' }}>
+            <p>This title contains mature content intended for adult audiences.</p>
+            <p>
+              By proceeding, you confirm that you are <strong>18 years of age or older</strong> (or
+              the age of majority in your jurisdiction) and wish to view this content.
+            </p>
+            <div
+              style={{
+                marginTop: '1rem',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center',
+              }}
+            >
+              <Button variant="secondary" onClick={handleBack}>
+                Go Back
+              </Button>
+              <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
+            </div>
+          </div>
+        </GenericModal>
       )}
 
       {!details && (
