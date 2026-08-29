@@ -8,6 +8,8 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
+import { requestContext } from '../utils/request-context'
+import { buildCfClearanceCookie } from '../utils/cookie.utils'
 
 const BASE_URL = 'https://japaneseasmr.com'
 const UA =
@@ -64,18 +66,42 @@ function decodeEntities(text: string): string {
     .trim()
 }
 
+function isCloudflareChallenge(status: number, text: string): boolean {
+  if (status === 403 || status === 503) return true
+  if (/Just a moment/i.test(text)) return true
+  // Only the interactive managed challenge uses the /h/ orchestrate path.
+  // The non-blocking jsd snippet (challenge-platform/scripts/jsd) is present on
+  // normal pages too and must NOT be treated as a block.
+  if (/challenge-platform\/h\//i.test(text)) return true
+  return false
+}
+
 async function fetchText(url: string): Promise<string> {
+  const store = requestContext.getStore()
+  const ua = store?.get('jasmr_ua') || UA
+  const rawCookie = store?.get('jasmr_cookie')
+  const cookieHeader = rawCookie ? buildCfClearanceCookie(rawCookie) : ''
+
   const res = await fetch(url, {
     headers: {
-      'User-Agent': UA,
+      'User-Agent': ua,
       Referer: `${BASE_URL}/`,
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       'Accept-Language': 'ja,en-US;q=0.8,en;q=0.6',
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     },
     signal: AbortSignal.timeout(30000),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`)
-  return res.text()
+
+  const text = await res.text()
+
+  if (res.status !== 200 || isCloudflareChallenge(res.status, text)) {
+    if (isCloudflareChallenge(res.status, text)) {
+      throw Object.assign(new Error('AUTH_REQUIRED'), { status: 403 })
+    }
+    throw new Error(`HTTP ${res.status}: ${url}`)
+  }
+  return text
 }
 
 function parseArchivePosts(html: string): JasmrWork[] {
@@ -141,7 +167,15 @@ function hasNextPage(html: string, page: number): boolean {
 
 function toProxyImage(url: string): string {
   if (!url) return ''
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`
+  const store = requestContext.getStore()
+  const cookie = store?.get('jasmr_cookie')
+  const ua = store?.get('jasmr_ua')
+  let u = `/api/image-proxy?url=${encodeURIComponent(url)}&referer=${encodeURIComponent(
+    `${BASE_URL}/`
+  )}`
+  if (cookie) u += `&cookie=${encodeURIComponent(cookie)}`
+  if (ua) u += `&ua=${encodeURIComponent(ua)}`
+  return u
 }
 
 function toShow(work: JasmrWork): Show {
@@ -334,6 +368,7 @@ export class JasmrProvider implements Provider {
       if (!noCache) this.cache.set(cacheKey, result, 300)
       return result
     } catch (error) {
+      if ((error as Error).message === 'AUTH_REQUIRED') throw error
       logger.error({ error }, '[JAsmr] Browse failed')
       return { shows: [], hasNext: false }
     }
@@ -405,6 +440,7 @@ export class JasmrProvider implements Provider {
       this.cache.set(cacheKey, result, 1800)
       return result
     } catch (error) {
+      if ((error as Error).message === 'AUTH_REQUIRED') throw error
       logger.error({ error, showId }, '[JAsmr] getEpisodes failed')
       return null
     }
@@ -433,6 +469,7 @@ export class JasmrProvider implements Provider {
       this.cache.set(cacheKey, images, 3600)
       return images
     } catch (error) {
+      if ((error as Error).message === 'AUTH_REQUIRED') throw error
       logger.error({ error, rjCode: rjCodeRaw }, '[JAsmr] getImages failed')
       return []
     }
@@ -454,6 +491,7 @@ export class JasmrProvider implements Provider {
       this.cache.set(cacheKey, chapters, 3600)
       return chapters
     } catch (error) {
+      if ((error as Error).message === 'AUTH_REQUIRED') throw error
       logger.error({ error, rjCode: rjCodeRaw }, '[JAsmr] getChapters failed')
       return []
     }
@@ -483,8 +521,17 @@ export class JasmrProvider implements Provider {
 
       const html = (await this.getPostHtml(rjCode)) || ''
 
-      const toProxy = (rawUrl: string): string =>
-        `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(`${BASE_URL}/`)}`
+      const store = requestContext.getStore()
+      const jasmrCookie = store?.get('jasmr_cookie')
+      const jasmrUa = store?.get('jasmr_ua')
+      const toProxy = (rawUrl: string): string => {
+        let u = `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(
+          `${BASE_URL}/`
+        )}`
+        if (jasmrCookie) u += `&cookie=${encodeURIComponent(jasmrCookie)}`
+        if (jasmrUa) u += `&ua=${encodeURIComponent(jasmrUa)}`
+        return u
+      }
 
       const links: VideoLink[] = []
 
@@ -522,6 +569,7 @@ export class JasmrProvider implements Provider {
       this.cache.set(cacheKey, result, 3600)
       return result
     } catch (error) {
+      if ((error as Error).message === 'AUTH_REQUIRED') throw error
       logger.error({ error, showId, episodeNumber }, '[JAsmr] getStreamUrls failed')
       return null
     }

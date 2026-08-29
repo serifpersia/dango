@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { FaHeadphones, FaSearch } from 'react-icons/fa'
 import { useParams, useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import GenericModal from '../components/common/GenericModal'
 import { Button } from '../components/common/Button'
 import AsmrCard from '../components/asmr/AsmrCard'
 import AsmrDetail from '../components/asmr/AsmrDetail'
 import AsmrPlayer from '../components/asmr/AsmrPlayer'
+import JasmrCookieModal from '../components/asmr/JasmrCookieModal'
 import { useAsmrBrowse, useAsmrWork } from '../hooks/useAsmr'
 import { useTranslate } from '../hooks/useTranslate'
 import type { AsmrTrack, AsmrWork } from '../hooks/useAsmr'
@@ -90,6 +92,14 @@ const Asmr: React.FC = () => {
   const [translateEN, setTranslateEN] = useState(
     () => localStorage.getItem('asmrTranslateEN') === 'true'
   )
+  const [showJasmrModal, setShowJasmrModal] = useState(false)
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const handleAuthRequired = () => setShowJasmrModal(true)
+    window.addEventListener('JASMR_AUTH_REQUIRED', handleAuthRequired)
+    return () => window.removeEventListener('JASMR_AUTH_REQUIRED', handleAuthRequired)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('asmrTranslateEN', String(translateEN))
@@ -365,6 +375,17 @@ const Asmr: React.FC = () => {
 
       {selectedWork && (
         <AsmrDetail work={selectedWork} onClose={handleCloseDetail} onPlay={handlePlay} t={tAsmr} />
+      )}
+
+      {showJasmrModal && (
+        <JasmrCookieModal
+          isOpen={showJasmrModal}
+          onClose={() => setShowJasmrModal(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['asmrBrowse'] })
+            queryClient.invalidateQueries({ queryKey: ['asmrWork'] })
+          }}
+        />
       )}
 
       {showMatureModal && (

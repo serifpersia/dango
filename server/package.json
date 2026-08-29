@@ -1,6 +1,6 @@
 {
   "name": "dango-server",
-  "version": "2.6.5",
+  "version": "2.6.6",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"

@@ -8,6 +8,7 @@ import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
 import SyncProviderSelector from '../components/settings/SyncProviderSelector'
+import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -401,6 +402,8 @@ const Settings: React.FC = () => {
                     {discordGatewayStatus.enabled ? ' - Gateway active' : ''}
                   </p>
                 )}
+
+                <DiscordTokenBookmarklet />
               </div>
 
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>

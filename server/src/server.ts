@@ -64,6 +64,12 @@ app.use((req, res, next) => {
   if (req.headers['x-animepahe-cookie']) {
     store.set('cookie', req.headers['x-animepahe-cookie'] as string)
   }
+  if (req.headers['x-jasmr-ua']) {
+    store.set('jasmr_ua', req.headers['x-jasmr-ua'] as string)
+  }
+  if (req.headers['x-jasmr-cookie']) {
+    store.set('jasmr_cookie', req.headers['x-jasmr-cookie'] as string)
+  }
   requestContext.run(store, next)
 })
 

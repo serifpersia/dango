@@ -11,8 +11,10 @@ function makeCacheMiddleware(cache: NodeCache, keyFn: (req: Request) => string, 
 
     const originalJson = res.json.bind(res)
     res.json = (data: unknown) => {
-      if (ttl !== undefined) cache.set(cacheKey, data, ttl)
-      else cache.set(cacheKey, data)
+      if (res.statusCode >= 200 && res.statusCode < 400) {
+        if (ttl !== undefined) cache.set(cacheKey, data, ttl)
+        else cache.set(cacheKey, data)
+      }
       return originalJson(data)
     }
     next()
@@ -42,6 +44,9 @@ export function createAsmrRouter(apiCache: NodeCache, provider: JasmrProvider): 
         })
         res.json(result)
       } catch (err) {
+        if ((err as Error).message === 'AUTH_REQUIRED') {
+          return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'jasmr' })
+        }
         logger.error({ err }, '[Asmr] browse failed')
         res.json({ shows: [], hasNext: false })
       }
@@ -66,6 +71,9 @@ export function createAsmrRouter(apiCache: NodeCache, provider: JasmrProvider): 
           chapters,
         })
       } catch (err) {
+        if ((err as Error).message === 'AUTH_REQUIRED') {
+          return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'jasmr' })
+        }
         logger.error({ err, rj: req.params.rj }, '[Asmr] work fetch failed')
         res.json({ rjCode: req.params.rj, description: '', tracks: [], images: [], chapters: [] })
       }

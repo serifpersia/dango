@@ -130,6 +130,13 @@ export class ProxyController {
         if (!headers['Referer']) headers['Referer'] = refererStr || 'https://oppai.stream/'
         headers['Origin'] = 'https://oppai.stream'
       }
+      if (urlStr.includes('weeabo0.xyz') || urlStr.includes('weeab0o.xyz')) {
+        if (!headers['Referer']) headers['Referer'] = refererStr || 'https://japaneseasmr.com/'
+        const jasmrCookieHeader = buildCfClearanceCookie(cookieStr)
+        if (jasmrCookieHeader) headers['Cookie'] = jasmrCookieHeader
+        const jasmrUa = (req.query.ua as string) || ''
+        if (jasmrUa) headers['User-Agent'] = jasmrUa
+      }
       if (req.headers.range) headers['Range'] = req.headers.range as string
 
       if (urlStr.includes('.m3u8')) {
@@ -159,7 +166,8 @@ export class ProxyController {
         const baseUrl = new URL(finalUrl)
         const proxiedMediaUrl = (targetUrl: string) =>
           `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}` +
-          (cookieStr ? `&cookie=${encodeURIComponent(sanitizeCfClearance(cookieStr))}` : '')
+          (cookieStr ? `&cookie=${encodeURIComponent(sanitizeCfClearance(cookieStr))}` : '') +
+          ((req.query.ua as string) ? `&ua=${encodeURIComponent(req.query.ua as string)}` : '')
         const needsProxy = Boolean(refererStr)
 
         const isProxied = (value: string) => value.includes('/api/proxy')
@@ -452,6 +460,14 @@ export class ProxyController {
         refererValue = 'https://oppai.stream/'
       } else if (targetUrl.includes('weeabo0.xyz')) {
         refererValue = 'https://japaneseasmr.com/'
+        const rawCookie = (cookie as string) || ''
+        let sanitized = rawCookie.trim()
+        sanitized = sanitized.replace(/^cf_clearance/i, '')
+        sanitized = sanitized.replace(/^[:=]\s*/, '')
+        sanitized = sanitized.replace(/["']/g, '').trim()
+        if (sanitized) headers['Cookie'] = `cf_clearance=${sanitized}`
+        const uaParam = (ua as string) || ''
+        if (uaParam) headers['User-Agent'] = uaParam
       }
 
       headers['Referer'] = refererValue
