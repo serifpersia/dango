@@ -17,6 +17,7 @@ interface DiscordActivityData {
   sessionId?: string
   thumbnails?: string[]
   isAdult?: boolean
+  stateLine?: string
 }
 
 class DiscordRPCService {
@@ -343,7 +344,9 @@ class DiscordRPCService {
         await this.client.user.clearActivity()
         await this.client.user.setActivity({
           details: data.title,
-          state: `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
+          state: data.stateLine
+            ? `${data.stateLine} (Paused)`
+            : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
           largeImageKey: imageKey,
           largeImageText: data.title,
           smallImageKey: 'logo',
@@ -377,7 +380,9 @@ class DiscordRPCService {
         buttons: { label: string; url: string }[]
       } = {
         details: data.title,
-        state: `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
+        state: data.stateLine
+          ? data.stateLine
+          : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
         largeImageKey: imageKey,
         largeImageText: data.title,
         smallImageKey: 'logo',
@@ -430,6 +435,7 @@ class DiscordRPCService {
       mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
+      tv: { details: 'TV', state: 'Browsing movies & shows' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }

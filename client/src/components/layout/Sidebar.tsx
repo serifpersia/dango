@@ -10,6 +10,7 @@ import {
   FaCog,
   FaChartPie,
   FaHeadphones,
+  FaTv,
 } from 'react-icons/fa'
 import Logo from '../common/Logo'
 import packageJson from '../../../package.json'
@@ -28,6 +29,7 @@ const Sidebar: React.FC = () => {
     { to: '/insights', icon: <FaChartPie />, label: 'Insights' },
     { to: '/mal', icon: <FaFileImport />, label: 'MAL Import' },
     { to: '/asmr', icon: <FaHeadphones />, label: 'ASMR' },
+    { to: '/tv', icon: <FaTv />, label: 'TV & Movies' },
     { to: '/settings', icon: <FaCog />, label: 'Settings' },
   ]
 

@@ -19,6 +19,7 @@ interface PresenceData {
   sessionId?: string
   thumbnails?: string[]
   isAdult?: boolean
+  stateLine?: string
 }
 
 class DiscordGatewayService {
@@ -140,7 +141,9 @@ class DiscordGatewayService {
 
     const name = 'dango'
     const details = data.title
-    const state = `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`
+    const state = data.stateLine
+      ? data.stateLine
+      : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`
     const type = data.providerName === 'ASMR' ? 2 : 3
 
     const imageUrl = this.resolveImageUrl(data)
@@ -234,6 +237,7 @@ class DiscordGatewayService {
       mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
+      tv: { details: 'TV', state: 'Browsing movies & shows' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }

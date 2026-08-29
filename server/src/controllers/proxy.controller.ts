@@ -513,6 +513,33 @@ export class ProxyController {
     }
   }
 
+  handleResolve = async (req: Request, res: Response) => {
+    const targetUrl = req.query.url
+    if (!targetUrl || typeof targetUrl !== 'string') {
+      return res.status(400).json({ error: 'URL required' })
+    }
+
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        redirect: 'follow',
+      })
+
+      res.json({
+        finalUrl: response.url,
+        status: response.status,
+      })
+    } catch (e) {
+      const err = e as { message?: string }
+      res.status(500).json({ error: err.message || 'Resolve failed' })
+    }
+  }
+
   private sendPlaceholder(res: Response) {
     const possiblePaths = [
       path.join(CONFIG.PACKAGE_ROOT, 'client/public/placeholder.svg'),

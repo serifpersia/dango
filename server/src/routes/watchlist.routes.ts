@@ -150,6 +150,32 @@ export function createWatchlistRouter(
     res.json({ success: true })
   })
 
+  router.post('/discord/tv', (req, res) => {
+    const { title, episodeLabel, isPlaying, thumbnail, currentTime, duration, sessionId } =
+      req.body ?? {}
+    if (!discordRPCService.isServiceEnabled) return res.json({ success: true })
+    if (typeof sessionId === 'string') discordRPCService.heartbeat(sessionId)
+    let thumb = String(thumbnail || '')
+    if (thumb.includes('/api/image-proxy')) {
+      const match = thumb.match(/url=([^&]+)/)
+      if (match) thumb = decodeURIComponent(match[1])
+    }
+    if (thumb.includes('localhost') || thumb.includes('127.0.0.1')) thumb = ''
+    discordRPCService.updatePresence({
+      title: String(title || 'TV').slice(0, 128),
+      episode: String(episodeLabel || '').slice(0, 64),
+      totalEpisodes: '',
+      stateLine: String(episodeLabel || 'Movie').slice(0, 64),
+      currentTime: Number(currentTime) || 0,
+      duration: Number(duration) || 0,
+      thumbnail: thumb,
+      isPlaying: !!isPlaying,
+      providerName: 'TV',
+      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+    })
+    res.json({ success: true })
+  })
+
   return {
     router,
     stopDiscovery: () => controller.stopNotificationDiscovery(),

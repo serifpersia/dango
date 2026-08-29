@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { ProxyController } from '../controllers/proxy.controller'
 
 export function createProxyRouter(): Router {
@@ -9,6 +9,7 @@ export function createProxyRouter(): Router {
   router.get('/embed-proxy', controller.handleEmbedProxy)
   router.get('/subtitle-proxy', controller.handleSubtitleProxy)
   router.get('/image-proxy', controller.handleImageProxy)
+  router.get('/resolve', controller.handleResolve)
 
   return router
 }

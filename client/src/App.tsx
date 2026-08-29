@@ -64,6 +64,8 @@ function useDiscordPageStatus() {
     else if (path.startsWith('/settings')) page = 'settings'
     else if (path.startsWith('/map')) page = 'map'
     else if (path.startsWith('/mal')) page = 'mal'
+    else if (path.startsWith('/asmr')) page = 'asmr'
+    else if (path.startsWith('/tv')) page = 'tv'
 
     fetch('/api/discord/status', {
       method: 'POST',
@@ -79,6 +81,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
 const Asmr = lazy(() => import('./pages/Asmr'))
+const Tv = lazy(() => import('./pages/Tv'))
 const MAL = lazy(() => import('./pages/MAL'))
 const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
@@ -173,6 +176,8 @@ function App() {
               <Route path="/search" element={<Search />} />
               <Route path="/asmr" element={<Asmr />} />
               <Route path="/asmr/:rj" element={<Asmr />} />
+              <Route path="/tv" element={<Tv />} />
+              <Route path="/tv/:id" element={<Tv />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/mal" element={<MAL />} />
               <Route path="/insights" element={<Insights />} />

@@ -69,9 +69,6 @@ function decodeEntities(text: string): string {
 function isCloudflareChallenge(status: number, text: string): boolean {
   if (status === 403 || status === 503) return true
   if (/Just a moment/i.test(text)) return true
-  // Only the interactive managed challenge uses the /h/ orchestrate path.
-  // The non-blocking jsd snippet (challenge-platform/scripts/jsd) is present on
-  // normal pages too and must NOT be treated as a block.
   if (/challenge-platform\/h\//i.test(text)) return true
   return false
 }

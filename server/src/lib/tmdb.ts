@@ -5,7 +5,9 @@ const TMDB_IMAGE = 'https://image.tmdb.org/t/p'
 
 let cachedKey: string | null = null
 
-async function getTmdbKey(): Promise<string> {
+export { TMDB_BASE, TMDB_IMAGE }
+
+export async function getTmdbKey(): Promise<string> {
   if (cachedKey) return cachedKey
   try {
     const keys = await freekeys.getKeys()

@@ -255,6 +255,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   return (
     <div
       className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !showVolumeSlider && !state.isScrubbing ? styles.hidden : ''} `}
+      data-speed-boost-ignore="true"
       onDoubleClick={(e) => e.stopPropagation()}
     >
       {/* Netflix Style Top Bar Overlay */}

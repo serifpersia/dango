@@ -37,6 +37,7 @@ import { createAuthRouter } from './routes/auth.routes'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
 import { createAsmrRouter } from './routes/asmr.routes'
+import { createTvRouter } from './routes/tv.routes'
 import { createProxyRouter } from './routes/proxy.routes'
 import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
@@ -200,6 +201,7 @@ const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
 app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createAsmrRouter(apiCache, jasmrProvider))
+app.use('/api', createTvRouter(apiCache))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter())
 app.use('/api', createTranslateRouter())

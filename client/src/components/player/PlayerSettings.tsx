@@ -132,6 +132,11 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
           onInput={(e) =>
             onSubtitleSettingsChange('fontSize', parseFloat((e.target as HTMLInputElement).value))
           }
+          style={
+            {
+              '--slider-percent': `${((subtitleSettings.fontSize - 0.5) / 9.5) * 100}%`,
+            } as React.CSSProperties
+          }
         />
       </div>
       <div className={styles.sliderGroup}>
@@ -139,12 +144,13 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         <input
           type="range"
           min="0"
-          max="50"
+          max="100"
           step="1"
           value={subtitleSettings.position}
           onInput={(e) =>
             onSubtitleSettingsChange('position', parseInt((e.target as HTMLInputElement).value))
           }
+          style={{ '--slider-percent': `${subtitleSettings.position}%` } as React.CSSProperties}
         />
       </div>
     </div>

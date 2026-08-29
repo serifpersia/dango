@@ -202,6 +202,9 @@ const Player: React.FC = () => {
 
   const handlePlayerClick = useCallback(
     (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest(`.${styles.controlsOverlay}`)) return
+
       const isHiding = player.state.showControls
       actions.setShowControls(!player.state.showControls)
 
