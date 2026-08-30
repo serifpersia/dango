@@ -77,6 +77,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     return isNaN(saved) || saved < 0 || saved > 100 ? 10 : saved
   })
   const inactivityTimer = useRef<number | null>(null)
+  const lastInteractionTimeRef = useRef(0)
+  const rafIdRef = useRef<number | null>(null)
+  const clickCountRef = useRef(0)
+  const clickTimerRef = useRef<number | null>(null)
   const progressBarRef = useRef<HTMLDivElement>(null)
   const controlsRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -161,41 +165,73 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     }
   }, [subtitleFontSize, subtitlePosition, selectedSubtitle, videoRef])
 
-  const resetInactivityTimer = useCallback(() => {
-    setShowControls(true)
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    inactivityTimer.current = window.setTimeout(() => {
-      if (isPlaying && !settingsView) setShowControls(false)
-    }, 3000)
-  }, [isPlaying, settingsView])
+  // Show controls and reset the hide timer on user activity — mirrors the
+  // anime player (touch-aware, cursor management, interaction throttling).
+  const handleUserActivity = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      const container = containerRef.current
+      if (!container) return
 
-  useEffect(() => {
-    resetInactivityTimer()
-    return () => {
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    }
-  }, [resetInactivityTimer])
+      const interactionDelay = e.type === 'touchstart' ? 800 : 500
+      if (Date.now() - lastInteractionTimeRef.current < interactionDelay) return
+
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          setShowControls(true)
+          container.style.cursor = 'default'
+
+          if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+
+          if (isPlaying && !settingsView && !isScrubbing) {
+            inactivityTimer.current = window.setTimeout(() => {
+              setShowControls(false)
+              if (document.fullscreenElement) {
+                container.style.cursor = 'none'
+              }
+            }, 3000)
+          }
+          rafIdRef.current = null
+        })
+      }
+    },
+    [isPlaying, settingsView, isScrubbing]
+  )
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
+    container.addEventListener('mousemove', handleUserActivity)
+    const handleTouch = (e: TouchEvent) => handleUserActivity(e)
+    container.addEventListener('touchstart', handleTouch, { passive: true })
+
     const handleMouseLeave = () => {
-      if (isPlaying && !settingsView) setShowControls(false)
+      setShowControls(false)
     }
-
-    const handleMouseMove = () => {
-      resetInactivityTimer()
-    }
-
     container.addEventListener('mouseleave', handleMouseLeave)
-    container.addEventListener('mousemove', handleMouseMove)
 
     return () => {
+      container.removeEventListener('mousemove', handleUserActivity)
+      container.removeEventListener('touchstart', handleTouch)
       container.removeEventListener('mouseleave', handleMouseLeave)
-      container.removeEventListener('mousemove', handleMouseMove)
     }
-  }, [isPlaying, settingsView, resetInactivityTimer])
+  }, [handleUserActivity])
+
+  // Keep controls visible while the user is interacting with UI.
+  useEffect(() => {
+    if (isScrubbing || settingsView) {
+      setShowControls(true)
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+    }
+  }, [isScrubbing, settingsView])
+
+  useEffect(() => {
+    return () => {
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
+    }
+  }, [])
 
   const togglePlay = () => {
     const video = videoRef.current
@@ -213,12 +249,23 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
 
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isOverUi(e)) return
-    setShowControls((prev) => !prev)
-  }
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    if (isOverUi(e)) return
-    toggleFullscreen()
+    const isHiding = showControls
+    setShowControls(!showControls)
+    if (isHiding) lastInteractionTimeRef.current = Date.now()
+
+    clickCountRef.current += 1
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+
+    if (clickCountRef.current === 2) {
+      toggleFullscreen()
+      clickCountRef.current = 0
+      return
+    }
+
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0
+    }, 250)
   }
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -453,17 +500,11 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     ))
 
   return (
-    <div
-      ref={containerRef}
-      className={styles.container}
-      onClick={handleContainerClick}
-      onDoubleClick={handleDoubleClick}
-    >
+    <div ref={containerRef} className={styles.container} onClick={handleContainerClick}>
       {children}
       <div
         ref={controlsRef}
         className={`${styles.controlsOverlay} ${!showControls && !settingsView ? styles.hidden : ''}`}
-        onMouseMove={resetInactivityTimer}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.topControls}>

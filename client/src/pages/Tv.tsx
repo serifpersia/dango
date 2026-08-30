@@ -131,9 +131,9 @@ const Tv: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<TvSearchResult | null>(null)
   const [details, setDetails] = useState<TvDetails | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
-  const [season, setSeason] = useState(1)
+  const [season, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
   const [episodes, setEpisodes] = useState<Episode[]>([])
-  const [episode, setEpisode] = useState(1)
+  const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
   const [source, setSource] = useState('movybz')
   const [streams, setStreams] = useState<StreamSource[]>([])
   const [streamLoading, setStreamLoading] = useState(false)
@@ -180,8 +180,10 @@ const Tv: React.FC = () => {
     setStreams([])
     setStreamError('')
     setIframeUrl('')
-    setSeason(1)
-    setEpisode(1)
+    const sParam = parseInt(searchParams.get('s') || '', 10)
+    const eParam = parseInt(searchParams.get('e') || '', 10)
+    setSeason(isNaN(sParam) ? 1 : sParam)
+    setEpisode(isNaN(eParam) ? 1 : eParam)
     setSource('movybz')
     setQualityIdx(0)
 
@@ -190,16 +192,15 @@ const Tv: React.FC = () => {
       .then((d: TvDetails) => {
         setDetails(d)
         setDetailsLoading(false)
-        if (d.seasons && d.seasons.length > 0) {
+        if (d.seasons && d.seasons.length > 0 && isNaN(sParam)) {
           setSeason(d.seasons[0].season_number)
         }
-        document.title = `${d.title} - dango`
       })
       .catch(() => {
         setDetailsLoading(false)
         setStatus('Failed to load details.')
       })
-  }, [id, typeParam])
+  }, [id, typeParam, searchParams])
 
   useEffect(() => {
     if (!details || !id) return
@@ -208,18 +209,23 @@ const Tv: React.FC = () => {
       setEpisodes([])
       return
     }
+    const eParam = parseInt(searchParams.get('e') || '', 10)
     fetch(`/api/tv/episodes/${id}/${season}`)
       .then((r) => r.json())
       .then((d: { episodes: Episode[] }) => {
         setEpisodes(d.episodes || [])
         if (d.episodes?.length > 0) {
-          setEpisode(d.episodes[0].episode_number)
+          const wanted =
+            !isNaN(eParam) && d.episodes.find((ep) => ep.episode_number === eParam)
+              ? eParam
+              : d.episodes[0].episode_number
+          setEpisode(wanted)
         }
       })
       .catch(() => {
         setStatus('Failed to load episodes.')
       })
-  }, [details, id, season])
+  }, [details, id, season, searchParams])
 
   useEffect(() => {
     if (!details || !id || isMovie) return
@@ -519,6 +525,38 @@ const Tv: React.FC = () => {
   const filteredStreams =
     sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
 
+  useEffect(() => {
+    if (!details) {
+      document.title = 'TV & Movies - dango'
+      return
+    }
+    document.title = isMovie
+      ? `${details.title} - dango`
+      : `${details.title} - Season ${season} Episode ${episode} - dango`
+  }, [details, isMovie, season, episode])
+
+  useEffect(() => {
+    if (!details || isMovie) return
+    const params = new URLSearchParams(searchParams)
+    const sInUrl = params.get('s')
+    const eInUrl = params.get('e')
+    const expectedS = String(season)
+    const expectedE = String(episode)
+    if (sInUrl === expectedS && eInUrl === expectedE) return
+    params.set('type', searchParams.get('type') || 'tv')
+    params.set('s', expectedS)
+    params.set('e', expectedE)
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true })
+  }, [details, isMovie, season, episode, searchParams, navigate])
+
+  const updateUrlEpisode = (nextSeason: number, nextEpisode: number) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('type', searchParams.get('type') || 'tv')
+    params.set('s', String(nextSeason))
+    params.set('e', String(nextEpisode))
+    navigate(`${location.pathname}?${params.toString()}`)
+  }
+
   return (
     <div className={styles.page}>
       {details && (
@@ -557,7 +595,11 @@ const Tv: React.FC = () => {
             Season
             <select
               value={season}
-              onChange={(e) => setSeason(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => {
+                const next = parseInt(e.target.value, 10) || 1
+                setSeason(next)
+                updateUrlEpisode(next, episode)
+              }}
               className={styles.select}
             >
               {details.seasons?.map((s) => (
@@ -571,7 +613,11 @@ const Tv: React.FC = () => {
             Episode
             <select
               value={episode}
-              onChange={(e) => setEpisode(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => {
+                const next = parseInt(e.target.value, 10) || 1
+                setEpisode(next)
+                updateUrlEpisode(season, next)
+              }}
               className={styles.select}
             >
               {episodes.map((ep) => (

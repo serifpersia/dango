@@ -36,6 +36,23 @@
   box-shadow: var(--shadow-focus);
 }
 
+@media (max-width: 848px) {
+  .bellBtn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.05rem;
+    padding: var(--space-1);
+  }
+}
+
+@media (max-width: 480px) {
+  .bellBtn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.95rem;
+  }
+}
+
 .badge {
   position: absolute;
   top: 6px;

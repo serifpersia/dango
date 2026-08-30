@@ -583,7 +583,7 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     if (displayTitle && displayTitle !== 'Loading...' && state.currentEpisode) {
-      document.title = `► ${displayTitle} #${state.currentEpisode} - dango`
+      document.title = `► ${displayTitle} Episode ${state.currentEpisode} - dango`
     }
   }, [displayTitle, state.currentEpisode])
 
