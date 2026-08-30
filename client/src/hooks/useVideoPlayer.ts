@@ -151,14 +151,9 @@ const useVideoPlayer = ({
       payload.currentTime = timeToReport
       lastReportedTime.current = timeToReport
 
-      const animepaheUa = localStorage.getItem('animepahe_ua')
-      const animepaheCookie = localStorage.getItem('animepahe_cookie')
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
-      if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
-      if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
 
       const saveProgress = async () => {
         try {
@@ -567,11 +562,6 @@ const useVideoPlayer = ({
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }
-    const animepaheUa = localStorage.getItem('animepahe_ua')
-    const animepaheCookie = localStorage.getItem('animepahe_cookie')
-
-    if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
-    if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
 
     fetch('/api/update-progress', {
       method: 'POST',

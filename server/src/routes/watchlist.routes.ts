@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller'
-import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
 
@@ -30,12 +29,12 @@ async function getDlsitePoster(rjCode: string): Promise<string | null> {
   }
 }
 
-export function createWatchlistRouter(
-  animePahe: AnimePaheProvider,
-  getDb: () => DatabaseWrapper
-): { router: Router; stopDiscovery: () => void } {
+export function createWatchlistRouter(getDb: () => DatabaseWrapper): {
+  router: Router
+  stopDiscovery: () => void
+} {
   const router = Router()
-  const controller = new WatchlistController({ animePahe })
+  const controller = new WatchlistController()
 
   controller.startNotificationDiscovery(getDb)
 

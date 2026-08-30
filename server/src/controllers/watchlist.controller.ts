@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
 import logger from '../logger'
 import { DatabaseWrapper } from '../db'
-import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { performWriteTransaction } from '../sync'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
 import {
@@ -12,7 +11,6 @@ import {
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { NotificationsRepository } from '../repositories/notifications.repository'
 import { QueueRepository } from '../repositories/queue.repository'
-import { SearchOptions } from '../providers/provider.interface'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
@@ -65,18 +63,11 @@ interface WatchlistFilterOptions {
   titlePreference?: 'name' | 'nativeName' | 'englishName'
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-// Background discovery (5-minute timer and mount nudge) runs at a slow, shared
-// pace to keep AniList usage low. User-triggered discovery (bell button ->
-// /discovery/refresh, force=true) runs faster.
 const BACKGROUND_DISCOVERY_INTERVAL_MS = 5 * 60 * 1000
 const NUDGE_THROTTLE_MS = 120 * 1000
 const SLOW_MAX_RUN_MS = 5 * 60 * 1000
 
 export class WatchlistController {
-  private activeTypeFetches = new Set<string>()
-  private animePahe?: AnimePaheProvider
   triggerDiscovery?: (force?: boolean) => boolean
   private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
   private lastExternalDiscoveryAt = 0
@@ -86,10 +77,6 @@ export class WatchlistController {
   private discoveryTotal = 0
   private discoveryDone = 0
   private stopped = false
-
-  constructor(providers: { animePahe?: AnimePaheProvider }) {
-    this.animePahe = providers.animePahe
-  }
 
   stopNotificationDiscovery(): void {
     this.stopped = true
@@ -346,18 +333,6 @@ export class WatchlistController {
     }, BACKGROUND_DISCOVERY_INTERVAL_MS)
   }
 
-  private getProviderForId(showId: string): AnimePaheProvider | null {
-    if (UUID_RE.test(showId) && this.animePahe) return this.animePahe
-    return null
-  }
-
-  private deobfuscateUrl(url: string, showId?: string): string {
-    if (!showId || !UUID_RE.test(showId)) {
-      return url
-    }
-    return url
-  }
-
   private showsMetaChanged(
     db: DatabaseWrapper,
     showId: string,
@@ -607,7 +582,7 @@ export class WatchlistController {
       ...show,
       episodeCount: show.episodeCount,
       type: show.type || show.smType,
-      thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
+      thumbnail: show.thumbnail ?? '',
     }))
 
     return enrichedRows
@@ -664,43 +639,15 @@ export class WatchlistController {
       displayName = nativeName
     }
 
-    let actualEpisodeNumber = episodeNumber
-    const providerForId = this.getProviderForId(showId)
-    if (providerForId?.name === 'AnimePahe') {
-      const epData = await providerForId.getEpisodes(
-        showId,
-        'sub',
-        req.headers['x-animepahe-ua'] as string,
-        req.headers['x-animepahe-cookie'] as string
-      )
-      if (epData && epData.episodes) {
-        const epList = epData.episodes.sort((a, b) => parseFloat(a) - parseFloat(b))
-        const idx = epList.indexOf(String(episodeNumber))
-        if (idx !== -1) {
-          actualEpisodeNumber = idx + 1
-        }
-      }
-    }
-
-    let discordThumbnails: string[] | undefined
-    try {
-      const meta = await providerForId?.getShowMeta(showId)
-      if (meta?.thumbnails) discordThumbnails = meta.thumbnails
-    } catch {
-      // Non-critical, Discord will fall back to logo
-    }
-
     discordRPCService.updatePresence({
       title: displayName,
-      episode: String(actualEpisodeNumber),
+      episode: String(episodeNumber),
       totalEpisodes: episodeCount ? String(episodeCount) : undefined,
       currentTime: currentTime || 0,
       duration: duration || 0,
-      thumbnail: this.deobfuscateUrl(showThumbnail || '', showId),
+      thumbnail: showThumbnail || '',
       isPlaying: isPlaying !== false,
-      providerName: providerForId?.name,
       sessionId,
-      thumbnails: discordThumbnails,
       isAdult,
     })
 
@@ -715,7 +662,7 @@ export class WatchlistController {
 
     const metaCandidate = {
       name: showName,
-      thumbnail: this.deobfuscateUrl(showThumbnail, showId),
+      thumbnail: showThumbnail,
       nativeName,
       englishName,
       genres: genresStr,
@@ -796,62 +743,11 @@ export class WatchlistController {
       data: rows.map((row) => ({
         ...row,
         _id: row.id,
-        thumbnail: this.deobfuscateUrl(row.thumbnail || '', row.id),
+        thumbnail: row.thumbnail || '',
       })),
       total: filteredRows.length,
       page,
       limit,
-    })
-
-    setImmediate(async () => {
-      if (req.db.isClosedCheck()) return
-      for (const row of rows) {
-        if (req.db.isClosedCheck()) return
-        const currentThumbnail = row.thumbnail || ''
-        const fixedThumbnail = this.deobfuscateUrl(currentThumbnail, row.id)
-        const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
-
-        if ((!row.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(row.id)) {
-          this.activeTypeFetches.add(row.id)
-          try {
-            let didUpdate = false
-            if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
-              await WatchlistRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
-              await ShowsMetaRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
-              didUpdate = true
-            }
-
-            if (!row.type) {
-              const meta = await this.getProviderForId(row.id)?.getShowMeta(
-                row.id,
-                req.headers['x-animepahe-ua'] as string,
-                req.headers['x-animepahe-cookie'] as string
-              )
-              if (meta && !req.db.isClosedCheck()) {
-                if (meta.type) {
-                  await WatchlistRepository.updateType(req.db, row.id, meta.type)
-                  await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
-                  didUpdate = true
-                }
-                if (meta.thumbnail) {
-                  const metaThumb = this.deobfuscateUrl(meta.thumbnail, row.id)
-                  if (metaThumb !== fixedThumbnail) {
-                    await WatchlistRepository.updateThumbnail(req.db, row.id, metaThumb)
-                    await ShowsMetaRepository.updateThumbnail(req.db, row.id, metaThumb)
-                    didUpdate = true
-                  }
-                }
-              }
-            }
-            if (didUpdate) req.db.scheduleSave()
-          } catch (e) {
-            logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
-          } finally {
-            this.activeTypeFetches.delete(row.id)
-          }
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
     })
   }
 
@@ -868,7 +764,7 @@ export class WatchlistController {
         ...row,
         _id: row.showId,
         id: row.id,
-        thumbnail: this.deobfuscateUrl(row.thumbnail || '', row.showId),
+        thumbnail: row.thumbnail || '',
       }))
     )
   }
@@ -897,7 +793,7 @@ export class WatchlistController {
         ShowsMetaRepository.upsert(tx, {
           id: showId,
           name: showName || '',
-          thumbnail: this.deobfuscateUrl(showThumbnail || '', showId),
+          thumbnail: showThumbnail || '',
           nativeName,
           englishName,
           type,
@@ -944,12 +840,7 @@ export class WatchlistController {
   }
 
   private async resolveAvailableEpisodes(db: DatabaseWrapper, showId: string): Promise<string[]> {
-    const episodeData = /^\d+$/.test(showId)
-      ? await getAnilistEpisodes(showId)
-      : await this.getProviderForId(showId)
-          ?.getEpisodes(showId, 'sub')
-          .then((d) => d?.episodes ?? [])
-          .catch(() => [])
+    const episodeData = await getAnilistEpisodes(showId)
     const episodes =
       Array.isArray(episodeData) && episodeData.length
         ? [...episodeData].sort((a, b) => parseFloat(a) - parseFloat(b))
@@ -998,7 +889,7 @@ export class WatchlistController {
         ShowsMetaRepository.upsert(tx, {
           id: showId,
           name: showName || '',
-          thumbnail: this.deobfuscateUrl(showThumbnail || '', showId),
+          thumbnail: showThumbnail || '',
           nativeName,
           englishName,
           type,
@@ -1093,31 +984,14 @@ export class WatchlistController {
 
   addToWatchlist = async (req: Request, res: Response) => {
     const { id: idRaw, status, nativeName, englishName } = req.body
-    let { name, thumbnail, type } = req.body
+    const { name, thumbnail, type } = req.body
     const id = await getMigratedId(req.db, idRaw)
-
-    if (id && !id.startsWith('show_')) {
-      try {
-        const meta = await this.getProviderForId(id)?.getShowMeta(
-          id,
-          req.headers['x-animepahe-ua'] as string,
-          req.headers['x-animepahe-cookie'] as string
-        )
-        if (meta && meta.type) {
-          if (!type || type === 'TV') type = meta.type
-          if (meta.name && !name) name = meta.name
-          if (meta.thumbnail && !thumbnail) thumbnail = meta.thumbnail
-        }
-      } catch (e) {
-        logger.warn({ id, err: e }, 'Failed to fetch metadata, proceeding with provided data')
-      }
-    }
 
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.upsert(tx, {
         id,
         name,
-        thumbnail: this.deobfuscateUrl(thumbnail, id),
+        thumbnail: thumbnail,
         status: status || 'Watching',
         nativeName: nativeName || '',
         englishName: englishName || '',
@@ -1236,7 +1110,7 @@ export class WatchlistController {
               name: show.name,
               nativeName: show.nativeName,
               englishName: show.englishName,
-              thumbnail: this.deobfuscateUrl(show.thumbnail, show.id),
+              thumbnail: show.thumbnail,
               episodeNumber: discovered.episodeNumber,
               id: `${show.id}-${discovered.episodeNumber}`,
             })
@@ -1309,7 +1183,7 @@ export class WatchlistController {
         _id: row.id,
         id: row.id,
         name: row.name,
-        thumbnail: this.deobfuscateUrl(row.thumbnail || '', row.id),
+        thumbnail: row.thumbnail || '',
         nativeName: row.nativeName,
         englishName: row.englishName,
         type: row.type,

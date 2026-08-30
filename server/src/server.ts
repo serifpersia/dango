@@ -194,10 +194,7 @@ app.use(
   createAuthRouter((database) => runSyncSequence(database))
 )
 
-const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
-  animepaheProvider,
-  () => db
-)
+const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(() => db)
 app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createAsmrRouter(apiCache, jasmrProvider))

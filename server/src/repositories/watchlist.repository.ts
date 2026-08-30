@@ -86,9 +86,6 @@ export const WatchlistRepository = {
   updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
     dbRun(db, 'UPDATE watchlist SET status = ? WHERE id = ?', [status, id]),
 
-  updateType: (db: DatabaseWrapper, id: string, type: string) =>
-    dbRun(db, 'UPDATE watchlist SET type = ? WHERE id = ?', [type, id]),
-
   updateThumbnail: (db: DatabaseWrapper, id: string, thumbnail: string) =>
     dbRun(db, 'UPDATE watchlist SET thumbnail = ? WHERE id = ?', [thumbnail, id]),
 
