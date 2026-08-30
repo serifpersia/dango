@@ -1,6 +1,7 @@
 import NodeCache from 'node-cache'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './mature-matching'
 
 const BASE_URL = 'https://oppai.stream'
 const SEARCH_URL = `${BASE_URL}/actions/search.php`
@@ -167,33 +168,28 @@ export class OpProvider implements Provider {
     const query = (romaji || title).trim()
     if (!query) return null
 
-    const words = query.split(/\s+/).filter(Boolean)
-    const variants = [
-      query,
-      query
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      words.slice(0, 3).join(' '),
-      words.slice(0, 2).join(' '),
-      words[0] || '',
-    ].filter(Boolean)
-
-    for (const variant of variants) {
+    const targets = [title, romaji].filter((t): t is string => !!t)
+    for (const variant of buildQueryVariants(title, romaji)) {
       const url = `${SEARCH_URL}?text=${encodeURIComponent(variant)}&order=recent&page=1&limit=23&genres=&blacklist=&studio=&ibt=0&swa=1`
       const html = await fetchText(url)
       const entries = parseSearchResults(html)
       if (entries.length === 0) continue
 
       const seriesMap = buildSeriesMap(entries)
-      const uniqueSeries = Array.from(seriesMap.entries()).map(([key, eps]) => ({
-        title: eps[0].name,
-        key,
-      }))
+      const nameCandidates: { title: string; key: string }[] = []
+      for (const [key, eps] of seriesMap.entries()) {
+        const seenNames = new Set<string>()
+        for (const ep of eps) {
+          if (ep.name && !seenNames.has(ep.name.toLowerCase())) {
+            seenNames.add(ep.name.toLowerCase())
+            nameCandidates.push({ title: ep.name, key })
+          }
+        }
+      }
 
-      const match = bestMatch(uniqueSeries, variant)
-      if (match && match.score >= 1) {
-        return match.key
+      const match = pickBestMatch(nameCandidates, targets)
+      if (match) {
+        return match.item.key
       }
     }
 
@@ -209,20 +205,40 @@ export class OpProvider implements Provider {
       if (cached) return cached
 
       const folder = titleSlugToFolder(showId)
-      const url = `${SEARCH_URL}?text=${encodeURIComponent(folder)}&order=recent&page=1&limit=50&genres=&blacklist=&studio=&ibt=0&swa=1`
-      const html = await fetchText(url)
-      const entries = parseSearchResults(html)
+      const compact = folder.toLowerCase().replace(/[^a-z0-9]/g, '')
 
-      const episodes = entries
-        .filter((e) => e.folder.toLowerCase() === folder.toLowerCase())
-        .sort((a, b) => parseFloat(a.ep) - parseFloat(b.ep))
-        .map((e) => e.ep)
+      const searchEntries = async (text: string, limit: number) => {
+        const url = `${SEARCH_URL}?text=${encodeURIComponent(text)}&order=recent&page=1&limit=${limit}&genres=&blacklist=&studio=&ibt=0&swa=1`
+        const html = await fetchText(url)
+        return parseSearchResults(html)
+      }
 
-      if (episodes.length === 0) return null
+      const words = folder
+        .split(/\s+/)
+        .filter((w) => w.length >= 3)
+        .sort((a, b) => b.length - a.length)
+      let matched: SearchEntry[] = []
+      for (const text of [folder, ...words]) {
+        const entries = await searchEntries(text, 50)
+        matched = entries.filter(
+          (e) => e.folder.toLowerCase().replace(/[^a-z0-9]/g, '') === compact
+        )
+        if (matched.length > 0) break
+      }
+      if (matched.length === 0) return null
 
-      const desc = entries.find((e) => e.folder.toLowerCase() === folder.toLowerCase())?.desc || ''
+      matched.sort((a, b) => parseFloat(a.ep) - parseFloat(b.ep))
+      const episodes = matched.map((e) => e.ep)
+
+      const watchMap: Record<string, string> = {}
+      for (const e of matched) {
+        if (e.watchUrl) watchMap[e.ep] = e.watchUrl
+      }
+      this.cache.set(`op_watch_${showId}`, watchMap, 3600)
+
+      const desc = matched[0]?.desc || ''
       const result: EpisodeDetails = { episodes, description: desc }
-      this.cache.set(cacheKey, result, 300)
+      this.cache.set(cacheKey, result, 3600)
       return result
     } catch (error) {
       logger.error({ error, showId }, '[OP] getEpisodes failed')
@@ -240,8 +256,16 @@ export class OpProvider implements Provider {
       const cached = this.cache.get<VideoSource[]>(cacheKey)
       if (cached) return cached
 
+      let watchMap = this.cache.get<Record<string, string>>(`op_watch_${showId}`)
+      if (!watchMap) {
+        await this.getEpisodes(showId)
+        watchMap = this.cache.get<Record<string, string>>(`op_watch_${showId}`)
+      }
+      const watchUrl = watchMap?.[episodeNumber]
       const folder = titleSlugToFolder(showId)
-      const url = `${BASE_URL}/watch?e=${encodeURIComponent(folderToTitleSlug(folder))}-${episodeNumber}`
+      const url =
+        watchUrl ??
+        `${BASE_URL}/watch?e=${encodeURIComponent(folderToTitleSlug(folder))}-${episodeNumber}`
       const html = await fetchText(url)
 
       // Parse availableres JS object: {"1080":"https://...webm","4k":"https://...webm","720":"https://...mp4"}

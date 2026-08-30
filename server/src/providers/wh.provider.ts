@@ -8,6 +8,7 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './mature-matching'
 
 const BASE_URL = 'https://watchhentai.net'
 const UA =
@@ -264,8 +265,9 @@ export class WhProvider implements Provider {
 
       if (results.length === 0) return []
 
-      const matchResult = this.bestMatch(results, query)
-      const matched = matchResult || results[0]
+      const matchResult = pickBestMatch(results, [query])
+      if (!matchResult) return []
+      const matched = matchResult.item
       const slug = matched.url.split('/').filter(Boolean).pop() || ''
 
       return [
@@ -290,26 +292,15 @@ export class WhProvider implements Provider {
     const query = (romaji || title).trim()
     if (!query) return null
 
-    const words = query.split(/\s+/).filter(Boolean)
-    const variants = [
-      query,
-      query
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      words.slice(0, 3).join(' '),
-      words.slice(0, 2).join(' '),
-      words[0] || '',
-    ].filter(Boolean)
-
-    for (const variant of variants) {
+    const targets = [title, romaji].filter((t): t is string => !!t)
+    for (const variant of buildQueryVariants(title, romaji)) {
       const html = await fetchText(`${BASE_URL}/?s=${encodeURIComponent(variant)}`)
       const results = parseSearchArticles(html)
       if (results.length === 0) continue
 
-      const matchResult = this.bestMatch(results, variant)
-      if (matchResult && matchResult.score >= 1) {
-        return matchResult.url.split('/').filter(Boolean).pop() || null
+      const matchResult = pickBestMatch(results, targets)
+      if (matchResult) {
+        return matchResult.item.url.split('/').filter(Boolean).pop() || null
       }
     }
 

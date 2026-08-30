@@ -1,7 +1,7 @@
 {
   "name": "dango",
   "private": true,
-  "version": "2.6.8",
+  "version": "2.6.9",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"

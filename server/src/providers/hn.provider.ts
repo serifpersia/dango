@@ -7,6 +7,7 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './mature-matching'
 
 const BASE_URL = 'https://hentaini.com'
 const API_URL = 'https://admin.hentaini.com/api'
@@ -212,34 +213,23 @@ export class HnProvider implements Provider {
     const query = (romaji || title).trim()
     if (!query) return null
 
-    const words = query.split(/\s+/).filter(Boolean)
-    const variants = [
-      query,
-      query
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      words.slice(0, 3).join(' '),
-      words.slice(0, 2).join(' '),
-      words[0] || '',
-    ].filter(Boolean)
-
-    for (const variant of variants) {
+    const targets = [title, romaji].filter((t): t is string => !!t)
+    for (const variant of buildQueryVariants(title, romaji)) {
       const res = await fetchApi<{
         data: { id: number; title: string; title_english: string; url: string }[]
       }>(`/series?filters[title][$containsi]=${encodeURIComponent(variant)}&pagination[limit]=10`)
 
       const items = (res?.data || []).map((item) => ({
-        title: item.title,
+        title: item.title || item.title_english,
         slug: item.url,
         poster: '',
       }))
 
       if (items.length === 0) continue
 
-      const matchResult = this.bestMatch(items, variant)
-      if (matchResult && matchResult.score >= 0) {
-        return matchResult.slug
+      const matchResult = pickBestMatch(items, targets)
+      if (matchResult) {
+        return matchResult.item.slug
       }
     }
     return null

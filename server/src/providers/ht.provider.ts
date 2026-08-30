@@ -1,6 +1,7 @@
 import NodeCache from 'node-cache'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './mature-matching'
 
 const BASE_URL = 'https://hentai.tv'
 const API_URL = 'https://hentai.tv/api/search'
@@ -149,19 +150,8 @@ export class HtProvider implements Provider {
     const query = (romaji || title).trim()
     if (!query) return null
 
-    const words = query.split(/\s+/).filter(Boolean)
-    const variants = [
-      query,
-      query
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      words.slice(0, 3).join(' '),
-      words.slice(0, 2).join(' '),
-      words[0] || '',
-    ].filter(Boolean)
-
-    for (const variant of variants) {
+    const targets = [title, romaji].filter((t): t is string => !!t)
+    for (const variant of buildQueryVariants(title, romaji)) {
       const videos = await searchApi(variant, 20)
       if (videos.length === 0) continue
 
@@ -171,9 +161,9 @@ export class HtProvider implements Provider {
         titleSlug: slug,
       }))
 
-      const match = bestMatch(uniqueSeries, variant)
-      if (match && match.score >= 1) {
-        return match.titleSlug
+      const match = pickBestMatch(uniqueSeries, targets)
+      if (match) {
+        return match.item.titleSlug
       }
     }
 
