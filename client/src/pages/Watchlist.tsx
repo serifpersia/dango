@@ -26,6 +26,7 @@ import {
   usePaginatedWatchlist,
   useRemoveFromWatchlist,
   useBatchRemoveFromWatchlist,
+  useBatchRemoveFromContinueWatching,
   useBatchUpdateWatchlistStatus,
   usePaginatedAllContinueWatching,
   useGenresAndStudios,
@@ -274,7 +275,14 @@ const Watchlist: React.FC = () => {
   const confirmRemove = (opts: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => {
     if (!itemToRemove) return
     if (itemToRemove.ids) {
-      bulkRemove.mutate(itemToRemove.ids)
+      if (isCW) {
+        bulkRemoveCw.mutate(itemToRemove.ids)
+        if (opts.removeFromWatchlist) {
+          bulkRemove.mutate(itemToRemove.ids)
+        }
+      } else {
+        bulkRemove.mutate(itemToRemove.ids)
+      }
       setSelectedIds(new Set())
       setItemToRemove(null)
       return
@@ -297,6 +305,7 @@ const Watchlist: React.FC = () => {
   }
 
   const bulkRemove = useBatchRemoveFromWatchlist()
+  const bulkRemoveCw = useBatchRemoveFromContinueWatching()
   const bulkUpdateStatus = useBatchUpdateWatchlistStatus()
 
   const toggleManageMode = () => {
@@ -485,15 +494,13 @@ const Watchlist: React.FC = () => {
         </h3>
 
         <div className={styles.headerActions}>
-          {!isCW && (
-            <button
-              className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
-              onClick={toggleManageMode}
-            >
-              <FaPencilAlt size={13} />
-              <span>Bulk Manage</span>
-            </button>
-          )}
+          <button
+            className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
+            onClick={toggleManageMode}
+          >
+            <FaPencilAlt size={13} />
+            <span>Bulk Manage</span>
+          </button>
           {total > 0 && (
             <div className={styles.pagination}>
               <button
@@ -528,24 +535,26 @@ const Watchlist: React.FC = () => {
           </button>
           <span className={styles.manageCount}>{selectedIds.size} selected</span>
           <div className={styles.manageSpacer} />
-          <select
-            className={styles.manageStatusSelect}
-            value=""
-            onChange={(e) => {
-              if (e.currentTarget.value) {
-                handleBulkStatus(e.currentTarget.value)
-              }
-            }}
-            disabled={selectedIds.size === 0}
-            title="Set status for selected items"
-          >
-            <option value="">Set status…</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          {!isCW && (
+            <select
+              className={styles.manageStatusSelect}
+              value=""
+              onChange={(e) => {
+                if (e.currentTarget.value) {
+                  handleBulkStatus(e.currentTarget.value)
+                }
+              }}
+              disabled={selectedIds.size === 0}
+              title="Set status for selected items"
+            >
+              <option value="">Set status…</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             className={styles.manageRemoveBtn}
             onClick={handleBulkRemove}

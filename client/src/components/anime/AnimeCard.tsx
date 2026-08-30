@@ -27,12 +27,9 @@ interface Anime {
   thumbnail: string
   type?: string
   episodeNumber?: number
-  relativeEpisodeNumber?: number
   currentTime?: number
   duration?: number
   showId?: string
-  nextEpisodeToWatch?: string
-  newEpisodesCount?: number
   watchedCount?: number
   episodeCount?: number
   availableEpisodes?: {
@@ -231,7 +228,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       },
     }
 
-    const hasNewEpisodes = (anime.newEpisodesCount || 0) > 0
     const ct = anime.currentTime || 0
     const dur = anime.duration || 0
     const hasProgress = ct > 5 && dur > 5 && ct < dur * 0.95
@@ -239,7 +235,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const displayTitle = (anime[titlePreference as keyof Anime] as string) || anime.name
 
-    const episodeToPlay = anime.episodeNumber ?? anime.nextEpisodeToWatch
+    const episodeToPlay = anime.episodeNumber
 
     const linkTarget = continueWatching
       ? {
@@ -278,10 +274,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     )
 
     const progressString = (() => {
-      const episodeToDisplay = anime.relativeEpisodeNumber ?? episodeToPlay
-
-      if (continueWatching && episodeToDisplay) {
-        return `EP ${episodeToDisplay}`
+      if (continueWatching && episodeToPlay) {
+        return `EP ${episodeToPlay}`
       }
 
       if (anime.watchedCount !== undefined && anime.watchedCount > 0) {

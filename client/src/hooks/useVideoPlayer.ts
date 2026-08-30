@@ -168,9 +168,6 @@ const useVideoPlayer = ({
             body: JSON.stringify(payload),
           })
           queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
-          queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-          queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
-          queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
           queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
         } catch (err) {
           console.error('Failed to update progress:', err)
@@ -583,9 +580,6 @@ const useVideoPlayer = ({
     })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
-        queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-        queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
-        queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
         queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
       })
       .catch((err) => console.error('Failed to send final progress:', err))

@@ -111,8 +111,11 @@ const Home: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
       })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      if (hasMoreContinueWatching && cwList.length - 1 < 14) {
+        fetchMoreContinueWatching()
+      }
     },
   })
 

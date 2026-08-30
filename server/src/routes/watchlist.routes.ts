@@ -42,6 +42,7 @@ export function createWatchlistRouter(
   router.get('/continue-watching/all', controller.getAllContinueWatching)
   router.get('/continue-watching/this-week', controller.getThisWeekSchedule)
   router.post('/continue-watching/remove', controller.removeContinueWatching)
+  router.post('/continue-watching/remove-many', controller.batchRemoveContinueWatching)
   router.post('/update-progress', controller.updateProgress)
   router.get('/watchlist', controller.getWatchlist)
   router.get('/watchlist/check/:showId', controller.checkWatchlist)

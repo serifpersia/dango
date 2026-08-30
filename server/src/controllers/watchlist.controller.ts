@@ -7,7 +7,6 @@ import { WatchlistRepository } from '../repositories/watchlist.repository'
 import {
   WatchedEpisodesRepository,
   ContinueWatchingResult,
-  UpNextResult,
   WatchedEpisode,
 } from '../repositories/watched-episodes.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
@@ -37,13 +36,10 @@ interface CombinedContinueWatchingShow {
   nativeName?: string
   englishName?: string
   episodeNumber?: string | number
-  relativeEpisodeNumber?: number | string
   currentTime?: number
   duration?: number
   episodeCount?: number
   watchedCount?: number
-  nextEpisodeToWatch?: string
-  newEpisodesCount?: number
   type?: string
   smType?: string
 }
@@ -609,7 +605,6 @@ export class WatchlistController {
 
     const enrichedRows = rows.map((show) => ({
       ...show,
-      relativeEpisodeNumber: show.episodeNumber,
       episodeCount: show.episodeCount,
       type: show.type || show.smType,
       thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
@@ -709,8 +704,6 @@ export class WatchlistController {
       isAdult,
     })
 
-    const inWatchlist = WatchlistRepository.exists(req.db, showId)
-
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
     const anilistId = /^\d+$/.test(showId)
       ? (dbGet<{ anilistId: number }>(
@@ -735,29 +728,27 @@ export class WatchlistController {
 
     const metaChanged = this.showsMetaChanged(req.db, showId, metaCandidate)
 
-    if (metaChanged || inWatchlist) {
+    if (metaChanged) {
       await performWriteTransaction(req.db, (tx) => {
-        if (metaChanged) {
-          ShowsMetaRepository.upsert(tx, {
-            id: showId,
-            ...metaCandidate,
-          })
-        }
+        ShowsMetaRepository.upsert(tx, {
+          id: showId,
+          ...metaCandidate,
+        })
+      })
+    }
 
-        if (inWatchlist) {
-          WatchedEpisodesRepository.upsert(tx, {
-            showId,
-            episodeNumber,
-            currentTime,
-            duration,
-          })
-
-          NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
-        }
+    await performWriteTransaction(req.db, (tx) => {
+      WatchedEpisodesRepository.upsert(tx, {
+        showId,
+        episodeNumber,
+        currentTime,
+        duration,
       })
 
-      req.db.scheduleSave()
-    }
+      NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+    })
+
+    req.db.scheduleSave()
 
     res.json({ success: true })
   }
@@ -770,6 +761,24 @@ export class WatchlistController {
       NotificationsRepository.deleteByShow(tx, showId)
     })
     res.json({ success: true })
+  }
+
+  batchRemoveContinueWatching = async (req: Request, res: Response) => {
+    const { ids: idsRaw } = req.body
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+
+    const ids = await Promise.all(idsRaw.map((id: string) => getMigratedId(req.db, id)))
+    await performWriteTransaction(req.db, (tx) => {
+      for (const id of ids) {
+        WatchedEpisodesRepository.deleteByShow(tx, id)
+        NotificationsRepository.deleteByShow(tx, id)
+      }
+    })
+
+    req.db.scheduleSave()
+    res.json({ success: true, removed: ids.length })
   }
 
   getWatchlist = async (req: Request, res: Response) => {
@@ -1150,7 +1159,6 @@ export class WatchlistController {
     const id = await getMigratedId(req.db, idRaw)
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.delete(tx, id)
-      WatchedEpisodesRepository.deleteByShow(tx, id)
       NotificationsRepository.deleteByShow(tx, id)
     })
     res.json({ success: true })
@@ -1193,7 +1201,6 @@ export class WatchlistController {
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.deleteMany(tx, ids)
       for (const id of ids) {
-        WatchedEpisodesRepository.deleteByShow(tx, id)
         NotificationsRepository.deleteByShow(tx, id)
       }
     })

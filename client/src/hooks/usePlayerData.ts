@@ -365,8 +365,6 @@ export const usePlayerData = (
         toast.success(`Moved to ${status}`)
         queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
         queryClient.invalidateQueries({ queryKey: ['watchlist'] })
-        queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-        queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
         queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
       },
       onError: () => toast.error('Failed to update watchlist status'),
@@ -417,8 +415,7 @@ export const usePlayerData = (
       queryClient.invalidateQueries({
         queryKey: ['video-sources', showId, variables.episodeNumber],
       })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: () => toast.error('Failed to mark episode as watched'),
   })

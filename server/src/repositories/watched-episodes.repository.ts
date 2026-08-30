@@ -26,17 +26,6 @@ export interface ContinueWatchingResult {
   watchedAt: string
 }
 
-export interface UpNextResult {
-  id: string
-  name: string
-  thumbnail: string
-  nativeName?: string
-  englishName?: string
-  type?: string
-  episodeCount?: number
-  smType?: string
-}
-
 export const WatchedEpisodesRepository = {
   getByShowAndEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
     dbGet<{ currentTime: number; duration: number }>(
@@ -90,52 +79,34 @@ export const WatchedEpisodesRepository = {
   deleteByShow: (db: DatabaseWrapper, showId: string) =>
     dbRun(db, 'DELETE FROM watched_episodes WHERE showId = ?', [showId]),
 
-  cleanupOrphanedProgress: (db: DatabaseWrapper) =>
-    dbRun(db, 'DELETE FROM watched_episodes WHERE showId NOT IN (SELECT id FROM watchlist)'),
-
   getContinueWatching: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
     const query = `
       SELECT 
-        w.id as _id,
-        w.id as id,
-        w.name as name,
-        w.thumbnail as thumbnail,
-        w.nativeName as nativeName,
-        w.englishName as englishName,
-        w.type as type,
+        we.showId as _id,
+        we.showId as id,
+        COALESCE(w.name, sm.name) as name,
+        COALESCE(w.thumbnail, sm.thumbnail) as thumbnail,
+        COALESCE(w.nativeName, sm.nativeName) as nativeName,
+        COALESCE(w.englishName, sm.englishName) as englishName,
+        COALESCE(w.type, sm.type) as type,
         sm.episodeCount,
         sm.type as smType,
-        (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
+        (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = we.showId) as watchedCount,
         we.episodeNumber, we.currentTime, we.duration, we.watchedAt
       FROM (
         SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
         FROM watched_episodes
       ) we
-      JOIN watchlist w ON we.showId = w.id
+      LEFT JOIN watchlist w ON we.showId = w.id
       LEFT JOIN shows_meta sm ON we.showId = sm.id
-      WHERE we.rn = 1 AND w.status = 'Watching'
+      WHERE we.rn = 1
+        AND (w.status IS NULL OR w.status = 'Watching')
+        AND (w.id IS NOT NULL OR sm.id IS NOT NULL)
       ORDER BY we.watchedAt DESC
       ${limitClause}
     `
     return dbAll<ContinueWatchingResult>(db, query)
-  },
-
-  getUpNextShows: (db: DatabaseWrapper) => {
-    const query = `
-      SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type, sm.episodeCount, sm.type as smType
-      FROM watchlist w
-      LEFT JOIN shows_meta sm ON w.id = sm.id
-      LEFT JOIN (
-        SELECT showId, MAX(watchedAt) as lastActivity
-        FROM watched_episodes
-        GROUP BY showId
-      ) we ON w.id = we.showId
-      WHERE w.status = 'Watching'
-      ORDER BY we.lastActivity DESC
-      LIMIT 15
-    `
-    return dbAll<UpNextResult>(db, query)
   },
 
   getEpisodesForShows: (db: DatabaseWrapper, showIds: string[]) => {

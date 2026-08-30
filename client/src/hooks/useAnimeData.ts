@@ -19,7 +19,6 @@ export interface Anime {
   currentTime?: number
   duration?: number
   watchedCount?: number
-  nextEpisodeToWatch?: string
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
@@ -200,9 +199,6 @@ export const useRemoveFromQueue = () => {
       toast.success('Removed from queue')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {
@@ -277,9 +273,6 @@ export const useRemoveFromQueueBatch = () => {
       toast.success('Removed from queue')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {
@@ -299,9 +292,6 @@ export const useClearQueue = () => {
       toast.success('Queue cleared')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {
@@ -501,6 +491,29 @@ export const useBatchRemoveFromWatchlist = () => {
       const count = data.removed ?? 0
       toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from watchlist`)
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveFromContinueWatching = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const response = await fetch('/api/continue-watching/remove-many', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      if (!response.ok) throw new Error('Failed to remove from continue watching')
+      return response.json() as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from continue watching`)
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {

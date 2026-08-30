@@ -21,8 +21,6 @@ interface Anime {
   duration?: number
   watchedCount?: number
   episodeCount?: number
-  nextEpisodeToWatch?: string
-  newEpisodesCount?: number
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
@@ -53,7 +51,6 @@ interface AnimeSectionProps {
   titleLink?: string
   onRemove?: (id: string) => void
   loading?: boolean
-  showSeeMore?: boolean
   emptyState?: React.ReactNode
   carousel?: boolean
   cardConfig?: AnimeSectionConfig
@@ -72,7 +69,6 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   titleLink,
   onRemove,
   loading,
-  showSeeMore,
   emptyState,
   carousel,
   cardConfig,
@@ -159,13 +155,6 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
           )}
         </div>
         <div className={styles['header-controls']}>
-          {showSeeMore && (
-            <div className={styles['header-actions']}>
-              <Link to="/watchlist/Continue Watching" className={styles.viewAllLink}>
-                View All
-              </Link>
-            </div>
-          )}
           {collapsible && (
             <button
               className={styles['collapse-button']}

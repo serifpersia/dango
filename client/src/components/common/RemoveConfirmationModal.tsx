@@ -39,7 +39,9 @@ export default function RemoveConfirmationModal({
   const title = scenario === 'continueWatching' ? 'Reset Progress' : 'Remove from Watchlist'
   const isBulk = typeof count === 'number' && count > 1
   const message = isBulk
-    ? `Are you sure you want to remove ${count} items from your watchlist?`
+    ? scenario === 'continueWatching'
+      ? `Are you sure you want to remove watch progress for ${count} items?`
+      : `Are you sure you want to remove ${count} items from your watchlist?`
     : scenario === 'continueWatching'
       ? `Are you sure you want to remove your watch progress for "${animeName}"?`
       : `Are you sure you want to remove "${animeName}" from your watchlist?`
