@@ -337,6 +337,7 @@ async function main() {
 
   process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGHUP', () => shutdown('SIGHUP'))
   process.once('SIGUSR2', () => shutdown('SIGUSR2'))
 
   app.post('/api/internal/shutdown', (req, res) => {

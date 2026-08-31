@@ -337,6 +337,9 @@ const shutdown = () => {
 process.on('SIGINT', () => {
   shutdown()
 })
+process.on('SIGHUP', () => {
+  shutdown()
+})
 ;(async () => {
   await checkForUpdates()
   main()
