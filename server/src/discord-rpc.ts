@@ -428,7 +428,7 @@ class DiscordRPCService {
     const pageLabels: Record<string, { details: string; state: string }> = {
       home: { details: 'Home', state: 'Browsing anime' },
       search: { details: 'Search', state: 'Exploring titles...' },
-      watchlist: { details: 'Watchlist', state: 'Reviewing your anime list' },
+      watchlist: { details: 'Watchlist', state: 'Reviewing the watchlist' },
       anime: { details: 'Anime Info', state: 'Reading show details' },
       insights: { details: 'Insights', state: 'Reviewing stats' },
       settings: { details: 'Settings', state: 'Tweaking preferences' },
