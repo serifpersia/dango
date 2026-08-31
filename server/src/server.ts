@@ -43,6 +43,7 @@ import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
 import { createTranslateRouter } from './routes/translate.routes'
 import { createDiscordGatewayRouter } from './routes/discord-gateway.routes'
+import { createTrackerRouter } from './routes/tracker.routes'
 import { discordRPCService } from './discord-rpc'
 import { discordGatewayService } from './discord-gateway'
 import { SettingsRepository } from './repositories/settings.repository'
@@ -203,6 +204,7 @@ app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter())
 app.use('/api', createTranslateRouter())
 app.use('/api', createDiscordGatewayRouter())
+app.use('/api', createTrackerRouter())
 app.use(
   '/api',
   createSettingsRouter(

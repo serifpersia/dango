@@ -234,7 +234,7 @@ class DiscordGatewayService {
       anime: { details: 'Anime Info', state: 'Reading show details' },
       insights: { details: 'Insights', state: 'Reviewing stats' },
       settings: { details: 'Settings', state: 'Tweaking preferences' },
-      mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
+      trackers: { details: 'Trackers', state: 'Syncing watchlists' },
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },

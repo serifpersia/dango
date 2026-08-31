@@ -1033,6 +1033,7 @@ export class WatchlistController {
     const id = await getMigratedId(req.db, idRaw)
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.delete(tx, id)
+      WatchedEpisodesRepository.deleteByShow(tx, id)
       NotificationsRepository.deleteByShow(tx, id)
     })
     res.json({ success: true })
@@ -1075,6 +1076,7 @@ export class WatchlistController {
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.deleteMany(tx, ids)
       for (const id of ids) {
+        WatchedEpisodesRepository.deleteByShow(tx, id)
         NotificationsRepository.deleteByShow(tx, id)
       }
     })

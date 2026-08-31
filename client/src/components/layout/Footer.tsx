@@ -38,7 +38,7 @@ const Footer: React.FC = () => {
           <div className={styles.linkColumn}>
             <h4 className={styles.columnTitle}>Features</h4>
             <Link to="/search">Search Anime</Link>
-            <Link to="/mal">MAL Sync</Link>
+            <Link to="/trackers">Trackers</Link>
             <Link to="/insights">Insights</Link>
           </div>
 

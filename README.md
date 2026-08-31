@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/dango-2.6.9-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-2.7.0-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -32,6 +32,7 @@ Based on a lightweight architecture, dango includes:
 - **Watchlist Management:** Keep track of current, completed, and planned titles.
 - **User Insights:** View personal library and progress statistics.
 - **MAL Integration:** Seamlessly import your lists from MyAnimeList.
+- **AniList Sync:** Connect your AniList account and sync your local watchlist with Anilist.
 - **ASMR & TV/Movies Sections:** Dedicated sections alongside the anime library.
 
 ## Join dango Discord server
@@ -229,6 +230,20 @@ If you prefer using **Mega**, **Dropbox**, or other providers, you can use [Rclo
    Rclone dropdown.
 
 Rclone is used only when GitHub and Google Drive sync are not active.
+
+---
+
+## AniList Sync (Optional)
+
+**dango** can sync your local watchlist with your AniList account. This is a bidirectional sync:
+local progress (status, episode count) is pushed to AniList, and remote changes are pulled into
+your local database.
+
+### Syncing
+
+Go to **Trackers** in the side menu and click **Sync Now**, or let dango sync automatically when
+configured. The sync compares your local database against your AniList list and applies changes
+non-destructively.
 
 ---
 

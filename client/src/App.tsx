@@ -1,5 +1,7 @@
 import { useEffect, useRef, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
@@ -63,7 +65,7 @@ function useDiscordPageStatus() {
     else if (path.startsWith('/insights')) page = 'insights'
     else if (path.startsWith('/settings')) page = 'settings'
     else if (path.startsWith('/map')) page = 'map'
-    else if (path.startsWith('/mal')) page = 'mal'
+    else if (path.startsWith('/trackers')) page = 'trackers'
     else if (path.startsWith('/asmr')) page = 'asmr'
     else if (path.startsWith('/tv')) page = 'tv'
 
@@ -82,7 +84,7 @@ const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
 const Asmr = lazy(() => import('./pages/Asmr'))
 const Tv = lazy(() => import('./pages/Tv'))
-const MAL = lazy(() => import('./pages/MAL'))
+const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
@@ -98,12 +100,56 @@ const PlayerRedirect = () => {
 }
 
 function App() {
+  const queryClient = useQueryClient()
   const { isOpen, openModal, closeModal, onSuccess } = useAnimePaheCookie()
   const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
   const location = useLocation()
   const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
   useDiscordPageStatus()
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const anilistParam = searchParams.get('anilist')
+    if (anilistParam) {
+      const user = searchParams.get('user')
+      const reason = searchParams.get('reason')
+      window.history.replaceState(null, '', window.location.pathname)
+      if (anilistParam === 'success') {
+        toast.success(
+          user ? `Connected to AniList as ${decodeURIComponent(user)}` : 'Connected to AniList'
+        )
+        queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
+      } else {
+        toast.error(reason ? decodeURIComponent(reason) : 'AniList authentication failed')
+      }
+      return
+    }
+
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const accessToken = hashParams.get('access_token')
+    const code = searchParams.get('code')
+    if (!accessToken && !code) return
+
+    const redirectUri = window.location.origin + window.location.pathname
+    window.history.replaceState(null, '', window.location.pathname)
+
+    toast('Connecting to AniList...')
+    fetch('/api/tracker/anilist/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(accessToken ? { token: accessToken } : { code, redirectUri }),
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Authentication failed')
+        toast.success(`Connected to AniList as ${data.user.name}`)
+        queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to authenticate with AniList')
+      })
+  }, [queryClient])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -179,7 +225,8 @@ function App() {
               <Route path="/tv" element={<Tv />} />
               <Route path="/tv/:id" element={<Tv />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/mal" element={<MAL />} />
+              <Route path="/trackers" element={<Trackers />} />
+              <Route path="/mal" element={<Navigate to="/trackers" replace />} />
               <Route path="/insights" element={<Insights />} />
               <Route path="/map" element={<UserMap />} />
               <Route path="/anime/:id" element={<AnimeInfoPage />} />

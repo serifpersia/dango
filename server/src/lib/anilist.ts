@@ -101,7 +101,7 @@ function refillTokens(): void {
   }
 }
 
-function applyRateLimitHeaders(headers: Headers): void {
+export function applyRateLimitHeaders(headers: Headers): void {
   const readHeader = (name: string): number | null => {
     const raw = headers.get(name)
     if (raw === null || raw === '') return null
@@ -319,7 +319,7 @@ function setCachedAiredEpisodes(key: string, data: unknown): void {
   airedEpisodesCache.set(key, { data, expiry: Date.now() + AIRED_EPISODES_TTL })
 }
 
-async function waitForAnilistSlot(): Promise<void> {
+export async function waitForAnilistSlot(): Promise<void> {
   while (true) {
     const now = Date.now()
 
