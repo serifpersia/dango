@@ -122,6 +122,7 @@ const Player: React.FC = () => {
   const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false)
   const [hasReachedEpisodeEnd, setHasReachedEpisodeEnd] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
+  const hasDismissedShowCompletedRef = useRef(false)
   const [queueCountdown, setQueueCountdown] = useState<number | null>(null)
   const hasAutoFallbackRef = useRef(false)
   const videoSourcesRef = useRef(state.videoSources)
@@ -138,8 +139,15 @@ const Player: React.FC = () => {
       episodeParamRef.current = episodeNumber
       setPendingQueueTransition(null)
       setQueueCountdown(null)
+      hasDismissedShowCompletedRef.current = false
     }
   }, [episodeNumber])
+
+  useEffect(() => {
+    if (!hasReachedEpisodeEnd) {
+      hasDismissedShowCompletedRef.current = false
+    }
+  }, [hasReachedEpisodeEnd])
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastInteractionTimeRef = useRef(0)
@@ -205,6 +213,24 @@ const Player: React.FC = () => {
     currentEpisodeIndex >= 0 && currentEpisodeIndex < state.episodes.length - 1
       ? state.episodes[currentEpisodeIndex + 1]
       : null
+  const hasNextEpisode = currentEpisodeIndex > -1 && currentEpisodeIndex < state.episodes.length - 1
+  const isLastEpisode =
+    state.episodes.length > 0 &&
+    !!state.currentEpisode &&
+    state.episodes[state.episodes.length - 1] === state.currentEpisode
+  const normalizedShowStatus = String(state.showMeta.status || '')
+    .trim()
+    .toLowerCase()
+  const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
+    normalizedShowStatus.includes(status)
+  )
+  const isCompleted =
+    state.resumeTime > 0 &&
+    state.resumeDuration > 0 &&
+    state.resumeTime >= state.resumeDuration * 0.8
+  const effectiveIsCompleted = isCompleted || hasReachedEpisodeEnd
+  const isShowCompleted = isLastEpisode && isFinishedShow && effectiveIsCompleted
+  const shouldShowModal = state.showResumeModal && (isShowCompleted || !effectiveIsCompleted)
 
   const handlePlayerClick = useCallback(
     (e: React.MouseEvent) => {
@@ -418,12 +444,35 @@ const Player: React.FC = () => {
       })
     }
 
+    let didAutoplayNavigate = false
     if (state.isAutoplayEnabled && queue.length === 0) {
       const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
       if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
         const nextEpisode = state.episodes[currentIndex + 1]
         queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
         navigate(`/watch/${showId}/${nextEpisode}`)
+        didAutoplayNavigate = true
+      }
+    }
+
+    if (
+      !didAutoplayNavigate &&
+      queue.length === 0 &&
+      !pendingQueueTransition &&
+      !hasDismissedShowCompletedRef.current
+    ) {
+      const isLast =
+        state.episodes.length > 0 &&
+        !!state.currentEpisode &&
+        state.episodes[state.episodes.length - 1] === state.currentEpisode
+      const normalized = String(state.showMeta.status || '')
+        .trim()
+        .toLowerCase()
+      const finishedShow = ['finished', 'completed', 'complete', 'ended'].some((s) =>
+        normalized.includes(s)
+      )
+      if (isLast && finishedShow) {
+        dispatch({ type: 'SET_STATE', payload: { showResumeModal: true } })
       }
     }
   }, [
@@ -432,9 +481,12 @@ const Player: React.FC = () => {
     queue,
     showId,
     state.showMeta?.id,
+    state.showMeta?.status,
     state.currentEpisode,
     state.episodes,
     state.isAutoplayEnabled,
+    pendingQueueTransition,
+    dispatch,
     queryClient,
   ])
 
@@ -560,16 +612,16 @@ const Player: React.FC = () => {
   }, [pendingQueueTransition, queueCountdown, navigate, dispatch])
 
   useEffect(() => {
-    if (state.showResumeModal && player.state.isFullscreen) {
+    if (shouldShowModal && player.state.isFullscreen) {
       player.actions.toggleFullscreen()
     }
-  }, [state.showResumeModal, player.state.isFullscreen, player.actions])
+  }, [shouldShowModal, player.state.isFullscreen, player.actions])
 
   useEffect(() => {
-    if (state.showResumeModal && refs.videoRef.current) {
+    if (shouldShowModal && refs.videoRef.current) {
       refs.videoRef.current.pause()
     }
-  }, [state.showResumeModal, refs.videoRef])
+  }, [shouldShowModal, refs.videoRef])
 
   const { titlePreference } = useTitlePreference()
   const displayTitle = useMemo(() => {
@@ -864,6 +916,23 @@ const Player: React.FC = () => {
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
   }
 
+  const handleCloseModal = useCallback(() => {
+    if (isShowCompleted) {
+      hasDismissedShowCompletedRef.current = true
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
+  }, [dispatch, isShowCompleted])
+
+  const handleMoveToCompletedAndNavigate = useCallback(async () => {
+    try {
+      await moveToCompleted()
+      dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
+      navigate('/')
+    } catch {
+      // ignore
+    }
+  }, [moveToCompleted, dispatch, navigate])
+
   const episodeNavControls = (className: string, variant: 'desktop' | 'mobile') => (
     <div className={className}>
       <button
@@ -897,32 +966,23 @@ const Player: React.FC = () => {
     </div>
   )
 
-  const hasNextEpisode = (() => {
-    const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
-    return currentIndex > -1 && currentIndex < state.episodes.length - 1
-  })()
-
-  const isLastEpisode =
-    state.episodes.length > 0 &&
-    !!state.currentEpisode &&
-    state.episodes[state.episodes.length - 1] === state.currentEpisode
-  const normalizedShowStatus = String(state.showMeta.status || '')
-    .trim()
-    .toLowerCase()
-  const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
-    normalizedShowStatus.includes(status)
-  )
-  const canMoveToCompleted =
-    state.inWatchlist &&
-    state.watchlistStatus === 'Watching' &&
-    isLastEpisode &&
-    isFinishedShow &&
-    hasReachedEpisodeEnd
-
-  const isCompleted =
-    state.resumeTime > 0 &&
-    state.resumeDuration > 0 &&
-    state.resumeTime >= state.resumeDuration * 0.8
+  useEffect(() => {
+    if (!hasReachedEpisodeEnd) return
+    if (state.showResumeModal) return
+    if (queue.length > 0) return
+    if (pendingQueueTransition) return
+    if (hasDismissedShowCompletedRef.current) return
+    if (isShowCompleted) {
+      dispatch({ type: 'SET_STATE', payload: { showResumeModal: true } })
+    }
+  }, [
+    hasReachedEpisodeEnd,
+    isShowCompleted,
+    state.showResumeModal,
+    queue.length,
+    pendingQueueTransition,
+    dispatch,
+  ])
 
   const handleAutoplayChange = (checked: boolean) => {
     dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } })
@@ -1087,13 +1147,14 @@ const Player: React.FC = () => {
       onClick={handleLayoutClick}
     >
       <ResumeModal
-        show={state.showResumeModal}
+        show={shouldShowModal}
         resumeTime={player.actions.formatTime(state.resumeTime)}
         onResume={handleResume}
         onStartOver={handleStartOver}
-        onNextEpisode={handleNextEpisode}
-        hasNextEpisode={hasNextEpisode}
-        isCompleted={isCompleted}
+        onClose={handleCloseModal}
+        isShowCompleted={isShowCompleted}
+        onMoveToCompleted={handleMoveToCompletedAndNavigate}
+        isMovingToCompleted={isUpdatingWatchlistStatus}
       />
 
       <AnimePaheCookieModal
@@ -1133,7 +1194,7 @@ const Player: React.FC = () => {
           className={`${styles.videoContainer} ${!player.state.isFullscreen ? layoutStyles.videoPlayerWrapper : ''} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
           onClick={handlePlayerClick}
           style={{
-            ...(state.showResumeModal ? { visibility: 'hidden' } : {}),
+            ...(shouldShowModal ? { visibility: 'hidden' } : {}),
           }}
         >
           {skipIndicator && (
@@ -1214,7 +1275,7 @@ const Player: React.FC = () => {
                     isAutoplayEnabled={state.isAutoplayEnabled}
                     onAutoplayChange={handleAutoplayChange}
                     showNextEpisodeButton={
-                      !state.showResumeModal && showNextEpisodePrompt && queue.length === 0
+                      !shouldShowModal && showNextEpisodePrompt && queue.length === 0
                     }
                     onNextEpisode={handleNextEpisode}
                     videoSources={state.videoSources}
@@ -1430,16 +1491,6 @@ const Player: React.FC = () => {
                           : isCurrentEpisodeWatched
                             ? 'Watched'
                             : 'Mark Watched'}
-                      </button>
-                    )}
-                    {canMoveToCompleted && (
-                      <button
-                        className={`${styles.watchlistBtn} ${styles.completeSeriesBtn}`}
-                        onClick={moveToCompleted}
-                        disabled={isUpdatingWatchlistStatus}
-                      >
-                        <FaCheck size={14} />
-                        {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
                       </button>
                     )}
                     <button

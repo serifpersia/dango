@@ -1,5 +1,6 @@
 import React from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
+import { FaTimes } from 'react-icons/fa'
 import { Button } from './Button'
 import styles from './ResumeModal.module.css'
 
@@ -8,9 +9,10 @@ interface ResumeModalProps {
   resumeTime: string
   onResume: () => void
   onStartOver: () => void
-  onNextEpisode?: () => void
-  hasNextEpisode?: boolean
-  isCompleted?: boolean
+  onClose?: () => void
+  isShowCompleted?: boolean
+  onMoveToCompleted?: () => void
+  isMovingToCompleted?: boolean
 }
 
 export default function ResumeModal({
@@ -18,37 +20,47 @@ export default function ResumeModal({
   resumeTime,
   onResume,
   onStartOver,
-  onNextEpisode,
-  hasNextEpisode,
-  isCompleted,
+  onClose,
+  isShowCompleted,
+  onMoveToCompleted,
+  isMovingToCompleted,
 }: ResumeModalProps) {
+  const handleDismiss = React.useCallback(() => {
+    if (onClose) onClose()
+    else onStartOver()
+  }, [onClose, onStartOver])
+
   return (
-    <Dialog.Root open={show} onOpenChange={(open) => !open && onStartOver()}>
+    <Dialog.Root open={show} onOpenChange={(open) => !open && handleDismiss()}>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={styles.content} onEscapeKeyDown={(e) => e.preventDefault()}>
-          {isCompleted ? (
+        <Dialog.Content className={styles.content}>
+          <Dialog.Close asChild>
+            <button className={styles.closeButton} aria-label="Close modal" type="button">
+              <FaTimes />
+            </button>
+          </Dialog.Close>
+          {isShowCompleted ? (
             <>
-              <h3>Episode Completed!</h3>
-              <p>
-                {hasNextEpisode
-                  ? 'You finished this episode. Ready for the next one?'
-                  : 'You finished this episode. Want to watch again?'}
-              </p>
+              <Dialog.Title asChild>
+                <h3>Show Completed!</h3>
+              </Dialog.Title>
+              <p>Congratulations! You&apos;ve finished the final episode of this series.</p>
               <div className={styles.buttonRow}>
-                <Button variant="secondary" onClick={onStartOver} style={{ flex: 1 }}>
-                  {hasNextEpisode ? 'Replay' : 'Start Over'}
+                <Button
+                  onClick={onMoveToCompleted}
+                  disabled={isMovingToCompleted}
+                  style={{ flex: 1 }}
+                >
+                  {isMovingToCompleted ? 'Saving...' : 'Move to Completed'}
                 </Button>
-                {hasNextEpisode && (
-                  <Button onClick={onNextEpisode} style={{ flex: 1 }}>
-                    Next Episode
-                  </Button>
-                )}
               </div>
             </>
           ) : (
             <>
-              <h3>Resume Playback?</h3>
+              <Dialog.Title asChild>
+                <h3>Resume Playback?</h3>
+              </Dialog.Title>
               <p>
                 You were watching at{' '}
                 <strong style={{ color: 'var(--accent)' }}>{resumeTime}</strong>. Would you like to
