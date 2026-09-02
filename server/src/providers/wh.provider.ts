@@ -8,7 +8,7 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './mature-matching'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://watchhentai.net'
 const UA =

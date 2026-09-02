@@ -1,6 +1,7 @@
 import NodeCache from 'node-cache'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 interface ApiAnime {
   id?: string
@@ -165,77 +166,37 @@ export class _123AnimeProvider implements Provider {
     romaji?: string,
     mode?: 'sub' | 'dub'
   ): Promise<string | null> {
-    const queries = [title]
-    if (romaji && romaji !== title) {
-      queries.push(romaji)
-    }
+    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
+    if (targets.length === 0) return null
 
-    const titleWords = new Set(
-      title
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length >= 2)
-    )
+    for (const variant of buildQueryVariants(title, romaji)) {
+      const results = await this.search({ query: variant })
+      if (results.length === 0) continue
 
-    let bestScore = 0
-    let bestId: string | null = null
+      const candidates = results.map((r) => ({
+        title: r.name || r.englishName || '',
+        id: r._id ?? r.id ?? '',
+        type: (r.type || '').toLowerCase(),
+      }))
 
-    for (const q of queries) {
-      const results = await this.search({ query: q })
-
-      for (const r of results) {
-        const resultName = (r.name || r.englishName || '').toLowerCase()
-        const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
-        const typeBonus =
-          mode && r.type
-            ? r.type.toLowerCase() === mode
-              ? 10
-              : r.type.toLowerCase() === 'dub' && mode === 'sub'
-                ? -5
-                : r.type.toLowerCase() === 'sub' && mode === 'dub'
-                  ? -5
-                  : 0
-            : 0
-        const totalScore = overlap + typeBonus
-        if (totalScore > bestScore) {
-          bestScore = totalScore
-          bestId = r._id ?? r.id ?? null
+      let pool = candidates
+      if (mode) {
+        const modeMatched = candidates.filter((c) => c.type === mode)
+        if (modeMatched.length > 0) {
+          pool = modeMatched
         }
       }
-      if (bestScore >= 3 + (mode ? 10 : 0)) break
-    }
 
-    if (bestScore < 3 + (mode ? 10 : 0)) {
-      const keywords = title
-        .split(/\s+/)
-        .filter((w) => w.length >= 4)
-        .slice(0, 3)
-        .join(' ')
-      if (keywords) {
-        const results = await this.search({ query: keywords })
-        for (const r of results) {
-          const resultName = (r.name || r.englishName || '').toLowerCase()
-          const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
-          const typeBonus =
-            mode && r.type
-              ? r.type.toLowerCase() === mode
-                ? 10
-                : r.type.toLowerCase() === 'dub' && mode === 'sub'
-                  ? -5
-                  : r.type.toLowerCase() === 'sub' && mode === 'dub'
-                    ? -5
-                    : 0
-              : 0
-          const totalScore = overlap + typeBonus
-          if (totalScore > bestScore) {
-            bestScore = totalScore
-            bestId = r._id ?? r.id ?? null
-          }
-        }
+      const matchResult = pickBestMatch(
+        pool.map((c) => ({ title: c.title, id: c.id })),
+        targets
+      )
+      if (matchResult) {
+        return matchResult.item.id
       }
     }
 
-    return bestId
+    return null
   }
 
   async getEpisodes(showId: string, mode?: 'sub' | 'dub'): Promise<EpisodeDetails | null> {

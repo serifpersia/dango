@@ -1,7 +1,7 @@
 import NodeCache from 'node-cache'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './mature-matching'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://hentai.tv'
 const API_URL = 'https://hentai.tv/api/search'

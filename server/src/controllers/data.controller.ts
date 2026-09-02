@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface'
+import { pickBestMatch } from '../providers/title-matching'
 import { genres, tags, studios } from '../constants.json'
 import {
   getTrending,
@@ -107,13 +108,13 @@ export class DataController {
           name?: string
           englishName?: string
         } | null
-        let targetTitle = meta?.name || meta?.englishName
+        let targetTitle = meta?.englishName || meta?.name
         let anilistShow: Show | null = null
 
         if (!targetTitle) {
           try {
             anilistShow = await getShowMetaById(showId)
-            targetTitle = anilistShow?.name || anilistShow?.englishName
+            targetTitle = anilistShow?.englishName || anilistShow?.name
 
             if (anilistShow && targetTitle) {
               await ShowsMetaRepository.upsert(req.db, {
@@ -166,9 +167,18 @@ export class DataController {
               const fallbackResults = await this.providers[providerKey]?.search?.({
                 query: targetTitle,
               })
-              const fallbackId = fallbackResults?.[0]?.id
-              if (fallbackId) {
-                showId = fallbackId
+              const targets = [targetTitle, romaji].filter(
+                (t): t is string => !!t && t.trim().length > 0
+              )
+              const fallbackMatch = pickBestMatch(
+                (fallbackResults || []).map((r) => ({
+                  title: r.name || r.englishName || '',
+                  id: r.id || r._id || '',
+                })),
+                targets
+              )
+              if (fallbackMatch) {
+                showId = fallbackMatch.item.id
               } else {
                 logger.warn(
                   { provider: providerKey, showId, title: targetTitle },

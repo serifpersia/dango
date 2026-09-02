@@ -93,7 +93,7 @@ export function titleSimilarity(query: string, candidate: string): number {
     if (coverage > score) score = coverage
   }
 
-  return score
+  return score >= 1 ? 0.99 : score
 }
 
 export function pickBestMatch<T extends MatchCandidate>(

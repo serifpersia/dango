@@ -7,7 +7,7 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './mature-matching'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://hentaini.com'
 const API_URL = 'https://admin.hentaini.com/api'

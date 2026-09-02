@@ -10,6 +10,7 @@ import {
   EpisodeDetail,
   SearchOptions,
 } from './provider.interface'
+import { pickBestMatch, buildQueryVariants } from './title-matching'
 import logger from '../logger'
 import { requestContext } from '../utils/request-context'
 import { sanitizeCfClearance } from '../utils/cookie.utils'
@@ -171,29 +172,25 @@ export class AnimePaheProvider implements Provider {
   }
 
   async resolveShowId(title: string, romaji?: string): Promise<string | null> {
-    const queries = [title, romaji].filter((t): t is string => !!t && t !== title)
-    let bestScore = 0
-    let bestId: string | null = null
-    const titleWords = new Set(
-      title
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length >= 2)
-    )
+    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
+    if (targets.length === 0) return null
 
-    for (const q of queries) {
-      const results = await this.search({ query: q })
-      for (const r of results) {
-        const resultName = (r.name || r.englishName || '').toLowerCase()
-        const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
-        if (overlap > bestScore) {
-          bestScore = overlap
-          bestId = r.session ?? r._id ?? r.id ?? null
-        }
+    for (const variant of buildQueryVariants(title, romaji)) {
+      const results = await this.search({ query: variant })
+      if (results.length === 0) continue
+
+      const candidates = results.map((r) => ({
+        title: r.name || r.englishName || '',
+        id: r.session ?? r._id ?? r.id ?? '',
+      }))
+
+      const matchResult = pickBestMatch(candidates, targets)
+      if (matchResult) {
+        return matchResult.item.id
       }
-      if (bestScore >= 3) break
     }
-    return bestId
+
+    return null
   }
 
   async getEpisodes(

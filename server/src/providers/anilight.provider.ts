@@ -1,5 +1,6 @@
 import NodeCache from 'node-cache'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 import logger from '../logger'
 import { execFileSync } from 'node:child_process'
 
@@ -282,10 +283,26 @@ export class AnilightProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
-    const results = await this.search({ query: title })
-    if (!results.length) return null
-    return results[0].id || null
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
+    if (targets.length === 0) return null
+
+    for (const variant of buildQueryVariants(title, romaji)) {
+      const results = await this.search({ query: variant })
+      if (results.length === 0) continue
+
+      const candidates = results.map((r) => ({
+        title: r.name || r.englishName || '',
+        id: r.id || r._id || '',
+      }))
+
+      const matchResult = pickBestMatch(candidates, targets)
+      if (matchResult) {
+        return matchResult.item.id
+      }
+    }
+
+    return null
   }
 
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {

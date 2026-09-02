@@ -2,6 +2,7 @@ import NodeCache from 'node-cache'
 import { gotScraping } from 'got-scraping'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE = 'https://anidb.app'
 const REFERRER = 'https://anidb.app/'
@@ -261,36 +262,26 @@ export class AnidbProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string): Promise<string | null> {
-    const query = (title || '').trim()
-    if (!query) return null
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
+    if (targets.length === 0) return null
 
-    const entries = await searchBrowse(query)
-    if (!entries.length) return null
+    for (const variant of buildQueryVariants(title, romaji)) {
+      const entries = await searchBrowse(variant)
+      if (!entries.length) continue
 
-    const qLower = query.toLowerCase()
-    const toSlug = (s: string) =>
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-    const qSlug = toSlug(qLower)
+      const candidates = entries.map((entry) => ({
+        title: entry.title,
+        id: buildShowId(entry),
+      }))
 
-    let best = entries[0]
-    let bestScore = -Infinity
-    for (const entry of entries) {
-      const t = entry.title.toLowerCase()
-      let score = 0
-      if (t === qLower) score += 4
-      else if (t.startsWith(qLower)) score += 2
-      else if (t.includes(qLower)) score += 1
-      if (entry.slug.startsWith(qSlug)) score += 0.5
-      if (score > bestScore) {
-        bestScore = score
-        best = entry
+      const matchResult = pickBestMatch(candidates, targets)
+      if (matchResult) {
+        return matchResult.item.id
       }
     }
-    return buildShowId(best)
+
+    return null
   }
 
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {

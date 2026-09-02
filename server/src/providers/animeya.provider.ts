@@ -1,6 +1,7 @@
 import NodeCache from 'node-cache'
 import * as cheerio from 'cheerio'
 import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
+import { buildQueryVariants, pickBestMatch } from './title-matching'
 import logger from '../logger'
 
 const UA =
@@ -502,9 +503,26 @@ export class AnimeyaProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
-    const results = await this.search({ query: title })
-    return results[0]?._id || null
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
+    if (targets.length === 0) return null
+
+    for (const variant of buildQueryVariants(title, romaji)) {
+      const results = await this.search({ query: variant })
+      if (results.length === 0) continue
+
+      const candidates = results.map((r) => ({
+        title: r.name || r.englishName || '',
+        id: r.id || r._id || '',
+      }))
+
+      const matchResult = pickBestMatch(candidates, targets)
+      if (matchResult) {
+        return matchResult.item.id
+      }
+    }
+
+    return null
   }
 
   private async getInfoInternal(slug: string): Promise<AnimeyaShowInfo> {
