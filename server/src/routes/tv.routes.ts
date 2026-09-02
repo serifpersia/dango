@@ -5,6 +5,309 @@ import https from 'https'
 import http from 'http'
 import { URL } from 'url'
 
+const MOVY_API = 'https://api.wecollege.net'
+const MOVY_SERVERS = [
+  'miami',
+  'phoenix',
+  'dallas',
+  'seattle',
+  'denver',
+  'cancun',
+  'atlanta',
+  'houston',
+  'portland',
+  'austin',
+  'munich',
+  'berlin',
+  'paris',
+  'delhi',
+] as const
+type MovyServer = (typeof MOVY_SERVERS)[number]
+const MOVY_K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+]
+const MOVY_MAGIC = [109, 118, 109, 49]
+const movyIsEven = (e: number) => ((e * (e + 1)) & 1) === 0
+function movyMix(e: number) {
+  e >>>= 0
+  e ^= e >>> 16
+  e = Math.imul(e, 0x85ebca6b) >>> 0
+  e ^= e >>> 13
+  e = Math.imul(e, 0xc2b2ae35) >>> 0
+  e ^= e >>> 16
+  return e >>> 0
+}
+function movyShift(e: number, t: number) {
+  return ((e >>>= 0), 0 === (t &= 31) ? e >>> 0 : ((e << t) | (e >>> (32 - t))) >>> 0)
+}
+function decodeMovyPayload(e: string, t: string | number, a: number): string {
+  const r = (function (e: string) {
+    const t = e
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(4 * Math.ceil(e.length / 4), '=')
+    return new Uint8Array(Buffer.from(t, 'base64'))
+  })(e)
+  const n = (function (e: string, t: string | number, a: number) {
+    const s = (function (e: string, t: string | number) {
+      const s = Array(61)
+      let r =
+        movyMix(
+          (function (e: string) {
+            let t = 0x811c9dc5
+            for (let a = 0; a < e.length; a++) t = Math.imul(t ^ e.charCodeAt(a), 0x1000193) >>> 0
+            return movyMix(t)
+          })(e) ^ movyMix(((t as number) >>> 0) ^ 0x9e3779b9)
+        ) >>> 0
+      for (let e = 0; e < 8; e++) {
+        if (movyIsEven(e)) {
+          const t = r % 61
+          r = movyShift((r + 0x9e3779b9) >>> 0, 7 + (7 & e))
+          s[t] = (r ^ movyMix(r)) >>> 0
+          r = movyMix((r + t) >>> 0)
+        } else {
+          s[e] = MOVY_K[15 & e]
+        }
+      }
+      return { S: s, acc: movyMix(0xa5a5a5a5 ^ r) >>> 0 }
+    })(e, t)
+    const r = new Uint8Array(a)
+    let n = 0
+    for (let e = 0; e < a; ) {
+      const t = (function (e: { S: number[]; acc: number }, t: number) {
+        const r = e.S
+        let n = e.acc
+        const i = n % 61
+        const o = 0 - Number(i in r)
+        const l = r[i] >>> 0
+        const c = Math.imul(0x9e3779b9, t + 1) >>> 0
+        const h = ((((n ^ ((l ^ c) >>> 0)) >>> 0) | (n & ((l ^ c) >>> 0) & o)) >>> 0) >>> 0
+        n = movyMix(
+          ((movyShift((h + n) >>> 0, 31 & i) ^ movyShift(n, 31 & Math.imul(i, 7))) + 0x9e3779b9) >>>
+            0
+        )
+        r[i] = n >>> 0
+        e.acc = n
+        return n >>> 0
+      })(s, n++)
+      r[e++] = 255 & t
+      if (e < a) r[e++] = (t >>> 8) & 255
+      if (e < a) r[e++] = (t >>> 16) & 255
+      if (e < a) r[e++] = (t >>> 24) & 255
+    }
+    return r
+  })(String(t), a, r.length)
+  for (let e = 0; e < r.length; e++) r[e] ^= n[e]
+  for (let e = 0; e < MOVY_MAGIC.length; e++) {
+    if (r[e] !== MOVY_MAGIC[e]) throw new Error('decrypt failed: bad seed or payload')
+  }
+  return Buffer.from(r.subarray(MOVY_MAGIC.length)).toString('utf8')
+}
+const movySeedCache = new Map<string, { seed: string; expiresAt: number }>()
+const inflightSeedRequests = new Map<string, Promise<string>>()
+async function movyGetSeed(mediaId: number, forceRefresh = false): Promise<string | null> {
+  const key = String(mediaId)
+  const now = Date.now()
+  if (!forceRefresh) {
+    const cached = movySeedCache.get(key)
+    if (cached && cached.expiresAt - 4000 > now) return cached.seed
+  }
+  if (inflightSeedRequests.has(key)) return await inflightSeedRequests.get(key)!
+  const promise = (async () => {
+    try {
+      const r = await fetch(`${MOVY_API}/seed?mediaId=${mediaId}`, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'application/json, text/plain, */*',
+          Referer: 'https://www.movy.bz/',
+          Origin: 'https://www.movy.bz',
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (r.ok) {
+        const data = await r.json()
+        const ttl = data.ttlMs || 30000
+        movySeedCache.set(key, { seed: data.seed, expiresAt: Date.now() + ttl })
+        return data.seed
+      }
+      if (r.status === 429) {
+        const cached = movySeedCache.get(key)
+        if (cached) return cached.seed
+      }
+    } catch {
+      const cached = movySeedCache.get(key)
+      if (cached) return cached.seed
+    } finally {
+      inflightSeedRequests.delete(key)
+    }
+    return movySeedCache.get(key)?.seed || null
+  })()
+  inflightSeedRequests.set(key, promise)
+  return await promise
+}
+async function tryMovyCity(
+  city: string,
+  baseParams: Record<string, string>,
+  seed: string,
+  numericTmdbId: number,
+  headers: Record<string, string>
+): Promise<{
+  sources: {
+    url: string
+    quality: string
+    type: string
+    width?: number
+    height?: number
+    bandwidth?: number
+    frameRate?: number | null
+  }[]
+  audioTracks: { language: string; label: string }[]
+} | null> {
+  try {
+    const params = new URLSearchParams({ ...baseParams, seed })
+    const r = await fetch(`${MOVY_API}/${city}/sources?${params.toString()}`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!r.ok) return null
+    const encrypted = await r.text()
+    let decrypted: string
+    try {
+      decrypted = decodeMovyPayload(encrypted, seed, numericTmdbId)
+    } catch {
+      const retrySeed = await movyGetSeed(numericTmdbId, true)
+      if (!retrySeed) return null
+      const retryParams = new URLSearchParams({ ...baseParams, seed: retrySeed })
+      const retryResp = await fetch(`${MOVY_API}/${city}/sources?${retryParams.toString()}`, {
+        headers,
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!retryResp.ok) return null
+      decrypted = decodeMovyPayload(await retryResp.text(), retrySeed, numericTmdbId)
+    }
+    const data = JSON.parse(decrypted)
+    if (!Array.isArray(data.sources) || data.sources.length === 0) return null
+    const validSources = (data.sources as { url?: string }[]).filter(
+      (s) => !(s.url || '').includes('.mpd')
+    )
+    if (validSources.length === 0) return null
+    const sources: {
+      url: string
+      quality: string
+      type: string
+      width?: number
+      height?: number
+      bandwidth?: number
+      frameRate?: number | null
+    }[] = []
+    const collectedAudioTracks: { language: string; label: string }[] = []
+    for (const s of validSources as { url: string; quality?: string }[]) {
+      const isHls = s.url.includes('.m3u8')
+      const isMp4 = s.url.includes('.mp4')
+      if (isHls) {
+        try {
+          const plRes = await fetch(s.url, {
+            headers: {
+              'User-Agent': headers['User-Agent'],
+              Referer: 'https://www.movy.bz/',
+              Origin: 'https://www.movy.bz',
+            },
+            signal: AbortSignal.timeout(6000),
+          })
+          if (!plRes.ok) continue
+          const playlist = await plRes.text()
+          if (!playlist.includes('#EXTM3U')) continue
+          for (const line of playlist.split('\n')) {
+            if (line.startsWith('#EXT-X-MEDIA:TYPE=AUDIO')) {
+              const language = line.match(/LANGUAGE="([^"]+)"/)?.[1] ?? 'unknown'
+              const label = line.match(/NAME="([^"]+)"/)?.[1] ?? 'Audio'
+              if (!collectedAudioTracks.find((t) => t.language === language && t.label === label)) {
+                collectedAudioTracks.push({ language, label })
+              }
+            }
+          }
+          const variantRegex =
+            /#EXT-X-STREAM-INF:[^\n]*BANDWIDTH=(\d+)[^\n]*RESOLUTION=(\d+x\d+)[^\n]*(?:FRAME-RATE=([\d.]+))?[^\n]*\n([^\n]+)/g
+          let match
+          const variants: {
+            bandwidth: number
+            width: number
+            height: number
+            frameRate: number | null
+            uri: string
+          }[] = []
+          while ((match = variantRegex.exec(playlist)) !== null) {
+            const resParts = match[2].split('x')
+            variants.push({
+              bandwidth: parseInt(match[1], 10),
+              width: parseInt(resParts[0], 10),
+              height: parseInt(resParts[1], 10),
+              frameRate: match[3] ? parseFloat(match[3]) : null,
+              uri: match[4],
+            })
+          }
+          if (variants.length > 0) {
+            let hasValidVariant = false
+            for (const v of variants) {
+              const fullUrl = v.uri.startsWith('http') ? v.uri : new URL(v.uri, s.url).href
+              try {
+                const headRes = await fetch(fullUrl, {
+                  method: 'HEAD',
+                  headers: {
+                    'User-Agent': headers['User-Agent'],
+                    Referer: 'https://www.movy.bz/',
+                    Origin: 'https://www.movy.bz',
+                  },
+                  signal: AbortSignal.timeout(5000),
+                })
+                if (headRes.ok) {
+                  hasValidVariant = true
+                  break
+                }
+              } catch {
+                // ignore
+              }
+            }
+            if (hasValidVariant || variants.length > 0) {
+              sources.push({ url: s.url, quality: s.quality || 'Auto', type: 'hls' })
+            } else {
+              continue
+            }
+          } else if (playlist.includes('#EXTINF')) {
+            sources.push({ url: s.url, quality: s.quality || 'Auto', type: 'hls' })
+          } else {
+            continue
+          }
+        } catch {
+          continue
+        }
+      } else {
+        try {
+          const headRes = await fetch(s.url, {
+            method: 'HEAD',
+            headers: {
+              'User-Agent': headers['User-Agent'],
+              Referer: 'https://www.movy.bz/',
+              Origin: 'https://www.movy.bz',
+            },
+            signal: AbortSignal.timeout(5000),
+          })
+          if (!headRes.ok) continue
+          sources.push({ url: s.url, quality: s.quality || 'Auto', type: isMp4 ? 'mp4' : 'hls' })
+        } catch {
+          continue
+        }
+      }
+    }
+    if (sources.length === 0) return null
+    return { sources, audioTracks: collectedAudioTracks }
+  } catch {
+    return null
+  }
+}
+
 interface TmdbSearchItem {
   id: number
   title?: string
@@ -216,156 +519,6 @@ export function createTvRouter(apiCache: NodeCache): Router {
     const mediaType = type === 'movie' ? 'movie' : 'tv'
     const season = String(req.query.season || '1')
     const episode = String(req.query.episode || '1')
-    const MOVY_API = 'https://api.wecollege.net'
-    const MOVY_SERVERS = [
-      'miami',
-      'phoenix',
-      'dallas',
-      'seattle',
-      'denver',
-      'cancun',
-      'atlanta',
-      'houston',
-      'portland',
-      'austin',
-      'munich',
-      'berlin',
-      'paris',
-      'delhi',
-    ]
-    const MOVY_K = [
-      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
-      0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
-      0x9bdc06a7, 0xc19bf174,
-    ]
-    const MOVY_MAGIC = [109, 118, 109, 49]
-    const movyIsEven = (e: number) => ((e * (e + 1)) & 1) === 0
-
-    function movyMix(e: number) {
-      e >>>= 0
-      e ^= e >>> 16
-      e = Math.imul(e, 0x85ebca6b) >>> 0
-      e ^= e >>> 13
-      e = Math.imul(e, 0xc2b2ae35) >>> 0
-      e ^= e >>> 16
-      return e >>> 0
-    }
-
-    function movyShift(e: number, t: number) {
-      return ((e >>>= 0), 0 === (t &= 31) ? e >>> 0 : ((e << t) | (e >>> (32 - t))) >>> 0)
-    }
-
-    function decodeMovyPayload(e: string, t: string | number, a: number): string {
-      const r = (function (e: string) {
-        const t = e
-          .replace(/-/g, '+')
-          .replace(/_/g, '/')
-          .padEnd(4 * Math.ceil(e.length / 4), '=')
-        return new Uint8Array(Buffer.from(t, 'base64'))
-      })(e)
-      const n = (function (e: string, t: string | number, a: number) {
-        const s = (function (e: string, t: string | number) {
-          const s = Array(61)
-          let r =
-            movyMix(
-              (function (e: string) {
-                let t = 0x811c9dc5
-                for (let a = 0; a < e.length; a++)
-                  t = Math.imul(t ^ e.charCodeAt(a), 0x1000193) >>> 0
-                return movyMix(t)
-              })(e) ^ movyMix(((t as number) >>> 0) ^ 0x9e3779b9)
-            ) >>> 0
-          for (let e = 0; e < 8; e++) {
-            if (movyIsEven(e)) {
-              const t = r % 61
-              r = movyShift((r + 0x9e3779b9) >>> 0, 7 + (7 & e))
-              s[t] = (r ^ movyMix(r)) >>> 0
-              r = movyMix((r + t) >>> 0)
-            } else {
-              s[e] = MOVY_K[15 & e]
-            }
-          }
-          return { S: s, acc: movyMix(0xa5a5a5a5 ^ r) >>> 0 }
-        })(e, t)
-        const r = new Uint8Array(a)
-        let n = 0
-        for (let e = 0; e < a; ) {
-          const t = (function (e: { S: number[]; acc: number }, t: number) {
-            const r = e.S
-            let n = e.acc
-            const i = n % 61
-            const o = 0 - Number(i in r)
-            const l = r[i] >>> 0
-            const c = Math.imul(0x9e3779b9, t + 1) >>> 0
-            const h = ((((n ^ ((l ^ c) >>> 0)) >>> 0) | (n & ((l ^ c) >>> 0) & o)) >>> 0) >>> 0
-            n = movyMix(
-              ((movyShift((h + n) >>> 0, 31 & i) ^ movyShift(n, 31 & Math.imul(i, 7))) +
-                0x9e3779b9) >>>
-                0
-            )
-            r[i] = n >>> 0
-            e.acc = n
-            return n >>> 0
-          })(s, n++)
-          r[e++] = 255 & t
-          if (e < a) r[e++] = (t >>> 8) & 255
-          if (e < a) r[e++] = (t >>> 16) & 255
-          if (e < a) r[e++] = (t >>> 24) & 255
-        }
-        return r
-      })(String(t), a, r.length)
-      for (let e = 0; e < r.length; e++) r[e] ^= n[e]
-      for (let e = 0; e < MOVY_MAGIC.length; e++) {
-        if (r[e] !== MOVY_MAGIC[e]) throw new Error('decrypt failed: bad seed or payload')
-      }
-      return Buffer.from(r.subarray(MOVY_MAGIC.length)).toString('utf8')
-    }
-
-    const movySeedCache = new Map<string, { seed: string; expiresAt: number }>()
-    const inflightSeedRequests = new Map<string, Promise<string>>()
-
-    async function movyGetSeed(mediaId: number, forceRefresh = false): Promise<string | null> {
-      const key = String(mediaId)
-      const now = Date.now()
-      if (!forceRefresh) {
-        const cached = movySeedCache.get(key)
-        if (cached && cached.expiresAt - 4000 > now) return cached.seed
-      }
-      if (inflightSeedRequests.has(key)) return await inflightSeedRequests.get(key)!
-      const promise = (async () => {
-        try {
-          const r = await fetch(`${MOVY_API}/seed?mediaId=${mediaId}`, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Accept: 'application/json, text/plain, */*',
-              Referer: 'https://www.movy.bz/',
-              Origin: 'https://www.movy.bz',
-            },
-            signal: AbortSignal.timeout(5000),
-          })
-          if (r.ok) {
-            const data = await r.json()
-            const ttl = data.ttlMs || 30000
-            movySeedCache.set(key, { seed: data.seed, expiresAt: Date.now() + ttl })
-            return data.seed
-          }
-          if (r.status === 429) {
-            const cached = movySeedCache.get(key)
-            if (cached) return cached.seed
-          }
-        } catch (e) {
-          const cached = movySeedCache.get(key)
-          if (cached) return cached.seed
-        } finally {
-          inflightSeedRequests.delete(key)
-        }
-        return movySeedCache.get(key)?.seed || null
-      })()
-      inflightSeedRequests.set(key, promise)
-      return await promise
-    }
-
     const numericTmdbId = parseInt(tmdbId, 10)
     let title = String(req.query.title || '')
     let year = String(req.query.year || '')
@@ -425,105 +578,93 @@ export function createTvRouter(apiCache: NodeCache): Router {
     }
 
     for (const city of MOVY_SERVERS) {
-      try {
-        baseParams.seed = validSeed
-        const params = new URLSearchParams(baseParams)
-        const r = await fetch(`${MOVY_API}/${city}/sources?${params.toString()}`, {
-          headers,
-          signal: AbortSignal.timeout(5000),
-        })
-        if (!r.ok) continue
-        const encrypted = await r.text()
-        let decrypted
-        try {
-          decrypted = decodeMovyPayload(encrypted, validSeed, numericTmdbId)
-        } catch {
-          const retrySeed = await movyGetSeed(numericTmdbId, true)
-          if (!retrySeed) continue
-          baseParams.seed = retrySeed
-          const retryParams = new URLSearchParams(baseParams)
-          const retryResp = await fetch(`${MOVY_API}/${city}/sources?${retryParams.toString()}`, {
-            headers,
-            signal: AbortSignal.timeout(5000),
-          })
-          if (!retryResp.ok) continue
-          decrypted = decodeMovyPayload(await retryResp.text(), retrySeed, numericTmdbId)
-        }
-        const data = JSON.parse(decrypted)
-        if (Array.isArray(data.sources) && data.sources.length > 0) {
-          const validSources = data.sources.filter(
-            (s: MovySource) => !(s.url || '').includes('.mpd')
-          )
-          if (validSources.length === 0) continue
-          const sources = []
-          for (const s of validSources) {
-            const isHls = s.url?.includes('.m3u8')
-            const isMp4 = s.url?.includes('.mp4')
-            const sourceType = isHls ? 'hls' : isMp4 ? 'mp4' : 'hls'
-            if (isHls) {
-              try {
-                const plRes = await fetch(s.url, {
-                  headers: {
-                    'User-Agent': headers['User-Agent'],
-                    Referer: 'https://www.movy.bz/',
-                    Origin: 'https://www.movy.bz',
-                  },
-                  signal: AbortSignal.timeout(6000),
-                })
-                if (plRes.ok) {
-                  const playlist = await plRes.text()
-                  const variantRegex =
-                    /#EXT-X-STREAM-INF:[^\n]*BANDWIDTH=(\d+)[^\n]*RESOLUTION=(\d+x\d+)[^\n]*(?:FRAME-RATE=([\d.]+))?[^\n]*\n([^\n]+)/g
-                  let match
-                  const variants = []
-                  while ((match = variantRegex.exec(playlist)) !== null) {
-                    const resParts = match[2].split('x')
-                    variants.push({
-                      bandwidth: parseInt(match[1], 10),
-                      width: parseInt(resParts[0], 10),
-                      height: parseInt(resParts[1], 10),
-                      frameRate: match[3] ? parseFloat(match[3]) : null,
-                      uri: match[4],
-                    })
-                  }
-                  if (variants.length > 0) {
-                    variants.sort((a, b) => a.height - b.height)
-                    for (const v of variants) {
-                      const fullUrl = v.uri.startsWith('http') ? v.uri : new URL(v.uri, s.url).href
-                      sources.push({
-                        url: fullUrl,
-                        quality: `${v.height}p`,
-                        type: 'hls',
-                        width: v.width,
-                        height: v.height,
-                        bandwidth: v.bandwidth,
-                        frameRate: v.frameRate,
-                      })
-                    }
-                  } else {
-                    sources.push({ url: s.url, quality: s.quality || 'Auto', type: 'hls' })
-                  }
-                } else {
-                  sources.push({ url: s.url, quality: s.quality || 'Auto', type: 'hls' })
-                }
-              } catch {
-                sources.push({ url: s.url, quality: s.quality || 'Auto', type: 'hls' })
-              }
-            } else {
-              sources.push({
-                url: s.url,
-                quality: s.quality || 'Auto',
-                type: isMp4 ? 'mp4' : 'hls',
-              })
-            }
-          }
-          return res.json({ server: city, sources, subtitles: data.subtitles || [] })
-        }
-      } catch {
-        continue
+      const result = await tryMovyCity(city, baseParams, validSeed, numericTmdbId, headers)
+      if (result) {
+        return res.json({ server: city, sources: result.sources, audioTracks: result.audioTracks })
       }
     }
-    res.json({ sources: [], subtitles: [], error: 'No sources found from Movy servers' })
+    res.json({ sources: [], audioTracks: [], error: 'No sources found from Movy servers' })
+  })
+
+  router.get('/tv/movybz/:type/:tmdbId/probe/:city', async (req, res) => {
+    const { type, tmdbId, city } = req.params as { type: string; tmdbId: string; city: string }
+    if (!MOVY_SERVERS.includes(city as MovyServer)) {
+      return res.status(400).json({ error: 'Invalid city', valid: false })
+    }
+    const mediaType = type === 'movie' ? 'movie' : 'tv'
+    const season = String(req.query.season || '1')
+    const episode = String(req.query.episode || '1')
+    const numericTmdbId = parseInt(tmdbId, 10)
+    let title = String(req.query.title || '')
+    let year = String(req.query.year || '')
+    let imdbId = String(req.query.imdbId || '')
+    let totalSeasons = String(req.query.totalSeasons || '1')
+    if (!title || !imdbId || !year) {
+      try {
+        const tmdbKey = await getTmdbKey()
+        if (tmdbKey) {
+          const tmdbRes = await fetch(
+            `${TMDB_BASE}/${mediaType}/${numericTmdbId}?api_key=${tmdbKey}&append_to_response=external_ids`,
+            { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) }
+          )
+          if (tmdbRes.ok) {
+            const d = await tmdbRes.json()
+            if (!title) title = d.title || d.name || ''
+            if (!year) year = (d.release_date || d.first_air_date || '').split('-')[0] || ''
+            if (!imdbId) imdbId = d.external_ids?.imdb_id || d.imdb_id || ''
+            if (mediaType === 'tv' && d.number_of_seasons)
+              totalSeasons = String(d.number_of_seasons)
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'application/json, text/plain, */*',
+      Referer: 'https://www.movy.bz/',
+      Origin: 'https://www.movy.bz',
+    }
+    const seed = await movyGetSeed(numericTmdbId)
+    if (!seed)
+      return res.json({
+        server: city,
+        sources: [],
+        audioTracks: [],
+        valid: false,
+        error: 'Seed unavailable',
+      })
+    const baseParams: Record<string, string> = {
+      title,
+      mediaType,
+      year,
+      tmdbId: String(numericTmdbId),
+      imdbId,
+      enc: '2',
+      seed,
+    }
+    if (mediaType === 'tv') {
+      baseParams.totalSeasons = totalSeasons
+      baseParams.seasonId = season
+      baseParams.episodeId = episode
+    }
+    const result = await tryMovyCity(city, baseParams, seed, numericTmdbId, headers)
+    if (result)
+      return res.json({
+        server: city,
+        sources: result.sources,
+        audioTracks: result.audioTracks,
+        valid: true,
+      })
+    return res.json({
+      server: city,
+      sources: [],
+      audioTracks: [],
+      valid: false,
+      error: 'No valid sources for this city',
+    })
   })
 
   router.get('/tv/vixsrc/:type/:tmdbId', async (req, res) => {

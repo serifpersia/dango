@@ -816,23 +816,33 @@ const Player: React.FC = () => {
       )
       const trackToActivate = englishTrack || player.state.availableSubtitles[0]
       setActiveSubtitleTrack(trackToActivate.lang || trackToActivate.label)
-
-      const video = refs.videoRef.current
-      if (video) {
-        Array.from(video.textTracks).forEach((t) => {
-          t.mode =
-            t.language === trackToActivate.lang || t.label === trackToActivate.label
-              ? 'showing'
-              : 'hidden'
-        })
-      }
     }
-  }, [
-    player.state.activeSubtitleTrack,
-    player.state.availableSubtitles,
-    setActiveSubtitleTrack,
-    refs.videoRef,
-  ])
+  }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, setActiveSubtitleTrack])
+
+  useEffect(() => {
+    const video = refs.videoRef.current
+    if (!video || player.state.availableSubtitles.length === 0) return
+    const active = player.state.activeSubtitleTrack
+    const enabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+    if (!enabled || active === 'off' || active === null) {
+      Array.from(video.textTracks).forEach((t) => {
+        t.mode = 'hidden'
+      })
+      return
+    }
+    let matched = false
+    Array.from(video.textTracks).forEach((t) => {
+      const isActive = t.language === active || t.label === active
+      t.mode = isActive ? 'showing' : 'hidden'
+      if (isActive) matched = true
+    })
+    if (!matched && video.textTracks.length > 0) {
+      const fallback =
+        Array.from(video.textTracks).find((t) => t.language === 'en' || t.label === 'English') ||
+        video.textTracks[0]
+      if (fallback) fallback.mode = 'showing'
+    }
+  }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, refs.videoRef])
 
   useEffect(() => {
     const styleId = 'dynamic-subtitle-styles'

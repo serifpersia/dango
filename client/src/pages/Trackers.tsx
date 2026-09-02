@@ -91,8 +91,7 @@ const Trackers: React.FC = () => {
   React.useEffect(() => {
     if (savedClientId && !clientIdInput) setClientIdInput(savedClientId)
     if (savedClientSecret && !clientSecretInput) setClientSecretInput(savedClientSecret)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedClientId, savedClientSecret])
+  }, [savedClientId, savedClientSecret, clientIdInput, clientSecretInput])
 
   const anilistConnected = trackerStatus?.anilist?.connected ?? false
   const anilistUser = trackerStatus?.anilist?.user ?? null

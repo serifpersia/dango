@@ -8,6 +8,23 @@ import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import styles from './Tv.module.css'
 
+const MOVY_SERVERS = [
+  'miami',
+  'phoenix',
+  'dallas',
+  'seattle',
+  'denver',
+  'cancun',
+  'atlanta',
+  'houston',
+  'portland',
+  'austin',
+  'munich',
+  'berlin',
+  'paris',
+  'delhi',
+] as const
+
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
 
 interface TvSearchResult {
@@ -134,7 +151,13 @@ const Tv: React.FC = () => {
   const [season, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
-  const [source, setSource] = useState('movybz')
+  const [source, setSource] = useState(() => {
+    try {
+      return localStorage.getItem('tvProvider') || 'movybz'
+    } catch {
+      return 'movybz'
+    }
+  })
   const [streams, setStreams] = useState<StreamSource[]>([])
   const [streamLoading, setStreamLoading] = useState(false)
   const [streamError, setStreamError] = useState('')
@@ -146,7 +169,25 @@ const Tv: React.FC = () => {
   const [qualityIdx, setQualityIdx] = useState(0)
   const [referer, setReferer] = useState('')
   const [iframeUrl, setIframeUrl] = useState('')
-  const fallbackAttemptedRef = useRef(false)
+  const [selectedMovyServer, setSelectedMovyServer] = useState<string>(() => {
+    try {
+      return localStorage.getItem('movyServer') || 'miami'
+    } catch {
+      return 'miami'
+    }
+  })
+  const streamsRef = useRef<StreamSource[]>([])
+  useEffect(() => {
+    streamsRef.current = streams
+  }, [streams])
+  const selectedAudioTrackRef = useRef(selectedAudioTrack)
+  useEffect(() => {
+    selectedAudioTrackRef.current = selectedAudioTrack
+  }, [selectedAudioTrack])
+  const selectedSubtitleRef = useRef(selectedSubtitle)
+  useEffect(() => {
+    selectedSubtitleRef.current = selectedSubtitle
+  }, [selectedSubtitle])
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<HlsJsInstance | null>(null)
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
@@ -184,7 +225,6 @@ const Tv: React.FC = () => {
     const eParam = parseInt(searchParams.get('e') || '', 10)
     setSeason(isNaN(sParam) ? 1 : sParam)
     setEpisode(isNaN(eParam) ? 1 : eParam)
-    setSource('movybz')
     setQualityIdx(0)
 
     fetch(`/api/tv/details/${type}/${itemId}`)
@@ -261,17 +301,22 @@ const Tv: React.FC = () => {
   const loadStreams = useCallback(async () => {
     if (!details || !id || isEmbedProvider) return
     if (details.adult && !hasMatureConsent) return
-    setStreamLoading(true)
-    setStreamError('')
-    setStreams([])
-    setQualityIdx(0)
-    setAudioTracks([])
-    setSubtitles([])
+    const hasExistingForMovy = source === 'movybz' && streamsRef.current.length > 0
+    if (hasExistingForMovy) {
+      setStreamError('')
+    } else {
+      setStreamLoading(true)
+      setStreamError('')
+      setStreams([])
+      setQualityIdx(0)
+      setAudioTracks([])
+      setSubtitles([])
+    }
 
     try {
       if (source === 'movybz') {
         const type = isMovie ? 'movie' : 'tv'
-        const params = new URLSearchParams({
+        const baseParams = new URLSearchParams({
           title: details.title || '',
           year: details.year || '',
           season: String(season),
@@ -279,20 +324,34 @@ const Tv: React.FC = () => {
           totalSeasons: String(details.number_of_seasons || 1),
           imdbId: details.imdb_id || '',
         })
-        const res = await fetch(`/api/tv/movybz/${type}/${id}?${params.toString()}`)
+        const res = await fetch(
+          `/api/tv/movybz/${type}/${id}/probe/${selectedMovyServer}?${baseParams.toString()}`
+        )
         const data = await res.json()
         setStreamLoading(false)
-        if (!data.sources || !data.sources.length) {
-          const err = data.error || 'No streams available.'
-          setStreamError(err)
-          if (!fallbackAttemptedRef.current) {
-            fallbackAttemptedRef.current = true
-            setSource('vixsrc')
+        if (data.valid && data.sources?.length) {
+          setStreams(data.sources)
+          setSourceTypeFilter('all')
+          setQualityIdx(0)
+          setSubtitles([])
+          setSelectedSubtitle(-1)
+          if (data.audioTracks?.length) {
+            const tracks = data.audioTracks as AudioTrack[]
+            setAudioTracks(tracks)
+            const englishIdx = tracks.findIndex(
+              (t) =>
+                t.language.toLowerCase().startsWith('en') ||
+                t.label.toLowerCase().includes('english')
+            )
+            setSelectedAudioTrack(englishIdx >= 0 ? englishIdx : 0)
+          } else {
+            setAudioTracks([])
           }
+          setStreamError('')
           return
         }
-        setStreams(data.sources)
-        setSourceTypeFilter('all')
+        setStreamError(`No streams from ${selectedMovyServer}. Try another server.`)
+        return
       } else if (source === 'vixsrc') {
         const type = isMovie ? 'movie' : 'tv'
         let url = `/api/tv/vixsrc/${type}/${id}`
@@ -302,10 +361,6 @@ const Tv: React.FC = () => {
         setStreamLoading(false)
         if (!data.sources || !data.sources.length) {
           setStreamError('No VixSrc streams available.')
-          if (!fallbackAttemptedRef.current) {
-            fallbackAttemptedRef.current = true
-            setSource('embedmaster')
-          }
           return
         }
         setStreams(data.sources)
@@ -314,24 +369,64 @@ const Tv: React.FC = () => {
         setAudioTracks(tracks)
         if (tracks.length > 0) {
           const englishIdx = tracks.findIndex(
-            (t: AudioTrack) => t.language === 'en' || t.label.toLowerCase().includes('english')
+            (t: AudioTrack) =>
+              t.language.toLowerCase().startsWith('en') || t.label.toLowerCase().includes('english')
           )
           setSelectedAudioTrack(englishIdx >= 0 ? englishIdx : 0)
         }
         const subs = data.subtitles || []
         setSubtitles(subs)
         if (subs.length > 0) {
-          const englishIdx = subs.findIndex(
-            (s: SubtitleTrack) => s.language === 'en' || s.label.toLowerCase().includes('english')
-          )
-          setSelectedSubtitle(englishIdx >= 0 ? englishIdx : 0)
+          const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
+          if (savedEnabled === 'false') {
+            setSelectedSubtitle(-1)
+          } else {
+            const englishIdx = subs.findIndex(
+              (s: SubtitleTrack) =>
+                s.language.toLowerCase().startsWith('en') ||
+                s.label.toLowerCase().includes('english')
+            )
+            setSelectedSubtitle(englishIdx >= 0 ? englishIdx : 0)
+          }
+        } else {
+          setSelectedSubtitle(-1)
         }
       }
     } catch {
       setStreamLoading(false)
       setStreamError('Failed to load streams.')
     }
-  }, [details, id, source, season, episode, isMovie, isEmbedProvider, hasMatureConsent])
+  }, [
+    details,
+    id,
+    source,
+    season,
+    episode,
+    isMovie,
+    isEmbedProvider,
+    hasMatureConsent,
+    selectedMovyServer,
+  ])
+
+  const handleMovyServerSelect = useCallback((city: string) => {
+    const normalized = city.toLowerCase()
+    setSelectedMovyServer(normalized)
+    try {
+      localStorage.setItem('movyServer', normalized)
+    } catch {
+      // ignore
+    }
+    setStreamError('')
+  }, [])
+
+  const handleSourceSelect = useCallback((newSource: string) => {
+    setSource(newSource)
+    try {
+      localStorage.setItem('tvProvider', newSource)
+    } catch {
+      // ignore
+    }
+  }, [])
 
   useEffect(() => {
     if (source && details && !isEmbedProvider) {
@@ -364,20 +459,139 @@ const Tv: React.FC = () => {
       if (Hls && Hls.isSupported()) {
         const hls = new Hls({ enableWorker: true })
         hlsRef.current = hls
+        hls.on(
+          Hls.Events.ERROR,
+          (_event: string, data: { fatal: boolean; type: string; details: string }) => {
+            if (data.fatal) {
+              setStreamError(`Stream failed (${data.details}). Try another source or reload.`)
+              setStreamLoading(false)
+              hls.destroy()
+              hlsRef.current = null
+            }
+          }
+        )
         hls.loadSource(proxiedUrl)
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          const hlsWithTracks = hls as unknown as {
+            audioTrack?: number
+            subtitleTrack?: number
+            audioTracks?: unknown[]
+            subtitleTracks?: unknown[]
+          }
+          if (typeof hlsWithTracks.audioTrack === 'number') {
+            hlsWithTracks.audioTrack = selectedAudioTrackRef.current
+
+            setTimeout(() => {
+              if (typeof hlsWithTracks.audioTrack === 'number') {
+                setSelectedAudioTrack(hlsWithTracks.audioTrack)
+              }
+            }, 300)
+          }
+          if (typeof hlsWithTracks.subtitleTrack === 'number') {
+            hlsWithTracks.subtitleTrack =
+              selectedSubtitleRef.current >= 0 ? selectedSubtitleRef.current : -1
+            setTimeout(() => {
+              if (typeof hlsWithTracks.subtitleTrack === 'number') {
+                setSelectedSubtitle(hlsWithTracks.subtitleTrack)
+              }
+            }, 300)
+          }
           video.play().catch(() => {})
+        })
+        const hlsWithEvents = hls as unknown as {
+          on: (event: string, handler: (e: string, data: { id: number }) => void) => void
+        }
+        hlsWithEvents.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_e: string, data: { id: number }) => {
+          setSelectedAudioTrack(data.id)
+        })
+        hlsWithEvents.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e: string, data: { id: number }) => {
+          setSelectedSubtitle(data.id)
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = proxiedUrl
-        video.play().catch(() => {})
+        video.play().catch(() => {
+          setStreamError('Failed to play stream. Try another source.')
+        })
       }
     } else {
       video.src = proxiedUrl
-      video.play().catch(() => {})
+      video.play().catch(() => {
+        setStreamError('Failed to play stream. Try another source.')
+      })
+    }
+
+    const handleVideoError = () => {
+      const err = video.error
+      const code = err?.code
+      const msg =
+        code === 4 ? 'Video source not supported or not found' : 'Failed to load video stream'
+      setStreamError(
+        `${msg}. The source may be invalid or expired. Try switching source or reloading.`
+      )
+      setStreamLoading(false)
+    }
+    video.addEventListener('error', handleVideoError)
+    return () => {
+      video.removeEventListener('error', handleVideoError)
     }
   }, [streams, qualityIdx, sourceTypeFilter, source, referer, isEmbedProvider])
+
+  useEffect(() => {
+    const hls = hlsRef.current as unknown as { audioTrack?: number; subtitleTrack?: number } | null
+    if (!hls || typeof hls.audioTrack !== 'number') return
+    hls.audioTrack = selectedAudioTrack
+  }, [selectedAudioTrack])
+
+  useEffect(() => {
+    const hls = hlsRef.current as unknown as { subtitleTrack?: number } | null
+    if (!hls || typeof hls.subtitleTrack !== 'number') return
+    if (selectedSubtitle >= 0) hls.subtitleTrack = selectedSubtitle
+    else hls.subtitleTrack = -1
+  }, [selectedSubtitle])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || isEmbedProvider) return
+    video.querySelectorAll('track').forEach((el) => el.remove())
+    if (subtitles.length === 0) return
+    subtitles.forEach((sub) => {
+      const track = document.createElement('track')
+      track.kind = 'subtitles'
+      track.label = sub.label || sub.language || 'Unknown'
+      track.srclang = sub.language || sub.label || 'en'
+      const subReferer =
+        source === 'movybz' ? 'https://www.movy.bz/' : referer || 'https://vixsrc.to/'
+      const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(subReferer)}`
+      track.src = subUrl
+      video.appendChild(track)
+    })
+  }, [subtitles, referer, isEmbedProvider, source])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || isEmbedProvider) return
+    const hls = hlsRef.current as unknown as { subtitleTrack?: number } | null
+    if (hls && typeof hls.subtitleTrack === 'number') {
+      hls.subtitleTrack = selectedSubtitle
+      return
+    }
+    const sync = () => {
+      Array.from(video.textTracks).forEach((track, idx) => {
+        track.mode = idx === selectedSubtitle ? 'showing' : 'hidden'
+      })
+    }
+    sync()
+    const handleAddTrack = () => sync()
+    video.textTracks.addEventListener('addtrack', handleAddTrack)
+    video.addEventListener('loadedmetadata', sync, { once: true } as AddEventListenerOptions)
+    const timeout = window.setTimeout(sync, 600)
+    return () => {
+      video.textTracks.removeEventListener('addtrack', handleAddTrack)
+      video.removeEventListener('loadedmetadata', sync)
+      window.clearTimeout(timeout)
+    }
+  }, [selectedSubtitle, subtitles, isEmbedProvider])
 
   const doSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -426,6 +640,16 @@ const Tv: React.FC = () => {
 
   const handleSubtitleChange = (index: number) => {
     setSelectedSubtitle(index)
+    try {
+      if (index === -1) {
+        localStorage.setItem('tvSubtitlesEnabled', 'false')
+      } else {
+        localStorage.setItem('tvSubtitlesEnabled', 'true')
+        localStorage.setItem('tvSelectedSubtitle', String(index))
+      }
+    } catch {
+      // ignore
+    }
     const video = videoRef.current
     const hls = hlsRef.current
     if (hls && hls.subtitleTrack !== undefined) {
@@ -598,7 +822,8 @@ const Tv: React.FC = () => {
               onChange={(e) => {
                 const next = parseInt(e.target.value, 10) || 1
                 setSeason(next)
-                updateUrlEpisode(next, episode)
+                setEpisode(1)
+                updateUrlEpisode(next, 1)
               }}
               className={styles.select}
             >
@@ -631,10 +856,7 @@ const Tv: React.FC = () => {
             Source
             <select
               value={source}
-              onChange={(e) => {
-                fallbackAttemptedRef.current = false
-                setSource(e.target.value)
-              }}
+              onChange={(e) => handleSourceSelect(e.target.value)}
               className={styles.select}
             >
               <optgroup label="Direct HLS">
@@ -660,10 +882,7 @@ const Tv: React.FC = () => {
             Source
             <select
               value={source}
-              onChange={(e) => {
-                fallbackAttemptedRef.current = false
-                setSource(e.target.value)
-              }}
+              onChange={(e) => handleSourceSelect(e.target.value)}
               className={styles.select}
             >
               <optgroup label="Direct HLS">
@@ -697,18 +916,6 @@ const Tv: React.FC = () => {
               <FaSpinner className={styles.spinner} /> Loading stream...
             </div>
           )}
-          {streamError && !isEmbedProvider && (
-            <div className={`${styles.statusMsg} ${styles.error}`}>
-              {streamError}
-              <button
-                className={styles.retryButton}
-                onClick={loadStreams}
-                style={{ marginLeft: 8 }}
-              >
-                Retry
-              </button>
-            </div>
-          )}
           {isEmbedProvider && iframeUrl ? (
             <iframe
               src={iframeUrl}
@@ -716,29 +923,126 @@ const Tv: React.FC = () => {
               allow="autoplay; fullscreen"
               allowFullScreen
             />
-          ) : !isEmbedProvider && !streamLoading && !streamError && filteredStreams.length > 0 ? (
-            <TvPlayerControls
-              videoRef={videoRef}
-              title={details.title}
-              audioTracks={audioTracks}
-              selectedAudioTrack={selectedAudioTrack}
-              onAudioTrackChange={handleAudioTrackChange}
-              subtitles={subtitles}
-              selectedSubtitle={selectedSubtitle}
-              onSubtitleChange={handleSubtitleChange}
-              streams={filteredStreams}
-              qualityIdx={qualityIdx}
-              onQualityChange={setQualityIdx}
-              onBack={handleBack}
+          ) : !isEmbedProvider && !streamLoading && filteredStreams.length > 0 ? (
+            <>
+              {streamError && (
+                <div
+                  className={`${styles.statusMsg} ${styles.error}`}
+                  style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ flex: 1 }}>{streamError}</span>
+                    <button className={styles.retryButton} onClick={loadStreams}>
+                      Retry
+                    </button>
+                  </div>
+                  {source === 'movybz' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                        alignItems: 'center',
+                        marginTop: 4,
+                      }}
+                    >
+                      <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
+                        Servers:
+                      </span>
+                      {MOVY_SERVERS.map((city) => (
+                        <button
+                          key={city}
+                          onClick={() => handleMovyServerSelect(city)}
+                          className={styles.retryButton}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '0.75rem',
+                            textTransform: 'capitalize',
+                            background: selectedMovyServer === city ? 'var(--accent)' : undefined,
+                            color: selectedMovyServer === city ? 'white' : undefined,
+                          }}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <TvPlayerControls
+                videoRef={videoRef}
+                title={details.title}
+                audioTracks={audioTracks}
+                selectedAudioTrack={selectedAudioTrack}
+                onAudioTrackChange={handleAudioTrackChange}
+                subtitles={subtitles}
+                selectedSubtitle={selectedSubtitle}
+                onSubtitleChange={handleSubtitleChange}
+                streams={filteredStreams}
+                qualityIdx={qualityIdx}
+                onQualityChange={setQualityIdx}
+                onBack={handleBack}
+                movyServers={MOVY_SERVERS}
+                selectedMovyServer={selectedMovyServer}
+                onMovyServerSelect={handleMovyServerSelect}
+                isMovySource={source === 'movybz'}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  disablePictureInPicture
+                  className={styles.video}
+                  onError={() => {
+                    setStreamError('Video failed to load. Try another server or reload.')
+                    setStreamLoading(false)
+                  }}
+                />
+              </TvPlayerControls>
+            </>
+          ) : streamError && !isEmbedProvider ? (
+            <div
+              className={`${styles.statusMsg} ${styles.error}`}
+              style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
             >
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                disablePictureInPicture
-                className={styles.video}
-              />
-            </TvPlayerControls>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ flex: 1 }}>{streamError}</span>
+                <button className={styles.retryButton} onClick={loadStreams}>
+                  Retry
+                </button>
+              </div>
+              {source === 'movybz' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    alignItems: 'center',
+                    marginTop: 4,
+                  }}
+                >
+                  <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
+                    Servers:
+                  </span>
+                  {MOVY_SERVERS.map((city) => (
+                    <button
+                      key={city}
+                      onClick={() => handleMovyServerSelect(city)}
+                      className={styles.retryButton}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        textTransform: 'capitalize',
+                        background: selectedMovyServer === city ? 'var(--accent)' : undefined,
+                        color: selectedMovyServer === city ? 'white' : undefined,
+                      }}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : null}
         </div>
       )}

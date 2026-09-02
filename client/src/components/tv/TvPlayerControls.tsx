@@ -11,11 +11,12 @@ import {
   FaChevronLeft,
   FaCheck,
   FaClosedCaptioning,
+  FaServer,
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import styles from './TvPlayerControls.module.css'
 
-type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | null
+type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | null
 
 interface TvPlayerControlsProps {
   videoRef: React.RefObject<HTMLVideoElement | null>
@@ -31,6 +32,10 @@ interface TvPlayerControlsProps {
   onQualityChange: (idx: number) => void
   onBack: () => void
   children?: React.ReactNode
+  movyServers?: readonly string[]
+  selectedMovyServer?: string
+  onMovyServerSelect?: (city: string) => void
+  isMovySource?: boolean
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -47,6 +52,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   onQualityChange,
   onBack,
   children,
+  movyServers = [],
+  selectedMovyServer = 'atlanta',
+  onMovyServerSelect,
+  isMovySource = false,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [showControls, setShowControls] = useState(true)
@@ -391,6 +400,16 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           <span className={styles.currentValue}>{streams[qualityIdx]?.quality || 'Auto'}</span>
         </button>
       )}
+      {isMovySource && movyServers.length > 0 && (
+        <button className={styles.menuItem} onClick={() => setSettingsView('server')}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FaServer size={12} /> Movy Server
+          </span>
+          <span className={styles.currentValue} style={{ textTransform: 'capitalize' }}>
+            {selectedMovyServer}
+          </span>
+        </button>
+      )}
       {hasSubtitles && (
         <button className={styles.menuItem} onClick={() => setSettingsView('subtitles')}>
           <span>Subtitles</span>
@@ -498,6 +517,21 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         {i === selectedAudioTrack && <FaCheck size={12} />}
       </button>
     ))
+
+  const renderServerSettings = () => (
+    <>
+      {movyServers.map((city) => (
+        <button
+          key={city}
+          className={`${styles.menuItem} ${selectedMovyServer === city ? styles.active : ''}`}
+          onClick={() => onMovyServerSelect?.(city)}
+        >
+          <span style={{ textTransform: 'capitalize' }}>{city}</span>
+          {selectedMovyServer === city && <FaCheck size={12} />}
+        </button>
+      ))}
+    </>
+  )
 
   return (
     <div ref={containerRef} className={styles.container} onClick={handleContainerClick}>
@@ -652,7 +686,9 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                   ? 'Subtitle Style'
                   : settingsView === 'audio'
                     ? 'Audio Track'
-                    : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)}
+                    : settingsView === 'server'
+                      ? 'Movy Server'
+                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)}
             </span>
           </div>
           <div className={styles.settingsContent}>
@@ -661,6 +697,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             {settingsView === 'subtitles' && renderSubtitleSettings()}
             {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
             {settingsView === 'audio' && renderAudioSettings()}
+            {settingsView === 'server' && renderServerSettings()}
           </div>
         </div>
       )}

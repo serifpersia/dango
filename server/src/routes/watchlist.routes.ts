@@ -16,10 +16,12 @@ async function getDlsitePoster(rjCode: string): Promise<string | null> {
       signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) return null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (await res.json()) as Record<string, any>
-    const entry = data[key] || data
-    const img: string | undefined = entry?.work_image
+    const raw = (await res.json()) as unknown
+    const data = raw as Record<string, unknown>
+    const entryRaw = (data[key] ?? data) as unknown
+    const entry = entryRaw as { work_image?: unknown }
+    const img: string | undefined =
+      typeof entry?.work_image === 'string' ? entry.work_image : undefined
     if (!img) return null
     const url = img.startsWith('//') ? `https:${img}` : img
     dlsitePosterCache.set(key, { url, ts: Date.now() })

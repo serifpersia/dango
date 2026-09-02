@@ -123,8 +123,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       destroyHls()
       audio.removeAttribute('src')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.link])
+  }, [track, volume, destroyHls])
 
   useEffect(() => () => destroyHls(), [destroyHls])
 
