@@ -472,6 +472,35 @@ const Tv: React.FC = () => {
         )
         hls.loadSource(proxiedUrl)
         hls.attachMedia(video)
+        const readSubtitlePreference = (): { enabled: boolean; index: number } => {
+          let enabled = false
+          let index = 0
+          try {
+            enabled = localStorage.getItem('tvSubtitlesEnabled') === 'true'
+            const stored = parseInt(localStorage.getItem('tvSelectedSubtitle') || '0', 10)
+            if (!isNaN(stored) && stored >= 0) index = stored
+          } catch {
+            // ignore
+          }
+          return { enabled, index }
+        }
+        const applySubtitlePreference = () => {
+          const extended = hls as unknown as {
+            subtitleTrack?: number
+            subtitleTracks?: unknown[]
+          }
+          if (typeof extended.subtitleTrack !== 'number') return
+          const pref = readSubtitlePreference()
+          const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
+          if (pref.enabled && tracks.length > 0) {
+            const target = pref.index < tracks.length ? pref.index : 0
+            extended.subtitleTrack = target
+            setSelectedSubtitle(target)
+          } else {
+            extended.subtitleTrack = -1
+            setSelectedSubtitle(-1)
+          }
+        }
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           const hlsWithTracks = hls as unknown as {
             audioTrack?: number
@@ -488,15 +517,7 @@ const Tv: React.FC = () => {
               }
             }, 300)
           }
-          if (typeof hlsWithTracks.subtitleTrack === 'number') {
-            hlsWithTracks.subtitleTrack =
-              selectedSubtitleRef.current >= 0 ? selectedSubtitleRef.current : -1
-            setTimeout(() => {
-              if (typeof hlsWithTracks.subtitleTrack === 'number') {
-                setSelectedSubtitle(hlsWithTracks.subtitleTrack)
-              }
-            }, 300)
-          }
+          applySubtitlePreference()
           video.play().catch(() => {})
         })
         const hlsWithEvents = hls as unknown as {
@@ -505,7 +526,20 @@ const Tv: React.FC = () => {
         hlsWithEvents.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_e: string, data: { id: number }) => {
           setSelectedAudioTrack(data.id)
         })
+        hlsWithEvents.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+          applySubtitlePreference()
+        })
         hlsWithEvents.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e: string, data: { id: number }) => {
+          if (data.id === -1) {
+            const pref = readSubtitlePreference()
+            const extended = hls as unknown as { subtitleTracks?: unknown[] }
+            const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
+            if (pref.enabled && tracks.length > 0) {
+              const target = pref.index < tracks.length ? pref.index : 0
+              ;(hls as unknown as { subtitleTrack?: number }).subtitleTrack = target
+              return
+            }
+          }
           setSelectedSubtitle(data.id)
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -577,7 +611,9 @@ const Tv: React.FC = () => {
       return
     }
     const sync = () => {
-      Array.from(video.textTracks).forEach((track, idx) => {
+      const tracks = Array.from(video.textTracks)
+      if (tracks.length === 0) return
+      tracks.forEach((track, idx) => {
         track.mode = idx === selectedSubtitle ? 'showing' : 'hidden'
       })
     }
