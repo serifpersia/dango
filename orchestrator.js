@@ -190,8 +190,8 @@ const log = (prefix, color, data) => {
     )
 
     if (isWin) {
-      if (serverProcess) spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t'], { shell: true })
-      if (clientProcess) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+      if (serverProcess) killPid(serverProcess.pid)
+      if (clientProcess) killPid(clientProcess.pid)
     } else {
       if (serverProcess) {
         try {
@@ -229,12 +229,26 @@ const log = (prefix, color, data) => {
 
 const spawnOpts = (cwd, extraEnv) => ({
   stdio: 'pipe',
-  shell: isWin,
+  shell: false,
   cwd,
   detached: !isWin,
   windowsHide: true,
   env: { ...process.env, ...(extraEnv || {}) },
 })
+
+const spawnNpm = (args, cwd, env) => {
+  if (isWin) {
+    return spawn('cmd.exe', ['/c', npmCmd, ...args], spawnOpts(cwd, env))
+  }
+  return spawn(npmCmd, args, spawnOpts(cwd, env))
+}
+
+const killPid = (pid) => {
+  if (!pid) return
+  try {
+    spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { stdio: 'ignore', windowsHide: true })
+  } catch {}
+}
 let serverProcess, clientProcess
 let isShuttingDown = false
 
@@ -247,16 +261,12 @@ async function main() {
   )
 
   if (mode === 'dev') {
-    serverProcess = spawn(
-      npmCmd,
-      ['run', 'dev', '--workspace=dango-server'],
-      spawnOpts(__dirname, { NODE_ENV: 'development' })
-    )
-    clientProcess = spawn(
-      npmCmd,
-      ['run', 'dev', '--workspace=dango-client'],
-      spawnOpts(__dirname, { NODE_ENV: 'development' })
-    )
+    serverProcess = spawnNpm(['run', 'dev', '--workspace=dango-server'], __dirname, {
+      NODE_ENV: 'development',
+    })
+    clientProcess = spawnNpm(['run', 'dev', '--workspace=dango-client'], __dirname, {
+      NODE_ENV: 'development',
+    })
   } else {
     const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
     serverProcess = spawn(
@@ -273,7 +283,7 @@ async function main() {
       if (!isShuttingDown) {
         log('System', colors.system, `Server crashed or exited prematurely.`)
         if (clientProcess) {
-          if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+          if (isWin) killPid(clientProcess.pid)
           else {
             try {
               process.kill(-clientProcess.pid, 'SIGTERM')
@@ -309,7 +319,7 @@ const shutdown = () => {
   console.log(`\n${colors.system}[System]${colors.reset} Initiating clean shutdown...`)
 
   if (clientProcess) {
-    if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+    if (isWin) killPid(clientProcess.pid)
     else {
       clientProcess.kill('SIGTERM')
       setTimeout(() => {
@@ -327,15 +337,14 @@ const shutdown = () => {
 
   req.on('error', () => {
     console.log(`${colors.system}[System]${colors.reset} Server unreachable, forcing exit.`)
-    if (isWin && serverProcess)
-      spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t'], { shell: true })
+    if (isWin && serverProcess) killPid(serverProcess.pid)
     else if (serverProcess) {
       try {
         process.kill(-serverProcess.pid, 'SIGKILL')
       } catch {}
     }
     if (clientProcess) {
-      if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+      if (isWin) killPid(clientProcess.pid)
       else
         try {
           process.kill(-clientProcess.pid, 'SIGKILL')
@@ -348,15 +357,14 @@ const shutdown = () => {
 
   setTimeout(() => {
     console.log(`${colors.system}[System]${colors.reset} Force exiting after timeout.`)
-    if (isWin && serverProcess)
-      spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t'], { shell: true })
+    if (isWin && serverProcess) killPid(serverProcess.pid)
     else if (serverProcess) {
       try {
         process.kill(-serverProcess.pid, 'SIGKILL')
       } catch {}
     }
     if (clientProcess) {
-      if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+      if (isWin) killPid(clientProcess.pid)
       else
         try {
           process.kill(-clientProcess.pid, 'SIGKILL')
