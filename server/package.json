@@ -1,7 +1,7 @@
 {
   "name": "dango-server",
   "private": true,
-  "version": "2.7.5",
+  "version": "2.7.6",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"

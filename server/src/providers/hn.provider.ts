@@ -267,7 +267,8 @@ export class HnProvider implements Provider {
       const m3u8Match = html.match(/https?:\/\/[^"' ]+\.m3u8[^"' ]*/i)
       if (!m3u8Match) return null
 
-      const streamUrl = m3u8Match[0]
+      let streamUrl = m3u8Match[0].replace(/\\+$/g, '').trim()
+      streamUrl = streamUrl.replace(/\\"/g, '"').replace(/"$/g, '').replace(/\\\//g, '/')
 
       const links: VideoLink[] = [
         {
