@@ -104,8 +104,27 @@ async function checkForUpdates() {
         'https://api.github.com/repos/serifpersia/dango/releases/latest',
         { timeout: 3000 }
       )
+      const remoteVersion = (data.name && data.name.match(/v(\d+\.\d+\.\d+)/)?.[1]) || null
+      if (remoteVersion) {
+        if (remoteVersion !== current) {
+          console.log(`\n${colors.system}====================================================`)
+          console.log(
+            `${colors.system}[Update Available]${colors.reset} New version ${remoteVersion} found (current: ${current})!`
+          )
+          console.log(
+            `Please download the latest release: ${colors.client}${data.html_url}${colors.reset}`
+          )
+          console.log(`Replace your current files with the new ones from the zip.`)
+          console.log(
+            `${colors.system}====================================================\n${colors.reset}`
+          )
+        }
+        return
+      }
+      if (!pkg.versionDate) return
+
       const latestDate = new Date(data.published_at)
-      const pkgDate = new Date(pkg.versionDate || 0)
+      const pkgDate = new Date(pkg.versionDate)
 
       if (latestDate > pkgDate) {
         console.log(`\n${colors.system}====================================================`)
@@ -230,13 +249,13 @@ async function main() {
   if (mode === 'dev') {
     serverProcess = spawn(
       npmCmd,
-      ['run', 'dev'],
-      spawnOpts(SERVER_DIR, { NODE_ENV: 'development' })
+      ['run', 'dev', '--workspace=dango-server'],
+      spawnOpts(__dirname, { NODE_ENV: 'development' })
     )
     clientProcess = spawn(
       npmCmd,
-      ['run', 'dev'],
-      spawnOpts(CLIENT_DIR, { NODE_ENV: 'development' })
+      ['run', 'dev', '--workspace=dango-client'],
+      spawnOpts(__dirname, { NODE_ENV: 'development' })
     )
   } else {
     const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')

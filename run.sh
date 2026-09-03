@@ -61,9 +61,6 @@ elif [ "$choice" == "2" ]; then
         fi
     fi
 
-    echo "--> Ensuring Production Dependencies for server..."
-    (cd server && npm install --omit=dev)
-
     echo
     echo "--> Starting application in production mode..."
     node orchestrator.js prod

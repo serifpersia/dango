@@ -1,5 +1,5 @@
 {
-  "name": "dango",
+  "name": "dango-client",
   "private": true,
   "version": "2.7.5",
   "type": "module",
@@ -17,12 +17,8 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",
-    "@preact/preset-vite": "^2.10.5",
     "@radix-ui/react-dialog": "^1.1.23",
     "@tanstack/react-query": "^5.99.2",
-    "@types/nprogress": "^0.2.3",
-    "@types/uuid": "^10.0.0",
-    "d3-color": "^3.1.0",
     "embla-carousel-react": "^8.6.0",
     "nprogress": "^0.2.0",
     "preact": "^10.29.1",
@@ -36,22 +32,13 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@preact/preset-vite": "^2.10.5",
+    "@types/nprogress": "^0.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "eslint": "^10.2.1",
+    "@types/uuid": "^10.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.5.0",
-    "prettier": "^3.8.3",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.58.2",
     "vite": "^7.3.1"
-  },
-  "overrides": {
-    "vite": {
-      "esbuild": "^0.28.1"
-    },
-    "d3-color": "^3.1.0"
   }
 }

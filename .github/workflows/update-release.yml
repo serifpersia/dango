@@ -43,7 +43,7 @@ jobs:
           echo "" >> release_notes.md
           echo "### Manual Setup" >> release_notes.md
           echo "1. Download and extract 'dango.zip'" >> release_notes.md
-          echo "2. Run 'npm install --omit=dev' inside the folder" >> release_notes.md
+          echo "2. Run 'npm install --omit=dev --workspaces=false' inside the folder (minimal prod deps, client is prebuilt)" >> release_notes.md
           echo "3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android APK" >> release_notes.md
@@ -87,9 +87,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install Dependencies
-        run: |
-          npm install
-          npm run install:client
+        run: npm ci
 
       - name: Build Application
         run: npm run build
@@ -103,7 +101,7 @@ jobs:
           mkdir -p release-package/server
           cp -r client/dist release-package/client/
           cp -r server/dist release-package/server/
-          cp client/package.json client/package-lock.json release-package/client/
+          cp client/package.json release-package/client/
           cp server/package.json release-package/server/
           echo "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" > release-package/server/.env
           cp package.json package-lock.json release-package/

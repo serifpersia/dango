@@ -135,11 +135,12 @@ cd dango
 ```
 
 **2. Install, Build, and Run:**
-Use provided run scripts that offer a menu to choose between a **Development** or **Production** setup. To run a development environment manually:
+This project uses **npm workspaces** (`client` + `server`) with a single `package-lock.json` at the root. All dependencies are installed and hoisted together.
 
-1. Run `npm install` to install core dependencies.
-2. Run `npm run install:client` to install frontend tools (Vite, React, etc).
-3. Run `npm run build` to build the source code.
+1. Run `npm install` to install all dependencies (root + workspaces, deduped).
+2. Run `npm run build` to build both workspaces (`client` via Vite, `server` via `tsc`).
+
+Use the provided run scripts that offer a menu to choose between a **Development** or **Production** setup:
 
 **On Linux / macOS:**
 
@@ -160,6 +161,15 @@ Once installed globally, you can use the following commands:
 
 - `dango` - Start the application.
 - `dango --version` (or `-v`) - Check your installed version.
+
+**For developers (workspaces):**
+
+- `npm install` - Install all workspaces (hoisted, single lockfile).
+- `npm run build` - Build both `client` and `server` (`npm run build --workspaces`).
+- `npm run dev` / `npm start` - Run via `orchestrator.js` (spawns `dango-server` + `dango-client` with `npm --workspace`).
+- `npm run --workspace=dango-client dev` - Run only the frontend (Vite).
+- `npm run --workspace=dango-server dev` - Run only the backend (`nodemon` + `ts-node`).
+- `npm run lint --workspaces` - Lint both workspaces.
 
 ### Data Location
 

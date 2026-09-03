@@ -3,6 +3,10 @@
   "version": "2.7.5",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/serifpersia/dango.git"
@@ -14,16 +18,15 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "install:client": "npm install --prefix client",
-    "build": "npm run build --prefix client && npm run build --prefix server",
+    "build": "npm run build --workspaces",
     "start": "node orchestrator.js prod",
     "dev": "node orchestrator.js dev",
-    "client": "npm start --prefix client",
-    "server": "npm run start --prefix server",
+    "client": "npm run start --workspace=client",
+    "server": "npm run start --workspace=server",
     "preview": "node orchestrator.js prod",
     "migrate": "ts-node --project server/tsconfig.json server/src/migration/migrate.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "npm run lint --prefix client && npm run lint --prefix server",
+    "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
     "prepublishOnly": "npm run build",
     "update-version": "node update-version.js"
@@ -72,26 +75,28 @@
     "ws": "^8.18.0",
     "xml2js": "^0.6.2"
   },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "prettier": "^3.8.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.0"
+  },
   "overrides": {
+    "d3-color": "^3.1.0",
+    "d3-interpolate": {
+      "d3-color": "^3.1.0"
+    },
+    "d3-transition": {
+      "d3-color": "^3.1.0"
+    },
     "encoding-sniffer": "^1.0.2",
     "esbuild": "^0.28.1",
     "undici": "^8.5.0"
   },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/compression": "^1.8.1",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.0",
-    "@types/multer": "^2.1.0",
-    "@types/node": "^22.5.0",
-    "@types/ws": "^8.5.10",
-    "@types/xml2js": "^0.4.14",
-    "eslint": "^10.2.1",
-    "globals": "^17.5.0",
-    "nodemon": "^3.1.14",
-    "prettier": "^3.8.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.18.1"
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

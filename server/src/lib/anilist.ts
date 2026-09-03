@@ -945,8 +945,7 @@ export async function searchAnilistByTitle(
     normalizedTitle.replace(/\s*\d+(?:st|nd|rd|th)?\s*Season\s*\d*/gi, '').trim(),
   ].filter((t, i, a) => t && a.indexOf(t) === i)
   let media:
-    | { id: number; title: { romaji?: string; english?: string; native?: string } }[]
-    | undefined
+    { id: number; title: { romaji?: string; english?: string; native?: string } }[] | undefined
   let anyFailed = false
 
   for (const searchTerm of searchTerms) {

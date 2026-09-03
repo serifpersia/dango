@@ -16,8 +16,6 @@ const targets = [
   path.join(root, 'server', 'package.json'),
 
   path.join(root, 'package-lock.json'),
-  path.join(root, 'client', 'package-lock.json'),
-  path.join(root, 'server', 'package-lock.json'),
 
   path.join(root, 'README.md'),
 ]
@@ -41,6 +39,11 @@ function updateFile(filePath) {
 
     if (json.packages && json.packages['']) {
       json.packages[''].version = newVersion
+      updated = true
+    }
+
+    if (filePath.endsWith('package.json') && filePath === path.join(root, 'package.json')) {
+      json.versionDate = new Date().toISOString()
       updated = true
     }
 

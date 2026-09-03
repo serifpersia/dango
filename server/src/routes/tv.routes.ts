@@ -74,7 +74,7 @@ function decodeMovyPayload(e: string, t: string | number, a: number): string {
     })(e, t)
     const r = new Uint8Array(a)
     let n = 0
-    for (let e = 0; e < a; ) {
+    for (let e = 0; e < a;) {
       const t = (function (e: { S: number[]; acc: number }, t: number) {
         const r = e.S
         let n = e.acc
