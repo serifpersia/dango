@@ -8,6 +8,9 @@ export const SettingsRepository = {
   upsert: (db: DatabaseWrapper, key: string, value: string) =>
     dbRun(db, 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]),
 
+  deleteByKey: (db: DatabaseWrapper, key: string) =>
+    dbRun(db, 'DELETE FROM settings WHERE key = ?', [key]),
+
   clearWatchlist: (db: DatabaseWrapper) => dbRun(db, 'DELETE FROM watchlist'),
 
   upsertWatchlistBatch: (

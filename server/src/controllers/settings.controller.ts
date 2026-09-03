@@ -83,8 +83,12 @@ export class SettingsController {
 
   updateSettings = async (req: Request, res: Response) => {
     try {
+      const key = String(req.body.key)
+      const value = String(req.body.value ?? '')
+      const shouldDelete = value === '' && key === 'tracker_anilist_client_id'
       await performWriteTransaction(req.db, (tx) => {
-        SettingsRepository.upsert(tx, req.body.key, String(req.body.value))
+        if (shouldDelete) SettingsRepository.deleteByKey(tx, key)
+        else SettingsRepository.upsert(tx, key, value)
       })
       if (req.body.key === 'discordRPCEnabled') {
         discordRPCService.setEnabled(req.body.value === 'true' || req.body.value === true)

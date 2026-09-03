@@ -45,7 +45,7 @@ interface SyncSummary {
 }
 
 const CLIENT_ID_SETTING = 'tracker_anilist_client_id'
-const CLIENT_SECRET_SETTING = 'tracker_anilist_client_secret'
+const SHIPPED_ANILIST_CLIENT_ID = (import.meta.env.VITE_ANILIST_CLIENT_ID || '').trim()
 
 const Trackers: React.FC = () => {
   const { setIsOpen } = useSidebar()
@@ -59,7 +59,7 @@ const Trackers: React.FC = () => {
   const [publicUsername, setPublicUsername] = useState<string>('')
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null)
   const [clientIdInput, setClientIdInput] = useState<string>('')
-  const [clientSecretInput, setClientSecretInput] = useState<string>('')
+  const [pendingToken, setPendingToken] = useState<string | null>(null)
 
   const { data: trackerStatus, isLoading: statusLoading } = useQuery({
     queryKey: ['trackerStatus'],
@@ -79,28 +79,27 @@ const Trackers: React.FC = () => {
     },
   })
 
-  const { data: savedClientSecret } = useQuery({
-    queryKey: ['anilistClientSecret'],
-    queryFn: async (): Promise<string> => {
-      const res = await fetch(`/api/settings?key=${CLIENT_SECRET_SETTING}`)
-      const data = await res.json()
-      return data.value || ''
-    },
-  })
-
+  const initializedRef = useRef(false)
   React.useEffect(() => {
-    if (savedClientId && !clientIdInput) setClientIdInput(savedClientId)
-    if (savedClientSecret && !clientSecretInput) setClientSecretInput(savedClientSecret)
-  }, [savedClientId, savedClientSecret, clientIdInput, clientSecretInput])
+    if (initializedRef.current) return
+    if (savedClientId === undefined) return
+    if (savedClientId) setClientIdInput(savedClientId)
+    initializedRef.current = true
+  }, [savedClientId])
 
   const anilistConnected = trackerStatus?.anilist?.connected ?? false
   const anilistUser = trackerStatus?.anilist?.user ?? null
 
+  const hasShipped = !!SHIPPED_ANILIST_CLIENT_ID
+  const savedTrim = (savedClientId || '').trim()
+  const isUsingShipped = !savedTrim && hasShipped
+  const effectiveClientId = savedTrim || SHIPPED_ANILIST_CLIENT_ID
+
   const handleAniListLogin = async () => {
-    const clientId = clientIdInput.trim()
-    const clientSecret = clientSecretInput.trim()
-    if (!clientId || !clientSecret) {
-      toast.error('Enter your AniList client ID and client secret first')
+    const inputTrim = clientIdInput.trim()
+    const clientId = inputTrim || SHIPPED_ANILIST_CLIENT_ID
+    if (!clientId) {
+      toast.error('Enter your AniList client ID first')
       return
     }
     const saveSetting = async (key: string, value: string) => {
@@ -112,26 +111,90 @@ const Trackers: React.FC = () => {
       if (!res.ok) throw new Error(`Failed to save ${key}`)
     }
     try {
-      if (clientId !== savedClientId) await saveSetting(CLIENT_ID_SETTING, clientId)
-      if (clientSecret !== savedClientSecret) await saveSetting(CLIENT_SECRET_SETTING, clientSecret)
+      if (inputTrim) {
+        if (inputTrim !== savedClientId) await saveSetting(CLIENT_ID_SETTING, inputTrim)
+      } else if (hasShipped && savedTrim) {
+        await saveSetting(CLIENT_ID_SETTING, '')
+      }
       queryClient.invalidateQueries({ queryKey: ['anilistClientId'] })
-      queryClient.invalidateQueries({ queryKey: ['anilistClientSecret'] })
     } catch (err) {
       toast.error((err as Error).message)
       return
     }
-    // Use backend callback as single registered redirect_uri so dev (5173) and prod (3000) both work.
-    // AniList only allows ONE redirect URL per app — this fixed backend URL covers both.
     const frontendBase = window.location.origin + window.location.pathname
     const isDevFrontend = window.location.port === '5173'
     const backendOrigin = isDevFrontend
       ? `${window.location.protocol}//${window.location.hostname}:3000`
       : window.location.origin
-    const backendCallback = `${backendOrigin}/api/tracker/anilist/callback`
-    const redirectUri = encodeURIComponent(backendCallback)
     const state = encodeURIComponent(frontendBase)
-    window.location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&state=${state}`
+    window.location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&state=${state}`
   }
+
+  const handleUseShipped = async () => {
+    setClientIdInput('')
+    if (!savedTrim) {
+      toast.success('Using Dango app client')
+      return
+    }
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: CLIENT_ID_SETTING, value: '' }),
+      })
+      if (!res.ok) throw new Error('Failed to clear')
+      queryClient.invalidateQueries({ queryKey: ['anilistClientId'] })
+      toast.success('Reverted to Dango app client — hidden ID will be used')
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
+  React.useEffect(() => {
+    const hash = window.location.hash
+    if (!hash || !hash.includes('access_token')) return
+    const params = new URLSearchParams(hash.substring(1))
+    const token = params.get('access_token')
+    if (!token) {
+      const err = params.get('error')
+      if (err) toast.error(`AniList error: ${err}`)
+      return
+    }
+    setPendingToken(token)
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/tracker/anilist/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || 'Authentication failed')
+        queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
+        toast.success(`Connected as ${data.user?.name ?? 'AniList user'}`)
+      } catch (e) {
+        toast.error((e as Error).message)
+      } finally {
+        setPendingToken(null)
+      }
+    })()
+  }, [queryClient])
+
+  React.useEffect(() => {
+    const qp = new URLSearchParams(window.location.search)
+    if (qp.get('anilist') === 'error') {
+      toast.error(`AniList auth failed: ${qp.get('reason') || 'unknown'}`)
+      qp.delete('anilist')
+      qp.delete('reason')
+      const qs = qp.toString()
+      history.replaceState(
+        null,
+        '',
+        window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash
+      )
+    }
+  }, [])
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -343,48 +406,75 @@ const Trackers: React.FC = () => {
           <div className={styles.loginSection}>
             <p className={styles.loginText}>
               Log in with AniList to enable bidirectional progress &amp; status synchronization.
+              {pendingToken && (
+                <span style={{ marginLeft: 8, color: 'var(--accent)' }}>Finishing login…</span>
+              )}
             </p>
             <div className={styles.fieldLabel}>
-              AniList client ID &amp; secret{' '}
+              AniList client ID — defaults to Dango's app{' '}
               <a
                 href="https://anilist.co/settings/developer"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                create an API client <FaExternalLinkAlt size={9} />
+                create your own app <FaExternalLinkAlt size={9} />
               </a>
             </div>
             <div className={styles.inputGroup}>
               <input
                 type="text"
-                placeholder="Client ID, e.g. 12345"
+                placeholder="Client ID"
                 value={clientIdInput}
                 onChange={(e) => setClientIdInput(e.target.value)}
-                className={styles.input}
-              />
-              <input
-                type="password"
-                placeholder="Client secret"
-                value={clientSecretInput}
-                onChange={(e) => setClientSecretInput(e.target.value)}
                 className={styles.input}
               />
               <button
                 className={styles.primaryBtn}
                 onClick={handleAniListLogin}
-                disabled={!clientIdInput.trim() || !clientSecretInput.trim()}
+                disabled={!(clientIdInput.trim() || hasShipped)}
               >
                 <FaExternalLinkAlt /> Connect
               </button>
             </div>
             <p className={styles.helpText}>
-              In your AniList client settings, set the redirect URL to{' '}
-              <code>
-                {window.location.port === '5173'
-                  ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
-                  : `${window.location.origin}/api/tracker/anilist/callback`}
-              </code>
-              .
+              {hasShipped ? (
+                <>
+                  By default uses Dango's client. To use your own AniList app: create it at{' '}
+                  <a
+                    href="https://anilist.co/settings/developer"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    anilist.co/settings/developer
+                  </a>
+                  , set its <strong>Redirect URL</strong> to{' '}
+                  <code>
+                    {window.location.port === '5173'
+                      ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
+                      : `${window.location.origin}/api/tracker/anilist/callback`}
+                  </code>
+                  , then paste only the <strong>Client ID</strong> above (leave empty to use
+                  Dango's).
+                </>
+              ) : (
+                <>
+                  No shipped client in this build — create your own app at{' '}
+                  <a
+                    href="https://anilist.co/settings/developer"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    anilist.co/settings/developer
+                  </a>
+                  , set <strong>Redirect URL</strong> to{' '}
+                  <code>
+                    {window.location.port === '5173'
+                      ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
+                      : `${window.location.origin}/api/tracker/anilist/callback`}
+                  </code>
+                  , then paste the <strong>Client ID</strong> above.
+                </>
+              )}
             </p>
           </div>
         )}

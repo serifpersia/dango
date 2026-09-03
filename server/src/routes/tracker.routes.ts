@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { AniListTracker, exchangeAuthorizationCode } from '../lib/tracker/anilist-tracker'
+import { AniListTracker } from '../lib/tracker/anilist-tracker'
 import { syncAniList, importFromUsername } from '../lib/tracker/sync.service'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { performWriteTransaction } from '../sync'
@@ -7,65 +7,45 @@ import { performWriteTransaction } from '../sync'
 const TOKEN_KEY = 'tracker_anilist_token'
 const USER_KEY = 'tracker_anilist_user'
 const CLIENT_ID_KEY = 'tracker_anilist_client_id'
-const CLIENT_SECRET_KEY = 'tracker_anilist_client_secret'
 
 export function createTrackerRouter(): Router {
   const router = Router()
 
-  // OAuth callback: AniList redirects here with ?code=&state=
-  // Single registered redirect_uri covers both dev (5173 frontend + 3000 backend) and prod (3000)
-  router.get('/tracker/anilist/callback', async (req, res) => {
-    const code = typeof req.query.code === 'string' ? req.query.code : ''
-    const state = typeof req.query.state === 'string' ? req.query.state : ''
-    // frontend origin to redirect back to (passed as state=encodeURIComponent(frontendUrl))
-    let frontendBase: string
-    try {
-      frontendBase = state ? decodeURIComponent(state) : ''
-    } catch {
-      frontendBase = ''
-    }
-    // fallback to referer / host if state missing
-    if (!frontendBase || !/^https?:\/\//.test(frontendBase)) {
-      frontendBase = req.get('referer') || `http://localhost:3000/trackers`
-    }
-
-    if (!code) {
-      return res.redirect(
-        `${frontendBase}${frontendBase.includes('?') ? '&' : '?'}anilist=error&reason=no_code`
-      )
-    }
-
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/tracker/anilist/callback`
-    try {
-      const clientIdRow = await SettingsRepository.getByKey(req.db, CLIENT_ID_KEY)
-      const clientSecretRow = await SettingsRepository.getByKey(req.db, CLIENT_SECRET_KEY)
-      if (!clientIdRow?.value || !clientSecretRow?.value) {
-        return res.redirect(
-          `${frontendBase}${frontendBase.includes('?') ? '&' : '?'}anilist=error&reason=missing_client`
-        )
-      }
-      const exchanged = await exchangeAuthorizationCode({
-        clientId: clientIdRow.value,
-        clientSecret: clientSecretRow.value,
-        redirectUri,
-        code,
-      })
-      const tracker = new AniListTracker(exchanged.access_token)
-      const viewer = await tracker.getViewer()
-      await performWriteTransaction(req.db, (tx) => {
-        SettingsRepository.upsert(tx, TOKEN_KEY, exchanged.access_token)
-        SettingsRepository.upsert(tx, USER_KEY, JSON.stringify(viewer))
-      })
-      const sep = frontendBase.includes('?') ? '&' : '?'
-      return res.redirect(
-        `${frontendBase}${sep}anilist=success&user=${encodeURIComponent(viewer.name)}`
-      )
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'exchange failed'
-      return res.redirect(
-        `${frontendBase}${frontendBase.includes('?') ? '&' : '?'}anilist=error&reason=${encodeURIComponent(msg)}`
-      )
-    }
+  router.get('/tracker/anilist/callback', (_req, res) => {
+    res.type('html').send(`<!doctype html>
+<html><head><meta charset="utf-8"><title>AniList — completing login</title></head>
+<body style="font-family:system-ui;padding:24px;background:#0b1426;color:#e5eefc"><p>Completing AniList login…</p>
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var state = qs.get('state');
+  var hash = location.hash || '';
+  var hp = new URLSearchParams(hash.slice(1));
+  if (!state) state = hp.get('state');
+  var token = hp.get('access_token');
+  var error = hp.get('error') || qs.get('error');
+  var frontend = '';
+  try { frontend = state ? decodeURIComponent(state) : ''; } catch(e) { frontend = state || ''; }
+  if (!frontend || !/^https?:\\/\\//.test(frontend)) {
+    frontend = location.origin + '/trackers';
+    if (frontend.indexOf('/api/tracker/anilist/callback') !== -1) frontend = location.origin + '/trackers';
+  }
+  if (error) {
+    location.replace(frontend + (frontend.indexOf('?') !== -1 ? '&' : '?') + 'anilist=error&reason=' + encodeURIComponent(error));
+    return;
+  }
+  if (token) {
+    location.replace(frontend + hash);
+    return;
+  }
+  var code = qs.get('code');
+  if (code) {
+    location.replace(frontend + (frontend.indexOf('?') !== -1 ? '&' : '?') + 'anilist=error&reason=code_flow_removed');
+    return;
+  }
+  location.replace(frontend + (frontend.indexOf('?') !== -1 ? '&' : '?') + 'anilist=error&reason=no_token');
+})();
+</script></body></html>`)
   })
 
   router.get('/tracker/status', async (req, res) => {
@@ -89,38 +69,10 @@ export function createTrackerRouter(): Router {
   })
 
   router.post('/tracker/anilist/auth', async (req, res) => {
-    const { token, code, redirectUri } = req.body ?? {}
-
-    let accessToken = typeof token === 'string' ? token : ''
-
-    // Authorization Code flow: exchange the ?code= from the redirect for a bearer token
-    if (!accessToken && code && typeof code === 'string') {
-      try {
-        const clientIdRow = await SettingsRepository.getByKey(req.db, CLIENT_ID_KEY)
-        const clientSecretRow = await SettingsRepository.getByKey(req.db, CLIENT_SECRET_KEY)
-        if (!clientIdRow?.value || !clientSecretRow?.value) {
-          return res
-            .status(400)
-            .json({ error: 'AniList client ID and secret must be configured first' })
-        }
-        if (!redirectUri || typeof redirectUri !== 'string') {
-          return res.status(400).json({ error: 'redirectUri is required for code exchange' })
-        }
-        const exchanged = await exchangeAuthorizationCode({
-          clientId: clientIdRow.value,
-          clientSecret: clientSecretRow.value,
-          redirectUri,
-          code,
-        })
-        accessToken = exchanged.access_token
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Token exchange failed'
-        return res.status(401).json({ error: message })
-      }
-    }
-
+    const { token } = req.body ?? {}
+    const accessToken = typeof token === 'string' ? token.trim() : ''
     if (!accessToken) {
-      return res.status(400).json({ error: 'Token or authorization code is required' })
+      return res.status(400).json({ error: 'Access token is required' })
     }
 
     try {

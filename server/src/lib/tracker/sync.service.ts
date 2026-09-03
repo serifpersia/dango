@@ -164,7 +164,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
           summary.pushed++
           continue
         }
-        logger.info(
+        logger.debug(
           { mediaId, remoteStatus: remote.status },
           '[AniList Sync] Remote only -> pulling to local'
         )

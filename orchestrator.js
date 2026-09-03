@@ -208,12 +208,13 @@ const log = (prefix, color, data) => {
   }
 }
 
-const spawnOpts = (cwd) => ({
+const spawnOpts = (cwd, extraEnv) => ({
   stdio: 'pipe',
   shell: isWin,
   cwd,
   detached: !isWin,
   windowsHide: true,
+  env: { ...process.env, ...(extraEnv || {}) },
 })
 let serverProcess, clientProcess
 let isShuttingDown = false
@@ -227,11 +228,23 @@ async function main() {
   )
 
   if (mode === 'dev') {
-    serverProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(SERVER_DIR))
-    clientProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(CLIENT_DIR))
+    serverProcess = spawn(
+      npmCmd,
+      ['run', 'dev'],
+      spawnOpts(SERVER_DIR, { NODE_ENV: 'development' })
+    )
+    clientProcess = spawn(
+      npmCmd,
+      ['run', 'dev'],
+      spawnOpts(CLIENT_DIR, { NODE_ENV: 'development' })
+    )
   } else {
     const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
-    serverProcess = spawn('node', ['--max-old-space-size=256', serverPath], spawnOpts(SERVER_DIR))
+    serverProcess = spawn(
+      'node',
+      ['--max-old-space-size=256', serverPath],
+      spawnOpts(SERVER_DIR, { NODE_ENV: 'production' })
+    )
   }
 
   if (serverProcess) {

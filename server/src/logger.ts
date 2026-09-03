@@ -1,6 +1,6 @@
 import pino from 'pino'
 
-const isDevelopment = process.env.NODE_ENV !== 'production'
+const isDevelopment = process.argv.includes('--dev') || process.env.NODE_ENV === 'development'
 
 const logger = pino({
   level: isDevelopment ? 'debug' : 'info',

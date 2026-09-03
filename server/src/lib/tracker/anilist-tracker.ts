@@ -2,7 +2,6 @@ import logger from '../../logger'
 import { waitForAnilistSlot, applyRateLimitHeaders } from '../anilist'
 
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
-const ANILIST_TOKEN_ENDPOINT = 'https://anilist.co/api/v2/oauth/token'
 
 export type AniListMediaListStatus = 'CURRENT' | 'COMPLETED' | 'PAUSED' | 'DROPPED' | 'PLANNING'
 
@@ -45,43 +44,10 @@ interface RequestOptions {
   retries?: number
 }
 
-export async function exchangeAuthorizationCode(params: {
-  clientId: string
-  clientSecret: string
-  redirectUri: string
-  code: string
-}): Promise<{ access_token: string }> {
-  let response: Response
-  try {
-    response = await fetch(ANILIST_TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: params.clientId,
-        client_secret: params.clientSecret,
-        redirect_uri: params.redirectUri,
-        code: params.code,
-      }),
-    })
-  } catch (err) {
-    logger.error({ err }, '[AniList Tracker] Token exchange network error')
-    throw new Error('Could not reach AniList to exchange the authorization code.', { cause: err })
-  }
-
-  const json = (await response.json().catch(() => null)) as {
-    access_token?: string
-    error?: string
-    message?: string
-    hint?: string
-  } | null
-
-  if (!response.ok || !json?.access_token) {
-    const detail = json?.message || json?.error || `status ${response.status}`
-    throw new Error(`AniList token exchange failed: ${detail}`)
-  }
-
-  return { access_token: json.access_token }
+export async function exchangeAuthorizationCode(): Promise<{ access_token: string }> {
+  throw new Error(
+    'Authorization Code flow removed — use Implicit Grant (response_type=token) instead.'
+  )
 }
 
 export class AniListTracker {

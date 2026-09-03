@@ -95,6 +95,7 @@ jobs:
         run: npm run build
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
+          VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
 
       - name: Create Release Archive
         run: |
@@ -146,4 +147,5 @@ jobs:
           npm publish --access public
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
+          VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
