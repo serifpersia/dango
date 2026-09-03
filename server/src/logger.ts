@@ -4,16 +4,14 @@ const isDevelopment = process.argv.includes('--dev') || process.env.NODE_ENV ===
 
 const logger = pino({
   level: isDevelopment ? 'debug' : 'info',
-  transport: isDevelopment
-    ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
-      }
-    : undefined,
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname',
+    },
+  },
 })
 
 export default logger
