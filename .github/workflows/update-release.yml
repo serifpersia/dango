@@ -146,7 +146,7 @@ jobs:
       - name: Publish to NPM
         run: |
           echo "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" > server/.env
-          if [ -n "$G_CLIENT_ID" ]; then echo "GITHUB_CLIENT_ID=$G_CLIENT_ID" >> server/.env; fi
+          if [ -n "$GITHUB_CLIENT_ID" ]; then echo "GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID" >> server/.env; fi
           if [ -n "$GOOGLE_AUTH_WORKER_URL" ]; then echo "GOOGLE_AUTH_WORKER_URL=$GOOGLE_AUTH_WORKER_URL" >> server/.env; fi
           npm publish --access public
         env:

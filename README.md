@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/dango-2.7.9-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-2.8.1-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -198,27 +198,6 @@ Sync provider priority is:
 If GitHub is connected, it is used first. Google Drive and Rclone remain available as fallback or
 legacy sync options.
 
-### 1. GitHub Cloud Sync
-
-GitHub Cloud Sync is the recommended setup. It uses GitHub's device login flow, so users do not
-need to create a Google Cloud project, manage client secrets, or install external sync tools.
-
-1. Open **dango**.
-2. Go to **Settings** -> **Synchronization**.
-3. Click **Sign in with GitHub**.
-4. Open the shown GitHub device URL, enter the code, and approve access.
-
-dango will create a private GitHub repository named `dango-sync-data` in your account and store
-your sync data in JSON:
-
-- Production mode uses `sync.json`.
-- Development mode uses `sync.dev.json`.
-
-The app requests GitHub repository access because it needs to create and update this private sync
-repository. The GitHub token is stored locally in your dango app-data `.env` file.
-
-To fully remove synced data, delete the `dango-sync-data` repository from your GitHub account.
-
 ### 2. Google Drive Sync
 
 Google Drive sync is preconfigured with a default dango-managed Google client. No Google Cloud
@@ -237,6 +216,24 @@ To fully disconnect Google Drive sync and remove stored data, go to **Google Dri
 
 If you prefer to use your own Google OAuth client, you can override the default in the Google
 authentication advanced settings.
+
+### 1. GitHub Cloud Sync
+
+1. Open **dango**.
+2. Go to **Settings** -> **Synchronization**.
+3. Click **Sign in with GitHub**.
+4. Open the shown GitHub device URL, enter the code, and approve access.
+
+dango will create a private GitHub repository named `dango-sync-data` in your account and store
+your sync data in JSON:
+
+- Production mode uses `sync.json`.
+- Development mode uses `sync.dev.json`.
+
+The app requests GitHub repository access because it needs to create and update this private sync
+repository. The GitHub token is stored locally in your dango app-data `.env` file.
+
+To fully remove synced data, delete the `dango-sync-data` repository from your GitHub account.
 
 ### 3. Rclone Sync
 
