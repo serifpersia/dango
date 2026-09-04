@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/dango-2.7.7-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-2.7.9-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -217,18 +217,26 @@ your sync data in JSON:
 The app requests GitHub repository access because it needs to create and update this private sync
 repository. The GitHub token is stored locally in your dango app-data `.env` file.
 
+To fully remove synced data, delete the `dango-sync-data` repository from your GitHub account.
+
 ### 2. Google Drive Sync
 
-Google Drive sync is still supported. To use it, you need to provide your own Google Cloud
-credentials:
+Google Drive sync is preconfigured with a default dango-managed Google client. No Google Cloud
+project setup is required:
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project and enable the **Google Drive API**.
-3. Configure the **OAuth Consent Screen** (set it to "External" and add yourself as a test user).
-4. Create **OAuth 2.0 Client IDs** (Application type: "Web application").
-5. Add `http://localhost:3000/api/auth/google/callback` to the **Authorized redirect URIs**.
-6. Open **dango**, go to **Settings** -> **Synchronization**, and enter your **Client ID** and
-   **Client Secret** in the Google authentication section.
+1. Open **dango**.
+2. Go to **Settings** -> **Synchronization**.
+3. Click **Sign in with Google** and approve access.
+
+Your sync data is stored in a private Google Drive appdata folder in JSON format:
+
+- Production mode uses `sync.json`.
+- Development mode uses `sync.dev.json`.
+
+To fully disconnect Google Drive sync and remove stored data, go to **Google Drive settings** → **Manage apps**, find **dango**, and revoke access. Then delete the hidden appdata sync files from your Drive.
+
+If you prefer to use your own Google OAuth client, you can override the default in the Google
+authentication advanced settings.
 
 ### 3. Rclone Sync
 

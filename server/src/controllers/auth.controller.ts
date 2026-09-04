@@ -27,8 +27,7 @@ export class AuthController {
     // New flow: Worker holds ID+secret, no local .env needed.
     // Legacy fallback: user-owned GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET.
     const useWorker = !!CONFIG.GOOGLE_AUTH_WORKER_URL
-    const hasLegacyConfig =
-      !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
+    const hasLegacyConfig = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
     res.json({ hasConfig: useWorker || hasLegacyConfig, useWorker })
   }
 

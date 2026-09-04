@@ -47,9 +47,7 @@ const GoogleAuthSettings: React.FC = () => {
       const config = await configRes.json()
       const auth = await authRes.json()
       setHasAuthConfig(!!config.hasConfig)
-      setHasOverride(
-        !!(auth.hasCustomWorkerUrl || auth.hasCustomClientId || auth.hasClientSecret)
-      )
+      setHasOverride(!!(auth.hasCustomWorkerUrl || auth.hasCustomClientId || auth.hasClientSecret))
     } catch (error) {
       console.error('Failed to fetch config status', error)
     }

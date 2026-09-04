@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dango</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --accent: hsl(265, 95%, 72%);
+        --accent-light: hsl(265, 90%, 80%);
+        --accent-glow: hsla(265, 95%, 72%, 0.5);
+        --bg-main: #050505;
+        --bg-secondary: #0f0f11;
+        --bg-tertiary: #18181b;
+        --bg-elevated: #27272a;
+        --text-primary: #ffffff;
+        --text-secondary: #b4b4bd;
+        --text-tertiary: #8f8f98;
+        --text-muted: #b4b4bd;
+        --border-primary: rgba(255, 255, 255, 0.08);
+        --border-secondary: rgba(255, 255, 255, 0.12);
+        --font-family:
+          'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-family);
+        background: var(--bg-main);
+        color: var(--text-primary);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border-primary);
+        padding: 1.5rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        background: rgba(12, 12, 15, 0.82);
+        backdrop-filter: blur(10px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 1.25rem;
+        letter-spacing: -0.02em;
+      }
+
+      .brand:hover {
+        color: var(--accent-light);
+        text-shadow: 0 0 8px var(--accent-glow);
+      }
+
+      nav {
+        display: flex;
+        gap: 1.25rem;
+        align-items: center;
+      }
+
+      nav a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: color 0.2s ease;
+      }
+
+      nav a:hover {
+        color: var(--accent-light);
+      }
+
+      main {
+        flex: 1;
+        max-width: 860px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 3rem 2rem 4rem;
+      }
+
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 2.5rem 0 0.75rem;
+        letter-spacing: -0.01em;
+      }
+
+      p {
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+      }
+
+      a.accent {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a.accent:hover {
+        color: var(--accent-light);
+        text-shadow: 0 0 8px var(--accent-glow);
+      }
+
+      ul,
+      ol {
+        color: var(--text-secondary);
+        padding-left: 1.25rem;
+        margin-bottom: 1rem;
+      }
+
+      li + li {
+        margin-top: 0.35rem;
+      }
+
+      code {
+        background: var(--bg-tertiary);
+        padding: 0.15rem 0.35rem;
+        border-radius: 6px;
+        font-size: 0.9em;
+        color: var(--accent-light);
+      }
+
+      .card {
+        border: 1px solid var(--border-primary);
+        border-radius: 16px;
+        padding: 1.25rem;
+        background: var(--bg-secondary);
+        margin-bottom: 1rem;
+      }
+
+      footer {
+        text-align: center;
+        padding: 2.5rem 2rem;
+        color: var(--text-muted);
+        border-top: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+        font-size: 0.9rem;
+      }
+
+      footer a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      @media (max-width: 640px) {
+        header {
+          padding: 1.25rem;
+        }
+        main {
+          padding: 2rem 1.25rem 3rem;
+        }
+        h1 {
+          font-size: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/dango/">
+        <span style="color: var(--accent)">dan</span
+        ><span style="color: var(--text-primary)">go</span>
+      </a>
+      <nav>
+        <a href="/dango/">Home</a>
+        <a href="/dango/privacy.html">Privacy</a>
+        <a href="/dango/terms.html">Terms</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>dango</h1>
+      <p>
+        A personal anime streaming tracker that keeps your watchlist, watched episodes, and sync
+        state in one place. It focuses on local playback, queue management, and optional cloud
+        backup through Google Drive.
+      </p>
+
+      <div class="card">
+        <h2>What it does</h2>
+        <ul>
+          <li>Browse and watch anime from configured providers.</li>
+          <li>Track watch progress and maintain a watchlist.</li>
+          <li>Sync metadata across devices with Google Drive.</li>
+          <li>Optional tracker integrations for progress syncing.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Data and storage</h2>
+        <p>
+          By default, your data is stored locally on the machine running the app. When Google Drive
+          sync is enabled, a small set of metadata is stored in your Drive appdata folder for
+          syncing purposes. See the
+          <a class="accent" href="/dango/privacy.html">Privacy Policy</a> for details.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Get started</h2>
+        <p>
+          Install and run dango locally. Open the app, configure providers if needed, and optionally
+          enable sync in Settings. For Google authentication, the app requests access to Drive so it
+          can store sync files in a private appdata folder.
+        </p>
+      </div>
+    </main>
+
+    <footer>
+      dango · <a href="/dango/privacy.html">Privacy Policy</a> ·
+      <a href="/dango/terms.html">Terms of Service</a>
+    </footer>
+  </body>
+</html>
