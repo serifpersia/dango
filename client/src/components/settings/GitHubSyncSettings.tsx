@@ -24,8 +24,7 @@ interface GitHubStatus {
   authenticated: boolean
   user: GitHubUser | null
   device: DeviceState
-  clientId: string
-  usingDefaultClientId: boolean
+  hasCustomClientId: boolean
 }
 
 const GitHubSyncSettings: React.FC = () => {
@@ -34,7 +33,9 @@ const GitHubSyncSettings: React.FC = () => {
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState<GitHubUser | null>(null)
   const [device, setDevice] = useState<DeviceState>({ status: 'idle' })
-  const [usingDefaultClientId, setUsingDefaultClientId] = useState(false)
+  const [hasOverride, setHasOverride] = useState(false)
+  const [customClientId, setCustomClientId] = useState('')
+  const [saving, setSaving] = useState(false)
   const pollTimer = useRef<number | null>(null)
 
   const [statusModal, setStatusModal] = useState<{
@@ -58,7 +59,7 @@ const GitHubSyncSettings: React.FC = () => {
     setAuthenticated(data.authenticated)
     setUser(data.user || data.device.user || null)
     setDevice(data.device)
-    setUsingDefaultClientId(data.usingDefaultClientId)
+    setHasOverride(!!data.hasCustomClientId)
   }, [])
 
   const fetchStatus = useCallback(async () => {
@@ -153,6 +154,51 @@ const GitHubSyncSettings: React.FC = () => {
     }
   }
 
+  const handleSaveOverride = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/auth/github/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: customClientId }),
+      })
+      if (!res.ok) throw new Error('save failed')
+      setCustomClientId('')
+      await fetchStatus()
+      setStatusModal({
+        show: true,
+        message: 'Custom GitHub auth saved.',
+        type: 'success',
+      })
+    } catch {
+      setStatusModal({ show: true, message: 'Failed to save override.', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClearOverride = async () => {
+    setSaving(true)
+    try {
+      await fetch('/api/auth/github/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: '' }),
+      })
+      setCustomClientId('')
+      await fetchStatus()
+      setStatusModal({
+        show: true,
+        message: 'Custom auth cleared. Using dango defaults.',
+        type: 'success',
+      })
+    } catch {
+      setStatusModal({ show: true, message: 'Failed to clear override.', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
   }
@@ -180,12 +226,6 @@ const GitHubSyncSettings: React.FC = () => {
               ? 'Waiting for GitHub...'
               : 'Sign in with GitHub'}
           </Button>
-          {usingDefaultClientId && (
-            <p className={styles.warning}>
-              Using the bundled dango GitHub OAuth app. Set GITHUB_CLIENT_ID in the server
-              environment to use your own OAuth app instead.
-            </p>
-          )}
         </div>
       )}
 
@@ -213,6 +253,29 @@ const GitHubSyncSettings: React.FC = () => {
       )}
 
       {device.status === 'error' && <p className={styles.warning}>{device.error}</p>}
+
+      <details style={{ marginTop: '1rem', fontSize: 'var(--font-size-sm)' }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
+          Advanced: use your own auth {hasOverride ? '(override active)' : ''}
+        </summary>
+        <div className={styles.formGroup} style={{ marginTop: '0.75rem' }}>
+          <label className={styles.label}>Client ID (optional)</label>
+          <input
+            className={styles.input}
+            value={customClientId}
+            onChange={(e) => setCustomClientId(e.currentTarget.value)}
+            placeholder="Your GitHub OAuth app ID"
+          />
+        </div>
+        <div className={styles.actions}>
+          <Button onClick={handleSaveOverride} disabled={saving}>
+            Save override
+          </Button>
+          <Button variant="secondary" onClick={handleClearOverride} disabled={saving}>
+            Use dango defaults
+          </Button>
+        </div>
+      </details>
 
       <StatusModal
         show={statusModal.show}

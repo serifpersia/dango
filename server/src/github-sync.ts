@@ -8,7 +8,6 @@ const log = logger.child({ module: 'GitHubSync' })
 
 const REPO_NAME = 'dango-sync-data'
 const LEGACY_REPO_NAME = 'aniweb-sync-data'
-const DEFAULT_CLIENT_ID = 'Ov23liT1ZtPk7XtN9PZk'
 const GITHUB_SCOPES = ['repo', 'delete_repo']
 const GITHUB_API_HEADERS = {
   accept: 'application/vnd.github+json',
@@ -104,7 +103,11 @@ type OctokitInstance = {
 }
 
 function getGitHubClientId() {
-  return process.env.GITHUB_CLIENT_ID || DEFAULT_CLIENT_ID
+  const id = process.env.GITHUB_CLIENT_ID || ''
+  if (!id) {
+    throw new Error('GITHUB_CLIENT_ID is not configured')
+  }
+  return id
 }
 
 function getSyncFilename() {

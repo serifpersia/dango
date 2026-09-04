@@ -18,6 +18,8 @@ export function createAuthRouter(
   router.post('/github/start', controller.startGitHubDeviceAuth)
   router.get('/github/poll', controller.pollGitHubDeviceAuth)
   router.post('/github/logout', controller.logoutGitHub)
+  router.get('/github/auth', controller.getGitHubAuthOverride)
+  router.post('/github/auth', controller.updateGitHubAuthSettings)
   router.get('/settings/rclone', controller.getRcloneSettings)
   router.post('/settings/rclone', controller.updateRcloneSettings)
   router.get('/settings/sync', controller.getSyncSettings)

@@ -22,7 +22,6 @@ import { AnidbProvider } from './providers/anidb.provider'
 import { HtProvider } from './providers/ht.provider'
 import { JasmrProvider } from './providers/jasmr.provider'
 import { OpProvider } from './providers/op.provider'
-import { googleDriveService } from './google'
 import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
 import {
@@ -116,20 +115,6 @@ async function runSyncSequence(
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
   await initSyncProvider(preferredProvider)
-
-  if (getActiveProvider() === 'google' && googleDriveService.isAuthenticated()) {
-    const legacyFolder = CONFIG.IS_DEV ? 'aniweb_dev_db' : 'aniweb_db'
-    try {
-      await googleDriveService.migrateFromAniWebDb(
-        legacyFolder,
-        remoteFolder,
-        dbName,
-        CONFIG.MANIFEST_FILENAME
-      )
-    } catch (err) {
-      logger.error({ err }, 'Google Drive migration from ani-web failed')
-    }
-  }
 
   if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
     try {

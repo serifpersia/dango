@@ -6,6 +6,8 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { pipeline } from 'stream/promises'
 import logger from './logger'
 import { CONFIG } from './config'
+import { DatabaseWrapper } from './db'
+import { dbAll } from './utils/db-utils'
 
 type GoogleTokenSet = {
   access_token?: string
@@ -37,10 +39,16 @@ export class GoogleDriveService {
   private folderIdCache: Map<string, string> = new Map()
 
   constructor() {
-    if (!CONFIG.GOOGLE_CLIENT_ID) {
-      logger.error('GOOGLE_CLIENT_ID is missing from .env!')
+    // Client ID/secret now live in Cloudflare Worker (GOOGLE_AUTH_WORKER_URL).
+    // Legacy user-owned .env credentials are optional fallback only.
+    if (!CONFIG.GOOGLE_AUTH_WORKER_URL && !CONFIG.GOOGLE_CLIENT_ID) {
+      logger.error('GOOGLE_AUTH_WORKER_URL is missing and no GOOGLE_CLIENT_ID fallback!')
     }
     this.loadTokens()
+  }
+
+  private useWorker(): boolean {
+    return !!CONFIG.GOOGLE_AUTH_WORKER_URL
   }
 
   private loadTokens() {
@@ -68,13 +76,32 @@ export class GoogleDriveService {
   }
 
   private getGoogleClientConfig() {
-    if (!CONFIG.GOOGLE_CLIENT_ID || !CONFIG.GOOGLE_CLIENT_SECRET) {
-      throw new Error('Google OAuth credentials are not configured')
-    }
-
+    // Legacy fallback only. Preferred path is Worker (no secret in dango).
     return {
-      clientId: CONFIG.GOOGLE_CLIENT_ID,
-      clientSecret: CONFIG.GOOGLE_CLIENT_SECRET,
+      clientId: CONFIG.GOOGLE_CLIENT_ID || '',
+      clientSecret: CONFIG.GOOGLE_CLIENT_SECRET || '',
+    }
+  }
+
+  private async refreshViaWorker(): Promise<boolean> {
+    if (!this.tokens.refresh_token) return false
+    try {
+      const { data } = await googleAxios.post<GoogleTokenSet>(
+        `${CONFIG.GOOGLE_AUTH_WORKER_URL}/refresh`,
+        { refresh_token: this.tokens.refresh_token },
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+      this.saveTokens(data)
+      return true
+    } catch (error) {
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 400 || error.response?.status === 401)
+      ) {
+        logger.warn('Worker refresh failed. Token may be revoked. Logging out.')
+        await this.logout()
+      }
+      throw error
     }
   }
 
@@ -83,7 +110,16 @@ export class GoogleDriveService {
       throw new Error('Missing refresh token')
     }
 
+    // Preferred: secret stays in Worker
+    if (this.useWorker()) {
+      await this.refreshViaWorker()
+      return
+    }
+
     const { clientId, clientSecret } = this.getGoogleClientConfig()
+    if (!clientId || !clientSecret) {
+      throw new Error('Google OAuth credentials are not configured')
+    }
     const params = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
@@ -147,8 +183,22 @@ export class GoogleDriveService {
     return !!this.tokens.refresh_token
   }
 
-  public getAuthUrl(): string {
+  public async getAuthUrl(): Promise<string> {
+    // Preferred: Worker builds URL with bundled client_id, no secret needed here
+    if (this.useWorker()) {
+      try {
+        const { data } = await googleAxios.get<{ url: string }>(
+          `${CONFIG.GOOGLE_AUTH_WORKER_URL}/auth-url`,
+          { params: { redirect_uri: CONFIG.GOOGLE_REDIRECT_URI } }
+        )
+        if (data?.url) return data.url
+      } catch (error) {
+        logger.error({ err: error }, 'Worker /auth-url failed, falling back to local')
+      }
+    }
+
     const { clientId } = this.getGoogleClientConfig()
+    if (!clientId) throw new Error('Google OAuth credentials are not configured')
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
     url.searchParams.set('client_id', clientId)
     url.searchParams.set('redirect_uri', CONFIG.GOOGLE_REDIRECT_URI)
@@ -160,6 +210,23 @@ export class GoogleDriveService {
   }
 
   public async handleCallback(code: string) {
+    // Preferred: Worker exchanges code with secret, dango never sees secret
+    if (this.useWorker()) {
+      try {
+        const { data } = await googleAxios.post<GoogleTokenSet>(
+          `${CONFIG.GOOGLE_AUTH_WORKER_URL}/exchange`,
+          { code, redirect_uri: CONFIG.GOOGLE_REDIRECT_URI },
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+        this.saveTokens(data)
+        return this.tokens
+      } catch (error) {
+        logger.error({ err: error }, 'Worker /exchange failed')
+        throw error
+      }
+    }
+
+    // Legacy fallback: user-owned client_id/secret in .env
     const { clientId, clientSecret } = this.getGoogleClientConfig()
     const params = new URLSearchParams({
       code,
@@ -282,63 +349,6 @@ export class GoogleDriveService {
     }
   }
 
-  public async migrateFromAniWebDb(
-    oldFolderName: string,
-    newFolderName: string,
-    dbName: string,
-    manifestFilename: string
-  ): Promise<void> {
-    if (!this.isAuthenticated()) return
-
-    const oldFolder = await this.findFile(
-      oldFolderName,
-      undefined,
-      'application/vnd.google-apps.folder'
-    )
-    if (!oldFolder) {
-      logger.info(`No legacy '${oldFolderName}' folder found on Google Drive. Skipping migration.`)
-      return
-    }
-
-    logger.info(`Found legacy '${oldFolderName}' folder. Migrating to '${newFolderName}'...`)
-
-    const newFolderId = await this.ensureFolder(newFolderName)
-    const oldFolderId = oldFolder.id
-
-    const oldFiles = await this.listFiles(oldFolderId)
-    if (oldFiles.length === 0) {
-      logger.info(`Legacy folder '${oldFolderName}' is empty. Deleting.`)
-      await this.deleteFile(oldFolderId)
-      return
-    }
-
-    for (const file of oldFiles) {
-      const tempPath = path.join(CONFIG.ROOT, `temp_migration_${file.name}`)
-      try {
-        await this.downloadFile(file.id, tempPath)
-        const existing = await this.findFile(file.name, newFolderId)
-        await this.uploadFile(
-          tempPath,
-          file.name,
-          file.name.endsWith('.json') ? 'application/json' : 'application/x-sqlite3',
-          newFolderId,
-          existing?.id
-        )
-        logger.info(`Migrated '${file.name}' from '${oldFolderName}' to '${newFolderName}'.`)
-      } catch (err) {
-        logger.error({ err, file: file.name }, `Failed to migrate file '${file.name}'.`)
-      } finally {
-        if (fs.existsSync(tempPath)) {
-          fs.unlinkSync(tempPath)
-        }
-      }
-    }
-
-    await this.deleteFile(oldFolderId)
-    logger.info(`Migration complete. Deleted legacy '${oldFolderName}' folder.`)
-    this.folderIdCache.delete(oldFolderName)
-  }
-
   public async findFile(
     filename: string,
     parentId?: string,
@@ -453,6 +463,171 @@ export class GoogleDriveService {
       logger.error({ err: error }, `Failed to upload file ${filename}`)
       throw error
     }
+  }
+
+  // ---- New JSON sync (same payload as GitHub, stored in hidden appDataFolder) ----
+  private getSyncFilename(): string {
+    return (CONFIG as { GOOGLE_SYNC_FILENAME?: string }).GOOGLE_SYNC_FILENAME || 'sync.json'
+  }
+
+  private async findFileInAppData(filename: string): Promise<GoogleDriveFile | null> {
+    if (!this.isAuthenticated()) return null
+    const safeName = filename.replace(/'/g, "\\'")
+    try {
+      const res = await this.googleRequest<{ files?: GoogleDriveFile[] }>({
+        method: 'GET',
+        url: 'https://www.googleapis.com/drive/v3/files',
+        params: {
+          q: `name = '${safeName}' and trashed = false`,
+          fields: 'files(id, name)',
+          spaces: 'appDataFolder',
+          orderBy: 'createdTime desc',
+        },
+      })
+      if (res.data.files && res.data.files.length > 0) {
+        return { id: res.data.files[0].id!, name: res.data.files[0].name! }
+      }
+      return null
+    } catch (error) {
+      logger.error({ err: error }, `Error searching appDataFolder for ${filename}`)
+      throw error
+    }
+  }
+
+  private async downloadJson(fileId: string): Promise<unknown> {
+    const res = await this.googleRequest<string>({
+      method: 'GET',
+      url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+      params: { alt: 'media' },
+      responseType: 'text',
+    })
+    return typeof res.data === 'string' ? JSON.parse(res.data) : res.data
+  }
+
+  private async uploadJson(filename: string, payload: unknown, existingId?: string) {
+    const content = JSON.stringify(payload, null, 2)
+    if (existingId) {
+      await this.googleRequest({
+        method: 'PATCH',
+        url: `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existingId)}`,
+        params: { uploadType: 'media' },
+        data: content,
+        headers: { 'Content-Type': 'application/json' },
+      })
+      return
+    }
+    const created = await this.googleRequest<{ id: string }>({
+      method: 'POST',
+      url: 'https://www.googleapis.com/drive/v3/files',
+      params: { fields: 'id' },
+      data: { name: filename, parents: ['appDataFolder'] },
+      headers: { 'Content-Type': 'application/json' },
+    })
+    await this.googleRequest({
+      method: 'PATCH',
+      url: `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(created.data.id)}`,
+      params: { uploadType: 'media' },
+      data: content,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async getRemoteVersion(): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getSyncFilename())
+    if (!file) return 0
+    try {
+      const payload = (await this.downloadJson(file.id)) as {
+        version?: number
+        tables?: { sync_metadata?: Array<{ key: string; value: number | string }> }
+      }
+      const row = payload?.tables?.sync_metadata?.find((r) => r.key === 'db_version')
+      const v = row?.value
+      return typeof v === 'number' ? v : Number(v || payload?.version || 0)
+    } catch {
+      return 0
+    }
+  }
+
+  async syncUp(db: DatabaseWrapper): Promise<void> {
+    if (!this.isAuthenticated()) return
+    const payload = await this.exportDatabase(db)
+    const existing = await this.findFileInAppData(this.getSyncFilename())
+    await this.uploadJson(this.getSyncFilename(), payload, existing?.id)
+  }
+
+  async syncDown(db: DatabaseWrapper): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getSyncFilename())
+    if (!file) return 0
+    const payload = (await this.downloadJson(file.id)) as {
+      version: number
+      exportedAt: string
+      tables: Record<string, Array<Record<string, string | number | null>>>
+    }
+    this.importDatabase(db, payload as never)
+    const row = (payload.tables?.sync_metadata as Array<{ key: string; value: number }> | undefined)?.find(
+      (r) => r.key === 'db_version'
+    )
+    return Number(row?.value || payload.version || 0)
+  }
+
+  private async exportDatabase(db: DatabaseWrapper) {
+    const tables = [
+      'watchlist',
+      'watched_episodes',
+      'queue',
+      'settings',
+      'shows_meta',
+      'sync_metadata',
+      'dismissed_notifications',
+      'discovered_notifications',
+    ] as const
+    const out = {} as Record<(typeof tables)[number], unknown[]>
+    for (const table of tables) {
+      out[table] = dbAll(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
+    }
+    const versionRow = (out.sync_metadata as Array<{ key: string; value: number }>).find(
+      (r) => r.key === 'db_version'
+    )
+    return {
+      version: Number(versionRow?.value || 0),
+      exportedAt: new Date().toISOString(),
+      tables: out,
+    }
+  }
+
+  private importDatabase(
+    db: DatabaseWrapper,
+    payload: {
+      tables: Record<string, Array<Record<string, string | number | null>>>
+    }
+  ) {
+    const tables = [
+      'watchlist',
+      'watched_episodes',
+      'queue',
+      'settings',
+      'shows_meta',
+      'sync_metadata',
+      'dismissed_notifications',
+      'discovered_notifications',
+    ] as const
+    db.serialize(() => {
+      for (const table of tables) {
+        db.run(`DELETE FROM "${table}"`)
+      }
+      for (const table of tables) {
+        for (const row of payload.tables[table] || []) {
+          const columns = Object.keys(row)
+          if (columns.length === 0) continue
+          const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
+          const placeholders = columns.map(() => '?').join(', ')
+          const values = columns.map((c) => row[c])
+          db.run(`INSERT INTO "${table}" (${columnSql}) VALUES (${placeholders})`, values)
+        }
+      }
+    })
   }
 }
 

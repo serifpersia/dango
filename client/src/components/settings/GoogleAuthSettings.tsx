@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../common/Button'
-import { FaEye, FaEyeSlash } from 'react-icons/fa'
 import StatusModal from '../common/StatusModal'
 import styles from './GoogleAuthSettings.module.css'
 
@@ -10,24 +9,19 @@ interface User {
 }
 
 const GoogleAuthSettings: React.FC = () => {
-  const [clientId, setClientId] = useState('')
-  const [clientSecret, setClientSecret] = useState('')
-  const [showClientId, setShowClientId] = useState(false)
-  const [showClientSecret, setShowClientSecret] = useState(false)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
-  const [authUrl, setAuthUrl] = useState('')
   const [hasAuthConfig, setHasAuthConfig] = useState(false)
-  const [hasStoredClientSecret, setHasStoredClientSecret] = useState(false)
+  const [hasOverride, setHasOverride] = useState(false)
+  const [workerUrl, setWorkerUrl] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const [statusModal, setStatusModal] = useState<{
     show: boolean
     message: string
     type: 'success' | 'error' | 'info'
-    showConfirmButton?: boolean
-    onConfirm?: () => void
-    confirmButtonText?: string
-    cancelButtonText?: string
   }>({
     show: false,
     message: '',
@@ -38,27 +32,24 @@ const GoogleAuthSettings: React.FC = () => {
     try {
       const res = await fetch('/api/auth/user')
       const userData = await res.json()
-      setUser(userData)
+      setUser(userData?.email ? userData : null)
     } catch {
       setUser(null)
     }
   }
 
-  const fetchAuthUrl = async () => {
+  const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/auth/google')
-      const data = await res.json()
-      setAuthUrl(data.url)
-    } catch (error) {
-      console.error('Failed to fetch auth URL', error)
-    }
-  }
-
-  const fetchConfigStatus = async () => {
-    try {
-      const res = await fetch('/api/auth/config-status')
-      const data = await res.json()
-      setHasAuthConfig(data.hasConfig)
+      const [configRes, authRes] = await Promise.all([
+        fetch('/api/auth/config-status'),
+        fetch('/api/auth/google-auth'),
+      ])
+      const config = await configRes.json()
+      const auth = await authRes.json()
+      setHasAuthConfig(!!config.hasConfig)
+      setHasOverride(
+        !!(auth.hasCustomWorkerUrl || auth.hasCustomClientId || auth.hasClientSecret)
+      )
     } catch (error) {
       console.error('Failed to fetch config status', error)
     }
@@ -67,21 +58,7 @@ const GoogleAuthSettings: React.FC = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true)
-      await Promise.all([
-        fetchUser(),
-        fetchConfigStatus(),
-        fetch('/api/auth/google-auth')
-          .then((res) => res.json())
-          .then((data) => {
-            setClientId(data.clientId || '')
-            setClientSecret('')
-            setHasStoredClientSecret(!!data.hasClientSecret)
-            if (data.clientId) {
-              fetchAuthUrl()
-            }
-          })
-          .catch((err) => console.error('Failed to fetch auth config', err)),
-      ])
+      await Promise.all([fetchUser(), fetchStatus()])
       setLoading(false)
     }
 
@@ -97,104 +74,6 @@ const GoogleAuthSettings: React.FC = () => {
     window.addEventListener('message', handleAuthMessage)
     return () => window.removeEventListener('message', handleAuthMessage)
   }, [])
-
-  const handleSave = async () => {
-    if (!clientId && !clientSecret && !hasStoredClientSecret) {
-      setStatusModal({
-        show: true,
-        message: 'Please enter a Client ID and Client Secret to save.',
-        type: 'info',
-      })
-      return
-    }
-    try {
-      const body: { clientId: string; clientSecret?: string } = { clientId }
-      if (clientSecret) {
-        body.clientSecret = clientSecret
-      }
-
-      const res = await fetch('/api/auth/google-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (res.ok) {
-        if (clientSecret) {
-          setHasStoredClientSecret(true)
-          setClientSecret('')
-        }
-        setStatusModal({
-          show: true,
-          message:
-            'Configuration saved successfully. You must restart the server for these changes to take effect.',
-          type: 'success',
-        })
-        fetchConfigStatus()
-        if (clientId) fetchAuthUrl()
-      } else {
-        const data = await res.json().catch(() => ({}))
-        setStatusModal({
-          show: true,
-          message: data.error || 'Failed to save configuration.',
-          type: 'error',
-        })
-      }
-    } catch (error) {
-      setStatusModal({
-        show: true,
-        message: 'Failed to save configuration.',
-        type: 'error',
-      })
-    }
-  }
-
-  const handleClear = () => {
-    setStatusModal({
-      show: true,
-      message:
-        'Are you sure you want to clear your Google authentication configuration? This will sign you out and remove all stored credentials.',
-      type: 'info',
-      showConfirmButton: true,
-      onConfirm: () => {
-        setStatusModal({ show: false, message: '', type: 'info' })
-        clearConfig()
-      },
-      confirmButtonText: 'Clear',
-      cancelButtonText: 'Cancel',
-    })
-  }
-
-  const clearConfig = async () => {
-    setClientId('')
-    setClientSecret('')
-    setHasStoredClientSecret(false)
-    try {
-      const res = await fetch('/api/auth/google-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: '', clientSecret: '' }),
-      })
-
-      if (res.ok) {
-        setStatusModal({
-          show: true,
-          message:
-            'Configuration cleared successfully. You must restart the server for these changes to take effect.',
-          type: 'success',
-        })
-        fetchConfigStatus()
-      } else {
-        throw new Error('Failed to clear')
-      }
-    } catch (error) {
-      setStatusModal({
-        show: true,
-        message: 'Failed to clear configuration.',
-        type: 'error',
-      })
-    }
-  }
 
   const handleSignIn = async () => {
     try {
@@ -240,12 +119,61 @@ const GoogleAuthSettings: React.FC = () => {
     }
   }
 
+  const handleSaveOverride = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/auth/google-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerUrl, clientId, clientSecret }),
+      })
+      if (!res.ok) throw new Error('save failed')
+      setWorkerUrl('')
+      setClientId('')
+      setClientSecret('')
+      await fetchStatus()
+      setStatusModal({
+        show: true,
+        message: 'Custom auth saved. Restart may be required.',
+        type: 'success',
+      })
+    } catch {
+      setStatusModal({ show: true, message: 'Failed to save override.', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClearOverride = async () => {
+    setSaving(true)
+    try {
+      await fetch('/api/auth/google-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerUrl: '', clientId: '', clientSecret: '' }),
+      })
+      setWorkerUrl('')
+      setClientId('')
+      setClientSecret('')
+      await fetchStatus()
+      setStatusModal({
+        show: true,
+        message: 'Custom auth cleared. Using dango defaults.',
+        type: 'success',
+      })
+    } catch {
+      setStatusModal({ show: true, message: 'Failed to clear override.', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading)
     return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
 
   return (
     <div className={styles.sectionCard}>
-      <h3 className={styles.title}>Google Authentication</h3>
+      <h3 className={styles.title}>Google Drive Sync</h3>
 
       {user ? (
         <div className={styles.userInfo}>
@@ -263,75 +191,58 @@ const GoogleAuthSettings: React.FC = () => {
             Sign in with Google
           </Button>
           {!hasAuthConfig && (
-            <p className={styles.warning}>
-              Google authentication is not configured. Please set up Client ID and Secret below.
-            </p>
+            <p className={styles.warning}>Google sync is not configured on the server.</p>
           )}
         </div>
       )}
 
-      <hr className={styles.hr} />
-
-      <div className={styles.formGroup}>
-        <label className={styles.label}>Client ID</label>
-        <div className={styles.inputWrapper}>
+      <details style={{ marginTop: '1rem', fontSize: 'var(--font-size-sm)' }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>
+          Advanced: use your own auth {hasOverride ? '(override active)' : ''}
+        </summary>
+        <div className={styles.formGroup} style={{ marginTop: '0.75rem' }}>
+          <label className={styles.label}>Worker URL (optional)</label>
           <input
-            type={showClientId ? 'text' : 'password'}
+            className={styles.input}
+            value={workerUrl}
+            onChange={(e) => setWorkerUrl(e.currentTarget.value)}
+            placeholder="https://your-worker.workers.dev"
+          />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Client ID (optional)</label>
+          <input
             className={styles.input}
             value={clientId}
             onChange={(e) => setClientId(e.currentTarget.value)}
-            placeholder="Enter Google Client ID"
+            placeholder="Your Google OAuth client ID"
           />
-          <button className={styles.iconButton} onClick={() => setShowClientId(!showClientId)}>
-            {showClientId ? <FaEyeSlash /> : <FaEye />}
-          </button>
         </div>
-      </div>
-
-      <div className={styles.formGroup}>
-        <label className={styles.label}>Client Secret</label>
-        <div className={styles.inputWrapper}>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Client Secret (optional)</label>
           <input
-            type={showClientSecret ? 'text' : 'password'}
+            type="password"
             className={styles.input}
             value={clientSecret}
             onChange={(e) => setClientSecret(e.currentTarget.value)}
-            placeholder={
-              hasStoredClientSecret
-                ? 'Stored securely. Enter a new secret only to replace it.'
-                : 'Enter Google Client Secret'
-            }
+            placeholder="Your Google OAuth secret"
           />
-          <button
-            className={styles.iconButton}
-            onClick={() => setShowClientSecret(!showClientSecret)}
-          >
-            {showClientSecret ? <FaEyeSlash /> : <FaEye />}
-          </button>
         </div>
-      </div>
-      {hasStoredClientSecret && !clientSecret && (
-        <p className={styles.warning}>
-          A client secret is already stored and will be kept unless you replace or clear it.
-        </p>
-      )}
-
-      <div className={styles.actions}>
-        <Button onClick={handleSave}>Save Config</Button>
-        <Button variant="secondary" onClick={handleClear}>
-          Clear Config
-        </Button>
-      </div>
+        <div className={styles.actions}>
+          <Button onClick={handleSaveOverride} disabled={saving}>
+            Save override
+          </Button>
+          <Button variant="secondary" onClick={handleClearOverride} disabled={saving}>
+            Use dango defaults
+          </Button>
+        </div>
+      </details>
 
       <StatusModal
         show={statusModal.show}
         message={statusModal.message}
         type={statusModal.type}
         onClose={() => setStatusModal((prev) => ({ ...prev, show: false }))}
-        showConfirmButton={statusModal.showConfirmButton}
-        onConfirm={statusModal.onConfirm}
-        confirmButtonText={statusModal.confirmButtonText}
-        cancelButtonText={statusModal.cancelButtonText}
       />
     </div>
   )

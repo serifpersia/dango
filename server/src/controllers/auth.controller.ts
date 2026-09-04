@@ -24,19 +24,25 @@ export class AuthController {
   }
 
   getConfigStatus = (_req: Request, res: Response) => {
-    const hasConfig = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
-    res.json({ hasConfig })
+    // New flow: Worker holds ID+secret, no local .env needed.
+    // Legacy fallback: user-owned GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET.
+    const useWorker = !!CONFIG.GOOGLE_AUTH_WORKER_URL
+    const hasLegacyConfig =
+      !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
+    res.json({ hasConfig: useWorker || hasLegacyConfig, useWorker })
   }
 
   getGoogleAuthSettings = (_req: Request, res: Response) => {
     res.json({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      useWorker: !!CONFIG.GOOGLE_AUTH_WORKER_URL,
+      hasCustomWorkerUrl: !!process.env.GOOGLE_AUTH_WORKER_URL,
+      hasCustomClientId: !!process.env.GOOGLE_CLIENT_ID,
       hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
     })
   }
 
   updateGoogleAuthSettings = async (req: Request, res: Response) => {
-    const { clientId, clientSecret } = req.body
+    const { clientId, clientSecret, workerUrl } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
     const updates: Record<string, string> = {}
@@ -49,7 +55,37 @@ export class AuthController {
       updates.GOOGLE_CLIENT_SECRET = clientSecret
     }
 
+    if (typeof workerUrl === 'string') {
+      updates.GOOGLE_AUTH_WORKER_URL = workerUrl
+    }
+
     await updateEnvFile(updates)
+    // Refresh CONFIG-derived values that are read at import time
+    if (typeof workerUrl === 'string') {
+      ;(CONFIG as { GOOGLE_AUTH_WORKER_URL: string }).GOOGLE_AUTH_WORKER_URL = workerUrl
+    }
+    if (typeof clientId === 'string') {
+      ;(CONFIG as { GOOGLE_CLIENT_ID?: string }).GOOGLE_CLIENT_ID = clientId || undefined
+    }
+    if (typeof clientSecret === 'string') {
+      ;(CONFIG as { GOOGLE_CLIENT_SECRET?: string }).GOOGLE_CLIENT_SECRET =
+        clientSecret || undefined
+    }
+    await initSyncProvider()
+    res.json({ success: true })
+  }
+
+  getGitHubAuthOverride = (_req: Request, res: Response) => {
+    res.json({ hasCustomClientId: !!process.env.GITHUB_CLIENT_ID })
+  }
+
+  updateGitHubAuthSettings = async (req: Request, res: Response) => {
+    const { clientId } = req.body
+    const { updateEnvFile } = await import('../utils/env.utils')
+    if (typeof clientId !== 'string') {
+      return res.status(400).json({ error: 'clientId required' })
+    }
+    await updateEnvFile({ GITHUB_CLIENT_ID: clientId })
     res.json({ success: true })
   }
 
@@ -92,8 +128,7 @@ export class AuthController {
         authenticated: !!user,
         user,
         device: githubSyncService.getDeviceState(),
-        clientId: process.env.GITHUB_CLIENT_ID || '',
-        usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
+        hasCustomClientId: !!process.env.GITHUB_CLIENT_ID,
       })
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch GitHub auth status')
@@ -101,8 +136,7 @@ export class AuthController {
         authenticated: false,
         user: null,
         device: githubSyncService.getDeviceState(),
-        clientId: process.env.GITHUB_CLIENT_ID || '',
-        usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
+        hasCustomClientId: !!process.env.GITHUB_CLIENT_ID,
       })
     }
   }
@@ -137,7 +171,7 @@ export class AuthController {
   }
 
   getAuthUrl = async (_req: Request, res: Response) => {
-    const url = googleDriveService.getAuthUrl()
+    const url = await googleDriveService.getAuthUrl()
     res.json({ url })
   }
 
@@ -154,7 +188,7 @@ export class AuthController {
         await googleDriveService.logout()
       }
     }
-    const url = googleDriveService.getAuthUrl()
+    const url = await googleDriveService.getAuthUrl()
     res.json({ url, authenticated: false })
   }
 

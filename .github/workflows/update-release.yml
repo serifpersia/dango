@@ -94,6 +94,8 @@ jobs:
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GOOGLE_AUTH_WORKER_URL: ${{ secrets.GOOGLE_AUTH_WORKER_URL }}
 
       - name: Create Release Archive
         run: |
@@ -104,6 +106,8 @@ jobs:
           cp client/package.json release-package/client/
           cp server/package.json release-package/server/
           echo "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" > release-package/server/.env
+          if [ -n "${{ secrets.GITHUB_CLIENT_ID }}" ]; then echo "GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}" >> release-package/server/.env; fi
+          if [ -n "${{ secrets.GOOGLE_AUTH_WORKER_URL }}" ]; then echo "GOOGLE_AUTH_WORKER_URL=${{ secrets.GOOGLE_AUTH_WORKER_URL }}" >> release-package/server/.env; fi
           cp package.json package-lock.json release-package/
           cp LICENSE README.md release-package/
           cp orchestrator.js release-package/
@@ -142,8 +146,12 @@ jobs:
       - name: Publish to NPM
         run: |
           echo "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" > server/.env
+          if [ -n "$GITHUB_CLIENT_ID" ]; then echo "GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID" >> server/.env; fi
+          if [ -n "$GOOGLE_AUTH_WORKER_URL" ]; then echo "GOOGLE_AUTH_WORKER_URL=$GOOGLE_AUTH_WORKER_URL" >> server/.env; fi
           npm publish --access public
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GOOGLE_AUTH_WORKER_URL: ${{ secrets.GOOGLE_AUTH_WORKER_URL }}

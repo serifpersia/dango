@@ -7,9 +7,103 @@ import { rcloneService } from './rclone'
 import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
-import { dbGet } from './utils/db-utils'
+import { dbAll, dbGet } from './utils/db-utils'
 
 const log = logger.child({ module: 'Sync' })
+
+const SYNC_TABLES = [
+  'watchlist',
+  'watched_episodes',
+  'queue',
+  'settings',
+  'shows_meta',
+  'sync_metadata',
+  'dismissed_notifications',
+  'discovered_notifications',
+] as const
+
+type SyncRow = Record<string, string | number | null>
+type SyncPayload = {
+  version: number
+  exportedAt: string
+  tables: Record<(typeof SYNC_TABLES)[number], SyncRow[]>
+}
+
+function readPayloadVersion(payload: SyncPayload): number {
+  const row = payload.tables.sync_metadata.find((r) => r.key === 'db_version')
+  const v = row?.value
+  return typeof v === 'number' ? v : Number(v || payload.version || 0)
+}
+
+async function exportSyncPayload(db: DatabaseWrapper): Promise<SyncPayload> {
+  const tables = {} as Record<(typeof SYNC_TABLES)[number], SyncRow[]>
+  for (const table of SYNC_TABLES) {
+    tables[table] = dbAll<SyncRow>(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
+  }
+  return {
+    version: readPayloadVersion({ version: 0, exportedAt: '', tables }),
+    exportedAt: new Date().toISOString(),
+    tables,
+  }
+}
+
+function importSyncPayload(db: DatabaseWrapper, payload: SyncPayload) {
+  db.serialize(() => {
+    for (const table of SYNC_TABLES) {
+      db.run(`DELETE FROM "${table}"`)
+    }
+    for (const table of SYNC_TABLES) {
+      for (const row of payload.tables[table] || []) {
+        const columns = Object.keys(row)
+        if (columns.length === 0) continue
+        const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
+        const placeholders = columns.map(() => '?').join(', ')
+        const values = columns.map((c) => row[c])
+        db.run(`INSERT INTO "${table}" (${columnSql}) VALUES (${placeholders})`, values)
+      }
+    }
+  })
+}
+
+async function getRcloneRemotePayloadVersion(remoteFolder: string): Promise<number> {
+  const exists = await rcloneService.fileExists(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME)
+  if (!exists) return 0
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_sync.json`)
+  try {
+    await rcloneService.downloadFile(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME, tempPath)
+    const content = await fs.readFile(tempPath, 'utf-8')
+    const payload = JSON.parse(content) as SyncPayload
+    return readPayloadVersion(payload)
+  } catch {
+    return 0
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath)
+  }
+}
+
+async function rcloneSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
+  const payload = await exportSyncPayload(db)
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_up.json`)
+  try {
+    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
+    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.RCLONE_SYNC_FILENAME)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
+async function rcloneSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_down.json`)
+  try {
+    await rcloneService.downloadFile(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME, tempPath)
+    const content = await fs.readFile(tempPath, 'utf-8')
+    const payload = JSON.parse(content) as SyncPayload
+    importSyncPayload(db, payload)
+    return readPayloadVersion(payload)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
 
 class Mutex {
   private _locked = false
@@ -130,30 +224,11 @@ async function getRemoteManifestVersion(
       return { version: await githubSyncService.getRemoteVersion() }
     } else if (activeProvider === 'google') {
       if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      const folderId = await googleDriveService.ensureFolder(remoteFolder)
-      const file = await googleDriveService.findFile(CONFIG.MANIFEST_FILENAME, folderId)
-      if (!file) return { version: 0 }
-
-      const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_manifest.json`)
-      try {
-        await googleDriveService.downloadFile(file.id, tempPath)
-        const content = await fs.readFile(tempPath, 'utf-8')
-        return { version: JSON.parse(content).version || 0, fileId: file.id }
-      } finally {
-        if (existsSync(tempPath)) await fs.unlink(tempPath)
-      }
+      // New JSON sync in appDataFolder (same payload as GitHub, no db file)
+      return { version: await googleDriveService.getRemoteVersion() }
     } else if (activeProvider === 'rclone') {
-      const exists = await rcloneService.fileExists(remoteFolder, CONFIG.MANIFEST_FILENAME)
-      if (!exists) return { version: 0 }
-
-      const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_manifest.json`)
-      try {
-        await rcloneService.downloadFile(remoteFolder, CONFIG.MANIFEST_FILENAME, tempPath)
-        const content = await fs.readFile(tempPath, 'utf-8')
-        return { version: JSON.parse(content).version || 0 }
-      } finally {
-        if (existsSync(tempPath)) await fs.unlink(tempPath)
-      }
+      // JSON sync in remote folder (same payload as GitHub/Google, no db file)
+      return { version: await getRcloneRemotePayloadVersion(remoteFolder) }
     }
   } catch (err) {
     log.warn({ err }, 'Could not read remote manifest.')
@@ -207,11 +282,29 @@ export async function syncDownOnBoot(
         return false
       }
 
+      if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return false
+        console.log(`[SYNC_START] Importing Google sync data (Remote v${remoteVersion})`)
+        const importedVersion = await googleDriveService.syncDown(db)
+        await setLocalManifestVersion(importedVersion || remoteVersion)
+        console.log('[SYNC_END]')
+        log.info('Google sync down complete.')
+        return false
+      }
+
+      if (activeProvider === 'rclone') {
+        console.log(`[SYNC_START] Importing Rclone sync data (Remote v${remoteVersion})`)
+        const importedVersion = await rcloneSyncDown(db, remoteFolderName)
+        await setLocalManifestVersion(importedVersion || remoteVersion)
+        console.log('[SYNC_END]')
+        log.info('Rclone sync down complete.')
+        return false
+      }
+
       console.log(`[SYNC_START] Downloading remote database (Remote v${remoteVersion})`)
       await closeMainDb()
 
       const backupPath = `${dbPath}.bak`
-      const dbName = path.basename(dbPath)
 
       try {
         if (existsSync(dbPath)) {
@@ -229,26 +322,7 @@ export async function syncDownOnBoot(
           void e
         }
 
-        if (activeProvider === 'google') {
-          if (!googleDriveService.isAuthenticated()) return true
-          const folderId = await googleDriveService.ensureFolder(remoteFolderName)
-          const remoteDb = await googleDriveService.findFile(dbName, folderId)
-          const remoteManifest = await googleDriveService.findFile(
-            CONFIG.MANIFEST_FILENAME,
-            folderId
-          )
-
-          if (remoteDb) await googleDriveService.downloadFile(remoteDb.id, dbPath)
-          if (remoteManifest)
-            await googleDriveService.downloadFile(remoteManifest.id, CONFIG.LOCAL_MANIFEST_PATH)
-        } else if (activeProvider === 'rclone') {
-          await rcloneService.downloadFile(remoteFolderName, dbName, dbPath)
-          await rcloneService.downloadFile(
-            remoteFolderName,
-            CONFIG.MANIFEST_FILENAME,
-            CONFIG.LOCAL_MANIFEST_PATH
-          )
-        }
+        log.warn('Legacy raw-db sync path reached with JSON providers. No action taken.')
 
         if (existsSync(backupPath)) {
           await fs.unlink(backupPath)
@@ -305,50 +379,17 @@ export async function syncUp(
     const localVersion = await getLocalManifestVersion()
     console.log(`[SYNC_START] Syncing up (Local v${localVersion})`)
 
-    const { version: remoteVersion, fileId: manifestId } =
-      await getRemoteManifestVersion(remoteFolderName)
+    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
 
     if (localVersion > remoteVersion) {
-      const dbName = path.basename(dbPath)
-      const syncDbPath = `${dbPath}.sync.db`
-      try {
-        if (activeProvider === 'github') {
-          if (!githubSyncService.isAuthenticated()) return
-          await githubSyncService.syncUp(db)
-        } else {
-          db.backup(syncDbPath)
-        }
-
-        if (activeProvider === 'google') {
-          if (!googleDriveService.isAuthenticated()) return
-          const folderId = await googleDriveService.ensureFolder(remoteFolderName)
-          const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
-
-          await googleDriveService.uploadFile(
-            syncDbPath,
-            dbName,
-            'application/x-sqlite3',
-            folderId,
-            remoteDbFile?.id
-          )
-
-          await googleDriveService.uploadFile(
-            CONFIG.LOCAL_MANIFEST_PATH,
-            CONFIG.MANIFEST_FILENAME,
-            'application/json',
-            folderId,
-            manifestId
-          )
-        } else if (activeProvider === 'rclone') {
-          await rcloneService.uploadFile(syncDbPath, remoteFolderName, dbName)
-          await rcloneService.uploadFile(
-            CONFIG.LOCAL_MANIFEST_PATH,
-            remoteFolderName,
-            CONFIG.MANIFEST_FILENAME
-          )
-        }
-      } finally {
-        if (existsSync(syncDbPath)) await fs.unlink(syncDbPath).catch(() => {})
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        await githubSyncService.syncUp(db)
+      } else if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        await googleDriveService.syncUp(db)
+      } else if (activeProvider === 'rclone') {
+        await rcloneSyncUp(db, remoteFolderName)
       }
 
       console.log('[SYNC_END]')
