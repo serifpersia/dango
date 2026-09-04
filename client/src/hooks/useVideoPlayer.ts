@@ -75,12 +75,23 @@ const useVideoPlayer = ({
   )
   const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null)
   const [showCCMenu, setShowCCMenu] = useState(false)
-  const [subtitleFontSize, setSubtitleFontSize] = useState(
-    parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
-  )
-  const [subtitlePosition, setSubtitlePosition] = useState(
-    parseInt(localStorage.getItem('subtitlePosition') || '-4')
-  )
+  const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
+    try {
+      const parsed = parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
+      return isNaN(parsed) ? 1.8 : parsed
+    } catch {
+      return 1.8
+    }
+  })
+  const [subtitlePosition, setSubtitlePosition] = useState(() => {
+    try {
+      const parsed = parseInt(localStorage.getItem('subtitlePosition') || '0')
+      if (isNaN(parsed)) return 0
+      return Math.max(0, Math.min(100, parsed))
+    } catch {
+      return 0
+    }
+  })
   const [availableSubtitles, setAvailableSubtitles] = useState<SubtitleTrack[]>([])
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)

@@ -143,36 +143,54 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
 
     const video = videoRef.current
     if (video) {
-      let activeTrack: TextTrack | null = null
+      const getLift = () => {
+        const raw = Number(subtitlePosition)
+        return isNaN(raw) ? 0 : Math.max(0, Math.min(100, raw))
+      }
 
       const updateCuePosition = () => {
-        activeTrack = Array.from(video.textTracks).find((t) => t.mode === 'showing') || null
-        if (activeTrack && activeTrack.cues) {
-          Array.from(activeTrack.cues).forEach((cue: unknown) => {
+        const pos = Math.max(0, Math.min(100, 100 - getLift()))
+        Array.from(video.textTracks).forEach((track) => {
+          if (!track.cues) return
+          Array.from(track.cues).forEach((cue: unknown) => {
             try {
               const vttCue = cue as { snapToLines?: boolean; line?: number }
               vttCue.snapToLines = false
-              const pos = Math.max(0, Math.min(100, 100 - subtitlePosition))
               vttCue.line = pos
             } catch {
               // ignore
             }
           })
-        }
+        })
       }
 
       updateCuePosition()
-      const handleCueChange = () => updateCuePosition()
-      activeTrack?.addEventListener('cuechange', handleCueChange)
+      const handleCueChange = () => {
+        updateCuePosition()
+      }
+      const handleAddTrack = () => {
+        Array.from(video.textTracks).forEach((t) => {
+          t.removeEventListener('cuechange', handleCueChange)
+          t.addEventListener('cuechange', handleCueChange)
+        })
+        updateCuePosition()
+      }
+      Array.from(video.textTracks).forEach((t) => {
+        t.addEventListener('cuechange', handleCueChange)
+      })
+      video.textTracks.addEventListener('addtrack', handleAddTrack)
+      const trackElements = Array.from(video.querySelectorAll('track'))
+      const handleTrackLoad = () => updateCuePosition()
+      trackElements.forEach((el) => el.addEventListener('load', handleTrackLoad))
       return () => {
-        const tag = document.getElementById(styleId)
-        if (tag) tag.remove()
-        if (activeTrack) {
-          activeTrack.removeEventListener('cuechange', handleCueChange)
-        }
+        Array.from(video.textTracks).forEach((t) => {
+          t.removeEventListener('cuechange', handleCueChange)
+        })
+        video.textTracks.removeEventListener('addtrack', handleAddTrack)
+        trackElements.forEach((el) => el.removeEventListener('load', handleTrackLoad))
       }
     }
-  }, [subtitleFontSize, subtitlePosition, selectedSubtitle, videoRef])
+  }, [subtitleFontSize, subtitlePosition, selectedSubtitle, subtitles, videoRef])
 
   // Show controls and reset the hide timer on user activity — mirrors the
   // anime player (touch-aware, cursor management, interaction throttling).

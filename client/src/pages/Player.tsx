@@ -832,9 +832,10 @@ const Player: React.FC = () => {
     }
     let matched = false
     Array.from(video.textTracks).forEach((t) => {
-      const isActive = t.language === active || t.label === active
-      t.mode = isActive ? 'showing' : 'hidden'
-      if (isActive) matched = true
+      const isMatch = t.language === active || t.label === active
+      const shouldShow = isMatch && !matched
+      t.mode = shouldShow ? 'showing' : 'hidden'
+      if (shouldShow) matched = true
     })
     if (!matched && video.textTracks.length > 0) {
       const fallback =
@@ -867,46 +868,75 @@ const Player: React.FC = () => {
     const video = refs.videoRef.current
     if (!video) return
 
-    const updateCuePosition = () => {
-      const activeTrack = Array.from(video.textTracks).find((t) => t.mode === 'showing')
-      if (activeTrack && activeTrack.cues) {
-        Array.from(activeTrack.cues).forEach((cue: unknown) => {
-          try {
-            const vttCue = cue as { snapToLines?: boolean; line?: number }
-            vttCue.snapToLines = false
-            const pos = Math.max(0, Math.min(100, 100 - player.state.subtitlePosition))
-            vttCue.line = pos
-          } catch (e) {
-            // Ignore error
-          }
-        })
-      }
+    const getPos = () => {
+      const raw = Number(player.state.subtitlePosition)
+      const lift = isNaN(raw) ? 0 : Math.max(0, Math.min(100, raw))
+      return Math.max(0, Math.min(100, 100 - lift))
     }
 
-    updateCuePosition()
-
-    const handleCueChange = () => {
-      updateCuePosition()
+    const applyToTrack = (track: TextTrack) => {
+      if (!track.cues) return
+      const pos = getPos()
+      Array.from(track.cues).forEach((cue: unknown) => {
+        try {
+          const vttCue = cue as { snapToLines?: boolean; line?: number }
+          vttCue.snapToLines = false
+          vttCue.line = pos
+        } catch (e) {
+          // Ignore error
+        }
+      })
     }
 
-    const activeTrack = Array.from(video.textTracks).find((t) => t.mode === 'showing')
-    if (activeTrack) {
-      activeTrack.addEventListener('cuechange', handleCueChange)
+    const applyToAllTracks = () => {
+      Array.from(video.textTracks).forEach(applyToTrack)
     }
+
+    applyToAllTracks()
+
+    const handleCueChange = (e: Event) => {
+      applyToTrack(e.target as TextTrack)
+    }
+
+    Array.from(video.textTracks).forEach((t) => {
+      t.addEventListener('cuechange', handleCueChange)
+    })
+
+    const handleAddTrack = () => {
+      Array.from(video.textTracks).forEach((t) => {
+        t.removeEventListener('cuechange', handleCueChange)
+        t.addEventListener('cuechange', handleCueChange)
+      })
+      applyToAllTracks()
+    }
+    video.textTracks.addEventListener('addtrack', handleAddTrack)
+    video.textTracks.addEventListener('removetrack', handleAddTrack)
+
+    const trackElements = Array.from(video.querySelectorAll('track'))
+    const handleTrackLoad = () => {
+      applyToAllTracks()
+    }
+    trackElements.forEach((el) => {
+      el.addEventListener('load', handleTrackLoad)
+    })
 
     return () => {
-      if (activeTrack) {
-        activeTrack.removeEventListener('cuechange', handleCueChange)
-      }
-      const tag = document.getElementById(styleId)
-      if (tag) {
-        tag.remove()
-      }
+      Array.from(video.textTracks).forEach((t) => {
+        t.removeEventListener('cuechange', handleCueChange)
+      })
+      video.textTracks.removeEventListener('addtrack', handleAddTrack)
+      video.textTracks.removeEventListener('removetrack', handleAddTrack)
+      trackElements.forEach((el) => {
+        el.removeEventListener('load', handleTrackLoad)
+      })
     }
   }, [
     player.state.subtitleFontSize,
     player.state.subtitlePosition,
     player.state.activeSubtitleTrack,
+    player.state.availableSubtitles,
+    state.selectedSource,
+    state.selectedLink,
     refs.videoRef,
   ])
 
