@@ -179,13 +179,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!refs.videoRef.current) return
     actions.setActiveSubtitleTrack(trackId)
+    let matched = false
     Array.from(refs.videoRef.current.textTracks).forEach((track) => {
-      track.mode =
+      const isMatch =
         trackId !== null &&
         trackId !== 'off' &&
         (track.language === trackId || track.label === trackId)
-          ? 'showing'
-          : 'hidden'
+      const shouldShow = isMatch && !matched
+      track.mode = shouldShow ? 'showing' : 'hidden'
+      if (shouldShow) matched = true
     })
   }
 

@@ -144,7 +144,7 @@ class DiscordGatewayService {
     const state = data.stateLine
       ? data.stateLine
       : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`
-    const type = data.providerName === 'ASMR' ? 2 : 3
+    const type = data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3
 
     const imageUrl = this.resolveImageUrl(data)
     let assets:
@@ -237,6 +237,7 @@ class DiscordGatewayService {
       trackers: { details: 'Trackers', state: 'Syncing watchlists' },
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
+      radio: { details: 'Radio', state: 'Browsing radio stations' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },
     }
 
@@ -251,7 +252,7 @@ class DiscordGatewayService {
             activities: [
               {
                 name: 'dango',
-                type: page === 'asmr' ? 2 : 3,
+                type: page === 'asmr' || page === 'radio' ? 2 : 3,
                 state: label.state,
                 details: label.details,
                 ...(CONFIG.DISCORD_CLIENT_ID ? { application_id: CONFIG.DISCORD_CLIENT_ID } : {}),

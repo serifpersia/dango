@@ -825,6 +825,12 @@
     background: var(--accent);
     color: var(--text-primary);
   }
+
+  .playBtn:hover:not(:disabled) {
+    background: var(--accent-light);
+    color: var(--text-primary);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
 }
 
 .playerBtn:active:not(:disabled) {

@@ -351,7 +351,7 @@ class DiscordRPCService {
           largeImageText: data.title,
           smallImageKey: 'logo',
           smallImageText: 'dango',
-          type: data.providerName === 'ASMR' ? 2 : 3,
+          type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
           statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
             {
@@ -387,7 +387,7 @@ class DiscordRPCService {
         largeImageText: data.title,
         smallImageKey: 'logo',
         smallImageText: 'dango',
-        type: data.providerName === 'ASMR' ? 2 : 3,
+        type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
@@ -435,6 +435,7 @@ class DiscordRPCService {
       mal: { details: 'MAL Sync', state: 'Syncing with MyAnimeList' },
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
+      radio: { details: 'Radio', state: 'Browsing radio stations' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },
     }
 
@@ -450,7 +451,7 @@ class DiscordRPCService {
         state: label.state,
         largeImageKey: 'logo',
         largeImageText: 'dango',
-        type: page === 'asmr' ? 2 : 3,
+        type: page === 'asmr' || page === 'radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
