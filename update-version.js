@@ -42,6 +42,15 @@ function updateFile(filePath) {
       updated = true
     }
 
+    if (filePath.endsWith('package-lock.json') && json.packages) {
+      for (const key of ['client', 'server']) {
+        if (json.packages[key]) {
+          json.packages[key].version = newVersion
+          updated = true
+        }
+      }
+    }
+
     if (filePath.endsWith('package.json') && filePath === path.join(root, 'package.json')) {
       json.versionDate = new Date().toISOString()
       updated = true

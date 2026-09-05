@@ -15,9 +15,8 @@ type ProviderId =
   | 'op'
 
 const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
-  { value: 'anidb', label: 'AniDB', mature: false },
-  { value: 'anilight', label: 'Anilight', mature: false },
   { value: 'megaplay', label: 'MegaPlay', mature: false },
+  { value: 'anilight', label: 'Anilight', mature: false },
   { value: 'animepahe', label: 'AnimePahe', mature: false },
   { value: 'animeya', label: 'Animeya', mature: false },
   { value: '123anime', label: '123Anime', mature: false },
@@ -25,6 +24,7 @@ const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] 
   { value: 'hn', label: 'HN', mature: true },
   { value: 'ht', label: 'HT', mature: true },
   { value: 'op', label: 'OP', mature: true },
+  { value: 'anidb', label: 'AniDB', mature: false },
 ]
 
 interface ProviderSelectorProps {
