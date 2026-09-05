@@ -26,21 +26,21 @@ const getPreferredMode = (): 'sub' | 'dub' => {
 const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const provider = localStorage.getItem('preferredProvider')
   const validProviders: string[] = [
-    'anidb',
     'megaplay',
+    'anilight',
     'animeya',
     'animepahe',
     '123anime',
     'wh',
     'hn',
-    'anilight',
     'ht',
     'op',
+    'anidb',
   ]
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']
   }
-  return 'anidb'
+  return 'megaplay'
 }
 
 export const createInitialState = (): PlayerState => ({
