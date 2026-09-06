@@ -874,18 +874,49 @@ const Player: React.FC = () => {
       return Math.max(0, Math.min(100, 100 - lift))
     }
 
+    const setCueLine = (cue: unknown, line: number) => {
+      try {
+        const vttCue = cue as { snapToLines?: boolean; line?: number }
+        vttCue.snapToLines = false
+        vttCue.line = line
+      } catch {
+        // ignore
+      }
+    }
+
+    const cueMetrics = () => {
+      const raw = Number(player.state.subtitleFontSize)
+      const px = (isNaN(raw) ? 1.8 : raw) * 16
+      const h = video.videoHeight || video.clientHeight || 720
+      const w = video.videoWidth || video.clientWidth || 1280
+      return { step: ((px * 1.3) / h) * 100, chars: Math.max(20, Math.floor(w / (px * 0.55))) }
+    }
+
+    const restackTrack = (track: TextTrack) => {
+      const pos = getPos()
+      const active = Array.from(track.activeCues ?? [])
+      if (active.length <= 1) {
+        active.forEach((cue) => setCueLine(cue, pos))
+        return
+      }
+      const { step, chars } = cueMetrics()
+      let bottom = pos
+      for (let i = active.length - 1; i >= 0; i--) {
+        const text = String((active[i] as { text?: unknown }).text ?? '').replace(/<[^>]*>/g, '')
+        const visual = text
+          .split('\n')
+          .reduce((n, seg) => n + Math.max(1, Math.ceil(seg.length / chars)), 0)
+        const top = bottom - visual * step
+        setCueLine(active[i], Math.max(0, top))
+        bottom = top - step * 0.4
+      }
+    }
+
     const applyToTrack = (track: TextTrack) => {
       if (!track.cues) return
       const pos = getPos()
-      Array.from(track.cues).forEach((cue: unknown) => {
-        try {
-          const vttCue = cue as { snapToLines?: boolean; line?: number }
-          vttCue.snapToLines = false
-          vttCue.line = pos
-        } catch (e) {
-          // Ignore error
-        }
-      })
+      Array.from(track.cues).forEach((cue: unknown) => setCueLine(cue, pos))
+      if (track.mode === 'showing') restackTrack(track)
     }
 
     const applyToAllTracks = () => {
@@ -895,7 +926,8 @@ const Player: React.FC = () => {
     applyToAllTracks()
 
     const handleCueChange = (e: Event) => {
-      applyToTrack(e.target as TextTrack)
+      const track = e.target as TextTrack
+      if (track.mode === 'showing') restackTrack(track)
     }
 
     Array.from(video.textTracks).forEach((t) => {
