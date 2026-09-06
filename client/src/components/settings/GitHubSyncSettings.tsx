@@ -240,7 +240,14 @@ const GitHubSyncSettings: React.FC = () => {
                 value={device.verification.verification_uri}
                 readOnly
               />
-              <Button onClick={() => window.open(device.verification?.verification_uri, '_blank')}>
+              <Button
+                onClick={() => {
+                  const uri = device.verification?.verification_uri
+                  if (uri && /^https?:\/\//i.test(uri)) {
+                    window.open(uri, '_blank', 'noopener,noreferrer')
+                  }
+                }}
+              >
                 Open
               </Button>
             </div>

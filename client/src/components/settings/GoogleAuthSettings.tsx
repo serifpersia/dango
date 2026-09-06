@@ -63,7 +63,12 @@ const GoogleAuthSettings: React.FC = () => {
     fetchInitialData()
 
     const handleAuthMessage = (event: MessageEvent) => {
-      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+      if (event.origin !== window.location.origin) return
+      if (
+        typeof event.data === 'object' &&
+        event.data !== null &&
+        event.data.type === 'GOOGLE_AUTH_SUCCESS'
+      ) {
         setUser(event.data.user)
         window.location.reload()
       }

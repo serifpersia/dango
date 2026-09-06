@@ -7,9 +7,11 @@ import cors from 'cors'
 import compression from 'compression'
 import NodeCache from 'node-cache'
 import fs from 'fs'
+import crypto from 'crypto'
 import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
+import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils'
 
 import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
 import { AnimeyaProvider } from './providers/animeya.provider'
@@ -175,7 +177,15 @@ app.use(
   })
 )
 
-app.use(cors())
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin))
+    },
+    credentials: true,
+  })
+)
+app.use(crossSiteProtectionMiddleware)
 app.use(express.json({ limit: '10mb' }))
 
 app.use('/api/auth', createLanAuthRouter())
@@ -343,12 +353,26 @@ async function main() {
   process.once('SIGUSR2', () => shutdown('SIGUSR2'))
 
   app.post('/api/internal/shutdown', (req, res) => {
-    if (req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1') {
-      res.status(200).json({ message: 'Shutting down' })
-      setTimeout(() => shutdown(), 500)
-    } else {
-      res.status(403).send('Forbidden')
+    const isLoopback = req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1'
+    if (!isLoopback) {
+      res.status(403).json({ error: 'Forbidden' })
+      return
     }
+
+    const expectedToken = process.env.INTERNAL_SHUTDOWN_TOKEN
+    const providedToken = req.headers['x-internal-token']
+    if (expectedToken) {
+      const expBuf = Buffer.from(expectedToken)
+      const provBuf = Buffer.from(typeof providedToken === 'string' ? providedToken : '')
+      if (expBuf.length !== provBuf.length || !crypto.timingSafeEqual(expBuf, provBuf)) {
+        logger.warn('Unauthorized internal shutdown attempt rejected: invalid token')
+        res.status(403).json({ error: 'Forbidden' })
+        return
+      }
+    }
+
+    res.status(200).json({ message: 'Shutting down' })
+    setTimeout(() => shutdown(), 500)
   })
 }
 

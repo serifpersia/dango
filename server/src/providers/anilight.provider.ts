@@ -40,6 +40,7 @@ function curlGetJSON<T>(url: string): T | null {
     '15',
     '-w',
     '\n__HTTP_STATUS__%{http_code}',
+    '--',
     url,
   ]
   let out: string
@@ -75,6 +76,7 @@ function curlGetText(url: string): string | null {
     '15',
     '-w',
     '\n__HTTP_STATUS__%{http_code}',
+    '--',
     url,
   ]
   let out: string

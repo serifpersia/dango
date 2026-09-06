@@ -27,7 +27,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
 
   const handleStartVerification = async () => {
     localStorage.setItem('jasmr_ua', userAgent)
-    window.open('https://japaneseasmr.com', '_blank')
+    window.open('https://japaneseasmr.com', '_blank', 'noopener,noreferrer')
     setStep(2)
   }
 

@@ -38,7 +38,13 @@ export async function updateEnvFile(updates: Record<string, string>) {
     const lines = envContent.split('\n')
     const newLines = [...lines]
 
-    Object.entries(updates).forEach(([key, value]) => {
+    Object.entries(updates).forEach(([rawKey, rawValue]) => {
+      const key = rawKey.trim()
+      if (!/^[A-Z0-9_]+$/i.test(key)) {
+        throw new Error(`Invalid environment variable key: ${key}`)
+      }
+      const value = String(rawValue ?? '').replace(/[\r\n]/g, '')
+
       let found = false
       for (let i = 0; i < newLines.length; i++) {
         const line = newLines[i]

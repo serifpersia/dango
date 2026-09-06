@@ -2,15 +2,20 @@ export const fetchApi = async (url: string) => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
-  const animepaheUa = localStorage.getItem('animepahe_ua')
-  const animepaheCookie = localStorage.getItem('animepahe_cookie')
-  const jasmrUa = localStorage.getItem('jasmr_ua')
-  const jasmrCookie = localStorage.getItem('jasmr_cookie')
+  const isLocalEndpoint =
+    url.startsWith('/') || (typeof window !== 'undefined' && url.startsWith(window.location.origin))
 
-  if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
-  if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
-  if (jasmrUa) headers['x-jasmr-ua'] = jasmrUa
-  if (jasmrCookie) headers['x-jasmr-cookie'] = jasmrCookie
+  if (isLocalEndpoint) {
+    const animepaheUa = localStorage.getItem('animepahe_ua')
+    const animepaheCookie = localStorage.getItem('animepahe_cookie')
+    const jasmrUa = localStorage.getItem('jasmr_ua')
+    const jasmrCookie = localStorage.getItem('jasmr_cookie')
+
+    if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
+    if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
+    if (jasmrUa) headers['x-jasmr-ua'] = jasmrUa
+    if (jasmrCookie) headers['x-jasmr-cookie'] = jasmrCookie
+  }
 
   const response = await fetch(url, { headers })
 

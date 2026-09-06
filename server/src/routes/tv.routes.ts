@@ -4,6 +4,7 @@ import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb'
 import https from 'https'
 import http from 'http'
 import { URL } from 'url'
+import { isSafeExternalUrl } from '../utils/security.utils'
 
 const MOVY_API = 'https://api.wecollege.net'
 const MOVY_SERVERS = [
@@ -811,6 +812,11 @@ export function createTvRouter(apiCache: NodeCache): Router {
     const urlStr = url as string
     const refererStr = (referer as string) || ''
     if (!urlStr) return res.status(400).send('URL required')
+
+    const safeCheck = isSafeExternalUrl(urlStr)
+    if (!safeCheck.safe) {
+      return res.status(400).send(safeCheck.error || 'Invalid URL')
+    }
 
     const abortController = new AbortController()
     const timeout = setTimeout(() => abortController.abort(), 30000)

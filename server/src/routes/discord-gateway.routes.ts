@@ -1,8 +1,7 @@
 import { Router } from 'express'
-import fs from 'fs'
 import logger from '../logger'
 import { discordGatewayService } from '../discord-gateway'
-import { CONFIG } from '../config'
+import { updateEnvFile } from '../utils/env.utils'
 
 const log = logger.child({ module: 'DiscordGatewayRoutes' })
 
@@ -23,37 +22,32 @@ export function createDiscordGatewayRouter(): Router {
     })
   })
 
-  router.post('/discord/gateway/save', (req, res) => {
+  router.post('/discord/gateway/save', async (req, res) => {
     let token = (req.body.token || '').trim()
     if (token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1)
     if (token.length < 30) return res.status(400).json({ error: 'Token too short' })
 
-    const envPath = CONFIG.ENV_PATH
-    const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : ''
-    const lines = envContent
-      .split(/\r?\n/)
-      .filter((line) => !line.startsWith('DISCORD_GATEWAY_TOKEN='))
-    lines.push(`DISCORD_GATEWAY_TOKEN=${token}`)
-    fs.writeFileSync(envPath, lines.join('\n') + '\n', 'utf-8')
-
-    process.env.DISCORD_GATEWAY_TOKEN = token
-    discordGatewayService.reloadToken()
-    log.info(`Discord Gateway token saved ${mask(token)} (not logged)`)
-    res.json({ ok: true, masked: mask(token) })
+    try {
+      await updateEnvFile({ DISCORD_GATEWAY_TOKEN: token })
+      discordGatewayService.reloadToken()
+      log.info(`Discord Gateway token saved ${mask(token)} (not logged)`)
+      res.json({ ok: true, masked: mask(token) })
+    } catch (e) {
+      log.error({ err: e }, 'Failed to save Discord Gateway token')
+      res.status(500).json({ error: 'Failed to save token' })
+    }
   })
 
-  router.post('/discord/gateway/remove', (_req, res) => {
-    const envPath = CONFIG.ENV_PATH
-    const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : ''
-    const lines = envContent
-      .split(/\r?\n/)
-      .filter((line) => !line.startsWith('DISCORD_GATEWAY_TOKEN='))
-    fs.writeFileSync(envPath, lines.join('\n') + '\n', 'utf-8')
-
-    delete process.env.DISCORD_GATEWAY_TOKEN
-    discordGatewayService.reloadToken()
-    log.info('Discord Gateway token removed')
-    res.json({ ok: true })
+  router.post('/discord/gateway/remove', async (_req, res) => {
+    try {
+      await updateEnvFile({ DISCORD_GATEWAY_TOKEN: '' })
+      discordGatewayService.reloadToken()
+      log.info('Discord Gateway token removed')
+      res.json({ ok: true })
+    } catch (e) {
+      log.error({ err: e }, 'Failed to remove Discord Gateway token')
+      res.status(500).json({ error: 'Failed to remove token' })
+    }
   })
 
   return router

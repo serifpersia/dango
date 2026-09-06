@@ -1,13 +1,13 @@
-import { spawn, exec } from 'child_process'
+import { spawn, execFile } from 'child_process'
 import logger from './logger'
 import { CONFIG } from './config'
 
 class RcloneService {
   private activeRemote: string | null = null
 
-  private executeCommand(command: string): Promise<string> {
+  private executeCommand(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      exec(command, (err, stdout, stderr) => {
+      execFile('rclone', args, (err, stdout, stderr) => {
         if (err) {
           if (stderr) logger.warn({ stderr }, 'Rclone command warning')
           return reject(new Error(stderr || err.message))
@@ -29,7 +29,7 @@ class RcloneService {
   }
   public async listRemotes(): Promise<string[]> {
     try {
-      const remotesStr = await this.executeCommand('rclone listremotes')
+      const remotesStr = await this.executeCommand(['listremotes'])
       return remotesStr
         .split('\n')
         .map((r) => r.trim())
@@ -42,7 +42,7 @@ class RcloneService {
 
   public async init(): Promise<boolean> {
     try {
-      await this.executeCommand('rclone version')
+      await this.executeCommand(['version'])
 
       const remotes = await this.listRemotes()
 

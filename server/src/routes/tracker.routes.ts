@@ -24,11 +24,22 @@ export function createTrackerRouter(): Router {
   if (!state) state = hp.get('state');
   var token = hp.get('access_token');
   var error = hp.get('error') || qs.get('error');
-  var frontend = '';
-  try { frontend = state ? decodeURIComponent(state) : ''; } catch(e) { frontend = state || ''; }
-  if (!frontend || !/^https?:\\/\\//.test(frontend)) {
+  var frontend = location.origin + '/trackers';
+  if (state) {
+    try {
+      var candidate = decodeURIComponent(state);
+      if (candidate.startsWith('/') && !candidate.startsWith('//')) {
+        frontend = location.origin + candidate;
+      } else {
+        var parsed = new URL(candidate, location.origin);
+        if (parsed.origin === location.origin) {
+          frontend = parsed.href;
+        }
+      }
+    } catch(e) {}
+  }
+  if (frontend.indexOf('/api/tracker/anilist/callback') !== -1) {
     frontend = location.origin + '/trackers';
-    if (frontend.indexOf('/api/tracker/anilist/callback') !== -1) frontend = location.origin + '/trackers';
   }
   if (error) {
     location.replace(frontend + (frontend.indexOf('?') !== -1 ? '&' : '?') + 'anilist=error&reason=' + encodeURIComponent(error));

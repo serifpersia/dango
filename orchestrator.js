@@ -4,8 +4,10 @@ const readline = require('readline')
 const http = require('http')
 const os = require('os')
 const path = require('path')
+const crypto = require('crypto')
 const axios = require('axios')
 
+const shutdownToken = crypto.randomBytes(32).toString('hex')
 const mode = process.argv[2] || 'prod'
 const isWin = os.platform() === 'win32'
 const npmCmd = isWin ? 'npm.cmd' : 'npm'
@@ -28,7 +30,7 @@ async function checkForUpdates() {
 
   try {
     const npmGlobalPrefix = require('child_process')
-      .execSync('npm config get prefix', { encoding: 'utf8' })
+      .execSync(`${npmCmd} config get prefix`, { encoding: 'utf8' })
       .trim()
     const scriptPath = path.resolve(__dirname)
     const isGlobalInstall = scriptPath.includes(npmGlobalPrefix)
@@ -77,10 +79,10 @@ async function checkForUpdates() {
               )
               if (!isWin) {
                 console.log(
-                  `${colors.system}[Update]${colors.reset} Hint: You might need to run with sudo:`
+                  `${colors.system}[Update]${colors.reset} Hint: If you encounter EACCES permission errors, configure npm global directory without root:`
                 )
                 console.log(
-                  `${colors.system}[Update]${colors.reset} ${colors.client}sudo dango${colors.reset}\n`
+                  `${colors.system}[Update]${colors.reset} ${colors.client}npm config set prefix ~/.npm-global${colors.reset}\n`
                 )
               }
               console.log(
@@ -263,6 +265,7 @@ async function main() {
   if (mode === 'dev') {
     serverProcess = spawnNpm(['run', 'dev', '--workspace=dango-server'], __dirname, {
       NODE_ENV: 'development',
+      INTERNAL_SHUTDOWN_TOKEN: shutdownToken,
     })
     clientProcess = spawnNpm(['run', 'dev', '--workspace=dango-client'], __dirname, {
       NODE_ENV: 'development',
@@ -272,7 +275,10 @@ async function main() {
     serverProcess = spawn(
       'node',
       ['--max-old-space-size=256', serverPath],
-      spawnOpts(SERVER_DIR, { NODE_ENV: 'production' })
+      spawnOpts(SERVER_DIR, {
+        NODE_ENV: 'production',
+        INTERNAL_SHUTDOWN_TOKEN: shutdownToken,
+      })
     )
   }
 
@@ -334,6 +340,9 @@ const shutdown = () => {
       port: 3000,
       path: '/api/internal/shutdown',
       method: 'POST',
+      headers: {
+        'x-internal-token': shutdownToken,
+      },
     },
     (res) => {
       if (res.statusCode !== 200) {

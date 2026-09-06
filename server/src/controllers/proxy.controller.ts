@@ -10,6 +10,7 @@ import { CONFIG } from '../config'
 import fs from 'fs'
 import logger from '../logger'
 import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils'
+import { isSafeExternalUrl } from '../utils/security.utils'
 
 function firstString(value: unknown): string | undefined {
   if (typeof value === 'string') return value
@@ -95,6 +96,11 @@ export class ProxyController {
   handleProxy = async (req: Request, res: Response) => {
     const { url, referer, cookie } = req.query
     if (!url) return res.status(400).send('URL required')
+
+    const safeCheck = isSafeExternalUrl(url)
+    if (!safeCheck.safe) {
+      return res.status(400).send(safeCheck.error || 'Invalid URL')
+    }
 
     const urlStr = url as string
     const refererStr = (referer as string) || ''
@@ -404,6 +410,11 @@ export class ProxyController {
     const { url, referer } = req.query
     if (!url) return res.status(400).send('URL required')
 
+    const safeCheck = isSafeExternalUrl(url)
+    if (!safeCheck.safe) {
+      return res.status(400).send(safeCheck.error || 'Invalid URL')
+    }
+
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
@@ -434,6 +445,11 @@ export class ProxyController {
   handleImageProxy = async (req: Request, res: Response) => {
     const { url, cookie, ua } = req.query
     if (!url) return res.status(400).send('URL required')
+
+    const safeCheck = isSafeExternalUrl(url)
+    if (!safeCheck.safe) {
+      return res.status(400).send(safeCheck.error || 'Invalid URL')
+    }
 
     const targetUrl = url as string
     const abortController = new AbortController()
@@ -522,6 +538,11 @@ export class ProxyController {
     const targetUrl = req.query.url
     if (!targetUrl || typeof targetUrl !== 'string') {
       return res.status(400).json({ error: 'URL required' })
+    }
+
+    const safeCheck = isSafeExternalUrl(targetUrl)
+    if (!safeCheck.safe) {
+      return res.status(400).json({ error: safeCheck.error || 'Invalid URL' })
     }
 
     try {

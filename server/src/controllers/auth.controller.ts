@@ -217,7 +217,7 @@ export class AuthController {
             <p>Database synced. Closing window...</p>
             <script>
             if (window.opener) {
-                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, '*');
+                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, window.location.origin);
                 window.close();
             } else {
                 window.location.href = '/';

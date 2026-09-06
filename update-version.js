@@ -3,8 +3,8 @@ const path = require('path')
 
 const newVersion = process.argv[2]
 
-if (!newVersion) {
-  console.error('❌ Provide version like: 1.2.3')
+if (!newVersion || !/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(newVersion)) {
+  console.error('❌ Provide valid semantic version like: 1.2.3 or 1.2.3-beta.1')
   process.exit(1)
 }
 

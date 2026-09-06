@@ -3,8 +3,8 @@ setlocal EnableDelayedExpansion
 
 cls
 
-if not "%1"=="" (
-    set "choice=%1"
+if not "%~1"=="" (
+    set "choice=%~1"
     goto process_choice
 )
 
@@ -28,8 +28,8 @@ set /p choice="Enter your choice (1 or 2): "
 echo.
 
 :process_choice
-if "%choice%"=="1" goto execute_dev
-if "%choice%"=="2" goto execute_prod
+if "!choice!"=="1" goto execute_dev
+if "!choice!"=="2" goto execute_prod
 
 powershell -NoProfile -Command "Write-Host 'Invalid choice. Please try again.' -ForegroundColor Red"
 timeout /t 2 >nul

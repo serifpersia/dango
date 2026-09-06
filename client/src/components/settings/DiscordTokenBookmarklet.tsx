@@ -133,7 +133,7 @@ const DiscordTokenBookmarklet: React.FC = () => {
           className="btn btn-secondary btn-sm"
           href="https://discord.com/channels/@me"
           target="_blank"
-          rel="opener"
+          rel="noopener noreferrer"
         >
           Open Discord
         </a>

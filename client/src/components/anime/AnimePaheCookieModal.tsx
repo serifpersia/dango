@@ -29,7 +29,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
 
   const handleStartVerification = async () => {
     localStorage.setItem('animepahe_ua', userAgent)
-    window.open('https://animepahe.pw', '_blank')
+    window.open('https://animepahe.pw', '_blank', 'noopener,noreferrer')
     setStep(2)
   }
 
