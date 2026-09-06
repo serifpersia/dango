@@ -66,6 +66,92 @@ function titleSlugToFolder(slug: string): string {
   return slug.replace(/-/g, ' ')
 }
 
+export const OP_ORDERS = ['recent', 'popular', 'views', 'rating', 'random']
+
+export const OP_TAGS = [
+  '4k',
+  'ahegao',
+  'anal',
+  'armpitmasturbation',
+  'bdsm',
+  'bigboobs',
+  'blackhair',
+  'blondehair',
+  'blowjob',
+  'bluehair',
+  'bondage',
+  'boobjob',
+  'brownhair',
+  'censored',
+  'comedy',
+  'cosplay',
+  'cowgirl',
+  'creampie',
+  'darkskin',
+  'demon',
+  'doggy',
+  'dominantgirl',
+  'doublepenetration',
+  'elf',
+  'facial',
+  'fantasy',
+  'filmed',
+  'footjob',
+  'futanari',
+  'gangbang',
+  'glasses',
+  'greenhair',
+  'gyaru',
+  'handjob',
+  'harem',
+  'hd',
+  'incest',
+  'inflation',
+  'loli',
+  'maid',
+  'masturbation',
+  'milf',
+  'mindbreak',
+  'mindcontrol',
+  'missionary',
+  'monster',
+  'nekomimi',
+  'ntr',
+  'nurse',
+  'old',
+  'orgy',
+  'pinkhair',
+  'plot',
+  'ponytail',
+  'pov',
+  'pregnant',
+  'publicsex',
+  'purplehair',
+  'rape',
+  'redhair',
+  'reverserape',
+  'rimjob',
+  'scat',
+  'schoolgirl',
+  'shorthair',
+  'shota',
+  'smallboobs',
+  'softcore',
+  'succubus',
+  'swimsuit',
+  'teacher',
+  'tentacle',
+  'threesome',
+  'toys',
+  'uglybastard',
+  'uncensored',
+  'vanilla',
+  'virgin',
+  'whitehair',
+  'x-ray',
+  'yuri',
+]
+
 function buildSeriesMap(entries: SearchEntry[]): Map<string, SearchEntry[]> {
   const map = new Map<string, SearchEntry[]>()
   for (const e of entries) {
@@ -108,6 +194,73 @@ export class OpProvider implements Provider {
 
   constructor(cache: NodeCache) {
     this.cache = cache
+  }
+
+  async browse(options: {
+    query?: string
+    page?: number
+    limit?: number
+    order?: string
+    genres?: string
+    blacklist?: string
+    studio?: string
+  }): Promise<{ shows: Show[]; total: number; hasMore: boolean }> {
+    try {
+      const query = (options.query || '').trim()
+      const page = Math.max(1, options.page || 1)
+      const limit = Math.min(50, Math.max(1, options.limit || 24))
+      const order = OP_ORDERS.includes(options.order || '') ? options.order! : 'recent'
+      const genres = (options.genres || '').trim()
+      const blacklist = (options.blacklist || '').trim()
+      const studio = (options.studio || '').trim()
+
+      const cacheKey = `op_browse_${query}_${page}_${limit}_${order}_${genres}_${blacklist}_${studio}`
+      const cached = this.cache.get<{ shows: Show[]; total: number; hasMore: boolean }>(cacheKey)
+      if (cached) return cached
+
+      const params = new URLSearchParams({
+        text: query,
+        order,
+        page: String(page),
+        limit: String(limit),
+        genres,
+        blacklist,
+        studio,
+        ibt: '0',
+        swa: '1',
+      })
+      const html = await fetchText(`${SEARCH_URL}?${params.toString()}`)
+      const entries = parseSearchResults(html)
+      const totalMatch = html.match(/amo='(\d+)'/)
+      const total = totalMatch ? parseInt(totalMatch[1]) : entries.length
+
+      const seriesMap = buildSeriesMap(entries)
+      const shows: Show[] = Array.from(seriesMap.entries()).map(([key, eps]) => {
+        const sorted = [...eps].sort((a, b) => parseFloat(a.ep) - parseFloat(b.ep))
+        const first = sorted[0]
+        return {
+          _id: key,
+          id: key,
+          name: first.name,
+          englishName: first.name,
+          thumbnail: `https://myspacecat.pictures/${encodeURIComponent(first.folder)}/thumbnail_${first.ep}.png`,
+          type: 'TV',
+          year: null,
+          isAdult: true,
+          availableEpisodesDetail: {
+            sub: sorted.map((e) => e.ep),
+            dub: [],
+          },
+        }
+      })
+
+      const output = { shows, total, hasMore: page * limit < total }
+      this.cache.set(cacheKey, output, 300)
+      return output
+    } catch (error) {
+      logger.error({ error }, '[OP] Browse failed')
+      return { shows: [], total: 0, hasMore: false }
+    }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {

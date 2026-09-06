@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { FaBroadcastTower, FaSearch } from 'react-icons/fa'
 import RadioPlayer from '../components/radio/RadioPlayer'
 import {
@@ -12,6 +12,10 @@ import asmrStyles from '../components/asmr/Asmr.module.css'
 import styles from '../components/radio/Radio.module.css'
 
 const Radio: React.FC = () => {
+  useEffect(() => {
+    document.title = 'Radio - dango'
+  }, [])
+
   const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<RadioStation | null>(null)

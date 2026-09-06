@@ -72,6 +72,10 @@ const seasonOptions: Option[] = [
 ]
 
 const Watchlist: React.FC = () => {
+  useEffect(() => {
+    document.title = 'Watchlist - dango'
+  }, [])
+
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()

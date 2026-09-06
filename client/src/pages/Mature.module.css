@@ -1,0 +1,11 @@
+.shrinkSelect > select {
+  align-self: flex-start;
+  width: auto;
+  max-width: 100%;
+}
+
+div.tightGrid {
+  grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
+  justify-content: start;
+  gap: var(--space-4);
+}

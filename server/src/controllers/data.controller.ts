@@ -10,6 +10,7 @@ import {
   getAnilistEpisodes,
   getSchedule,
   searchAnilist,
+  searchAnilistByTitle,
   setCachedAnilist,
   getSpotlightBanners,
   getBatchedHomeData,
@@ -320,6 +321,165 @@ export class DataController {
     } catch (e) {
       logger.error({ err: e }, 'search failed')
       res.json([])
+    }
+  }
+
+  matureSearch = async (req: Request, res: Response) => {
+    try {
+      const provider = ((req.query.provider as string) || 'anilist').toLowerCase()
+      const query = (req.query.query as string) || ''
+      const page = parseInt(req.query.page as string) || 1
+      const limit = parseInt(req.query.limit as string) || 14
+
+      if (provider === 'anilist') {
+        const result = await searchAnilist({
+          query,
+          page,
+          perPage: limit,
+          format: req.query.type as string,
+          status: req.query.status as string,
+          season: req.query.season as string,
+          seasonYear: req.query.year ? parseInt(req.query.year as string) : undefined,
+          countryOfOrigin: req.query.country as string,
+          genre: req.query.genres as string,
+          genre_not_in: req.query.excludeGenres
+            ? (req.query.excludeGenres as string).split(',')
+            : undefined,
+          isAdult: true,
+          sort: (req.query.sortBy as string) || undefined,
+        })
+        return res.json({ data: result, hasMore: result.length >= limit })
+      }
+
+      if (provider === 'wh') {
+        const p = this.providers['wh'] as unknown as {
+          browse: (o: { query?: string; page?: number; genre?: string }) => Promise<{
+            shows: Show[]
+            hasMore: boolean
+          }>
+        }
+        const result = await p.browse({
+          query,
+          page,
+          genre: (req.query.genre as string) || undefined,
+        })
+        return res.json({ data: result.shows, hasMore: result.hasMore })
+      }
+
+      if (provider === 'op') {
+        const p = this.providers['op'] as unknown as {
+          browse: (o: {
+            query?: string
+            page?: number
+            limit?: number
+            order?: string
+            genres?: string
+            blacklist?: string
+            studio?: string
+          }) => Promise<{
+            shows: Show[]
+            total: number
+            hasMore: boolean
+          }>
+        }
+        const result = await p.browse({
+          query,
+          page,
+          limit,
+          order: (req.query.order as string) || undefined,
+          genres: (req.query.genres as string) || undefined,
+          blacklist: (req.query.blacklist as string) || undefined,
+          studio: (req.query.studio as string) || undefined,
+        })
+        return res.json({ data: result.shows, hasMore: result.hasMore, total: result.total })
+      }
+
+      if (provider === 'ht') {
+        const p = this.providers['ht'] as unknown as {
+          browse: (o: {
+            query?: string
+            limit?: number
+            genre?: string
+            page?: number
+          }) => Promise<{
+            shows: Show[]
+            hasMore: boolean
+          }>
+        }
+        const result = await p.browse({
+          query,
+          limit: 40,
+          genre: (req.query.genre as string) || undefined,
+          page,
+        })
+        return res.json({ data: result.shows, hasMore: result.hasMore })
+      }
+
+      if (provider === 'hn') {
+        const p = this.providers['hn'] as unknown as {
+          browse: (o: {
+            query?: string
+            page?: number
+            pageSize?: number
+            sort?: string
+            genre?: string
+          }) => Promise<{
+            shows: Show[]
+            hasMore: boolean
+            genres: { slug: string; name: string }[]
+          }>
+        }
+        if (!p?.browse) {
+          const shows = await this.providers['hn'].search({ query })
+          return res.json({
+            data: shows.map((s) => ({ ...s, isAdult: true })),
+            hasMore: false,
+          })
+        }
+        const result = await p.browse({
+          query,
+          page,
+          pageSize: limit,
+          sort: (req.query.sortBy as string) || undefined,
+          genre: (req.query.genre as string) || undefined,
+        })
+        return res.json({ data: result.shows, hasMore: result.hasMore, genres: result.genres })
+      }
+
+      return res.status(400).json({ error: 'Unknown mature provider' })
+    } catch (e) {
+      logger.error({ err: e }, 'mature search failed')
+      res.json({ data: [], hasMore: false })
+    }
+  }
+
+  resolveMature = async (req: Request, res: Response) => {
+    try {
+      const title = ((req.query.title as string) || '').trim()
+      if (!title) return res.status(400).json({ error: 'title is required' })
+      const result = await searchAnilistByTitle(title)
+      if (!result) return res.status(404).json({ error: 'No match found' })
+      return res.json({ id: result.id })
+    } catch (e) {
+      logger.error({ err: e }, 'mature resolve failed')
+      res.status(500).json({ error: 'Resolve failed' })
+    }
+  }
+
+  getMatureFilters = async (_req: Request, res: Response) => {
+    try {
+      const { WH_GENRES } = await import('../providers/wh.provider')
+      const { OP_TAGS, OP_ORDERS } = await import('../providers/op.provider')
+      const { HT_GENRES } = await import('../providers/ht.provider')
+      return res.json({
+        whGenres: WH_GENRES,
+        opTags: OP_TAGS,
+        opOrders: OP_ORDERS,
+        htGenres: HT_GENRES,
+      })
+    } catch (e) {
+      logger.error({ err: e }, 'mature filters failed')
+      res.status(500).json({ error: 'Failed to load filters' })
     }
   }
 

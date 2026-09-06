@@ -7,6 +7,7 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
+import NodeCache from 'node-cache'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://hentaini.com'
@@ -136,8 +137,137 @@ function parseNuxtData(html: string): NuxtEntry | null {
   return extractEpisode(resolved)
 }
 
+interface HnImage {
+  path: string
+  image_type?: { name: string }
+}
+
+interface HnSeriesItem {
+  id: number
+  title: string
+  title_english: string
+  url: string
+  visits: number
+  images?: HnImage[]
+}
+
+function pickPoster(images?: HnImage[]): string {
+  if (!images || images.length === 0) return ''
+  const named = (n: string) =>
+    images.find((i) => (i.image_type?.name || '').toLowerCase() === n)?.path || ''
+  return imageUrl(
+    named('cover') ||
+      named('poster') ||
+      named('thumbnail') ||
+      named('backdrop') ||
+      images[0].path ||
+      ''
+  )
+}
+
+function extractSeriesCover(html: string): string {
+  const imgs = html.match(/<img[^>]+>/g) || []
+  for (const img of imgs) {
+    if (/aspect-\[2\/3\]/.test(img)) {
+      const src = img.match(/src="([^"]+)"/)?.[1] || ''
+      if (src.startsWith('http')) return src
+    }
+  }
+  const cover = html.match(/https?:\/\/[^"'\s]*uploads\/[^"'\s]*cover[^"'\s]*/i)?.[0]
+  if (cover) return cover
+  const anyUpload = html.match(/https?:\/\/[^"'\s]*uploads\/[^"'\s]*\.(?:jpe?g|png|webp)/i)?.[0]
+  return anyUpload || ''
+}
+
+interface HnGenre {
+  slug: string
+  name: string
+}
+
+interface HnLandingSeries {
+  url: string
+  title: string
+  titleEnglish: string
+  visits: number
+  poster: string
+  genres: HnGenre[]
+}
+
+function resolveNuxtRefs(raw: unknown[]): unknown {
+  const visited = new Set<number>()
+  function resolve(v: unknown): unknown {
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < raw.length) {
+      if (visited.has(v)) return v
+      visited.add(v)
+      const result = resolve(raw[v])
+      visited.delete(v)
+      return result
+    }
+    if (Array.isArray(v)) {
+      const wrapper = v[0]
+      if (
+        typeof wrapper === 'string' &&
+        (wrapper === 'ShallowReactive' || wrapper === 'ShallowRef' || wrapper === 'EmptyRef')
+      ) {
+        return resolve(v[1])
+      }
+      return v.map(resolve)
+    }
+    if (v && typeof v === 'object') {
+      const obj: Record<string, unknown> = {}
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        obj[k] = resolve(val)
+      }
+      return obj
+    }
+    return v
+  }
+  return resolve(raw)
+}
+
+function collectLandingSeries(resolved: unknown): HnLandingSeries[] {
+  const out: HnLandingSeries[] = []
+  const seen = new Set<string>()
+  const walk = (o: unknown, depth: number): void => {
+    if (depth > 12 || !o || typeof o !== 'object') return
+    if (Array.isArray(o)) {
+      for (const x of o) walk(x, depth + 1)
+      return
+    }
+    const r = o as Record<string, unknown>
+    if (typeof r.url === 'string' && typeof r.title === 'string' && Array.isArray(r.images)) {
+      const url = r.url
+      if (url && !seen.has(url)) {
+        seen.add(url)
+        const images = r.images as HnImage[]
+        const genreList = (Array.isArray(r.genreList) ? r.genreList : []) as {
+          url?: string
+          name?: string
+        }[]
+        out.push({
+          url,
+          title: r.title,
+          titleEnglish: typeof r.title_english === 'string' ? r.title_english : r.title,
+          visits: Number(r.visits) || 0,
+          poster: pickPoster(images),
+          genres: genreList
+            .filter((g) => g && (g.url || g.name))
+            .map((g) => ({ slug: String(g.url || ''), name: String(g.name || g.url || '') })),
+        })
+      }
+      return
+    }
+    for (const val of Object.values(r)) walk(val, depth + 1)
+  }
+  walk(resolved, 0)
+  return out
+}
+
 export class HnProvider implements Provider {
   name = 'HN'
+
+  private posterCache: Map<string, string> = new Map()
+  private landingCache = new NodeCache({ stdTTL: 1800 })
 
   private bestMatch(
     results: { title: string; slug: string; poster: string }[],
@@ -164,26 +294,134 @@ export class HnProvider implements Provider {
     return { ...best, score: bestScore }
   }
 
+  private async resolvePoster(slug: string, apiPoster: string): Promise<string> {
+    if (apiPoster) return apiPoster
+    const cached = this.posterCache.get(slug)
+    if (cached !== undefined) return cached
+    try {
+      const html = await fetchText(`${BASE_URL}/h/${slug}`)
+      const poster = extractSeriesCover(html)
+      this.posterCache.set(slug, poster)
+      return poster
+    } catch {
+      this.posterCache.set(slug, '')
+      return ''
+    }
+  }
+
+  async browse(options: {
+    query?: string
+    page?: number
+    pageSize?: number
+    sort?: string
+    genre?: string
+  }): Promise<{ shows: Show[]; hasMore: boolean; genres: HnGenre[] }> {
+    try {
+      const query = (options.query || '').trim()
+      const genre = (options.genre || '').trim().toLowerCase()
+      const sort = options.sort || ''
+
+      if (!query) {
+        const cacheKey = 'hn_landing'
+        let landing = this.landingCache.get<HnLandingSeries[]>(cacheKey)
+        if (!landing) {
+          const html = await fetchText(`${BASE_URL}/`)
+          const match = html.match(/__NUXT_DATA__">\s*(\[.*?\])\s*<\//s)
+          if (!match) return { shows: [], hasMore: false, genres: [] }
+          const raw = JSON.parse(match[1]) as unknown[]
+          landing = collectLandingSeries(resolveNuxtRefs(raw))
+          this.landingCache.set(cacheKey, landing, 1800)
+        }
+        const genreSet = new Map<string, string>()
+        for (const s of landing) {
+          for (const g of s.genres) {
+            if (g.slug && !genreSet.has(g.slug)) genreSet.set(g.slug, g.name)
+          }
+        }
+        const genres = Array.from(genreSet.entries()).map(([slug, name]) => ({ slug, name }))
+        let filtered = landing
+        if (genre) {
+          filtered = landing.filter((s) => s.genres.some((g) => g.slug.toLowerCase() === genre))
+        }
+        if (sort === 'visits:desc') {
+          filtered = [...filtered].sort((a, b) => b.visits - a.visits)
+        } else if (sort === 'title:asc') {
+          filtered = [...filtered].sort((a, b) => a.title.localeCompare(b.title))
+        }
+        const shows: Show[] = await Promise.all(
+          filtered.map(async (s) => ({
+            _id: s.url,
+            id: s.url,
+            name: s.title,
+            englishName: s.titleEnglish,
+            thumbnail: await this.resolvePoster(s.url, s.poster),
+            type: 'TV',
+            year: null,
+            isAdult: true,
+            availableEpisodesDetail: { sub: [], dub: [] },
+          }))
+        )
+        return { shows, hasMore: false, genres }
+      }
+
+      const page = Math.max(1, options.page || 1)
+      const pageSize = Math.min(20, Math.max(1, options.pageSize || 14))
+
+      const params = new URLSearchParams()
+      params.set('filters[title][$containsi]', query)
+      params.set('pagination[page]', String(page))
+      params.set('pagination[pageSize]', String(pageSize))
+      if (sort) params.set('sort', sort)
+
+      const fetchBrowse = () =>
+        fetchApi<{
+          data: HnSeriesItem[]
+          meta?: { pagination?: { page?: number; pageCount?: number; total?: number } }
+        }>(`/series?${params.toString()}`)
+
+      let res = await fetchBrowse()
+      if (!res?.data && sort) {
+        params.delete('sort')
+        res = await fetchApi(`/series?${params.toString()}`)
+      }
+
+      const items = res?.data || []
+      const shows: Show[] = await Promise.all(
+        items.map(async (item) => ({
+          _id: item.url,
+          id: item.url,
+          name: item.title,
+          englishName: item.title_english || item.title,
+          thumbnail: await this.resolvePoster(item.url, pickPoster(item.images)),
+          type: 'TV',
+          year: null,
+          isAdult: true,
+          availableEpisodesDetail: { sub: [], dub: [] },
+        }))
+      )
+
+      const pageCount = res?.meta?.pagination?.pageCount
+      const hasMore = typeof pageCount === 'number' ? page < pageCount : shows.length >= pageSize
+      return { shows, hasMore, genres: [] }
+    } catch (error) {
+      logger.error({ error }, '[HN] Browse failed')
+      return { shows: [], hasMore: false, genres: [] }
+    }
+  }
+
   async search(options: SearchOptions): Promise<Show[]> {
     try {
       const query = (options.query || '').trim()
       if (!query) return []
 
       const res = await fetchApi<{
-        data: {
-          id: number
-          title: string
-          title_english: string
-          url: string
-          visits: number
-          images?: { path: string; image_type?: { name: string } }[]
-        }[]
+        data: HnSeriesItem[]
       }>(`/series?filters[title][$containsi]=${encodeURIComponent(query)}&pagination[limit]=10`)
 
       const apiResults = (res?.data || []).map((item) => ({
         title: item.title,
         slug: item.url,
-        poster: imageUrl(item.images?.find((i) => i.image_type?.name === 'cover')?.path || ''),
+        poster: pickPoster(item.images),
         score: 0,
       }))
 
@@ -197,7 +435,7 @@ export class HnProvider implements Provider {
           id: matched.slug,
           name: matched.title,
           englishName: matched.title,
-          thumbnail: matched.poster,
+          thumbnail: await this.resolvePoster(matched.slug, matched.poster),
           type: 'TV',
           year: null,
           availableEpisodesDetail: { sub: [], dub: [] },

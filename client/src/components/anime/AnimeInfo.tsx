@@ -37,6 +37,10 @@ export default function AnimeInfo() {
     }
   }, [showId, showMeta, navigate])
 
+  useEffect(() => {
+    document.title = showMeta?.name ? `${showMeta.name} - dango` : 'Anime - dango'
+  }, [showMeta?.name])
+
   const getDisplayTitle = () => {
     if (!showMeta?.name) return ''
     if (titlePreference === 'name') return showMeta.name

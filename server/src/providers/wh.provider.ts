@@ -114,6 +114,47 @@ function extractArticles(html: string): string[] {
   return results
 }
 
+function browseUrl(query: string, page: number, genre?: string): string {
+  if (genre) {
+    return page > 1 ? `${BASE_URL}/genre/${genre}/page/${page}/` : `${BASE_URL}/genre/${genre}/`
+  }
+  if (query) {
+    const base = `${BASE_URL}/?s=${encodeURIComponent(query)}`
+    return page > 1 ? `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}` : base
+  }
+  return page > 1 ? `${BASE_URL}/series/page/${page}/` : `${BASE_URL}/series/`
+}
+
+export const WH_GENRES = [
+  '3d',
+  'ahegao',
+  'anal',
+  'blackmail',
+  'blowjob',
+  'bondage',
+  'censored',
+  'cosplay',
+  'creampie',
+  'dark-skin',
+  'deepthroat',
+  'dubbed',
+  'femdom',
+  'harem',
+  'horny-slut',
+  'incest',
+  'large-breasts',
+  'ntr',
+  'public-sex',
+  'rape',
+  'school-girls',
+  'tits-fuck',
+  'uncensored',
+  'vanilla-id-1',
+  'virgins',
+  'x-ray',
+  'yuri',
+]
+
 function parseSearchArticles(html: string) {
   const results: { title: string; url: string; poster: string; year: string }[] = []
   const articles = extractArticles(html)
@@ -253,6 +294,47 @@ export class WhProvider implements Provider {
     }
 
     return { ...best, score: bestScore }
+  }
+
+  async browse(options: {
+    query?: string
+    page?: number
+    genre?: string
+  }): Promise<{ shows: Show[]; hasMore: boolean }> {
+    try {
+      const query = (options.query || '').trim()
+      const page = Math.max(1, options.page || 1)
+      const genre = (options.genre || '').trim().toLowerCase()
+
+      const cacheKey = `wh_browse_${genre || query}_${page}`
+      const cached = this.cache.get<{ shows: Show[]; hasMore: boolean }>(cacheKey)
+      if (cached) return cached
+
+      const html = await fetchText(browseUrl(query, page, genre || undefined))
+      const results = parseSearchArticles(html)
+
+      const shows: Show[] = results.map((r) => {
+        const slug = r.url.split('/').filter(Boolean).pop() || ''
+        return {
+          _id: slug,
+          id: slug,
+          name: r.title,
+          englishName: r.title,
+          thumbnail: r.poster,
+          type: 'TV',
+          year: r.year ? Number(r.year) : null,
+          isAdult: true,
+          availableEpisodesDetail: { sub: [], dub: [] },
+        }
+      })
+
+      const output = { shows, hasMore: results.length >= 50 }
+      this.cache.set(cacheKey, output, 300)
+      return output
+    } catch (error) {
+      logger.error({ error }, '[WH] Browse failed')
+      return { shows: [], hasMore: false }
+    }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {

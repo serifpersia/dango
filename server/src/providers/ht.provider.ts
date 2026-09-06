@@ -42,6 +42,19 @@ function imageUrl(path: string): string {
   return `${BASE_URL}${path}`
 }
 
+async function fetchPageHtml(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': UA,
+      Referer: `${BASE_URL}/`,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`)
+  return res.text()
+}
+
 async function searchApi(query: string, limit = 40): Promise<HtVideo[]> {
   const url = `${API_URL}?q=${encodeURIComponent(query)}&limit=${limit}`
   const res = await fetch(url, {
@@ -66,6 +79,160 @@ function groupBySeries(videos: HtVideo[]): Map<string, HtVideo[]> {
   }
   return map
 }
+
+function parseFlightVideos(html: string): HtVideo[] {
+  const videos: HtVideo[] = []
+  const seen = new Set<string>()
+  const segments = html.split('\\"titleSlug\\":\\"')
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i].slice(0, 6000)
+    const slug = seg.split('\\"')[0]
+    const epSlug = seg.match(/\\"slug\\":\\"([^\\]+)\\"/)?.[1] || ''
+    const title = seg.match(/\\"title\\":\\"([^\\]+)\\"/)?.[1] || ''
+    if (!slug || !title) continue
+    const key = `${slug}::${epSlug}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    const num = (name: string) => {
+      const m = seg.match(new RegExp(`\\"${name}\\":([\\d.]+)`))
+      return m ? Number(m[1]) : 0
+    }
+    const cover = seg.match(/\\"(cover|thumb|featureImage)\\":\\"([^\\]+)\\"/)?.[2] || ''
+    const tagsM = seg.match(/\\"tags\\":\[([^\]]{0,2000})\]/)
+    const tags = tagsM ? Array.from(tagsM[1].matchAll(/\\"([^\\]+)\\"/g)).map((m) => m[1]) : []
+    videos.push({
+      id: '',
+      slug: epSlug,
+      title,
+      titleSlug: slug,
+      titleId: '',
+      ep: num('ep'),
+      views: num('views'),
+      likes: num('likes'),
+      dislikes: num('dislikes'),
+      rating: num('rating'),
+      censored: seg.includes('\\"censored\\":true'),
+      brand: seg.match(/\\"brand\\":\\"([^\\]*)\\"/)?.[1] || '',
+      quality: '',
+      year: num('year'),
+      language: '',
+      duration: '',
+      tags,
+      cover,
+      thumb: '',
+      backdrop: null,
+      featureImage: '',
+      embedUrl: null,
+      description: '',
+      grad: [],
+      releasedAt: '',
+    })
+  }
+  return videos
+}
+
+export const HT_GENRES = [
+  '3d',
+  'ahegao',
+  'anal',
+  'bdsm',
+  'big-boobs',
+  'big-breasts',
+  'big-tits',
+  'blow-job',
+  'blowjob',
+  'bondage',
+  'boob-job',
+  'censored',
+  'cheating',
+  'comedy',
+  'corruption',
+  'cosplay',
+  'cream-pie',
+  'creampie',
+  'dark-skin',
+  'doggy-style',
+  'drama',
+  'elf',
+  'erotic-game',
+  'exhibitionism',
+  'facial',
+  'fantasy',
+  'ffm-threesome',
+  'filmed',
+  'first-kiss',
+  'foot-job',
+  'futanari',
+  'gangbang',
+  'glasses',
+  'group-sex',
+  'gyaru',
+  'hand-job',
+  'harem',
+  'hd',
+  'hentai',
+  'high-school',
+  'horror',
+  'housewife',
+  'huge-breasts',
+  'humiliation',
+  'impregnation',
+  'incest',
+  'inflation',
+  'lactation',
+  'loli',
+  'loli-01',
+  'magic',
+  'maid',
+  'masturbation',
+  'milf',
+  'mind-break',
+  'mind-control',
+  'monster',
+  'nekomimi',
+  'ntr',
+  'nudity',
+  'nurse',
+  'office-lady',
+  'oral',
+  'orgy',
+  'paizuri',
+  'plot',
+  'pov',
+  'pregnant',
+  'public-sex',
+  'rape',
+  'reverse-rape',
+  'rimjob',
+  'romance',
+  'scat',
+  'school-girl',
+  'school-life',
+  'schoolgirl',
+  'sex',
+  'sex-toys',
+  'short',
+  'shota',
+  'small-tits',
+  'softcore',
+  'swimsuit',
+  'teacher',
+  'teasing',
+  'tentacle',
+  'threesome',
+  'toys',
+  'trap',
+  'tsundere',
+  'ugly-bastard',
+  'uncensored',
+  'vanilla',
+  'virgin',
+  'voyeurism',
+  'watersports',
+  'x-ray',
+  'yaoi',
+  'yuri',
+]
 
 function bestMatch(
   series: { title: string; titleSlug: string }[],
@@ -98,6 +265,66 @@ export class HtProvider implements Provider {
 
   constructor(cache: NodeCache) {
     this.cache = cache
+  }
+
+  async browse(options: {
+    query?: string
+    limit?: number
+    genre?: string
+    page?: number
+  }): Promise<{ shows: Show[]; hasMore: boolean }> {
+    try {
+      const query = (options.query || '').trim()
+      const genre = (options.genre || '').trim().toLowerCase()
+      const page = Math.max(1, options.page || 1)
+      const limit = Math.min(100, Math.max(1, options.limit || 40))
+
+      const cacheKey = `ht_browse_${genre || query}_${page}_${limit}`
+      const cached = this.cache.get<{ shows: Show[]; hasMore: boolean }>(cacheKey)
+      if (cached) return cached
+
+      let videos: HtVideo[] = []
+      let hasMore = false
+      if (genre) {
+        const url =
+          page > 1 ? `${BASE_URL}/genre/${genre}?page=${page}` : `${BASE_URL}/genre/${genre}`
+        const html = await fetchPageHtml(url)
+        videos = parseFlightVideos(html)
+        hasMore = new RegExp(`[?&]page=${page + 1}\\b`).test(html)
+      } else if (query) {
+        videos = await searchApi(query, limit)
+      } else {
+        const html = await fetchPageHtml(`${BASE_URL}/browse`)
+        videos = parseFlightVideos(html)
+      }
+
+      const seriesMap = groupBySeries(videos)
+      const shows: Show[] = Array.from(seriesMap.entries()).map(([slug, eps]) => {
+        const first = eps[0]
+        return {
+          _id: slug,
+          id: slug,
+          name: first.title,
+          englishName: first.title,
+          thumbnail: imageUrl(first.cover || first.thumb),
+          type: 'TV',
+          year: first.year || null,
+          isAdult: true,
+          score: first.rating || null,
+          availableEpisodesDetail: {
+            sub: eps.map((e) => String(e.ep)),
+            dub: [],
+          },
+        }
+      })
+
+      const output = { shows, hasMore }
+      this.cache.set(cacheKey, output, 300)
+      return output
+    } catch (error) {
+      logger.error({ error }, '[HT] Browse failed')
+      return { shows: [], hasMore: false }
+    }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {

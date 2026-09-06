@@ -60,6 +60,7 @@ function useDiscordPageStatus() {
 
     let page = 'home'
     if (path.startsWith('/search')) page = 'search'
+    else if (path.startsWith('/mature')) page = 'search'
     else if (path.startsWith('/watchlist')) page = 'watchlist'
     else if (path.startsWith('/anime/')) page = 'anime'
     else if (path.startsWith('/insights')) page = 'insights'
@@ -83,6 +84,7 @@ const Watchlist = lazy(() => import('./pages/Watchlist'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
+const Mature = lazy(() => import('./pages/Mature'))
 const Asmr = lazy(() => import('./pages/Asmr'))
 const Radio = lazy(() => import('./pages/Radio'))
 const Tv = lazy(() => import('./pages/Tv'))
@@ -222,6 +224,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/watchlist/:filter?" element={<Watchlist />} />
               <Route path="/search" element={<Search />} />
+              <Route path="/mature" element={<Mature />} />
               <Route path="/asmr" element={<Asmr />} />
               <Route path="/asmr/:rj" element={<Asmr />} />
               <Route path="/radio" element={<Radio />} />

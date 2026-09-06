@@ -63,6 +63,25 @@ export function createDataRouter(
     controller.search
   )
 
+  router.get(
+    '/mature/search',
+    makeCacheMiddleware(
+      apiCache,
+      (req) => `mature-search-${JSON.stringify(req.query)}`,
+      600,
+      (d) => !!d && typeof d === 'object' && Array.isArray((d as { data?: unknown }).data)
+    ),
+    controller.matureSearch
+  )
+
+  router.get(
+    '/mature/resolve',
+    makeCacheMiddleware(apiCache, (req) => `mature-resolve-${req.query.title || ''}`, 3600),
+    controller.resolveMature
+  )
+
+  router.get('/mature/filters', controller.getMatureFilters)
+
   router.get('/skip-times/:showId/:episodeNumber', controller.getSkipTimes)
   router.get('/video', controller.getVideo)
   router.get(

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   FaClock,
@@ -60,6 +60,10 @@ interface InsightData {
 }
 
 const Insights: React.FC = () => {
+  useEffect(() => {
+    document.title = 'Insights - dango'
+  }, [])
+
   const { data, isLoading, isError } = useQuery<InsightData>({
     queryKey: ['insights'],
     queryFn: async () => {

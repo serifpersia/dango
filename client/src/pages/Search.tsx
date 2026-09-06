@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router'
+import { useSearchParams, useNavigate } from 'react-router'
 import {
   FaSearch,
   FaFilter,
@@ -66,7 +66,12 @@ const anilistStatusOptions: Option[] = [
 ]
 
 export default function Search() {
+  useEffect(() => {
+    document.title = 'Search - dango'
+  }, [])
+
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
 
@@ -245,7 +250,16 @@ export default function Search() {
           <div className={styles.filterGrid}>
             <div className={styles.filterItem}>
               <label>Type</label>
-              <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
+              <select
+                value={type}
+                onChange={(e) => {
+                  if (e.currentTarget.value === 'ADULT') {
+                    navigate('/mature')
+                    return
+                  }
+                  setType(e.currentTarget.value)
+                }}
+              >
                 {typeOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}

@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
 import {
   FaHome,
   FaSearch,
+  FaPepperHot,
   FaClock,
   FaSyncAlt,
   FaCog,
@@ -18,6 +19,19 @@ import packageJson from '../../../package.json'
 
 const Sidebar: React.FC = () => {
   const { isOpen, setIsOpen } = useSidebar()
+  const [hasMatureConsent, setHasMatureConsent] = useState(
+    () => localStorage.getItem('agreedToViewMature') === 'true'
+  )
+
+  useEffect(() => {
+    const sync = () => setHasMatureConsent(localStorage.getItem('agreedToViewMature') === 'true')
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [])
 
   const handleNavLinkClick = () => {
     setIsOpen(false)
@@ -32,6 +46,7 @@ const Sidebar: React.FC = () => {
     { to: '/asmr', icon: <FaHeadphones />, label: 'ASMR' },
     { to: '/radio', icon: <FaBroadcastTower />, label: 'Radio' },
     { to: '/tv', icon: <FaTv />, label: 'TV & Movies' },
+    ...(hasMatureConsent ? [{ to: '/mature', icon: <FaPepperHot />, label: 'Mature' }] : []),
     { to: '/settings', icon: <FaCog />, label: 'Settings' },
   ]
 
