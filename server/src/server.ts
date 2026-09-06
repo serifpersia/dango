@@ -33,6 +33,8 @@ import {
   getActiveProvider,
 } from './sync'
 import { createAuthRouter } from './routes/auth.routes'
+import { createLanAuthRouter } from './routes/lan-auth.routes'
+import { lanAuthMiddleware } from './app-auth'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
 import { createAsmrRouter } from './routes/asmr.routes'
@@ -176,6 +178,9 @@ app.use(
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
+app.use('/api/auth', createLanAuthRouter())
+app.use(lanAuthMiddleware)
+
 app.use(
   '/api/auth',
   createAuthRouter((database) => runSyncSequence(database))
@@ -227,6 +232,16 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
+    if (
+      err instanceof SyntaxError &&
+      'body' in err &&
+      req.headers['content-type']?.includes('application/json')
+    ) {
+      if (!res.headersSent) {
+        return res.status(400).json({ error: 'Invalid JSON', status: 400 })
+      }
+    }
+
     logger.error({ err, url: req.url, method: req.method }, 'Unhandled error')
 
     if (res.headersSent) {

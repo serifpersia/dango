@@ -31,6 +31,9 @@ export const fetchApi = async (url: string) => {
     if (response.status === 403 && errorMsg === 'AUTH_REQUIRED' && data.provider === 'jasmr') {
       window.dispatchEvent(new CustomEvent('JASMR_AUTH_REQUIRED'))
     }
+    if (response.status === 401 && errorMsg === 'LAN_AUTH_REQUIRED') {
+      window.dispatchEvent(new CustomEvent('LAN_AUTH_REQUIRED'))
+    }
 
     throw new Error(errorMsg || `Failed to fetch from ${url}`)
   }

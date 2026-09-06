@@ -97,6 +97,9 @@ import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
 import TopProgressBar from './components/common/TopProgressBar'
 import ErrorBoundary from './components/common/ErrorBoundary'
+import { LanAuthProvider } from './contexts/LanAuthProvider'
+import { useLanAuth } from './hooks/useLanAuth'
+import LanAuthModal from './components/modals/LanAuthModal'
 
 const PlayerRedirect = () => {
   const { id, episodeNumber } = useParams()
@@ -105,12 +108,60 @@ const PlayerRedirect = () => {
 
 function App() {
   const queryClient = useQueryClient()
-  const { isOpen, openModal, closeModal, onSuccess } = useAnimePaheCookie()
+  const {
+    isOpen: animePaheOpen,
+    openModal: openAnimePaheModal,
+    closeModal: closeAnimePaheModal,
+    onSuccess,
+  } = useAnimePaheCookie()
   const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
+  const {
+    isOpen: lanAuthOpen,
+    openModal: openLanAuthModal,
+    closeModal: closeLanAuthModal,
+  } = useLanAuth()
   const location = useLocation()
   const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
   useDiscordPageStatus()
+
+  useEffect(() => {
+    const handleAuthRequired = () => openLanAuthModal()
+    window.addEventListener('LAN_AUTH_REQUIRED', handleAuthRequired)
+    return () => window.removeEventListener('LAN_AUTH_REQUIRED', handleAuthRequired)
+  }, [openLanAuthModal])
+
+  useEffect(() => {
+    fetch('/api/auth/app-status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.hasPassword && !data.isAuthenticated) {
+          openLanAuthModal()
+        }
+      })
+      .catch(() => {})
+  }, [openLanAuthModal])
+
+  useEffect(() => {
+    const noticeShown = localStorage.getItem('lan_auth_notice_shown')
+    if (!noticeShown) {
+      localStorage.setItem('lan_auth_notice_shown', 'true')
+      setTimeout(() => {
+        toast(
+          'Optional LAN lock is available. Set a password in Settings to protect access from other devices on your network.',
+          {
+            duration: 10000,
+            icon: '🔒',
+            style: {
+              background: '#1a3a5c',
+              color: '#fff',
+              border: '1px solid #2a5a8c',
+            },
+          }
+        )
+      }, 3000)
+    }
+  }, [])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -160,10 +211,10 @@ function App() {
   }, [location.pathname])
 
   useEffect(() => {
-    const handleAuthRequired = () => openModal()
+    const handleAuthRequired = () => openAnimePaheModal()
     window.addEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
     return () => window.removeEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
-  }, [openModal])
+  }, [openAnimePaheModal])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -188,7 +239,12 @@ function App() {
 
   return (
     <div className="app-container">
-      <AnimePaheCookieModal isOpen={isOpen} onClose={closeModal} onSuccess={onSuccess} />
+      <AnimePaheCookieModal
+        isOpen={animePaheOpen}
+        onClose={closeAnimePaheModal}
+        onSuccess={onSuccess}
+      />
+      <LanAuthModal isOpen={lanAuthOpen} onClose={closeLanAuthModal} onSuccess={() => {}} />
       <Toaster
         position="top-center"
         toastOptions={{
@@ -254,4 +310,10 @@ function App() {
   )
 }
 
-export default App
+export default function AppWithProviders() {
+  return (
+    <LanAuthProvider>
+      <App />
+    </LanAuthProvider>
+  )
+}

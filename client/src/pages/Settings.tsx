@@ -9,6 +9,7 @@ import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
 import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
+import LanAuthSettings from '../components/settings/LanAuthSettings'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -262,6 +263,10 @@ const Settings: React.FC = () => {
                     id="discord-rpc-enabled"
                   />
                 </div>
+              </div>
+
+              <div style={{ marginTop: '2rem' }}>
+                <LanAuthSettings />
               </div>
 
               {discordEnabled && (

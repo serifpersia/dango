@@ -143,4 +143,5 @@ export const CONFIG = {
   RCLONE_REMOTE: process.env.RCLONE_REMOTE,
   SYNC_PROVIDER: process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined,
   DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+  APP_PASSWORD_HASH: process.env.APP_PASSWORD_HASH || '',
 }
