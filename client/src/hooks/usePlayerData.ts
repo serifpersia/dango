@@ -306,12 +306,19 @@ export const usePlayerData = (
         nativeName: showMeta.names?.native,
         englishName: showMeta.names?.english,
         type: showMeta.type,
+        isAdult: showMeta.isAdult,
       }
-      await fetch(endpoint, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string
+        } | null
+        throw new Error(body?.error || 'Failed to update watchlist')
+      }
       return !wasIn
     },
     onSuccess: (newInWatchlist) => {
@@ -320,7 +327,8 @@ export const usePlayerData = (
       queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
     },
-    onError: () => toast.error('Failed to update watchlist'),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Failed to update watchlist'),
   })
 
   const toggleWatchlist = useCallback(async () => {

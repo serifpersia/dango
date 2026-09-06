@@ -505,6 +505,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('watchlist', 'type', 'TEXT')
     addCol('shows_meta', 'type', 'TEXT')
     addCol('shows_meta', 'anilistId', 'INTEGER')
+    addCol('shows_meta', 'isAdult', 'INTEGER')
 
     await db.saveNow()
     return db

@@ -75,6 +75,9 @@ export class SettingsController {
       if (value === null && req.query.key === 'discordRPCHideMature') {
         value = 'true'
       }
+      if (value === null && req.query.key === 'ignoreAdultContent') {
+        value = 'true'
+      }
       res.json({ value: value })
     } catch {
       res.status(500).json({ error: 'DB error' })

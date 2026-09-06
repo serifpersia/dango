@@ -19,6 +19,8 @@ export interface ContinueWatchingResult {
   type?: string
   episodeCount?: number
   smType?: string
+  isAdult?: number | null
+  watchlistStatus?: string | null
   watchedCount: number
   episodeNumber: string
   currentTime: number
@@ -92,6 +94,8 @@ export const WatchedEpisodesRepository = {
         COALESCE(w.type, sm.type) as type,
         sm.episodeCount,
         sm.type as smType,
+        sm.isAdult as isAdult,
+        w.status as watchlistStatus,
         (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = we.showId) as watchedCount,
         we.episodeNumber, we.currentTime, we.duration, we.watchedAt
       FROM (

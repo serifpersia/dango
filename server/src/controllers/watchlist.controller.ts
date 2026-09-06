@@ -40,6 +40,8 @@ interface CombinedContinueWatchingShow {
   watchedCount?: number
   type?: string
   smType?: string
+  isAdult?: number | null
+  watchlistStatus?: string | null
 }
 
 interface EpisodeNotification {
@@ -347,6 +349,7 @@ export class WatchlistController {
       episodeCount?: number
       type?: string
       anilistId?: number
+      isAdult?: number | null
     }
   ): boolean {
     const existing = ShowsMetaRepository.getById(db, showId) as {
@@ -360,6 +363,7 @@ export class WatchlistController {
       episodeCount?: number | null
       type?: string | null
       anilistId?: number | null
+      isAdult?: number | null
     } | null
 
     if (!existing) return true
@@ -379,7 +383,8 @@ export class WatchlistController {
       differs(candidate.status, existing.status) ||
       differs(candidate.episodeCount, existing.episodeCount) ||
       differs(candidate.type, existing.type) ||
-      differs(candidate.anilistId, existing.anilistId)
+      differs(candidate.anilistId, existing.anilistId) ||
+      differs(candidate.isAdult, existing.isAdult)
     )
   }
 
@@ -578,12 +583,25 @@ export class WatchlistController {
   ): Promise<CombinedContinueWatchingShow[]> {
     const rows = await WatchedEpisodesRepository.getContinueWatching(req.db, limit)
 
-    const enrichedRows = rows.map((show) => ({
-      ...show,
-      episodeCount: show.episodeCount,
-      type: show.type || show.smType,
-      thumbnail: show.thumbnail ?? '',
-    }))
+    const ignoreAdultRow = await SettingsRepository.getByKey(req.db, 'ignoreAdultContent')
+    const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
+    const watchlistOnlyRow = await SettingsRepository.getByKey(req.db, 'cwWatchlistOnly')
+    const watchlistOnly = watchlistOnlyRow
+      ? watchlistOnlyRow.value === 'true' || watchlistOnlyRow.value === '1'
+      : false
+
+    const enrichedRows = rows
+      .filter((show) => {
+        if (ignoreAdult && show.isAdult) return false
+        if (watchlistOnly && show.watchlistStatus !== 'Watching') return false
+        return true
+      })
+      .map((show) => ({
+        ...show,
+        episodeCount: show.episodeCount,
+        type: show.type || show.smType,
+        thumbnail: show.thumbnail ?? '',
+      }))
 
     return enrichedRows
   }
@@ -671,6 +689,7 @@ export class WatchlistController {
       episodeCount,
       type,
       anilistId,
+      isAdult: typeof isAdult === 'boolean' ? (isAdult ? 1 : 0) : null,
     }
 
     const metaChanged = this.showsMetaChanged(req.db, showId, metaCandidate)
@@ -708,6 +727,37 @@ export class WatchlistController {
       NotificationsRepository.deleteByShow(tx, showId)
     })
     res.json({ success: true })
+  }
+
+  private async getAdultNonWatchlistShowIds(db: DatabaseWrapper): Promise<string[]> {
+    const rows = await dbAll<{ showId: string }>(
+      db,
+      `SELECT DISTINCT we.showId as showId
+       FROM watched_episodes we
+       JOIN shows_meta sm ON sm.id = we.showId AND sm.isAdult = 1
+       LEFT JOIN watchlist w ON w.id = we.showId
+       WHERE w.id IS NULL`
+    )
+    return rows.map((r) => r.showId)
+  }
+
+  getAdultContinueWatchingCount = async (req: Request, res: Response) => {
+    const ids = await this.getAdultNonWatchlistShowIds(req.db)
+    res.json({ count: ids.length })
+  }
+
+  purgeAdultContinueWatching = async (req: Request, res: Response) => {
+    const ids = await this.getAdultNonWatchlistShowIds(req.db)
+    if (ids.length > 0) {
+      await performWriteTransaction(req.db, (tx) => {
+        for (const id of ids) {
+          WatchedEpisodesRepository.deleteByShow(tx, id)
+          NotificationsRepository.deleteByShow(tx, id)
+        }
+      })
+      req.db.scheduleSave()
+    }
+    res.json({ success: true, removed: ids.length })
   }
 
   batchRemoveContinueWatching = async (req: Request, res: Response) => {
@@ -984,7 +1034,7 @@ export class WatchlistController {
 
   addToWatchlist = async (req: Request, res: Response) => {
     const { id: idRaw, status, nativeName, englishName } = req.body
-    const { name, thumbnail, type } = req.body
+    const { name, thumbnail, type, isAdult: isAdultRaw } = req.body
     const id = await getMigratedId(req.db, idRaw)
 
     await performWriteTransaction(req.db, (tx) => {
@@ -997,6 +1047,9 @@ export class WatchlistController {
         englishName: englishName || '',
         type: type || 'TV',
       })
+      if (typeof isAdultRaw === 'boolean') {
+        ShowsMetaRepository.upsert(tx, { id, isAdult: isAdultRaw ? 1 : 0 })
+      }
     })
 
     await req.db.saveNow()

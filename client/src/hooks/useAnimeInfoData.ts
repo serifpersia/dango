@@ -41,6 +41,7 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
         nativeName: (meta?.names as Record<string, string> | undefined)?.native,
         englishName: (meta?.names as Record<string, string> | undefined)?.english,
         type: meta?.type,
+        isAdult: (meta as { isAdult?: boolean } | undefined)?.isAdult,
       }
 
       const response = await fetch(endpoint, {
@@ -48,7 +49,12 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!response.ok) throw new Error('Watchlist update failed')
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string
+        } | null
+        throw new Error(body?.error || 'Watchlist update failed')
+      }
       return !wasIn
     },
     onMutate: async ({ wasIn }) => {
@@ -61,9 +67,9 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
         })
       )
     },
-    onError: () => {
+    onError: (err) => {
       queryClient.invalidateQueries({ queryKey: ['watchlist-check', showId] })
-      toast.error('Failed to update watchlist')
+      toast.error(err instanceof Error ? err.message : 'Failed to update watchlist')
     },
     onSuccess: (newInWatchlist) => {
       toast.success(newInWatchlist ? 'Added to watchlist' : 'Removed from watchlist')
