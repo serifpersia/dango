@@ -157,11 +157,13 @@ const PUBLIC_PATHS = new Set([
   '/api/auth/app-status',
   '/api/auth/app-login',
   '/api/auth/app-logout',
+  '/api/internal/shutdown',
 ])
 
 export function lanAuthMiddleware(req: Request, res: Response, next: NextFunction) {
   if (!req.path.startsWith('/api/')) return next()
   if (PUBLIC_PATHS.has(req.path)) return next()
+  if (req.path.startsWith('/api/internal/') && isLoopbackRequest(req)) return next()
   if (!hasAppPassword()) return next()
   if (validateLanSession(getRequestToken(req))) return next()
   return res.status(401).json({ error: 'LAN_AUTH_REQUIRED' })

@@ -328,12 +328,35 @@ const shutdown = () => {
     }
   }
 
-  const req = http.request({
-    hostname: '127.0.0.1',
-    port: 3000,
-    path: '/api/internal/shutdown',
-    method: 'POST',
-  })
+  const req = http.request(
+    {
+      hostname: '127.0.0.1',
+      port: 3000,
+      path: '/api/internal/shutdown',
+      method: 'POST',
+    },
+    (res) => {
+      if (res.statusCode !== 200) {
+        console.log(
+          `${colors.system}[System]${colors.reset} Server rejected shutdown request (${res.statusCode}), forcing exit.`
+        )
+        if (isWin && serverProcess) killPid(serverProcess.pid)
+        else if (serverProcess) {
+          try {
+            process.kill(-serverProcess.pid, 'SIGKILL')
+          } catch {}
+        }
+        if (clientProcess) {
+          if (isWin) killPid(clientProcess.pid)
+          else
+            try {
+              process.kill(-clientProcess.pid, 'SIGKILL')
+            } catch {}
+        }
+        setTimeout(() => process.exit(0), 1000)
+      }
+    }
+  )
 
   req.on('error', () => {
     console.log(`${colors.system}[System]${colors.reset} Server unreachable, forcing exit.`)
