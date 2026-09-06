@@ -161,6 +161,7 @@ export function createWatchlistRouter(getDb: () => DatabaseWrapper): {
       const match = thumb.match(/url=([^&]+)/)
       if (match) thumb = decodeURIComponent(match[1])
     }
+    if (thumb && !thumb.startsWith('https://')) thumb = ''
     if (thumb.includes('localhost') || thumb.includes('127.0.0.1')) thumb = ''
     discordRPCService.updatePresence({
       title: String(title || 'Radio').slice(0, 128),

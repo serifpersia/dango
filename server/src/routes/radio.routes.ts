@@ -115,7 +115,7 @@ function toStation(s: RbStation): RadioStation | null {
     name: s.name || 'Unknown station',
     streamUrl: url,
     homepage: s.homepage || undefined,
-    favicon: s.favicon || undefined,
+    favicon: s.favicon && s.favicon.startsWith('https://') ? s.favicon : undefined,
     tags: s.tags || undefined,
     codec: s.codec || undefined,
     bitrate: s.bitrate || undefined,

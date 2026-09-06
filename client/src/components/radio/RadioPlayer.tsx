@@ -66,7 +66,12 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
 
   const song = nowPlaying.song
   const cover = songArt(song) || station.favicon || null
-  const hasImages = !!cover
+  const [artFailed, setArtFailed] = useState(false)
+  useEffect(() => {
+    setArtFailed(false)
+  }, [cover])
+  const effectiveCover = artFailed ? null : cover
+  const hasImages = !!effectiveCover
   const headline = song ? `${songArtist(song)} — ${song.title}` : station.name
 
   useEffect(() => {
@@ -114,7 +119,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
           title: headline,
           stationLabel: station.name,
           isPlaying: playing,
-          thumbnail: cover || '',
+          thumbnail: effectiveCover || '',
           currentTime: elapsedSeconds(nowPlaying.startTime),
           sessionId: sessionIdRef.current,
         }),
@@ -125,7 +130,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
         body: JSON.stringify({ sessionId: sessionIdRef.current }),
       }).catch(() => {})
     },
-    [station, headline, cover, nowPlaying.startTime]
+    [station, headline, effectiveCover, nowPlaying.startTime]
   )
 
   useEffect(() => {
@@ -354,9 +359,15 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
           className={`${styles.npStage} ${!showArt || !hasImages ? styles.npStageBlank : ''}`}
           onClick={() => setShowControls((v) => !v)}
         >
-          {showArt && hasImages && cover && (
+          {showArt && hasImages && effectiveCover && (
             <div className={radioStyles.coverWrap}>
-              <img src={cover} alt={headline} draggable={false} className={radioStyles.cover} />
+              <img
+                src={effectiveCover}
+                alt={headline}
+                draggable={false}
+                className={radioStyles.cover}
+                onError={() => setArtFailed(true)}
+              />
             </div>
           )}
         </div>

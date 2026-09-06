@@ -99,7 +99,7 @@ class DiscordGatewayService {
 
   private resolveImageUrl(data: PresenceData): string | null {
     const isSafeUrl = (url: string): boolean => {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) return false
+      if (!url.startsWith('https://')) return false
       if (url.includes('localhost') || url.includes('127.0.0.1')) return false
       if (url.includes('s4.anilist.co') || url.includes('anilistcdn')) return true
       const blocked = [
@@ -157,7 +157,7 @@ class DiscordGatewayService {
         if (proxied) {
           assets = { large_image: proxied, large_text: data.title.slice(0, 128) }
         } else {
-          assets = { large_image: imageUrl, large_text: data.title.slice(0, 128) }
+          assets = { large_image: 'logo', large_text: data.title.slice(0, 128) }
         }
       }
     } else if (CONFIG.DISCORD_CLIENT_ID) {

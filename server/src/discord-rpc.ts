@@ -299,7 +299,7 @@ class DiscordRPCService {
     if (!this.client || !this.client.user) return
 
     const isSafeUrl = (url: string): boolean => {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      if (!url.startsWith('https://')) {
         return false
       }
       if (url.includes('localhost') || url.includes('127.0.0.1')) {
@@ -349,8 +349,7 @@ class DiscordRPCService {
             : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
           largeImageKey: imageKey,
           largeImageText: data.title,
-          smallImageKey: 'logo',
-          smallImageText: 'dango',
+          ...(imageKey !== 'logo' ? { smallImageKey: 'logo', smallImageText: 'dango' } : {}),
           type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
           statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
@@ -373,8 +372,8 @@ class DiscordRPCService {
         endTimestamp?: number
         largeImageKey: string
         largeImageText: string
-        smallImageKey: string
-        smallImageText: string
+        smallImageKey?: string
+        smallImageText?: string
         type: number
         statusDisplayType?: number
         buttons: { label: string; url: string }[]
@@ -385,8 +384,7 @@ class DiscordRPCService {
           : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
         largeImageKey: imageKey,
         largeImageText: data.title,
-        smallImageKey: 'logo',
-        smallImageText: 'dango',
+        ...(imageKey !== 'logo' ? { smallImageKey: 'logo', smallImageText: 'dango' } : {}),
         type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
