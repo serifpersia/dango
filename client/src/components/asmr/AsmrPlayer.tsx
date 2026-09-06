@@ -81,8 +81,14 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     const saved = parseFloat(localStorage.getItem('asmrVolume') || '')
     return Number.isFinite(saved) ? saved : 1
   })
+  const volumeRef = useRef(volume)
+  useEffect(() => {
+    volumeRef.current = volume
+  }, [volume])
 
   const track = tracks[trackIndex]
+  const trackLink = track?.link
+  const trackIsHls = track?.hls
   const hasImages = images.length > 0
 
   const destroyHls = useCallback(() => {
@@ -94,7 +100,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
 
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !track) return
+    if (!audio || !trackLink) return
 
     setCurrentTime(0)
     setDuration(0)
@@ -102,28 +108,28 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     setIsPlaying(false)
     destroyHls()
 
-    if (track.hls) {
+    if (trackIsHls) {
       if (window.Hls && window.Hls.isSupported()) {
         const hls = new window.Hls({ enableWorker: true })
         hlsRef.current = hls
-        hls.loadSource(track.link)
+        hls.loadSource(trackLink)
         hls.attachMedia(audio)
       } else {
-        audio.src = track.link
+        audio.src = trackLink
       }
     } else {
-      audio.src = track.link
+      audio.src = trackLink
     }
 
     audio.load()
-    audio.volume = volume
+    audio.volume = volumeRef.current
     audio.play().catch(() => setIsPlaying(false))
 
     return () => {
       destroyHls()
       audio.removeAttribute('src')
     }
-  }, [track, volume, destroyHls])
+  }, [trackLink, trackIsHls, destroyHls])
 
   useEffect(() => () => destroyHls(), [destroyHls])
 
