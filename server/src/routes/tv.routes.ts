@@ -514,6 +514,67 @@ export function createTvRouter(apiCache: NodeCache): Router {
     }
   })
 
+  router.get('/tv/subtitles/:type/:tmdbId', async (req, res) => {
+    const { type, tmdbId } = req.params
+    const numericTmdbId = parseInt(tmdbId, 10)
+    if (!numericTmdbId) return res.json({ subtitles: [] })
+    const mediaType = type === 'movie' ? 'movie' : 'tv'
+    const season = String(req.query.season || '1')
+    const episode = String(req.query.episode || '1')
+    const cacheKey =
+      mediaType === 'tv'
+        ? `tv-subs-${numericTmdbId}-${season}-${episode}`
+        : `tv-subs-${numericTmdbId}-movie`
+    const cached = apiCache.get(cacheKey)
+    if (cached) return res.json(cached)
+    try {
+      const searchUrl =
+        mediaType === 'tv'
+          ? `https://subtitles.vidy.st/search?id=${numericTmdbId}&season=${encodeURIComponent(season)}&episode=${encodeURIComponent(episode)}`
+          : `https://subtitles.vidy.st/search?id=${numericTmdbId}`
+      const r = await fetch(searchUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!r.ok) return res.json({ subtitles: [] })
+      const items = (await r.json()) as {
+        url?: string
+        language?: string
+        display?: string
+        format?: string
+        isTrusted?: boolean
+        isHearingImpaired?: boolean
+        downloadCount?: number
+        media?: string
+        release?: string
+      }[]
+      const subtitles = (Array.isArray(items) ? items : [])
+        .filter((s) => typeof s.url === 'string' && s.url.startsWith('https://'))
+        .map((s) => ({
+          language: String(s.language || 'en'),
+          label: String(s.display || s.language || 'Unknown'),
+          url: String(s.url),
+          trusted: s.isTrusted === true,
+          hi: s.isHearingImpaired === true,
+          downloads: Number(s.downloadCount) || 0,
+          media: String(s.media || s.release || ''),
+        }))
+        .sort((a, b) => {
+          const aEn = a.language.toLowerCase().startsWith('en') ? 0 : 1
+          const bEn = b.language.toLowerCase().startsWith('en') ? 0 : 1
+          if (aEn !== bEn) return aEn - bEn
+          if (a.trusted !== b.trusted) return a.trusted ? -1 : 1
+          return b.downloads - a.downloads
+        })
+        .slice(0, 50)
+      const payload = { subtitles }
+      apiCache.set(cacheKey, payload, 3600)
+      res.json(payload)
+    } catch {
+      res.json({ subtitles: [] })
+    }
+  })
+
   router.get('/tv/movybz/:type/:tmdbId', async (req, res) => {
     const { type, tmdbId } = req.params
     const mediaType = type === 'movie' ? 'movie' : 'tv'

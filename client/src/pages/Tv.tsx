@@ -335,6 +335,36 @@ const Tv: React.FC = () => {
           setQualityIdx(0)
           setSubtitles([])
           setSelectedSubtitle(-1)
+          const subType = type
+          const subId = id
+          const subSeason = season
+          const subEpisode = episode
+          fetch(`/api/tv/subtitles/${subType}/${subId}?season=${subSeason}&episode=${subEpisode}`)
+            .then((r) => r.json())
+            .then((sd: { subtitles?: SubtitleTrack[] }) => {
+              const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
+              if (osSubs.length === 0) return
+              setSubtitles(osSubs)
+              const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
+              if (savedEnabled === 'false') {
+                setSelectedSubtitle(-1)
+              } else {
+                const englishIdx = osSubs.findIndex(
+                  (s) =>
+                    s.language.toLowerCase().startsWith('en') ||
+                    s.label.toLowerCase().includes('english')
+                )
+                const pick = englishIdx >= 0 ? englishIdx : 0
+                setSelectedSubtitle(pick)
+                try {
+                  localStorage.setItem('tvSubtitlesEnabled', 'true')
+                  localStorage.setItem('tvSelectedSubtitle', String(pick))
+                } catch {
+                  // ignore
+                }
+              }
+            })
+            .catch(() => {})
           if (data.audioTracks?.length) {
             const tracks = data.audioTracks as AudioTrack[]
             setAudioTracks(tracks)
@@ -391,6 +421,37 @@ const Tv: React.FC = () => {
         } else {
           setSelectedSubtitle(-1)
         }
+        const osType = type
+        const osId = id
+        fetch(`/api/tv/subtitles/${osType}/${osId}?season=${season}&episode=${episode}`)
+          .then((r) => r.json())
+          .then((sd: { subtitles?: SubtitleTrack[] }) => {
+            const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
+            if (osSubs.length === 0) return
+            setSubtitles((prev) => {
+              const merged = [...prev, ...osSubs.filter((s) => !prev.some((p) => p.url === s.url))]
+              if (prev.length === 0) {
+                const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
+                if (savedEnabled !== 'false') {
+                  const englishIdx = merged.findIndex(
+                    (s) =>
+                      s.language.toLowerCase().startsWith('en') ||
+                      s.label.toLowerCase().includes('english')
+                  )
+                  const pick = englishIdx >= 0 ? englishIdx : 0
+                  setSelectedSubtitle(pick)
+                  try {
+                    localStorage.setItem('tvSubtitlesEnabled', 'true')
+                    localStorage.setItem('tvSelectedSubtitle', String(pick))
+                  } catch {
+                    // ignore
+                  }
+                }
+              }
+              return merged
+            })
+          })
+          .catch(() => {})
       }
     } catch {
       setStreamLoading(false)
@@ -490,15 +551,18 @@ const Tv: React.FC = () => {
             subtitleTracks?: unknown[]
           }
           if (typeof extended.subtitleTrack !== 'number') return
-          const pref = readSubtitlePreference()
           const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
-          if (pref.enabled && tracks.length > 0) {
+          if (tracks.length === 0) {
+            extended.subtitleTrack = -1
+            return
+          }
+          const pref = readSubtitlePreference()
+          if (pref.enabled) {
             const target = pref.index < tracks.length ? pref.index : 0
             extended.subtitleTrack = target
             setSelectedSubtitle(target)
           } else {
             extended.subtitleTrack = -1
-            setSelectedSubtitle(-1)
           }
         }
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -530,11 +594,12 @@ const Tv: React.FC = () => {
           applySubtitlePreference()
         })
         hlsWithEvents.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e: string, data: { id: number }) => {
+          const extended = hls as unknown as { subtitleTracks?: unknown[] }
+          const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
+          if (tracks.length === 0) return
           if (data.id === -1) {
             const pref = readSubtitlePreference()
-            const extended = hls as unknown as { subtitleTracks?: unknown[] }
-            const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
-            if (pref.enabled && tracks.length > 0) {
+            if (pref.enabled) {
               const target = pref.index < tracks.length ? pref.index : 0
               ;(hls as unknown as { subtitleTrack?: number }).subtitleTrack = target
               return
@@ -578,8 +643,12 @@ const Tv: React.FC = () => {
   }, [selectedAudioTrack])
 
   useEffect(() => {
-    const hls = hlsRef.current as unknown as { subtitleTrack?: number } | null
+    const hls = hlsRef.current as unknown as {
+      subtitleTrack?: number
+      subtitleTracks?: unknown[]
+    } | null
     if (!hls || typeof hls.subtitleTrack !== 'number') return
+    if (!Array.isArray(hls.subtitleTracks) || hls.subtitleTracks.length === 0) return
     if (selectedSubtitle >= 0) hls.subtitleTrack = selectedSubtitle
     else hls.subtitleTrack = -1
   }, [selectedSubtitle])
@@ -605,10 +674,17 @@ const Tv: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current
     if (!video || isEmbedProvider) return
-    const hls = hlsRef.current as unknown as { subtitleTrack?: number } | null
-    if (hls && typeof hls.subtitleTrack === 'number') {
-      hls.subtitleTrack = selectedSubtitle
-      return
+    const hls = hlsRef.current as unknown as {
+      subtitleTrack?: number
+      subtitleTracks?: unknown[]
+    } | null
+    if (
+      hls &&
+      typeof hls.subtitleTrack === 'number' &&
+      Array.isArray(hls.subtitleTracks) &&
+      hls.subtitleTracks.length > 0
+    ) {
+      hls.subtitleTrack = -1
     }
     const sync = () => {
       const tracks = Array.from(video.textTracks)
@@ -687,10 +763,17 @@ const Tv: React.FC = () => {
       // ignore
     }
     const video = videoRef.current
-    const hls = hlsRef.current
-    if (hls && hls.subtitleTrack !== undefined) {
-      hls.subtitleTrack = index
-      return
+    const hls = hlsRef.current as unknown as {
+      subtitleTrack?: number
+      subtitleTracks?: unknown[]
+    } | null
+    if (
+      hls &&
+      typeof hls.subtitleTrack === 'number' &&
+      Array.isArray(hls.subtitleTracks) &&
+      hls.subtitleTracks.length > 0
+    ) {
+      hls.subtitleTrack = -1
     }
     if (!video) return
     Array.from(video.textTracks).forEach((track, i) => {

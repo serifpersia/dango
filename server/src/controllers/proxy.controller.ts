@@ -419,7 +419,12 @@ export class ProxyController {
         responseType: 'text',
         signal: abortController.signal,
       })
-      res.set('Content-Type', 'text/vtt; charset=utf-8').send(response.data)
+      const body = String(response.data ?? '').replace(/^\uFEFF/, '')
+      res.set('Content-Type', 'text/vtt; charset=utf-8')
+      if (/^\s*WEBVTT/i.test(body)) return res.send(body)
+      return res.send(
+        `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`
+      )
     } catch (e) {
       if (axios.isCancel(e)) return
       res.status(500).send('Proxy error')
