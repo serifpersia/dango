@@ -295,6 +295,36 @@ export default function Mature() {
     if (resolvingId) return
     setResolvingId(id)
     try {
+      if (provider !== 'anilist') {
+        let anilistUp = false
+        try {
+          const st = (await fetchApi('/api/anilist-status')) as { available?: boolean }
+          anilistUp = st?.available === true
+        } catch {
+          anilistUp = false
+        }
+        if (anilistUp) {
+          const data = (await fetchApi(
+            `/api/mature/resolve?title=${encodeURIComponent(show.name)}`
+          )) as { id: number }
+          navigate(`/anime/${data.id}`)
+          return
+        }
+        const res = await fetch('/api/mature/allocate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            nativeId: id,
+            title: show.name,
+            thumbnail: show.thumbnail,
+          }),
+        })
+        const data = (await res.json().catch(() => null)) as { id?: string } | null
+        if (!res.ok || !data?.id) throw new Error('Allocate failed')
+        navigate(`/anime/${data.id}`)
+        return
+      }
       const data = (await fetchApi(
         `/api/mature/resolve?title=${encodeURIComponent(show.name)}`
       )) as { id: number }

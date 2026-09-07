@@ -19,6 +19,8 @@ import {
   checkAnilistStatus,
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
+import { isTempShowId, isTempMatureProvider } from '../lib/temp-ids'
+import { TempShowIdsRepository } from '../repositories/temp-show-ids.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
 import logger from '../logger'
@@ -101,6 +103,34 @@ export class DataController {
   getVideo = async (req: Request, res: Response) => {
     try {
       let showId = req.query.showId as string
+
+      if (isTempShowId(showId)) {
+        try {
+          const row = TempShowIdsRepository.getById(req.db, showId)
+          if (!row || !isTempMatureProvider(row.provider)) return res.json([])
+          let tempProvider = this.providers[row.provider]
+          let nativeId = row.nativeId
+          const wanted = String(req.query.provider || '').toLowerCase()
+          if (wanted && wanted !== row.provider && isTempMatureProvider(wanted)) {
+            const resolved = await this.providers[wanted].resolveShowId?.(row.title)
+            if (!resolved) return res.json([])
+            tempProvider = this.providers[wanted]
+            nativeId = resolved
+          }
+          if (tempProvider) {
+            const urls = await tempProvider.getStreamUrls(
+              nativeId,
+              req.query.episodeNumber as string,
+              req.query.mode as 'sub' | 'dub'
+            )
+            return res.json(urls || [])
+          }
+        } catch (e) {
+          logger.error({ err: e, showId }, 'Temp show video fetch failed')
+        }
+        return res.json([])
+      }
+
       const providerName = req.query.provider as string
 
       const providerKey = providerName?.toLowerCase()
@@ -232,6 +262,29 @@ export class DataController {
     }
 
     const showId = await getMigratedId(req.db, showIdRaw)
+
+    if (isTempShowId(showId)) {
+      try {
+        const row = TempShowIdsRepository.getById(req.db, showId)
+        if (!row || !isTempMatureProvider(row.provider)) return res.json({ episodes: [] })
+        let tempProvider = this.providers[row.provider]
+        let nativeId = row.nativeId
+        const wanted = String(req.query.provider || '').toLowerCase()
+        if (wanted && wanted !== row.provider && isTempMatureProvider(wanted)) {
+          const resolved = await this.providers[wanted].resolveShowId?.(row.title)
+          if (!resolved) return res.json({ episodes: [] })
+          tempProvider = this.providers[wanted]
+          nativeId = resolved
+        }
+        if (tempProvider) {
+          const data = await tempProvider.getEpisodes(nativeId, req.query.mode as 'sub' | 'dub')
+          if (data?.episodes?.length) return res.json(data)
+        }
+      } catch {
+        // ignore
+      }
+      return res.json({ episodes: [] })
+    }
 
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId)) {
       try {
@@ -512,6 +565,28 @@ export class DataController {
   getShowMeta = async (req: Request, res: Response) => {
     const showIdRaw = req.params.id as string
     const id = await getMigratedId(req.db, showIdRaw)
+
+    if (isTempShowId(id)) {
+      const row = TempShowIdsRepository.getById(req.db, id)
+      if (!row || !isTempMatureProvider(row.provider)) {
+        res.json({})
+        return
+      }
+      res.set('Cache-Control', 'public, max-age=300').json({
+        _id: row.id,
+        id: row.id,
+        name: row.title,
+        englishName: row.title,
+        thumbnail: row.thumbnail || '',
+        type: 'TV',
+        isAdult: true,
+        status: 'UNKNOWN',
+        provider: row.provider,
+        nativeId: row.nativeId,
+      })
+      return
+    }
+
     const isNumeric = /^\d+$/.test(id)
 
     if (isNumeric) {
@@ -572,6 +647,31 @@ export class DataController {
 
   getGenresAndTags = (_req: Request, res: Response) => {
     res.json({ genres, tags, studios })
+  }
+
+  allocateTempShow = async (req: Request, res: Response) => {
+    try {
+      const provider = String(req.body?.provider || '').toLowerCase()
+      const nativeId = String(req.body?.nativeId || '').trim()
+      const title = String(req.body?.title || '').trim()
+      const thumbnail = String(req.body?.thumbnail || '')
+      if (!provider || !this.providers[provider] || !isTempMatureProvider(provider)) {
+        return res.status(400).json({ error: 'Unknown provider' })
+      }
+      if (!nativeId || !title) {
+        return res.status(400).json({ error: 'nativeId and title are required' })
+      }
+      const row = TempShowIdsRepository.allocate(req.db, {
+        provider,
+        nativeId,
+        title,
+        thumbnail,
+      })
+      return res.json({ id: row.id })
+    } catch (e) {
+      logger.error({ err: e }, 'temp show allocate failed')
+      res.status(500).json({ error: 'Allocate failed' })
+    }
   }
 
   getAnilistStatus = async (_req: Request, res: Response) => {

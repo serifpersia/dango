@@ -82,6 +82,8 @@ export function createDataRouter(
 
   router.get('/mature/filters', controller.getMatureFilters)
 
+  router.post('/mature/allocate', controller.allocateTempShow)
+
   router.get('/skip-times/:showId/:episodeNumber', controller.getSkipTimes)
   router.get('/video', controller.getVideo)
   router.get(

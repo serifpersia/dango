@@ -8,6 +8,8 @@ import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
 import { dbAll, dbGet } from './utils/db-utils'
+import { TempShowIdsRepository } from './repositories/temp-show-ids.repository'
+import { isTempSyncRow } from './lib/temp-ids'
 
 const log = logger.child({ module: 'Sync' })
 
@@ -38,7 +40,8 @@ function readPayloadVersion(payload: SyncPayload): number {
 async function exportSyncPayload(db: DatabaseWrapper): Promise<SyncPayload> {
   const tables = {} as Record<(typeof SYNC_TABLES)[number], SyncRow[]>
   for (const table of SYNC_TABLES) {
-    tables[table] = dbAll<SyncRow>(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
+    const rows = dbAll<SyncRow>(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
+    tables[table] = rows.filter((row) => !isTempSyncRow(row))
   }
   return {
     version: readPayloadVersion({ version: 0, exportedAt: '', tables }),
@@ -54,6 +57,7 @@ function importSyncPayload(db: DatabaseWrapper, payload: SyncPayload) {
     }
     for (const table of SYNC_TABLES) {
       for (const row of payload.tables[table] || []) {
+        if (isTempSyncRow(row)) continue
         const columns = Object.keys(row)
         if (columns.length === 0) continue
         const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
@@ -461,6 +465,19 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(
       `CREATE TABLE IF NOT EXISTS legacy_id_mapping (legacyId TEXT PRIMARY KEY, numericId TEXT)`
     )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS temp_show_ids (id TEXT PRIMARY KEY, provider TEXT NOT NULL, nativeId TEXT NOT NULL, title TEXT NOT NULL, thumbnail TEXT, createdAt INTEGER NOT NULL)`
+    )
+    db.run(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_temp_show_ids_provider_native ON temp_show_ids(provider, nativeId)`
+    )
+
+    try {
+      const purged = TempShowIdsRepository.purge(db)
+      if (purged > 0) logger.info({ purged }, 'Purged stale temp show ids on boot')
+    } catch (e) {
+      logger.warn({ err: e }, 'Temp show purge on boot failed')
+    }
 
     db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`)
     db.run(

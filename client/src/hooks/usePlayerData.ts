@@ -208,7 +208,7 @@ export const usePlayerData = (
   const { data: showMeta, isLoading: loadingShowData, error: showDataError } = useShowMeta(showId)
 
   const { data: playerData } = useQuery({
-    queryKey: ['player-data', showId, uiState.currentMode],
+    queryKey: ['player-data', showId, uiState.currentMode, uiState.selectedProvider],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
 
@@ -217,7 +217,9 @@ export const usePlayerData = (
         description?: string
       } | null> => {
         try {
-          const data = await fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`)
+          const data = await fetchApi(
+            `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
+          )
           if (data?.episodes?.length) return data
         } catch {
           // ignore
@@ -274,6 +276,20 @@ export const usePlayerData = (
       dispatch({ type: 'SET_PROVIDER', payload: 'animepahe' })
     }
   }, [showMeta?.isAdult, uiState.selectedProvider, showId])
+
+  useEffect(() => {
+    if (!showId || !/^dango-mt-\d+$/.test(showId)) return
+    if (hasForcedAdultProvider.current === `temp:${showId}`) return
+    const origin = (showMeta as { provider?: string } | undefined)?.provider
+    if (!origin) return
+    hasForcedAdultProvider.current = `temp:${showId}`
+    if (
+      (origin === 'wh' || origin === 'hn' || origin === 'ht' || origin === 'op') &&
+      uiState.selectedProvider !== origin
+    ) {
+      dispatch({ type: 'SET_PROVIDER', payload: origin as PlayerState['selectedProvider'] })
+    }
+  }, [showId, showMeta, uiState.selectedProvider])
 
   const {
     data: videoData,

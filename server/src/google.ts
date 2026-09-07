@@ -8,6 +8,7 @@ import logger from './logger'
 import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
 import { dbAll } from './utils/db-utils'
+import { isTempSyncRow } from './lib/temp-ids'
 
 type GoogleTokenSet = {
   access_token?: string
@@ -585,7 +586,9 @@ export class GoogleDriveService {
     ] as const
     const out = {} as Record<(typeof tables)[number], unknown[]>
     for (const table of tables) {
-      out[table] = dbAll(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
+      out[table] = dbAll(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`).filter(
+        (row) => !isTempSyncRow(row as Record<string, unknown>)
+      )
     }
     const versionRow = (out.sync_metadata as Array<{ key: string; value: number }>).find(
       (r) => r.key === 'db_version'
@@ -619,6 +622,7 @@ export class GoogleDriveService {
       }
       for (const table of tables) {
         for (const row of payload.tables[table] || []) {
+          if (isTempSyncRow(row)) continue
           const columns = Object.keys(row)
           if (columns.length === 0) continue
           const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')

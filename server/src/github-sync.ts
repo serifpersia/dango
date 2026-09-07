@@ -1,6 +1,7 @@
 import logger from './logger'
 import { DatabaseWrapper } from './db'
 import { dbAll } from './utils/db-utils'
+import { isTempSyncRow } from './lib/temp-ids'
 import { updateEnvFile } from './utils/env.utils'
 import { CONFIG } from './config'
 
@@ -470,7 +471,8 @@ class GitHubSyncService {
     const tables = {} as Record<SyncTable, Row[]>
 
     for (const table of SYNC_TABLES) {
-      tables[table] = await getRowsFromAll<Row>(db, `SELECT * FROM ${quoteIdentifier(table)}`)
+      const rows = await getRowsFromAll<Row>(db, `SELECT * FROM ${quoteIdentifier(table)}`)
+      tables[table] = rows.filter((row) => !isTempSyncRow(row))
     }
 
     return {
@@ -488,6 +490,7 @@ class GitHubSyncService {
 
       for (const table of SYNC_TABLES) {
         for (const row of payload.tables[table]) {
+          if (isTempSyncRow(row)) continue
           const columns = Object.keys(row)
           if (columns.length === 0) continue
 

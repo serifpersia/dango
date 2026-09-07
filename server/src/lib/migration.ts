@@ -1,6 +1,7 @@
 import { DatabaseWrapper } from '../db'
 import { performWriteTransaction } from '../sync'
 import { searchAnilistByTitle, getShowMetaById } from './anilist'
+import { isTempShowId } from './temp-ids'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { dbGet, dbRun } from '../utils/db-utils'
@@ -371,6 +372,8 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
 }
 
 export function getMigratedId(db: DatabaseWrapper, legacyId: string): Promise<string> {
+  if (isTempShowId(legacyId)) return Promise.resolve(legacyId)
+
   if (/^\d+$/.test(legacyId)) {
     const existing = inFlightMigrations.get(legacyId)
     if (existing) return existing
