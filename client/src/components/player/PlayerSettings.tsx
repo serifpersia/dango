@@ -20,9 +20,14 @@ interface PlayerSettingsProps {
   onSubtitleSettingsChange: (key: 'fontSize' | 'position', value: number) => void
   useNativeControls: boolean
   onNativeControlsToggle: (value: boolean) => void
+  anime4kEnabled: boolean
+  onAnime4kToggle: (value: boolean) => void
+  anime4kSupported: boolean
+  anime4kProfile: 'low' | 'balanced' | 'high' | 'denoise'
+  onAnime4kProfileChange: (profile: 'low' | 'balanced' | 'high' | 'denoise') => void
 }
 
-type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style'
+type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler'
 
 const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
   const {
@@ -39,6 +44,11 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onSubtitleSettingsChange,
     useNativeControls,
     onNativeControlsToggle,
+    anime4kEnabled,
+    onAnime4kToggle,
+    anime4kSupported,
+    anime4kProfile,
+    onAnime4kProfileChange,
   } = props
   const [view, setView] = useState<SettingsView>('main')
 
@@ -73,6 +83,22 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         <span>Native Controls</span>
         {useNativeControls && <FaCheck size={12} />}
       </button>
+      {anime4kSupported && (
+        <button
+          className={`${styles.menuItem} ${anime4kEnabled ? styles.selected : ''}`}
+          onClick={() => {
+            onAnime4kToggle(!anime4kEnabled)
+          }}
+        >
+          <span>AI Upscaler</span>
+          {anime4kEnabled && <FaCheck size={12} />}
+        </button>
+      )}
+      {anime4kSupported && anime4kEnabled && (
+        <button className={styles.menuItem} onClick={() => setView('upscaler')}>
+          <span>Upscaler Settings</span>
+        </button>
+      )}
     </div>
   )
 
@@ -156,6 +182,59 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     </div>
   )
 
+  const renderUpscaler = () => (
+    <div className={styles.menuContent}>
+      <button
+        className={`${styles.menuItem} ${anime4kProfile === 'low' ? styles.selected : ''}`}
+        onClick={() => onAnime4kProfileChange('low')}
+      >
+        <div>
+          <div>Low</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+            Lightest, best for weaker GPUs
+          </div>
+        </div>
+        {anime4kProfile === 'low' && <FaCheck size={12} />}
+      </button>
+      <button
+        className={`${styles.menuItem} ${anime4kProfile === 'balanced' ? styles.selected : ''}`}
+        onClick={() => onAnime4kProfileChange('balanced')}
+      >
+        <div>
+          <div>Balanced</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+            Source + display aware
+          </div>
+        </div>
+        {anime4kProfile === 'balanced' && <FaCheck size={12} />}
+      </button>
+      <button
+        className={`${styles.menuItem} ${anime4kProfile === 'high' ? styles.selected : ''}`}
+        onClick={() => onAnime4kProfileChange('high')}
+      >
+        <div>
+          <div>High</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+            Aggressive, needs strong GPU
+          </div>
+        </div>
+        {anime4kProfile === 'high' && <FaCheck size={12} />}
+      </button>
+      <button
+        className={`${styles.menuItem} ${anime4kProfile === 'denoise' ? styles.selected : ''}`}
+        onClick={() => onAnime4kProfileChange('denoise')}
+      >
+        <div>
+          <div>Denoise</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+            Clean noisy/compressed sources
+          </div>
+        </div>
+        {anime4kProfile === 'denoise' && <FaCheck size={12} />}
+      </button>
+    </div>
+  )
+
   if (!isOpen) return null
 
   return (
@@ -178,6 +257,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         {view === 'quality' && renderQuality()}
         {view === 'subtitles' && renderSubtitles()}
         {view === 'subtitle-style' && renderSubtitleStyle()}
+        {view === 'upscaler' && renderUpscaler()}
       </div>
     </div>
   )

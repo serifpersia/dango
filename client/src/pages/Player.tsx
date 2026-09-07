@@ -32,6 +32,7 @@ import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
+import useAnime4K from '../hooks/useAnime4K'
 import { usePlayerData } from '../hooks/usePlayerData'
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
@@ -106,9 +107,30 @@ const Player: React.FC = () => {
   const isMobile = useIsMobile()
   const rafIdRef = useRef<number | null>(null)
   const episodeSidebarRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const subtitleOverlayRef = useRef<HTMLDivElement>(null)
   const seekToTimeRef = useRef<number>(0)
   const resumeTimeRef = useRef(state.resumeTime)
   const showResumeModalRef = useRef(state.showResumeModal)
+
+  const [anime4kProfile, setAnime4kProfile] = useState<'low' | 'balanced' | 'high' | 'denoise'>(
+    () => {
+      try {
+        return (
+          (localStorage.getItem('anime4kProfile') as 'low' | 'balanced' | 'high' | 'denoise') ||
+          'balanced'
+        )
+      } catch {
+        return 'balanced'
+      }
+    }
+  )
+
+  const upscaler = useAnime4K({
+    videoRef: refs.videoRef,
+    canvasRef,
+    profile: anime4kProfile,
+  })
 
   useEffect(() => {
     resumeTimeRef.current = state.resumeTime
@@ -972,6 +994,92 @@ const Player: React.FC = () => {
     refs.videoRef,
   ])
 
+  useEffect(() => {
+    if (!upscaler.isEnabled || !upscaler.isWebGPUSupported) return
+    const video = refs.videoRef.current
+    const overlay = subtitleOverlayRef.current
+    if (!video || !overlay) return
+
+    const enabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+    const activeTrackLabel = player.state.activeSubtitleTrack
+
+    function getShowingTrack(): TextTrack | undefined {
+      return Array.from(video.textTracks).find((t) => t.mode === 'showing')
+    }
+
+    function renderCues() {
+      overlay.innerHTML = ''
+      if (!enabled || activeTrackLabel === 'off' || activeTrackLabel === null) return
+
+      const track = Array.from(video.textTracks).find(
+        (t) => t.language === activeTrackLabel || t.label === activeTrackLabel
+      )
+      if (!track || track.mode !== 'showing') return
+
+      const cues = Array.from(track.activeCues ?? [])
+      if (cues.length === 0) return
+
+      const fontSize = `${player.state.subtitleFontSize}rem`
+      const bottom = `${player.state.subtitlePosition}%`
+
+      cues.forEach((cue) => {
+        const text = String((cue as { text?: unknown }).text ?? '').replace(/<[^>]*>/g, '')
+        if (!text) return
+        const div = document.createElement('div')
+        div.style.cssText = `
+          font-size: ${fontSize};
+          color: white;
+          background-color: rgba(0, 0, 0, 0.5);
+          text-shadow: 0 0 4px black;
+          padding: 0.2em 0.5em;
+          text-align: center;
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: ${bottom};
+          white-space: pre-wrap;
+          line-height: 1.4;
+        `
+        div.textContent = text
+        overlay.appendChild(div)
+      })
+    }
+
+    const handleCueChange = () => renderCues()
+    const handleTimeUpdate = () => renderCues()
+
+    Array.from(video.textTracks).forEach((t) => {
+      t.addEventListener('cuechange', handleCueChange)
+    })
+    video.addEventListener('timeupdate', handleTimeUpdate)
+    renderCues()
+
+    return () => {
+      Array.from(video.textTracks).forEach((t) => {
+        t.removeEventListener('cuechange', handleCueChange)
+      })
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+      overlay.innerHTML = ''
+    }
+  }, [
+    upscaler.isEnabled,
+    upscaler.isWebGPUSupported,
+    player.state.subtitleFontSize,
+    player.state.subtitlePosition,
+    player.state.activeSubtitleTrack,
+    refs.videoRef,
+  ])
+
+  useEffect(() => {
+    if (!upscaler.isEnabled || !upscaler.isWebGPUSupported) return
+    if (!anime4kProfile) return
+    try {
+      localStorage.setItem('anime4kProfile', anime4kProfile)
+    } catch {
+      // ignore
+    }
+  }, [anime4kProfile, upscaler.isEnabled, upscaler.isWebGPUSupported])
+
   const handleResume = () => {
     if (refs.videoRef.current) {
       refs.videoRef.current.currentTime = state.resumeTime
@@ -1378,6 +1486,11 @@ const Player: React.FC = () => {
                       setIsTheaterMode(newMode)
                       localStorage.setItem('playerTheaterMode', newMode.toString())
                     }}
+                    anime4kEnabled={upscaler.isEnabled}
+                    onAnime4kToggle={upscaler.toggle}
+                    anime4kSupported={upscaler.isWebGPUSupported}
+                    anime4kProfile={anime4kProfile}
+                    onAnime4kProfileChange={setAnime4kProfile}
                   />
                 )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
@@ -1407,7 +1520,21 @@ const Player: React.FC = () => {
                   onWaiting={actions.onWaiting}
                   onPlaying={actions.onPlaying}
                   onError={handleVideoSourceError}
+                  className={
+                    upscaler.isEnabled && upscaler.isWebGPUSupported
+                      ? styles.videoElementHidden
+                      : ''
+                  }
                 />
+              )}
+              {upscaler.isWebGPUSupported && !isVideoLoading && state.videoSources.length > 0 && (
+                <canvas
+                  ref={canvasRef}
+                  className={`${styles.upscalerCanvas} ${upscaler.isEnabled ? styles.upscalerActive : ''}`}
+                />
+              )}
+              {upscaler.isEnabled && upscaler.isWebGPUSupported && (
+                <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
               )}
             </>
           )}

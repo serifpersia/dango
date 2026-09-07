@@ -37,6 +37,11 @@ interface PlayerControlsProps {
   episodeNumber: string | undefined
   isTheaterMode: boolean
   onTheaterModeToggle: () => void
+  anime4kEnabled: boolean
+  onAnime4kToggle: (value: boolean) => void
+  anime4kSupported: boolean
+  anime4kProfile: 'low' | 'balanced' | 'high' | 'denoise'
+  onAnime4kProfileChange: (profile: 'low' | 'balanced' | 'high' | 'denoise') => void
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -55,6 +60,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   episodeNumber,
   isTheaterMode,
   onTheaterModeToggle,
+  anime4kEnabled,
+  onAnime4kToggle,
+  anime4kSupported,
+  anime4kProfile,
+  onAnime4kProfileChange,
 }) => {
   const { state, refs, actions } = player
   const { showSettings, showVolumeSlider } = state
@@ -519,6 +529,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           }}
           useNativeControls={state.useNativeControls}
           onNativeControlsToggle={actions.setUseNativeControls}
+          anime4kEnabled={anime4kEnabled}
+          onAnime4kToggle={onAnime4kToggle}
+          anime4kSupported={anime4kSupported}
+          anime4kProfile={anime4kProfile}
+          onAnime4kProfileChange={onAnime4kProfileChange}
         />
       </Suspense>
     </div>

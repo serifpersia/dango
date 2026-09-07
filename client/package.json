@@ -1,7 +1,7 @@
 {
   "name": "dango-client",
   "private": true,
-  "version": "2.8.7",
+  "version": "2.8.8",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -19,6 +19,7 @@
     "@floating-ui/react": "^0.27.20",
     "@radix-ui/react-dialog": "^1.1.23",
     "@tanstack/react-query": "^5.99.2",
+    "anime4k-webgpu-async": "^2.0.0",
     "embla-carousel-react": "^8.6.0",
     "nprogress": "^0.2.0",
     "preact": "^10.29.1",
@@ -37,6 +38,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
+    "@webgpu/types": "^0.1.72",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "vite": "^7.3.1"

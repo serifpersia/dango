@@ -411,6 +411,38 @@
   object-fit: contain;
 }
 
+.videoContainer video.videoElementHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upscalerCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upscalerCanvas.upscalerActive {
+  opacity: 1;
+}
+
+.subtitleOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
 .controlsOverlay {
   position: absolute;
   top: 0;
