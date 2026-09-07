@@ -5,6 +5,7 @@ import type { VideoSource } from '../../pages/Player'
 type ProviderId =
   | 'anidb'
   | 'anilight'
+  | 'kaa'
   | 'megaplay'
   | 'animepahe'
   | 'animeya'
@@ -16,6 +17,7 @@ type ProviderId =
 
 const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
   { value: 'megaplay', label: 'MegaPlay', mature: false },
+  { value: 'kaa', label: 'KAA', mature: false },
   { value: 'anilight', label: 'Anilight', mature: false },
   { value: 'animepahe', label: 'AnimePahe', mature: false },
   { value: 'animeya', label: 'Animeya', mature: false },

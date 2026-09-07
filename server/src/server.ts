@@ -20,6 +20,7 @@ import { AnimePaheProvider } from './providers/animepahe.provider'
 import { WhProvider } from './providers/wh.provider'
 import { HnProvider } from './providers/hn.provider'
 import { AnilightProvider } from './providers/anilight.provider'
+import { KaaProvider } from './providers/kaa.provider'
 import { AnidbProvider } from './providers/anidb.provider'
 import { HtProvider } from './providers/ht.provider'
 import { JasmrProvider } from './providers/jasmr.provider'
@@ -88,6 +89,7 @@ const animepaheProvider = new AnimePaheProvider(apiCache)
 const whProvider = new WhProvider(apiCache)
 const hnProvider = new HnProvider()
 const anilightProvider = new AnilightProvider(apiCache)
+const kaaProvider = new KaaProvider(apiCache)
 const anidbProvider = new AnidbProvider(apiCache)
 const htProvider = new HtProvider(apiCache)
 const jasmrProvider = new JasmrProvider(apiCache)
@@ -101,6 +103,7 @@ const providers = {
   wh: whProvider,
   hn: hnProvider,
   anilight: anilightProvider,
+  kaa: kaaProvider,
   anidb: anidbProvider,
   ht: htProvider,
   jasmr: jasmrProvider,

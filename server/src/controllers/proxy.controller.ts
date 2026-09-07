@@ -58,6 +58,17 @@ export class ProxyController {
   ]
   private static readonly HANIME_HOSTS = new Set(['r2.1hanime.com', '1.1hanime.com'])
   private static readonly OPPAI_HOSTS = new Set(['myspacecat.pictures'])
+  private static readonly KAA_HOSTS = new Set([
+    'hls.krussdomi.com',
+    'subst.krussdomi.com',
+    'krussdomi.com',
+    'st1.advancedairesearchlab.xyz',
+    'st1.habibikun.xyz',
+    'st1.babybayw.xyz',
+    'st1.narutokun.xyz',
+  ])
+  private static readonly KAA_REFERER = 'https://krussdomi.com/'
+  private static readonly KAA_ORIGIN = 'https://krussdomi.com'
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
@@ -93,6 +104,29 @@ export class ProxyController {
     }
   }
 
+  private pinVariant(body: string, idx: number): string | null {
+    const lines = body.split('\n')
+    let streamIdx = -1
+    let skipUri = false
+    const out: string[] = []
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('#EXT-X-STREAM-INF')) {
+        streamIdx++
+        skipUri = streamIdx !== idx
+        if (!skipUri) out.push(line)
+        continue
+      }
+      if (skipUri && trimmed && !trimmed.startsWith('#')) {
+        skipUri = false
+        continue
+      }
+      out.push(line)
+    }
+    if (streamIdx < 0 || idx > streamIdx) return null
+    return out.join('\n')
+  }
+
   handleProxy = async (req: Request, res: Response) => {
     const { url, referer, cookie } = req.query
     if (!url) return res.status(400).send('URL required')
@@ -105,7 +139,10 @@ export class ProxyController {
     const urlStr = url as string
     const refererStr = (referer as string) || ''
     const cookieStr = (cookie as string) || ''
-    const cacheKey = `m3u8-${urlStr}-${refererStr}`
+    const variantIdx =
+      req.query.variant !== undefined ? parseInt(req.query.variant as string, 10) : NaN
+    const pinVariant = Number.isInteger(variantIdx) && (variantIdx as number) >= 0
+    const cacheKey = `m3u8-${urlStr}-${refererStr}${pinVariant ? `-v${variantIdx}` : ''}`
 
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
@@ -118,6 +155,9 @@ export class ProxyController {
         urlStr.includes(host)
       )
       const isOppai = Array.from(ProxyController.OPPAI_HOSTS).some((host) => urlStr.includes(host))
+      const isKaa =
+        refererStr.startsWith(ProxyController.KAA_ORIGIN) ||
+        Array.from(ProxyController.KAA_HOSTS).some((host) => urlStr.includes(host))
       const headers: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
@@ -135,6 +175,10 @@ export class ProxyController {
       if (isOppai) {
         if (!headers['Referer']) headers['Referer'] = refererStr || 'https://oppai.stream/'
         headers['Origin'] = 'https://oppai.stream'
+      }
+      if (isKaa) {
+        if (!headers['Referer']) headers['Referer'] = refererStr || ProxyController.KAA_REFERER
+        headers['Origin'] = ProxyController.KAA_ORIGIN
       }
       if (urlStr.includes('weeabo0.xyz') || urlStr.includes('weeab0o.xyz')) {
         if (!headers['Referer']) headers['Referer'] = refererStr || 'https://japaneseasmr.com/'
@@ -178,7 +222,13 @@ export class ProxyController {
 
         const isProxied = (value: string) => value.includes('/api/proxy')
 
-        const rewritten = resp.body
+        let playlistBody = resp.body
+        if (pinVariant) {
+          const pinned = this.pinVariant(playlistBody, variantIdx as number)
+          if (pinned) playlistBody = pinned
+        }
+
+        const rewritten = playlistBody
           .split('\n')
           .map((line: string) => {
             const trimmed = line.trim()
@@ -424,6 +474,13 @@ export class ProxyController {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       }
       if (referer) headers['Referer'] = referer as string
+      const subUrl = url as string
+      if (
+        (referer as string)?.startsWith(ProxyController.KAA_ORIGIN) ||
+        Array.from(ProxyController.KAA_HOSTS).some((host) => subUrl.includes(host))
+      ) {
+        headers['Origin'] = ProxyController.KAA_ORIGIN
+      }
 
       const response = await axiosInstance.get(url as string, {
         headers,

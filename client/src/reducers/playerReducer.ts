@@ -13,6 +13,7 @@ export type Action =
         | 'wh'
         | 'hn'
         | 'anilight'
+        | 'kaa'
         | 'anidb'
         | 'ht'
         | 'op'
@@ -28,6 +29,7 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const validProviders: string[] = [
     'megaplay',
     'anilight',
+    'kaa',
     'animeya',
     'animepahe',
     '123anime',

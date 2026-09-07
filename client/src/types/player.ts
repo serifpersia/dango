@@ -126,6 +126,7 @@ export interface PlayerState {
     | 'wh'
     | 'hn'
     | 'anilight'
+    | 'kaa'
     | 'anidb'
     | 'ht'
     | 'op'
