@@ -64,6 +64,86 @@ const STOPWORDS = new Set([
   'a',
 ])
 
+const SEASON_TOKENS = new Set([
+  'season',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  'ii',
+  'iii',
+  'iv',
+  'v',
+  'vi',
+  'vii',
+  'viii',
+  'ix',
+  'x',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+])
+
+function distinctiveTokensExcludingSeason(s: string): string[] {
+  return [...new Set(tokenize(s).filter((w) => !STOPWORDS.has(w) && !SEASON_TOKENS.has(w)))]
+}
+
+const ROMAN_TO_NUM: Record<string, number> = {
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  v: 5,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+  ix: 9,
+  x: 10,
+}
+const WORD_TO_NUM: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+}
+
+function detectSeasonMarker(s: string): string {
+  const t = s.toLowerCase()
+
+  // "season 2", "season ii", "season 2nd", "season three"
+  const seasonNum = t.match(
+    /\bseason\s*(\d+|ii|iii|iv|v|vi|vii|viii|ix|x|two|three|four|five|six|seven|eight|nine|ten)\b/
+  )
+  if (seasonNum) {
+    const token = seasonNum[1]
+    const n = ROMAN_TO_NUM[token]
+    const w = WORD_TO_NUM[token]
+    return String(n ?? w ?? token)
+  }
+
+  const ord = t.match(/\b(\d+)(st|nd|rd|th)\b/)
+  if (ord) return ord[1]
+
+  const trailing = t.match(/\b(ii|iii|iv|v|vi|vii|viii|ix|x)\b(?!\s*(st|nd|rd|th|season))/)
+  if (trailing) return String(ROMAN_TO_NUM[trailing[1]])
+
+  // bare trailing number, e.g. "...Another World 2"
+  const trailingNum = t.match(/\b(\d+)\s*(season)?\s*$/)
+  if (trailingNum) return trailingNum[1]
+
+  return ''
+}
+
 export function distinctiveTokens(s: string): string[] {
   return [...new Set(tokenize(s).filter((w) => !STOPWORDS.has(w)))]
 }
@@ -81,8 +161,8 @@ export function titleSimilarity(query: string, candidate: string): number {
     if (prefixScore > score) score = prefixScore
   }
 
-  const qD = distinctiveTokens(query)
-  const cD = distinctiveTokens(candidate)
+  const qD = distinctiveTokensExcludingSeason(query)
+  const cD = distinctiveTokensExcludingSeason(candidate)
   if (qD.length > 0 && cD.length >= 2) {
     const cSet = new Set(cD)
     let hits = 0
@@ -91,6 +171,16 @@ export function titleSimilarity(query: string, candidate: string): number {
     }
     const coverage = hits / Math.min(qD.length, cD.length)
     if (coverage > score) score = coverage
+  }
+
+  const qMarker = detectSeasonMarker(query)
+  if (qMarker) {
+    const cMarker = detectSeasonMarker(candidate)
+    if (cMarker === qMarker) {
+      score += 0.25
+    } else if (!cMarker && score >= 0.5) {
+      score -= 0.25
+    }
   }
 
   return score >= 1 ? 0.99 : score
