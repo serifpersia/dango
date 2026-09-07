@@ -270,6 +270,58 @@ export class KaaProvider implements Provider {
     return `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(KAA_REFERER)}`
   }
 
+  private parsePlayerSubtitles(html: string): SubtitleTrack[] {
+    const seen = new Set<string>()
+    const tracks: SubtitleTrack[] = []
+    const objRe = /\[0,\{([^}]*)\}\]/g
+    let obj: RegExpExecArray | null
+    while ((obj = objRe.exec(html)) !== null) {
+      const block = obj[1]
+      const langM = block.match(/"language"\s*:\s*\[0\s*,\s*"([^"]+)"/)
+      const nameM = block.match(/"name"\s*:\s*\[0\s*,\s*"([^"]+)"/)
+      const srcM = block.match(/"src"\s*:\s*\[0\s*,\s*"(https?:\/\/[^"]+\.srt[^"]*)"/)
+      if (!srcM) continue
+      const url = srcM[1].replace(/^https:\/\/\//, 'https://')
+      if (seen.has(url)) continue
+      seen.add(url)
+      tracks.push({
+        language: langM?.[1] || 'en',
+        label: nameM?.[1] || langM?.[1] || 'English',
+        url,
+      })
+    }
+    return tracks
+  }
+
+  private async fetchCatStreamData(playerSrc: string): Promise<{
+    masterUrl: string | null
+    subtitles: SubtitleTrack[]
+  }> {
+    let masterUrl: string | null = null
+    const subtitles: SubtitleTrack[] = []
+    try {
+      const res = await fetch(playerSrc, {
+        headers: {
+          'User-Agent': KAA_UA,
+          Referer: 'https://kaa.lt/',
+          Origin: 'https://kaa.lt',
+          Accept: 'text/html',
+        },
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!res.ok) return { masterUrl, subtitles }
+      const html = (await res.text()).replace(/&quot;/g, '"')
+
+      const manifestMatch = html.match(/"manifest"\s*:\s*\[0\s*,\s*"(\/\/[^"]+\.m3u8[^"]*)"\]/)
+      if (manifestMatch) masterUrl = manifestMatch[1].replace(/^\/\//, 'https://')
+
+      subtitles.push(...this.parsePlayerSubtitles(html))
+    } catch {
+      // ignore
+    }
+    return { masterUrl, subtitles }
+  }
+
   private async getMasterLevels(masterUrl: string): Promise<{ index: number; label: string }[]> {
     try {
       const res = await fetch(masterUrl, {
@@ -311,26 +363,7 @@ export class KaaProvider implements Provider {
       })
       if (!res.ok) return []
       const html = (await res.text()).replace(/&quot;/g, '"')
-      const tracks: SubtitleTrack[] = []
-      const re =
-        /"language"\s*:\s*\[0\s*,\s*"([^"]+)"\]\s*,\s*"name"\s*:\s*\[0\s*,\s*"([^"]+)"\]\s*,\s*"src"\s*:\s*\[0\s*,\s*"(https:\/\/subst\.krussdomi\.com\/[^"]+\.vtt)"\]/g
-      let m: RegExpExecArray | null
-      while ((m = re.exec(html)) !== null) {
-        tracks.push({
-          language: m[1] || 'en',
-          label: m[2] || m[1] || 'English',
-          url: m[3],
-        })
-      }
-      if (!tracks.length) {
-        const seen = new Set<string>()
-        for (const mm of html.matchAll(/https:\/\/subst\.krussdomi\.com\/[^"'\s]+\.vtt/g)) {
-          if (seen.has(mm[0])) continue
-          seen.add(mm[0])
-          tracks.push({ language: 'en', label: 'English', url: mm[0] })
-        }
-      }
-      return tracks
+      return this.parsePlayerSubtitles(html)
     } catch {
       return []
     }
@@ -365,12 +398,47 @@ export class KaaProvider implements Provider {
 
       const sources: VideoSource[] = []
       let playerSrc = ''
+      let catStreamData: { masterUrl: string | null; subtitles: SubtitleTrack[] } | null = null
       for (const s of servers) {
         const src = s.src || ''
-        if (!src.includes('source=vidstream')) continue
+        const isVidstream = src.includes('source=vidstream')
+        const isCatstream = src.includes('source=catstream')
+        if (!isVidstream && !isCatstream) continue
         const m = src.match(/[?&]id=([^&]+)/)
         if (!m) continue
         if (!playerSrc) playerSrc = src
+
+        if (isCatstream) {
+          if (!catStreamData) catStreamData = await this.fetchCatStreamData(src)
+          if (!catStreamData?.masterUrl) continue
+          const masterUrl = catStreamData.masterUrl
+          const linkHeaders = { Referer: KAA_REFERER }
+          const links: VideoLink[] = []
+          for (const level of await this.getMasterLevels(masterUrl)) {
+            links.push({
+              resolutionStr: level.label,
+              link:
+                `/api/proxy?url=${encodeURIComponent(masterUrl)}` +
+                `&referer=${encodeURIComponent(KAA_REFERER)}&variant=${level.index}`,
+              hls: true,
+              headers: linkHeaders,
+            })
+          }
+          links.push({
+            resolutionStr: 'Auto',
+            link: this.proxyUrl(masterUrl),
+            hls: true,
+            headers: linkHeaders,
+          })
+          sources.push({
+            sourceName: s.name ? `KAA ${s.name}` : 'KAA',
+            links,
+            type: 'player',
+            actualEpisodeNumber: String(epNum),
+          })
+          continue
+        }
+
         const masterUrl = `${KAA_HLS_BASE}/${m[1]}/master.m3u8`
         const linkHeaders = { Referer: KAA_REFERER }
         const links: VideoLink[] = []
@@ -400,7 +468,19 @@ export class KaaProvider implements Provider {
 
       if (!sources.length) return null
 
-      const subtitles = playerSrc ? await this.fetchSubtitles(playerSrc) : []
+      const subtitles: SubtitleTrack[] = []
+      const seen = new Set<string>()
+      const push = (list?: SubtitleTrack[]) => {
+        for (const t of list || []) {
+          if (seen.has(t.url)) continue
+          seen.add(t.url)
+          subtitles.push(t)
+        }
+      }
+      push(catStreamData?.subtitles)
+      if (!subtitles.length && playerSrc) {
+        push(await this.fetchSubtitles(playerSrc))
+      }
       if (subtitles.length) {
         for (const src of sources) src.subtitles = subtitles
       }
