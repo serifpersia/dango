@@ -1,0 +1,115 @@
+function setupSheet() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    var analyticsSheet = ss.getSheetByName("Analytics") || ss.insertSheet("Analytics");
+    analyticsSheet.getRange("A2:F").clearContent();
+    var headers = [["UUID", "Version", "First Seen", "Last Seen", "User Agent", "Timezone"]];
+    analyticsSheet.getRange(1, 1, 1, 6).setValues(headers).setFontWeight("bold").setBackground("#4a86e8").setFontColor("#ffffff");
+    analyticsSheet.getRange("C:D").setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    analyticsSheet.autoResizeColumns(1, 6);
+
+    var summarySheet = ss.getSheetByName("Summary") || ss.insertSheet("Summary");
+    summarySheet.clear();
+    var summaryData = [
+        ["Metric", "Value"],
+        ["Total Installations", "=COUNTA(Analytics!A2:A)"],
+        ["Active Users (Last 24h)", "=COUNTIF(Analytics!D2:D, \">\" & (NOW() - 1))"]
+    ];
+    summarySheet.getRange(1, 1, 3, 2).setValues(summaryData);
+    summarySheet.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#d9d9d9");
+    summarySheet.getRange(2, 1, 2, 1).setFontWeight("bold");
+    summarySheet.autoResizeColumns(1, 2);
+
+    var providersSheet = ss.getSheetByName("Providers") || ss.insertSheet("Providers");
+    var providerHeaders = [["Provider", "Status", "Note"]];
+    providersSheet.getRange(1, 1, 1, 3).setValues(providerHeaders).setFontWeight("bold").setBackground("#4a86e8").setFontColor("#ffffff");
+    var providerRows = [
+        ["allanime", "DOWN", ""],
+        ["megaplay", "OK", ""],
+        ["animeya", "OK", ""],
+        ["animepahe", "OK", ""],
+        ["123anime", "OK", ""]
+    ];
+    providersSheet.getRange(2, 1, providerRows.length, 3).setValues(providerRows);
+    providersSheet.autoResizeColumns(1, 3);
+}
+
+function doPost(e) {
+    if (!e || !e.postData) return ContentService.createTextOutput("Waiting...");
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Analytics");
+    var postData = JSON.parse(e.postData.contents);
+    var now = new Date();
+
+    var data = sheet.getDataRange().getValues();
+    var found = false;
+
+    for (var i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(postData.id)) {
+            sheet.getRange(i + 1, 4).setValue(now);
+            sheet.getRange(i + 1, 2).setValue(postData.version);
+            sheet.getRange(i + 1, 5).setValue(postData.userAgent);
+            sheet.getRange(i + 1, 6).setValue(postData.timezone || "");
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        sheet.appendRow([postData.id, postData.version, now, now, postData.userAgent, postData.timezone || ""]);
+    }
+    return ContentService.createTextOutput("OK");
+}
+
+function doGet(e) {
+    var type = e && e.parameter && e.parameter.type;
+
+    if (type === "providers") {
+        var psheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Providers");
+        var out = [];
+        if (psheet) {
+            var rows = psheet.getDataRange().getValues();
+            for (var i = 1; i < rows.length; i++) {
+                if (!rows[i][0]) continue;
+                out.push({
+                    provider: rows[i][0],
+                    status: rows[i][1] || "UNKNOWN",
+                    note: rows[i][2] || ""
+                });
+            }
+        }
+        return ContentService
+            .createTextOutput(JSON.stringify({ providers: out }))
+            .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (type === "locations") {
+        var lsheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Analytics");
+        var lrows = lsheet.getDataRange().getValues();
+        var counts = {};
+        for (var i = 1; i < lrows.length; i++) {
+            var tz = String(lrows[i][5] || "Unknown").trim();
+            if (!tz) continue;
+            counts[tz] = (counts[tz] || 0) + 1;
+        }
+        return ContentService
+            .createTextOutput(JSON.stringify({ locations: counts }))
+            .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Analytics");
+    var data = sheet.getDataRange().getValues();
+
+    var total = data.length - 1;
+    var active = 0;
+    var now = new Date();
+
+    for (var i = 1; i < data.length; i++) {
+        var lastSeen = new Date(data[i][3]);
+        if ((now - lastSeen) < (24 * 60 * 60 * 1000)) active++;
+    }
+
+    return ContentService
+    .createTextOutput(JSON.stringify({ total: total, active: active }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
