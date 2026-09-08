@@ -243,7 +243,7 @@ export class KaaProvider extends BaseProvider {
       const block = obj[1]
       const langM = block.match(/"language"\s*:\s*\[0\s*,\s*"([^"]+)"/)
       const nameM = block.match(/"name"\s*:\s*\[0\s*,\s*"([^"]+)"/)
-      const srcM = block.match(/"src"\s*:\s*\[0\s*,\s*"(https?:\/\/[^"]+\.srt[^"]*)"/)
+      const srcM = block.match(/"src"\s*:\s*\[0\s*,\s*"(https?:\/\/[^"]+\.(?:srt|vtt)[^"]*)"/)
       if (!srcM) continue
       const url = srcM[1].replace(/^https:\/\/\//, 'https://')
       if (seen.has(url)) continue
