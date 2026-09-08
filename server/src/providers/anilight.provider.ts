@@ -1,8 +1,7 @@
-import NodeCache from 'node-cache'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 import { execFileSync } from 'node:child_process'
+import { BaseProvider } from './base-provider'
 
 const ANILIGHT_API = 'https://api.anilight.live/api'
 const SITE_BASE = 'https://anilight.live'
@@ -239,14 +238,8 @@ function mapAnimeToShow(item: AnilightAnime): Show {
   }
 }
 
-export class AnilightProvider implements Provider {
-  name = 'anilight'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
+export class AnilightProvider extends BaseProvider {
+  name = 'Anilight'
 
   private getWatchCacheKey(slug: string): string {
     return `anilight_watch_${slug}`
@@ -283,28 +276,6 @@ export class AnilightProvider implements Provider {
       logger.error({ error }, '[Anilight] Search failed')
       return []
     }
-  }
-
-  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
-    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
-    if (targets.length === 0) return null
-
-    for (const variant of buildQueryVariants(title, romaji)) {
-      const results = await this.search({ query: variant })
-      if (results.length === 0) continue
-
-      const candidates = results.map((r) => ({
-        title: r.name || r.englishName || '',
-        id: r.id || r._id || '',
-      }))
-
-      const matchResult = pickBestMatch(candidates, targets)
-      if (matchResult) {
-        return matchResult.item.id
-      }
-    }
-
-    return null
   }
 
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {

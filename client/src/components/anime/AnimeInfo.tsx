@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa'
 import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
-import { fixThumbnailUrl } from '../../lib/utils'
+import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import GenericModal from '../common/GenericModal'
 import { Button } from '../common/Button'
@@ -149,7 +149,7 @@ export default function AnimeInfo() {
             <div className={styles.synopsisSection}>
               <h2 className={styles.sectionTitleSmall}>Synopsis</h2>
               <SynopsisText
-                text={showMeta.description ? showMeta.description.replace(/<[^>]*>?/gm, '') : ''}
+                text={sanitizeText(showMeta.description)}
                 emptyText="No description available."
               />
             </div>

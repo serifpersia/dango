@@ -1,6 +1,6 @@
-import NodeCache from 'node-cache'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { BaseProvider } from './base-provider'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://hentai.tv'
@@ -258,14 +258,8 @@ function bestMatch(
   return { ...best, score: bestScore }
 }
 
-export class HtProvider implements Provider {
-  name = 'HT'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
+export class HtProvider extends BaseProvider {
+  name = 'Ht'
 
   async browse(options: {
     query?: string

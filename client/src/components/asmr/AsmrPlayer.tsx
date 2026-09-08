@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import {
   FaPlay,
   FaPause,
@@ -18,6 +18,8 @@ import {
   FaListOl,
 } from 'react-icons/fa'
 import type { AsmrChapter, AsmrTrack } from '../../hooks/useAsmr'
+import { loadHls } from '../../lib/hls'
+import type Hls from 'hls.js'
 import styles from './Asmr.module.css'
 
 interface AsmrPlayerProps {
@@ -109,13 +111,27 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     destroyHls()
 
     if (trackIsHls) {
-      if (window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls({ enableWorker: true })
-        hlsRef.current = hls
-        hls.loadSource(trackLink)
-        hls.attachMedia(audio)
-      } else {
-        audio.src = trackLink
+      let cancelled = false
+      void (async () => {
+        const HlsClass = await loadHls()
+        if (cancelled) return
+        if (HlsClass && HlsClass.isSupported()) {
+          const hls = new HlsClass({ enableWorker: true })
+          hlsRef.current = hls
+          hls.loadSource(trackLink)
+          hls.attachMedia(audio)
+          audio.play().catch(() => setIsPlaying(false))
+        } else {
+          audio.src = trackLink
+          audio.load()
+          audio.volume = volumeRef.current
+          audio.play().catch(() => setIsPlaying(false))
+        }
+      })()
+      return () => {
+        cancelled = true
+        destroyHls()
+        audio.removeAttribute('src')
       }
     } else {
       audio.src = trackLink

@@ -140,7 +140,6 @@ export function createDataRouter(
     controller.getBatchedHome
   )
 
-  router.get('/genres-and-tags', controller.getGenresAndTags)
   router.get('/anilist-status', controller.getAnilistStatus)
   router.get('/system-notifications', controller.getSystemNotifications)
 

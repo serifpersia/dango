@@ -113,21 +113,16 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
 
   return (
     <section
-      className={continueWatching ? styles['continue-watching'] : undefined}
-      style={{ marginBottom: '2.5rem' }}
+      className={`${styles.sectionWrapper} ${continueWatching ? styles['continue-watching'] : ''}`}
     >
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
           {titleLink ? (
             <Link to={titleLink} className={styles['title-link']}>
-              <div className="section-title" style={{ marginBottom: 0 }}>
-                {title}
-              </div>
+              <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
             </Link>
           ) : (
-            <div className="section-title" style={{ marginBottom: 0 }}>
-              {title}
-            </div>
+            <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
           )}
           {carousel && animeList.length > 0 && isExpanded && (
             <div className={styles['nav-arrows']}>

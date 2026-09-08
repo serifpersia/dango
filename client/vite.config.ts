@@ -3,7 +3,30 @@ import { fileURLToPath, URL } from 'node:url'
 import preact from '@preact/preset-vite'
 
 export default defineConfig({
+  // reactAliasesEnabled is off on purpose: `react` must resolve to our
+  // local compat layer (preact/compat + `use`/`useOptimistic` polyfills
+  // required by react-router v8), not to bare preact/compat.
   plugins: [preact({ reactAliasesEnabled: false })],
+  resolve: {
+    // `react` resolves to a local compat layer (preact/compat + React 19
+    // `use`/`useOptimistic` polyfills required by react-router v8).
+    // `prop-types` resolves to a no-op stub: react-simple-maps imports it
+    // for legacy runtime checks, but this strict-TS project does not use it.
+    alias: [
+      {
+        find: /^react$/,
+        replacement: fileURLToPath(new URL('./src/lib/preact-compat.js', import.meta.url)),
+      },
+      { find: /^react\/jsx-runtime$/, replacement: 'preact/jsx-runtime' },
+      { find: /^react-dom$/, replacement: 'preact/compat' },
+      { find: /^react-dom\/client$/, replacement: 'preact/compat/client' },
+      { find: /^react-dom\/test-utils$/, replacement: 'preact/test-utils' },
+      {
+        find: /^prop-types$/,
+        replacement: fileURLToPath(new URL('./src/lib/prop-types-stub.ts', import.meta.url)),
+      },
+    ],
+  },
   server: {
     host: '0.0.0.0',
     strictPort: true,
@@ -31,18 +54,6 @@ export default defineConfig({
         },
       },
     },
-  },
-  resolve: {
-    alias: [
-      {
-        find: /^react$/,
-        replacement: fileURLToPath(new URL('./src/lib/preact-compat.js', import.meta.url)),
-      },
-      { find: /^react\/jsx-runtime$/, replacement: 'preact/jsx-runtime' },
-      { find: /^react-dom$/, replacement: 'preact/compat' },
-      { find: /^react-dom\/client$/, replacement: 'preact/compat/client' },
-      { find: /^react-dom\/test-utils$/, replacement: 'preact/test-utils' },
-    ],
   },
   build: {
     chunkSizeWarningLimit: 5000,

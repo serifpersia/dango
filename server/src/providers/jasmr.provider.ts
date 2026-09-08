@@ -1,15 +1,8 @@
-import NodeCache from 'node-cache'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SearchOptions,
-  VideoLink,
-} from './provider.interface'
+import { Show, VideoSource, EpisodeDetails, SearchOptions, VideoLink } from './provider.interface'
 import logger from '../logger'
 import { requestContext } from '../utils/request-context'
 import { buildCfClearanceCookie } from '../utils/cookie.utils'
+import { BaseProvider } from './base-provider'
 
 const BASE_URL = 'https://japaneseasmr.com'
 const UA =
@@ -324,14 +317,8 @@ function parseChapters(html: string): JasmrChapter[] {
   return chapters
 }
 
-export class JasmrProvider implements Provider {
+export class JasmrProvider extends BaseProvider {
   name = 'JAsmr'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private async fetchArchive(
     query: string,

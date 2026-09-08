@@ -511,10 +511,8 @@ const useVideoPlayer = ({
   useEffect(() => {
     if (sourceType !== 'iframe') return
 
-    // Immediate update at start
     sendProgressUpdate(false, true)
 
-    // Periodic update every 60 seconds
     const heartbeatInterval = setInterval(() => {
       sendProgressUpdate(false, true)
     }, 60000)

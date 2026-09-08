@@ -466,7 +466,6 @@ export class GoogleDriveService {
     }
   }
 
-  // ---- New JSON sync (same payload as GitHub, stored in hidden appDataFolder) ----
   private getSyncFilename(): string {
     return (CONFIG as { GOOGLE_SYNC_FILENAME?: string }).GOOGLE_SYNC_FILENAME || 'sync.json'
   }

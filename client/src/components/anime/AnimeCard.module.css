@@ -50,9 +50,7 @@
 .cardWrapper:focus-within .card {
   border-color: var(--border-accent);
   background-color: var(--bg-tertiary);
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.4),
-    0 0 24px -6px var(--accent-glow);
+  box-shadow: var(--shadow-active);
 }
 
 .cardWrapper:focus-within {
@@ -197,7 +195,7 @@
 }
 
 .cardWrapper:hover .title {
-  color: #c084fc;
+  color: var(--accent-light);
 }
 
 .badge {
@@ -239,19 +237,19 @@
   composes: badge;
   bottom: var(--space-2);
   right: var(--space-2);
-  background-color: var(--color-danger) !important;
-  color: white !important;
+  background-color: var(--color-danger);
+  color: white;
   border: none;
   font-size: 14px;
   padding: 5px 10px;
   z-index: 5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-.adultBadge.gated {
-  background-color: rgba(0, 0, 0, 0.75) !important;
+.posterContainer .adultBadge.gated {
+  background-color: rgba(0, 0, 0, 0.75);
   border: 1px solid rgba(220, 53, 69, 0.45);
-  color: #ff4a5a !important;
+  color: #ff4a5a;
 }
 
 .notAiredBadge {
@@ -355,9 +353,9 @@
   font-size: 14px;
 }
 
-.removeBtn:hover {
-  background-color: rgba(239, 68, 68, 0.9) !important;
-  border-color: rgba(239, 68, 68, 0.9) !important;
+.cardWrapper .removeBtn:hover {
+  background-color: rgba(239, 68, 68, 0.9);
+  border-color: rgba(239, 68, 68, 0.9);
   transform: scale(1.08);
 }
 
@@ -412,7 +410,7 @@
 @media (max-width: 768px) {
   .cardWrapper,
   .card {
-    height: auto !important;
+    height: auto;
   }
 
   .progressSection {
@@ -423,10 +421,10 @@
     padding: 8px 8px 0;
   }
 
-  .title {
+  .cardWrapper .title {
     height: auto;
     max-height: 2.6em;
-    font-size: 0.82rem !important;
+    font-size: 0.82rem;
     line-height: 1.25;
     color: #e2e8f0;
   }
@@ -466,9 +464,9 @@
     display: none;
   }
 
-  .removeBtn {
-    opacity: 1 !important;
-    background-color: rgba(0, 0, 0, 0.5) !important;
+  .cardWrapper .removeBtn {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.5);
   }
 
   .card.horizontal {
@@ -489,9 +487,9 @@
   }
 
   .card.horizontal .titleSection {
-    padding: var(--space-2) var(--space-3) !important;
+    padding: var(--space-2) var(--space-3);
     justify-content: center;
-    flex-grow: 1 !important;
+    flex-grow: 1;
   }
 
   .card.vertical .posterContainer {
@@ -525,10 +523,10 @@
   opacity: 0.3;
 }
 
-.lowEnd .card {
-  transition: none !important;
+.cardWrapper.lowEnd .card {
+  transition: none;
 }
 
-.lowEnd .posterImg {
-  transition: none !important;
+.cardWrapper.lowEnd .posterImg {
+  transition: none;
 }

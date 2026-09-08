@@ -6,6 +6,14 @@
   gap: var(--space-4);
 }
 
+.sectionWrapper {
+  margin-bottom: 2.5rem;
+}
+
+.sectionTitleNoMargin {
+  margin-bottom: 0;
+}
+
 .title-wrapper {
   display: flex;
   align-items: center;

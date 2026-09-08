@@ -355,7 +355,6 @@ export class MegaPlayProvider implements Provider {
       }
     }
 
-    // Fast path: key/IV pair that worked before (keyed by script URL version).
     const cachedPair = this.cache.get<{ keyValue: string; ivValue: string }>('megaplay_crypt_pair')
     if (cachedPair) {
       const hit = tryPair(cachedPair.keyValue, cachedPair.ivValue)
@@ -540,7 +539,7 @@ export class MegaPlayProvider implements Provider {
             }
           }
         } catch {
-          // fall through to add master as Auto
+          // ignore
         }
         links.push({
           resolutionStr: 'Auto',

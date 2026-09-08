@@ -1,13 +1,14 @@
 :root {
-  /* ===== COLOR: ACCENT ===== */
-  --accent-h: 265;
-  --accent-s: 95%;
-  --accent-l: 72%;
-  --accent: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
-  --accent-light: hsl(var(--accent-h), 90%, 80%);
-  --accent-lighter: hsl(var(--accent-h), 90%, 90%);
-  --accent-dark: hsl(var(--accent-h), 90%, 55%);
-  --accent-glow: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.5);
+  /* ===== COLOR: ACCENT — Deep Iris ===== */
+  --accent: #6d5dfc;
+  --accent-light: #897cff;
+  --accent-lighter: #b3a8ff;
+  --accent-dark: #5646db;
+  --accent-subtle: rgba(109, 93, 252, 0.12);
+  --accent-glow: rgba(109, 93, 252, 0.18);
+  --accent-h: 245;
+  --accent-s: 96%;
+  --accent-l: 68%;
 
   /* ===== COLOR: SEMANTIC ===== */
   --color-danger: #ef4444;
@@ -22,14 +23,14 @@
   --accent-blue: hsl(var(--secondary-h), var(--secondary-s), var(--secondary-l));
   --accent-blue-light: hsl(var(--secondary-h), var(--secondary-s), 70%);
 
-  /* ===== COLOR: NEUTRAL ===== */
-  --bg-main: #050505;
-  --bg-primary: #17171a;
-  --bg-secondary: #0f0f11;
-  --bg-tertiary: #18181b;
-  --bg-elevated: #27272a;
+  /* ===== COLOR: NEUTRAL — Obsidian ===== */
+  --bg-main: #0c0d12;
+  --bg-primary: #13151d;
+  --bg-secondary: #13151d;
+  --bg-tertiary: #191c27;
+  --bg-elevated: #202433;
   --primary-color: var(--accent);
-  --header-bg: rgba(12, 12, 15, 0.82);
+  --header-bg: rgba(12, 13, 18, 0.85);
 
   --text-primary: #ffffff;
   --text-secondary: #b4b4bd;
@@ -48,8 +49,8 @@
   --danger-color: var(--color-danger);
 
   /* ===== SHADOW TOKENS ===== */
-  --shadow-input-focus: 0 0 0 2px var(--accent-glow);
-  --shadow-focus: 0 0 0 2px var(--accent-glow);
+  --shadow-input-focus: 0 0 0 2px var(--accent-subtle);
+  --shadow-focus: 0 0 0 2px var(--accent-subtle);
 
   /* ===== COLOR: GLASS ===== */
   --glass-bg: rgba(20, 20, 22, 0.95);
@@ -143,10 +144,11 @@
   --radius-full: 9999px;
 
   /* ===== SHADOW ===== */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
+  --shadow-active: 0 0 0 1px var(--border-accent), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
   --shadow-thumb: 0 0 5px rgba(0, 0, 0, 0.5);
   --blur-sm: 4px;
   --blur-md: 6px;
@@ -184,7 +186,7 @@
 
   /* ===== TV / SPATIAL NAVIGATION TOKENS ===== */
   --focus-ring-color: var(--accent-light);
-  --focus-ring-glow: 0 0 0 3px rgba(139, 92, 246, 0.4), 0 0 20px var(--accent-glow);
+  --focus-ring-glow: 0 0 0 3px rgba(109, 93, 252, 0.35);
   --focus-scale: scale(1.05);
 }
 

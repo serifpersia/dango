@@ -71,7 +71,6 @@ export async function updateEnvFile(updates: Record<string, string>) {
         .trim() + '\n'
     fs.writeFileSync(envPath, finalContent)
 
-    // Update process.env so the changes are reflected immediately in the running process
     Object.entries(updates).forEach(([key, value]) => {
       if (value === '') {
         delete process.env[key]

@@ -1,14 +1,7 @@
-import NodeCache from 'node-cache'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SearchOptions,
-  VideoLink,
-} from './provider.interface'
+import { Show, VideoSource, EpisodeDetails, SearchOptions, VideoLink } from './provider.interface'
 import logger from '../logger'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { BaseProvider } from './base-provider'
 
 const BASE_URL = 'https://watchhentai.net'
 const UA =
@@ -259,14 +252,8 @@ function extractPlayerData(html: string) {
   return { sources, defaultSrc, thumbnail, duration }
 }
 
-export class WhProvider implements Provider {
-  name = 'WH'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
+export class WhProvider extends BaseProvider {
+  name = 'Wh'
 
   private bestMatch(
     results: { title: string; url: string; poster: string; year: string }[],
@@ -547,7 +534,7 @@ export class WhProvider implements Provider {
           })
           if (res.ok) playerHtml = await res.text()
         } catch {
-          // fall back to watch page html
+          // ignore
         }
       }
 
@@ -573,7 +560,7 @@ export class WhProvider implements Provider {
               })
             }
           } catch {
-            // fall back to plain URL extraction
+            // ignore
           }
         }
 

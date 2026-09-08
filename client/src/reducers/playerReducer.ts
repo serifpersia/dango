@@ -14,7 +14,6 @@ export type Action =
         | 'hn'
         | 'anilight'
         | 'kaa'
-        | 'anidb'
         | 'ht'
         | 'op'
     }
@@ -37,7 +36,6 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
     'hn',
     'ht',
     'op',
-    'anidb',
   ]
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']

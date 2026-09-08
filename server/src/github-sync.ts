@@ -250,7 +250,6 @@ class GitHubSyncService {
         await runSyncSequence(db, 'github')
         return this.deviceState
       } else {
-        // Token exists but is invalid/expired, clear it
         log.warn('Saved GitHub token is invalid or expired. Clearing for new auth.')
         await this.logout()
       }

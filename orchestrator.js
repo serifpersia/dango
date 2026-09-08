@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { spawn } = require('child_process')
+const { spawn, execSync } = require('child_process')
 const readline = require('readline')
 const http = require('http')
 const os = require('os')
@@ -29,9 +29,9 @@ async function checkForUpdates() {
   if (process.argv.includes('--no-update') || mode === 'dev') return
 
   try {
-    const npmGlobalPrefix = require('child_process')
-      .execSync(`${npmCmd} config get prefix`, { encoding: 'utf8' })
-      .trim()
+    const npmGlobalPrefix = execSync(`${npmCmd} config get prefix`, {
+      encoding: 'utf8',
+    }).trim()
     const scriptPath = path.resolve(__dirname)
     const isGlobalInstall = scriptPath.includes(npmGlobalPrefix)
 
@@ -66,7 +66,7 @@ async function checkForUpdates() {
           if (answer === 'y' || answer === 'yes') {
             console.log(`${colors.system}[Update]${colors.reset} Updating dango...`)
             try {
-              require('child_process').execSync(`${npmCmd} install -g @serifpersia/dango@latest`, {
+              execSync(`${npmCmd} install -g @serifpersia/dango@latest`, {
                 stdio: 'inherit',
               })
               console.log(
@@ -190,22 +190,8 @@ const log = (prefix, color, data) => {
     console.log(
       `${colors.system}[System]${colors.reset} Server sync complete. Shutting down cleanly.`
     )
-
-    if (isWin) {
-      if (serverProcess) killPid(serverProcess.pid)
-      if (clientProcess) killPid(clientProcess.pid)
-    } else {
-      if (serverProcess) {
-        try {
-          process.kill(-serverProcess.pid, 'SIGTERM')
-        } catch {}
-      }
-      if (clientProcess) {
-        try {
-          process.kill(-clientProcess.pid, 'SIGTERM')
-        } catch {}
-      }
-    }
+    terminateProcess(serverProcess)
+    terminateProcess(clientProcess)
     setTimeout(() => process.exit(0), 2000)
     return
   }
@@ -229,8 +215,11 @@ const log = (prefix, color, data) => {
   }
 }
 
-const spawnOpts = (cwd, extraEnv) => ({
-  stdio: 'pipe',
+const spawnOpts = (cwd, extraEnv, withIpc = false) => ({
+  // 'ipc' gives the child a structured message channel (see server/src/lib/ipc.ts).
+  // It only works for directly spawned node processes (prod); under `npm run`
+  // (dev) there is no IPC forwarding, so stdout tags remain the fallback signal.
+  stdio: withIpc ? ['pipe', 'pipe', 'pipe', 'ipc'] : 'pipe',
   shell: false,
   cwd,
   detached: !isWin,
@@ -245,11 +234,31 @@ const spawnNpm = (args, cwd, env) => {
   return spawn(npmCmd, args, spawnOpts(cwd, env))
 }
 
-const killPid = (pid) => {
-  if (!pid) return
+const terminateProcess = (proc, signal = 'SIGTERM') => {
+  if (!proc || !proc.pid) return
+  if (isWin) {
+    try {
+      spawn('taskkill', ['/pid', String(proc.pid), '/f', '/t'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+    } catch (err) {
+      console.error(
+        `${colors.system}[System]${colors.reset} Failed to kill pid ${proc.pid}: ${err.message}`
+      )
+    }
+    return
+  }
   try {
-    spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { stdio: 'ignore', windowsHide: true })
-  } catch {}
+    process.kill(-proc.pid, signal)
+  } catch (err) {
+    // ESRCH just means the process group is already gone — not an error.
+    if (err.code !== 'ESRCH') {
+      console.error(
+        `${colors.system}[System]${colors.reset} Failed to signal ${proc.pid} (${signal}): ${err.message}`
+      )
+    }
+  }
 }
 let serverProcess, clientProcess
 let isShuttingDown = false
@@ -288,14 +297,7 @@ async function main() {
     serverProcess.on('exit', (code) => {
       if (!isShuttingDown) {
         log('System', colors.system, `Server crashed or exited prematurely.`)
-        if (clientProcess) {
-          if (isWin) killPid(clientProcess.pid)
-          else {
-            try {
-              process.kill(-clientProcess.pid, 'SIGTERM')
-            } catch {}
-          }
-        }
+        terminateProcess(clientProcess)
         setTimeout(() => process.exit(code || 0), 500)
       }
     })
@@ -325,13 +327,12 @@ const shutdown = () => {
   console.log(`\n${colors.system}[System]${colors.reset} Initiating clean shutdown...`)
 
   if (clientProcess) {
-    if (isWin) killPid(clientProcess.pid)
-    else {
-      clientProcess.kill('SIGTERM')
-      setTimeout(() => {
-        if (clientProcess.connected || !clientProcess.killed) clientProcess.kill('SIGKILL')
-      }, 5000)
-    }
+    terminateProcess(clientProcess, 'SIGTERM')
+    setTimeout(() => {
+      if (clientProcess.exitCode === null && !clientProcess.killed) {
+        terminateProcess(clientProcess, 'SIGKILL')
+      }
+    }, 5000)
   }
 
   const req = http.request(
@@ -349,19 +350,8 @@ const shutdown = () => {
         console.log(
           `${colors.system}[System]${colors.reset} Server rejected shutdown request (${res.statusCode}), forcing exit.`
         )
-        if (isWin && serverProcess) killPid(serverProcess.pid)
-        else if (serverProcess) {
-          try {
-            process.kill(-serverProcess.pid, 'SIGKILL')
-          } catch {}
-        }
-        if (clientProcess) {
-          if (isWin) killPid(clientProcess.pid)
-          else
-            try {
-              process.kill(-clientProcess.pid, 'SIGKILL')
-            } catch {}
-        }
+        terminateProcess(serverProcess, 'SIGKILL')
+        terminateProcess(clientProcess, 'SIGKILL')
         setTimeout(() => process.exit(0), 1000)
       }
     }
@@ -369,19 +359,8 @@ const shutdown = () => {
 
   req.on('error', () => {
     console.log(`${colors.system}[System]${colors.reset} Server unreachable, forcing exit.`)
-    if (isWin && serverProcess) killPid(serverProcess.pid)
-    else if (serverProcess) {
-      try {
-        process.kill(-serverProcess.pid, 'SIGKILL')
-      } catch {}
-    }
-    if (clientProcess) {
-      if (isWin) killPid(clientProcess.pid)
-      else
-        try {
-          process.kill(-clientProcess.pid, 'SIGKILL')
-        } catch {}
-    }
+    terminateProcess(serverProcess, 'SIGKILL')
+    terminateProcess(clientProcess, 'SIGKILL')
     setTimeout(() => process.exit(0), 1000)
   })
 
@@ -389,19 +368,8 @@ const shutdown = () => {
 
   setTimeout(() => {
     console.log(`${colors.system}[System]${colors.reset} Force exiting after timeout.`)
-    if (isWin && serverProcess) killPid(serverProcess.pid)
-    else if (serverProcess) {
-      try {
-        process.kill(-serverProcess.pid, 'SIGKILL')
-      } catch {}
-    }
-    if (clientProcess) {
-      if (isWin) killPid(clientProcess.pid)
-      else
-        try {
-          process.kill(-clientProcess.pid, 'SIGKILL')
-        } catch {}
-    }
+    terminateProcess(serverProcess, 'SIGKILL')
+    terminateProcess(clientProcess, 'SIGKILL')
     setTimeout(() => process.exit(1), 1000)
   }, 15000)
 }

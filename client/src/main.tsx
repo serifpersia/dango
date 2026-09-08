@@ -1,5 +1,4 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { render } from 'preact'
 import { BrowserRouter } from 'react-router'
 import App from './App'
 import './styles/base.css'
@@ -20,8 +19,9 @@ const queryClient = new QueryClient({
   },
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+const root = document.getElementById('root')
+if (root) {
+  render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AnimePaheCookieProvider>
@@ -34,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </SidebarProvider>
         </AnimePaheCookieProvider>
       </QueryClientProvider>
-    </BrowserRouter>
-  </React.StrictMode>
-)
+    </BrowserRouter>,
+    root
+  )
+}

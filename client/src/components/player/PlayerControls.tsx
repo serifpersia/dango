@@ -270,7 +270,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       data-speed-boost-ignore="true"
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      {/* Netflix Style Top Bar Overlay */}
       <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
         <button
           className={styles.backBtn}

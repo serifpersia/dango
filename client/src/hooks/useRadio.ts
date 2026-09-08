@@ -129,7 +129,7 @@ export const useListenMoe = (gateway?: string) => {
           })
         }
       } catch {
-        // ignore malformed payloads
+        // ignore
       }
     }
 

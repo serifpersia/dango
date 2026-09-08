@@ -17,6 +17,8 @@ import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeCard.module.css'
 import useIsMobile from '../../hooks/useIsMobile'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
+import { useCardInteraction } from '../../hooks/useCardInteraction'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 
 interface Anime {
   _id: string
@@ -109,10 +111,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const [isHovered, setIsHovered] = useState(false)
     const [isPopupVisible, setIsPopupVisible] = useState(false)
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
-    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
     const openPopup = (rect: DOMRect) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
       setAnchorRect(rect)
       setIsPopupVisible(true)
     }
@@ -122,19 +122,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       setAnchorRect(null)
     }
 
-    const schedulePopupClose = useCallback(() => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => {
-        closePopup()
-      }, 300)
-    }, [])
+    const interaction = useCardInteraction(openPopup)
 
-    const clearPopupTimeout = useCallback(() => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-    }, [])
+    const schedulePopupClose = useCallback(() => {
+      interaction.schedulePopupClose(closePopup)
+    }, [interaction])
+
+    const clearPopupTimeout = interaction.clearPopupTimeout
 
     const handleInfoMouseEnter = (e: React.MouseEvent) => {
       if (isMobile) return
@@ -154,61 +148,20 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       schedulePopupClose()
     }
 
-    const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null)
-    const longPressFiredRef = React.useRef(false)
-    const longPressStartRef = React.useRef({ x: 0, y: 0 })
-    const activePointerTypeRef = React.useRef<string | null>(null)
-
-    const cancelLongPress = () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current)
-        longPressTimerRef.current = null
-      }
-    }
-
-    const openPopupFromCard = (rect: DOMRect, viaHold = false) => {
-      longPressFiredRef.current = viaHold
-      openPopup(rect)
-    }
-
     const handlePointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
-      if (shouldBlur || e.pointerType === 'mouse') return
-      activePointerTypeRef.current = e.pointerType
-      longPressFiredRef.current = false
-      longPressStartRef.current = { x: e.clientX, y: e.clientY }
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      cancelLongPress()
-      longPressTimerRef.current = setTimeout(() => {
-        longPressTimerRef.current = null
-        openPopupFromCard(rect, true)
-      }, 500)
+      interaction.handlePointerDown(e, shouldBlur)
     }
 
     const handlePointerMove = (e: React.PointerEvent<HTMLAnchorElement>) => {
-      if (!longPressTimerRef.current) return
-      const dx = Math.abs(e.clientX - longPressStartRef.current.x)
-      const dy = Math.abs(e.clientY - longPressStartRef.current.y)
-      if (dx > 20 || dy > 20) cancelLongPress()
+      interaction.handlePointerMove(e)
     }
 
     const handlePointerUpOrCancel = () => {
-      cancelLongPress()
-      activePointerTypeRef.current = null
+      interaction.handlePointerUpOrCancel()
     }
 
     const handleContextMenu = (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-
-      if (activePointerTypeRef.current === 'touch') {
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current)
-          longPressTimerRef.current = null
-          openPopupFromCard((e.currentTarget as HTMLElement).getBoundingClientRect(), true)
-        }
-      } else if (!shouldBlur && !longPressFiredRef.current) {
-        openPopupFromCard((e.currentTarget as HTMLElement).getBoundingClientRect())
-      }
+      interaction.handleContextMenu(e, shouldBlur)
     }
 
     const mergedConfig = {
@@ -304,15 +257,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       anime.rating === 'Rx' ||
       anime.rating?.includes('17+')
 
-    const [isAgreedToViewMature, setIsAgreedToViewMature] = React.useState(
-      localStorage.getItem('agreedToViewMature') === 'true'
-    )
+    const [matureConsent, setMatureConsent] = useLocalStorage<string>('agreedToViewMature', 'false')
+    const isAgreedToViewMature = matureConsent === 'true'
     const [showModal, setShowModal] = React.useState(false)
     const pendingMatureTargetRef = React.useRef<To | null>(null)
 
     const handleConfirmViewMature = () => {
-      localStorage.setItem('agreedToViewMature', 'true')
-      setIsAgreedToViewMature(true)
+      setMatureConsent('true')
       setShowModal(false)
       if (pendingMatureTargetRef.current) {
         navigate(pendingMatureTargetRef.current)
@@ -322,10 +273,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const shouldBlur = adultContent && !isAgreedToViewMature
     const handleCardClick = (e: React.MouseEvent) => {
-      if (longPressFiredRef.current) {
+      if (interaction.consumeLongPressClick()) {
         e.preventDefault()
         e.stopPropagation()
-        longPressFiredRef.current = false
         return
       }
       if (shouldBlur) {

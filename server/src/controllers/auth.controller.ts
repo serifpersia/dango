@@ -59,7 +59,6 @@ export class AuthController {
     }
 
     await updateEnvFile(updates)
-    // Refresh CONFIG-derived values that are read at import time
     if (typeof workerUrl === 'string') {
       ;(CONFIG as { GOOGLE_AUTH_WORKER_URL: string }).GOOGLE_AUTH_WORKER_URL = workerUrl
     }

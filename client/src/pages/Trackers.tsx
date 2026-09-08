@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useSidebar } from '../hooks/useSidebar'
+import { useAnilistAuthCallback } from '../hooks/useAnilistAuthCallback'
 import { Button } from '../components/common/Button'
 import {
   FaFileAlt,
@@ -55,11 +56,10 @@ const Trackers: React.FC = () => {
     document.title = 'Trackers - dango'
   }, [])
 
-  // --- AniList state ---
   const [publicUsername, setPublicUsername] = useState<string>('')
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null)
   const [clientIdInput, setClientIdInput] = useState<string>('')
-  const [pendingToken, setPendingToken] = useState<string | null>(null)
+  const isExchangingToken = useAnilistAuthCallback()
 
   const { data: trackerStatus, isLoading: statusLoading } = useQuery({
     queryKey: ['trackerStatus'],
@@ -150,52 +150,6 @@ const Trackers: React.FC = () => {
     }
   }
 
-  React.useEffect(() => {
-    const hash = window.location.hash
-    if (!hash || !hash.includes('access_token')) return
-    const params = new URLSearchParams(hash.substring(1))
-    const token = params.get('access_token')
-    if (!token) {
-      const err = params.get('error')
-      if (err) toast.error(`AniList error: ${err}`)
-      return
-    }
-    setPendingToken(token)
-    history.replaceState(null, '', window.location.pathname + window.location.search)
-    ;(async () => {
-      try {
-        const res = await fetch('/api/tracker/anilist/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Authentication failed')
-        queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
-        toast.success(`Connected as ${data.user?.name ?? 'AniList user'}`)
-      } catch (e) {
-        toast.error((e as Error).message)
-      } finally {
-        setPendingToken(null)
-      }
-    })()
-  }, [queryClient])
-
-  React.useEffect(() => {
-    const qp = new URLSearchParams(window.location.search)
-    if (qp.get('anilist') === 'error') {
-      toast.error(`AniList auth failed: ${qp.get('reason') || 'unknown'}`)
-      qp.delete('anilist')
-      qp.delete('reason')
-      const qs = qp.toString()
-      history.replaceState(
-        null,
-        '',
-        window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash
-      )
-    }
-  }, [])
-
   const disconnectMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/tracker/anilist/disconnect', { method: 'POST' })
@@ -253,7 +207,6 @@ const Trackers: React.FC = () => {
     onError: (err: Error) => toast.error(err.message),
   })
 
-  // --- MAL XML import state (existing flow) ---
   const [eraseWatchlist, setEraseWatchlist] = useState<boolean>(false)
   const [selectedFileName, setSelectedFileName] = useState<string>('')
   const [importing, setImporting] = useState<boolean>(false)
@@ -303,7 +256,7 @@ const Trackers: React.FC = () => {
         try {
           msg = JSON.parse(text).error || msg
         } catch {
-          // response body is not JSON, keep default message
+          // ignore
         }
         throw new Error(msg)
       }
@@ -336,7 +289,7 @@ const Trackers: React.FC = () => {
                 setResult(parsed)
               }
             } catch {
-              // ignore malformed SSE data lines
+              // ignore
             }
           } else if (line === '') {
             eventType = ''
@@ -371,7 +324,6 @@ const Trackers: React.FC = () => {
         </p>
       </div>
 
-      {/* --- AniList --- */}
       <div className={styles.importCard}>
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleRow}>
@@ -406,7 +358,7 @@ const Trackers: React.FC = () => {
           <div className={styles.loginSection}>
             <p className={styles.loginText}>
               Log in with AniList to enable bidirectional progress &amp; status synchronization.
-              {pendingToken && (
+              {isExchangingToken && (
                 <span style={{ marginLeft: 8, color: 'var(--accent)' }}>Finishing login…</span>
               )}
             </p>
@@ -549,7 +501,6 @@ const Trackers: React.FC = () => {
         </div>
       </div>
 
-      {/* --- MyAnimeList XML import --- */}
       <div className={styles.importCard}>
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleRow}>

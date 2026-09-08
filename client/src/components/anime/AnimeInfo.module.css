@@ -364,7 +364,7 @@
     rgba(255, 255, 255, 0.12) 60%,
     rgba(255, 255, 255, 0)
   );
-  animation: shimmer 1.8s infinite ease-in-out;
+  animation: skeleton-wave 1.8s infinite ease-in-out;
 }
 
 .skeletonBanner {
@@ -413,12 +413,6 @@
   height: 50px;
   width: 50%;
   border-radius: var(--radius-sm);
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 @keyframes floatIn {

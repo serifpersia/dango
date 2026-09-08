@@ -1,7 +1,7 @@
 {
   "name": "dango-client",
   "private": true,
-  "version": "2.8.8",
+  "version": "2.8.9",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -11,36 +11,33 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
     "start:prod": "vite preview",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",
-    "@radix-ui/react-dialog": "^1.1.23",
     "@tanstack/react-query": "^5.99.2",
     "anime4k-webgpu-async": "^2.0.0",
     "embla-carousel-react": "^8.6.0",
+    "hls.js": "^1.5.13",
     "nprogress": "^0.2.0",
     "preact": "^10.29.1",
-    "prop-types": "^15.8.1",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.6.0",
     "react-router": "^8.3.0",
-    "react-simple-maps": "^3.0.0",
+    "react-simple-maps": "^5.0.3",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.5",
     "@types/nprogress": "^0.2.3",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
     "@webgpu/types": "^0.1.72",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^5.0.0"
   }
 }

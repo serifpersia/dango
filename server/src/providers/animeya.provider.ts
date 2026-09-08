@@ -1,8 +1,7 @@
-import NodeCache from 'node-cache'
 import * as cheerio from 'cheerio'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
+import { BaseProvider } from './base-provider'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, healthiest/537.36) Chrome/120.0.0.0 Safari/537.36'
@@ -47,14 +46,8 @@ interface AnimeyaCardProps {
   episodes?: number
 }
 
-export class AnimeyaProvider implements Provider {
+export class AnimeyaProvider extends BaseProvider {
   name = 'Animeya'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private async fetchText(url: string, referer?: string): Promise<string> {
     const res = await fetch(url, {
@@ -388,7 +381,6 @@ export class AnimeyaProvider implements Provider {
 
       for (const rawObj of rscMap.values()) {
         const obj = this.resolveRSC(rawObj, rscMap)
-        // Prioritize finding the 'medias' array which contains the actual search results
         const mediasLists = this.deepSearch(obj, (o) => Array.isArray(o?.medias))
         for (const listNode of mediasLists) {
           const medias = (listNode as Record<string, unknown>).medias as Record<string, unknown>[]
@@ -501,28 +493,6 @@ export class AnimeyaProvider implements Provider {
       logger.error({ err: error }, 'Animeya search failed')
       return []
     }
-  }
-
-  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
-    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
-    if (targets.length === 0) return null
-
-    for (const variant of buildQueryVariants(title, romaji)) {
-      const results = await this.search({ query: variant })
-      if (results.length === 0) continue
-
-      const candidates = results.map((r) => ({
-        title: r.name || r.englishName || '',
-        id: r.id || r._id || '',
-      }))
-
-      const matchResult = pickBestMatch(candidates, targets)
-      if (matchResult) {
-        return matchResult.item.id
-      }
-    }
-
-    return null
   }
 
   private async getInfoInternal(slug: string): Promise<AnimeyaShowInfo> {

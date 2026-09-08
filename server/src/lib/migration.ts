@@ -305,13 +305,11 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
 
     // 4. Perform the DB updates across all tables atomically
     await performWriteTransaction(db, (tx) => {
-      // Save the mapping
       tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
         legacyId,
         newId,
       ])
 
-      // Update watchlist
       const legacyWatchlist = WatchlistRepository.getById(tx, legacyId)
       if (legacyWatchlist) {
         const newWatchlistExists = WatchlistRepository.getById(tx, newId)
@@ -326,7 +324,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         }
       }
 
-      // Update shows_meta
       const legacyShowsMeta = ShowsMetaRepository.getById(tx, legacyId)
       if (legacyShowsMeta) {
         const newShowsMetaExists = ShowsMetaRepository.getById(tx, newId)
@@ -342,7 +339,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         }
       }
 
-      // Update other tables
       tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [newId, legacyId])
       tx.run('DELETE FROM watched_episodes WHERE showId = ?', [legacyId])
 

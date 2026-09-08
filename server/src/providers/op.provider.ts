@@ -1,7 +1,7 @@
-import NodeCache from 'node-cache'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { BaseProvider } from './base-provider'
 
 const BASE_URL = 'https://oppai.stream'
 const SEARCH_URL = `${BASE_URL}/actions/search.php`
@@ -187,14 +187,8 @@ function bestMatch(
   return { ...best, score: bestScore }
 }
 
-export class OpProvider implements Provider {
-  name = 'OP'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
+export class OpProvider extends BaseProvider {
+  name = 'Op'
 
   async browse(options: {
     query?: string
@@ -444,7 +438,7 @@ export class OpProvider implements Provider {
             (a, b) => (resOrder[a.resolutionStr] || 99) - (resOrder[b.resolutionStr] || 99)
           )
         } catch {
-          // fall through to fallback
+          // ignore
         }
       }
 

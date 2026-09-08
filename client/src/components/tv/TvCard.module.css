@@ -36,9 +36,7 @@
 .cardWrapper:focus-within .card {
   border-color: var(--border-accent);
   background-color: var(--bg-tertiary);
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.4),
-    0 0 24px -6px var(--accent-glow);
+  box-shadow: var(--shadow-active);
 }
 
 .cardWrapper:focus-within {
@@ -182,7 +180,7 @@
 }
 
 .cardWrapper:hover .title {
-  color: #c084fc;
+  color: var(--accent-light);
 }
 
 .year {

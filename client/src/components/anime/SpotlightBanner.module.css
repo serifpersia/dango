@@ -25,10 +25,6 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
-  --darkreader-inline-bgcolor: none !important;
-  --darkreader-inline-bgimage: none !important;
-  --darkreader-inline-bordercolor: none !important;
-  --darkreader-inline-color: none !important;
   display: block;
 }
 

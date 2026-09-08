@@ -10,16 +10,14 @@ if not "%~1"=="" (
 
 :menu
 
-powershell -NoProfile -Command ^
-    "Write-Host '';" ^
-    "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
-    "Write-Host '                dango' -ForegroundColor Cyan;" ^
-    "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
-    "Write-Host 'https://github.com/serifpersia/dango' -ForegroundColor Blue;" ^
-    "Write-Host '---------------------------------------------' -ForegroundColor Yellow;" ^
-    "Write-Host '';" ^
-    "Write-Host 'Please choose a mode to run:' -ForegroundColor Yellow"
-
+echo.
+echo ---------------------------------------------
+echo                     dango                    
+echo ---------------------------------------------
+echo https://github.com/serifpersia/dango
+echo ---------------------------------------------
+echo.
+echo Please choose a mode to run:
 echo   1) Development (Install all deps, build, and run hot-reload)
 echo   2) Production  (Run pre-built version)
 echo.
@@ -31,12 +29,12 @@ echo.
 if "!choice!"=="1" goto execute_dev
 if "!choice!"=="2" goto execute_prod
 
-powershell -NoProfile -Command "Write-Host 'Invalid choice. Please try again.' -ForegroundColor Red"
+echo Invalid choice. Please try again.
 timeout /t 2 >nul
 goto menu
 
 :execute_dev
-powershell -NoProfile -Command "Write-Host 'Running in DEVELOPMENT mode...' -ForegroundColor Cyan"
+echo Running in DEVELOPMENT mode...
 echo.
 echo --^> Installing all dependencies...
 call npm install
@@ -46,7 +44,7 @@ node orchestrator.js dev
 goto end
 
 :execute_prod
-powershell -NoProfile -Command "Write-Host 'Running in PRODUCTION mode...' -ForegroundColor Green"
+echo Running in PRODUCTION mode...
 echo.
 
 if exist "server\dist\server.js" if exist "client\dist" (
@@ -55,13 +53,13 @@ if exist "server\dist\server.js" if exist "client\dist" (
     echo --^> Build missing. Installing and Building...
     call npm install
     if !errorlevel! neq 0 (
-        powershell -NoProfile -Command "Write-Host 'Error: Install failed!' -ForegroundColor Red"
+        echo Error: Install failed!
         pause
         exit /b 1
     )
     call npm run build
     if !errorlevel! neq 0 (
-        powershell -NoProfile -Command "Write-Host 'Error: Build failed!' -ForegroundColor Red"
+        echo Error: Build failed!
         pause
         exit /b 1
     )

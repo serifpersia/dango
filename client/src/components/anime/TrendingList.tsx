@@ -6,6 +6,7 @@ import { useInfiniteTrendingList } from '../../hooks/useAnimeData'
 import styles from './TrendingList.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useCarousel } from '../../hooks/useCarousel'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 
 interface TrendingListProps {
   title: string
@@ -17,9 +18,7 @@ const PAGE_SIZE = 10
 
 export default function TrendingList({ title }: TrendingListProps) {
   const { lowEndMode } = useLowEndMode()
-  const [sort, setSort] = useState(() => {
-    return localStorage.getItem('trending_sort') || SORT_TRENDING
-  })
+  const [sort, setSort] = useLocalStorage<string>('trending_sort', SORT_TRENDING)
   const [anilistAvailable, setAnilistAvailable] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -41,11 +40,7 @@ export default function TrendingList({ title }: TrendingListProps) {
     if (anilistAvailable === false && sort === SORT_TRENDING) {
       setSort(SORT_ALL_TIME)
     }
-  }, [anilistAvailable, sort])
-
-  useEffect(() => {
-    localStorage.setItem('trending_sort', sort)
-  }, [sort])
+  }, [anilistAvailable, sort, setSort])
 
   const showTrendingOption = anilistAvailable !== false
 
@@ -70,13 +65,10 @@ export default function TrendingList({ title }: TrendingListProps) {
   const { emblaRef, stepBy } = useCarousel({ onReachThreshold: handleReachThreshold })
 
   return (
-    <section style={{ marginBottom: '2.5rem' }}>
-      {/* Header — matches AnimeSection header style */}
+    <section className={styles.sectionWrapper}>
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          <div className="section-title" style={{ marginBottom: 0 }}>
-            {title}
-          </div>
+          <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
           <div className={styles['nav-arrows']}>
             <button
               className={styles['nav-button']}
@@ -118,7 +110,6 @@ export default function TrendingList({ title }: TrendingListProps) {
         </div>
       </div>
 
-      {/* Carousel */}
       {isLoading ? (
         <div className={styles.carouselContainer}>
           <div className={styles.carousel}>

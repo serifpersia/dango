@@ -32,7 +32,7 @@
     rgba(255, 255, 255, 0.12) 60%,
     rgba(255, 255, 255, 0)
   );
-  animation: shimmer 1.8s infinite ease-in-out;
+  animation: skeleton-wave 1.8s infinite ease-in-out;
 }
 
 .info {
@@ -54,12 +54,6 @@
 .line.short {
   width: 60%;
   height: 14px;
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 @media (max-width: 768px) {
@@ -106,7 +100,7 @@
 }
 
 .skeletonCard.lowEnd .line {
-  animation: none !important;
+  animation: none;
   opacity: 0.3;
 }
 

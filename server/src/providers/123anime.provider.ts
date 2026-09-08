@@ -1,7 +1,7 @@
-import NodeCache from 'node-cache'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { BaseProvider } from './base-provider'
 
 interface ApiAnime {
   id?: string
@@ -26,14 +26,8 @@ interface ApiStreamData {
 
 const BASE_URL = 'https://shirayuki-scrapper-api.onrender.com'
 
-export class _123AnimeProvider implements Provider {
+export class _123AnimeProvider extends BaseProvider {
   name = '123Anime'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private normalizeSlugForSearch(title: string): string {
     return title

@@ -1,9 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import { useFloating, flip, shift, autoUpdate } from '@floating-ui/react'
 import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
 import { Link } from 'react-router'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
+import { sanitizeText } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import QueueOptionsButton from './QueueOptionsButton'
 import styles from './AnimePopup.module.css'
@@ -119,7 +120,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
 
                 <div className={styles.synopsis}>
                   {showMeta.description
-                    ? showMeta.description.replace(/<[^>]*>?/gm, '')
+                    ? sanitizeText(showMeta.description)
                     : 'No synopsis available.'}
                 </div>
 

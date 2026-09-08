@@ -461,7 +461,6 @@ export const usePlayerData = (
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !uiState.showCombinedDetails } })
   }, [uiState.showCombinedDetails])
 
-  // DERIVED STATE
   const state = useMemo(() => {
     const error = showDataError || videoError
     const errorMessage = error ? (error as Error).message : null

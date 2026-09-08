@@ -11,6 +11,7 @@ import crypto from 'crypto'
 import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
+import { notifyServerExit } from './lib/ipc'
 import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils'
 
 import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
@@ -21,7 +22,6 @@ import { WhProvider } from './providers/wh.provider'
 import { HnProvider } from './providers/hn.provider'
 import { AnilightProvider } from './providers/anilight.provider'
 import { KaaProvider } from './providers/kaa.provider'
-import { AnidbProvider } from './providers/anidb.provider'
 import { HtProvider } from './providers/ht.provider'
 import { JasmrProvider } from './providers/jasmr.provider'
 import { OpProvider } from './providers/op.provider'
@@ -90,7 +90,6 @@ const whProvider = new WhProvider(apiCache)
 const hnProvider = new HnProvider()
 const anilightProvider = new AnilightProvider(apiCache)
 const kaaProvider = new KaaProvider(apiCache)
-const anidbProvider = new AnidbProvider(apiCache)
 const htProvider = new HtProvider(apiCache)
 const jasmrProvider = new JasmrProvider(apiCache)
 const opProvider = new OpProvider(apiCache)
@@ -104,7 +103,6 @@ const providers = {
   hn: hnProvider,
   anilight: anilightProvider,
   kaa: kaaProvider,
-  anidb: anidbProvider,
   ht: htProvider,
   jasmr: jasmrProvider,
   op: opProvider,
@@ -336,14 +334,14 @@ async function main() {
       try {
         await syncUp(db, dbPath, remoteFolder)
       } catch (e) {
-        console.error('Final sync on shutdown failed:', e)
+        logger.error({ err: e }, 'Final sync on shutdown failed')
       }
     }
 
     await waitForSync()
 
     db.close(() => {
-      console.log('[SERVER_EXIT]')
+      notifyServerExit()
       if (signal === 'SIGUSR2') {
         process.kill(process.pid, 'SIGUSR2')
       }
@@ -380,6 +378,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('Server failed to start:', err)
+  logger.error({ err }, 'Server failed to start')
   process.exit(1)
 })

@@ -24,14 +24,12 @@ export const fixThumbnailUrl = (
 
   let finalUrl = url
 
-  // 1. Resolve aln host issues (confirmed working host)
   if (finalUrl.includes('aln.youtube-anime.com')) {
     finalUrl = finalUrl.replace(
       /https?:\/\/allanime\.day\/aln\.youtube-anime\.com/,
       'https://aln.youtube-anime.com'
     )
 
-    // Fix pathing
     if (finalUrl.includes('/images/mcovers')) {
       finalUrl = finalUrl.replace('/images/mcovers', '/mcovers')
     }
@@ -40,7 +38,6 @@ export const fixThumbnailUrl = (
     }
   }
 
-  // 2. Resolve Anilist CDN issues
   if (finalUrl.includes('allanime.day/s4.anilist.co')) {
     finalUrl = finalUrl.replace(
       /https?:\/\/allanime\.day\/s4\.anilist\.co/,
@@ -55,7 +52,6 @@ export const fixThumbnailUrl = (
     )
   }
 
-  // Handle dimensions and proxying
   const cacheKey = `${finalUrl}-${width}-${height}`
   if (thumbnailCache.has(cacheKey)) {
     return thumbnailCache.get(cacheKey)!
@@ -107,4 +103,17 @@ export const formatTime = (timeInSeconds: number): string => {
   const result = new Date(timeInSeconds * 1000).toISOString().slice(11, 19)
   const hours = parseInt(result.slice(0, 2), 10)
   return hours > 0 ? result : result.slice(3)
+}
+
+export function sanitizeText(html: string | undefined | null): string {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim()
 }

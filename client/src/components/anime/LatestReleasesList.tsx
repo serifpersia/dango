@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import ErrorMessage from '../common/ErrorMessage'
@@ -6,6 +6,7 @@ import { useInfiniteLatestReleases } from '../../hooks/useAnimeData'
 import styles from './TrendingList.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useCarousel } from '../../hooks/useCarousel'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 
 const formatOptions = [
   { value: 'TV', label: 'TV' },
@@ -20,9 +21,7 @@ const PAGE_SIZE = 10
 
 export default function LatestReleasesList() {
   const { lowEndMode } = useLowEndMode()
-  const [format, setFormat] = useState(() => {
-    return localStorage.getItem('latest_releases_format') || 'TV'
-  })
+  const [format, setFormat] = useLocalStorage<string>('latest_releases_format', 'TV')
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
     useInfiniteLatestReleases(format, PAGE_SIZE)
@@ -30,10 +29,6 @@ export default function LatestReleasesList() {
   const animeList = useMemo(() => {
     return data?.pages.flatMap((page) => page) || []
   }, [data])
-
-  useEffect(() => {
-    localStorage.setItem('latest_releases_format', format)
-  }, [format])
 
   const handleReachThreshold = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage && !isLoading) {
@@ -44,12 +39,10 @@ export default function LatestReleasesList() {
   const { emblaRef, stepBy } = useCarousel({ onReachThreshold: handleReachThreshold })
 
   return (
-    <section style={{ marginBottom: '2.5rem' }}>
+    <section className={styles.sectionWrapper}>
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          <div className="section-title" style={{ marginBottom: 0 }}>
-            Latest Releases
-          </div>
+          <div className={`section-title ${styles.sectionTitleNoMargin}`}>Latest Releases</div>
           <div className={styles['nav-arrows']}>
             <button
               className={styles['nav-button']}

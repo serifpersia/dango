@@ -226,7 +226,7 @@ class DiscordRPCService {
         this.client.removeAllListeners()
         this.client.destroy()
       } catch (err) {
-        // Ignore errors during destruction
+        // ignore
       }
       this.client = null
     }

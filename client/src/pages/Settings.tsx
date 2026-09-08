@@ -53,9 +53,7 @@ const Settings: React.FC = () => {
           localStorage.setItem('installation_id', data.id)
         }
       })
-      .catch(() => {
-        // fallback: keep whatever is in localStorage
-      })
+      .catch(() => {})
   }, [])
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
 

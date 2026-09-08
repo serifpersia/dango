@@ -6,6 +6,8 @@ import TvPlayerControls from '../components/tv/TvPlayerControls'
 import GenericModal from '../components/common/GenericModal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
+import { loadHls, canPlayHlsNatively } from '../lib/hls'
+import type Hls from 'hls.js'
 import styles from './Tv.module.css'
 
 const MOVY_SERVERS = [
@@ -78,21 +80,6 @@ interface SubtitleTrack {
   language: string
   label: string
   url: string
-}
-
-interface HlsJsInstance {
-  audioTracks?: { length: number }
-  audioTrack: number
-  loadSource: (url: string) => void
-  attachMedia: (media: HTMLMediaElement) => void
-  on: (event: string, handler: () => void) => void
-  destroy: () => void
-}
-
-interface HlsJsConstructor {
-  new (options?: { enableWorker?: boolean }): HlsJsInstance
-  isSupported: () => boolean
-  Events: Record<string, string>
 }
 
 const WATCHSERIES_PROVIDERS = {
@@ -189,7 +176,7 @@ const Tv: React.FC = () => {
     selectedSubtitleRef.current = selectedSubtitle
   }, [selectedSubtitle])
   const videoRef = useRef<HTMLVideoElement>(null)
-  const hlsRef = useRef<HlsJsInstance | null>(null)
+  const hlsRef = useRef<Hls | null>(null)
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const discordSessionRef = useRef<string>('')
   if (!discordSessionRef.current) {
@@ -503,6 +490,8 @@ const Tv: React.FC = () => {
     }
     if (isEmbedProvider) return
 
+    let cancelled = false
+
     const filtered =
       sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
     const currentUrl = filtered[qualityIdx]?.url || ''
@@ -516,103 +505,84 @@ const Tv: React.FC = () => {
     const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(source === 'movybz' ? 'https://www.movy.bz/' : referer)}`
 
     if (filtered[qualityIdx]?.type === 'hls') {
-      const Hls = (window as unknown as { Hls?: HlsJsConstructor }).Hls
-      if (Hls && Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true })
-        hlsRef.current = hls
-        hls.on(
-          Hls.Events.ERROR,
-          (_event: string, data: { fatal: boolean; type: string; details: string }) => {
+      void (async () => {
+        const HlsClass = await loadHls()
+        if (cancelled) return
+        if (HlsClass && HlsClass.isSupported()) {
+          const hls = new HlsClass({ enableWorker: true })
+          hlsRef.current = hls
+          hls.on(HlsClass.Events.ERROR, (_event, data) => {
             if (data.fatal) {
               setStreamError(`Stream failed (${data.details}). Try another source or reload.`)
               setStreamLoading(false)
               hls.destroy()
               hlsRef.current = null
             }
+          })
+          hls.loadSource(proxiedUrl)
+          hls.attachMedia(video)
+          const readSubtitlePreference = (): { enabled: boolean; index: number } => {
+            let enabled = false
+            let index = 0
+            try {
+              enabled = localStorage.getItem('tvSubtitlesEnabled') === 'true'
+              const stored = parseInt(localStorage.getItem('tvSelectedSubtitle') || '0', 10)
+              if (!isNaN(stored) && stored >= 0) index = stored
+            } catch {
+              // ignore
+            }
+            return { enabled, index }
           }
-        )
-        hls.loadSource(proxiedUrl)
-        hls.attachMedia(video)
-        const readSubtitlePreference = (): { enabled: boolean; index: number } => {
-          let enabled = false
-          let index = 0
-          try {
-            enabled = localStorage.getItem('tvSubtitlesEnabled') === 'true'
-            const stored = parseInt(localStorage.getItem('tvSelectedSubtitle') || '0', 10)
-            if (!isNaN(stored) && stored >= 0) index = stored
-          } catch {
-            // ignore
-          }
-          return { enabled, index }
-        }
-        const applySubtitlePreference = () => {
-          const extended = hls as unknown as {
-            subtitleTrack?: number
-            subtitleTracks?: unknown[]
-          }
-          if (typeof extended.subtitleTrack !== 'number') return
-          const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
-          if (tracks.length === 0) {
-            extended.subtitleTrack = -1
-            return
-          }
-          const pref = readSubtitlePreference()
-          if (pref.enabled) {
-            const target = pref.index < tracks.length ? pref.index : 0
-            extended.subtitleTrack = target
-            setSelectedSubtitle(target)
-          } else {
-            extended.subtitleTrack = -1
-          }
-        }
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          const hlsWithTracks = hls as unknown as {
-            audioTrack?: number
-            subtitleTrack?: number
-            audioTracks?: unknown[]
-            subtitleTracks?: unknown[]
-          }
-          if (typeof hlsWithTracks.audioTrack === 'number') {
-            hlsWithTracks.audioTrack = selectedAudioTrackRef.current
-
-            setTimeout(() => {
-              if (typeof hlsWithTracks.audioTrack === 'number') {
-                setSelectedAudioTrack(hlsWithTracks.audioTrack)
-              }
-            }, 300)
-          }
-          applySubtitlePreference()
-          video.play().catch(() => {})
-        })
-        const hlsWithEvents = hls as unknown as {
-          on: (event: string, handler: (e: string, data: { id: number }) => void) => void
-        }
-        hlsWithEvents.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_e: string, data: { id: number }) => {
-          setSelectedAudioTrack(data.id)
-        })
-        hlsWithEvents.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-          applySubtitlePreference()
-        })
-        hlsWithEvents.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e: string, data: { id: number }) => {
-          const extended = hls as unknown as { subtitleTracks?: unknown[] }
-          const tracks = Array.isArray(extended.subtitleTracks) ? extended.subtitleTracks : []
-          if (tracks.length === 0) return
-          if (data.id === -1) {
+          const applySubtitlePreference = () => {
+            if (typeof hls.subtitleTrack !== 'number') return
+            const tracks = Array.isArray(hls.subtitleTracks) ? hls.subtitleTracks : []
+            if (tracks.length === 0) {
+              hls.subtitleTrack = -1
+              return
+            }
             const pref = readSubtitlePreference()
             if (pref.enabled) {
               const target = pref.index < tracks.length ? pref.index : 0
-              ;(hls as unknown as { subtitleTrack?: number }).subtitleTrack = target
-              return
+              hls.subtitleTrack = target
+              setSelectedSubtitle(target)
+            } else {
+              hls.subtitleTrack = -1
             }
           }
-          setSelectedSubtitle(data.id)
-        })
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = proxiedUrl
-        video.play().catch(() => {
-          setStreamError('Failed to play stream. Try another source.')
-        })
-      }
+          hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
+            hls.audioTrack = selectedAudioTrackRef.current
+            setTimeout(() => {
+              setSelectedAudioTrack(hls.audioTrack)
+            }, 300)
+            applySubtitlePreference()
+            video.play().catch(() => {})
+          })
+          hls.on(HlsClass.Events.AUDIO_TRACK_SWITCHED, (_e, data) => {
+            setSelectedAudioTrack(data.id)
+          })
+          hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
+            applySubtitlePreference()
+          })
+          hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, (_e, data) => {
+            const tracks = Array.isArray(hls.subtitleTracks) ? hls.subtitleTracks : []
+            if (tracks.length === 0) return
+            if (data.id === -1) {
+              const pref = readSubtitlePreference()
+              if (pref.enabled) {
+                const target = pref.index < tracks.length ? pref.index : 0
+                hls.subtitleTrack = target
+                return
+              }
+            }
+            setSelectedSubtitle(data.id)
+          })
+        } else if (canPlayHlsNatively(video)) {
+          video.src = proxiedUrl
+          video.play().catch(() => {
+            setStreamError('Failed to play stream. Try another source.')
+          })
+        }
+      })()
     } else {
       video.src = proxiedUrl
       video.play().catch(() => {
@@ -632,21 +602,19 @@ const Tv: React.FC = () => {
     }
     video.addEventListener('error', handleVideoError)
     return () => {
+      cancelled = true
       video.removeEventListener('error', handleVideoError)
     }
   }, [streams, qualityIdx, sourceTypeFilter, source, referer, isEmbedProvider])
 
   useEffect(() => {
-    const hls = hlsRef.current as unknown as { audioTrack?: number; subtitleTrack?: number } | null
+    const hls = hlsRef.current
     if (!hls || typeof hls.audioTrack !== 'number') return
     hls.audioTrack = selectedAudioTrack
   }, [selectedAudioTrack])
 
   useEffect(() => {
-    const hls = hlsRef.current as unknown as {
-      subtitleTrack?: number
-      subtitleTracks?: unknown[]
-    } | null
+    const hls = hlsRef.current
     if (!hls || typeof hls.subtitleTrack !== 'number') return
     if (!Array.isArray(hls.subtitleTracks) || hls.subtitleTracks.length === 0) return
     if (selectedSubtitle >= 0) hls.subtitleTrack = selectedSubtitle
@@ -674,10 +642,7 @@ const Tv: React.FC = () => {
   useEffect(() => {
     const video = videoRef.current
     if (!video || isEmbedProvider) return
-    const hls = hlsRef.current as unknown as {
-      subtitleTrack?: number
-      subtitleTracks?: unknown[]
-    } | null
+    const hls = hlsRef.current
     if (
       hls &&
       typeof hls.subtitleTrack === 'number' &&
@@ -763,10 +728,7 @@ const Tv: React.FC = () => {
       // ignore
     }
     const video = videoRef.current
-    const hls = hlsRef.current as unknown as {
-      subtitleTrack?: number
-      subtitleTracks?: unknown[]
-    } | null
+    const hls = hlsRef.current
     if (
       hls &&
       typeof hls.subtitleTrack === 'number' &&

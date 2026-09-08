@@ -1,3 +1,4 @@
+import NodeCache from 'node-cache'
 import {
   Provider,
   Show,
@@ -7,7 +8,6 @@ import {
   VideoLink,
 } from './provider.interface'
 import logger from '../logger'
-import NodeCache from 'node-cache'
 import { buildQueryVariants, pickBestMatch } from './title-matching'
 
 const BASE_URL = 'https://hentaini.com'
@@ -546,7 +546,7 @@ export class HnProvider implements Provider {
             }
           }
         } catch {
-          // fall through
+          // ignore
         }
       }
 

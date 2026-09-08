@@ -3,17 +3,7 @@ import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
 
 type ProviderId =
-  | 'anidb'
-  | 'anilight'
-  | 'kaa'
-  | 'megaplay'
-  | 'animepahe'
-  | 'animeya'
-  | '123anime'
-  | 'wh'
-  | 'hn'
-  | 'ht'
-  | 'op'
+  'anilight' | 'kaa' | 'megaplay' | 'animepahe' | 'animeya' | '123anime' | 'wh' | 'hn' | 'ht' | 'op'
 
 const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
   { value: 'megaplay', label: 'MegaPlay', mature: false },
@@ -26,7 +16,6 @@ const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] 
   { value: 'hn', label: 'HN', mature: true },
   { value: 'ht', label: 'HT', mature: true },
   { value: 'op', label: 'OP', mature: true },
-  { value: 'anidb', label: 'AniDB', mature: false },
 ]
 
 interface ProviderSelectorProps {

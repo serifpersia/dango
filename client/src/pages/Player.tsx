@@ -16,10 +16,12 @@ import {
   FaListUl,
 } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
+import { loadHls } from '../lib/hls'
+import type Hls from 'hls.js'
 import GenericModal from '../components/common/GenericModal'
+import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
-import ResumeModal from '../components/common/ResumeModal'
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
@@ -289,8 +291,10 @@ const Player: React.FC = () => {
     const videoElement = refs.videoRef.current
     if (!videoElement) return
 
+    let cancelled = false
     if (hlsInstance.current) {
       hlsInstance.current.destroy()
+      hlsInstance.current = null
     }
 
     if (state.loadingVideo || state.selectedSource) {
@@ -362,11 +366,29 @@ const Player: React.FC = () => {
     }
     videoElement.addEventListener('loadedmetadata', handleLoaded, { once: true })
 
+    const shouldAutoPlay = !(showResumeModalRef.current && resumeTimeRef.current > 5)
+    const playWhenReady = () => {
+      if (shouldAutoPlay) {
+        videoElement.play().catch(() => {
+          actions.setShowControls(true)
+        })
+      }
+    }
+
     if (state.selectedLink.hls) {
-      const Hls = (window as unknown as { Hls?: typeof Hls }).Hls
-      if (Hls && Hls.isSupported()) {
+      // HLS attaches asynchronously (bundled hls.js is lazy-loaded).
+      // Autoplay must wait until the manifest is parsed — calling play()
+      // before attach aborts the media fetch and rejects the promise.
+      void (async () => {
+        const HlsClass = await loadHls()
+        if (cancelled) return
+        if (!HlsClass || !HlsClass.isSupported()) {
+          videoElement.src = proxiedUrl
+          playWhenReady()
+          return
+        }
         const isLowEnd = document.body.classList.contains('low-end')
-        const hls = new Hls({
+        const hls = new HlsClass({
           maxBufferLength: isLowEnd ? 15 : 30,
           maxMaxBufferLength: isLowEnd ? 30 : 60,
           maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
@@ -374,23 +396,20 @@ const Player: React.FC = () => {
           enableWorker: true,
         })
         hlsInstance.current = hls
-        hls.on(Hls.Events.ERROR, (_event, data) => {
+        hls.on(HlsClass.Events.ERROR, (_event, data) => {
           if (data.fatal && !hasAutoFallbackRef.current) {
             handleVideoSourceErrorRef.current()
           }
         })
         hls.loadSource(proxiedUrl)
         hls.attachMedia(videoElement)
-      } else if (
-        videoElement.canPlayType('application/vnd.apple.mpegurl') ||
-        videoElement.canPlayType('application/x-mpegURL')
-      ) {
-        videoElement.src = proxiedUrl
-      } else {
-        videoElement.src = proxiedUrl
-      }
+        hls.once(HlsClass.Events.MANIFEST_PARSED, () => {
+          if (!cancelled) playWhenReady()
+        })
+      })()
     } else {
       videoElement.src = proxiedUrl
+      playWhenReady()
     }
 
     const savedVolume = localStorage.getItem('playerVolume')
@@ -403,18 +422,12 @@ const Player: React.FC = () => {
       videoElement.muted = savedMuted === 'true'
     }
 
-    const shouldAutoPlay = !(showResumeModalRef.current && resumeTimeRef.current > 5)
-    if (shouldAutoPlay) {
-      videoElement.play().catch((error) => {
-        console.warn('Autoplay was prevented:', error)
-        actions.setShowControls(true)
-      })
-    }
-
     return () => {
+      cancelled = true
       videoElement.removeEventListener('loadedmetadata', handleLoaded)
       if (hlsInstance.current) {
         hlsInstance.current.destroy()
+        hlsInstance.current = null
       }
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
@@ -1326,16 +1339,43 @@ const Player: React.FC = () => {
       className={`${layoutStyles.playerPageLayout} ${isTheaterMode ? layoutStyles.theaterMode : ''}`}
       onClick={handleLayoutClick}
     >
-      <ResumeModal
-        show={shouldShowModal}
-        resumeTime={player.actions.formatTime(state.resumeTime)}
-        onResume={handleResume}
-        onStartOver={handleStartOver}
+      <Modal
+        isOpen={shouldShowModal}
         onClose={handleCloseModal}
-        isShowCompleted={isShowCompleted}
-        onMoveToCompleted={handleMoveToCompletedAndNavigate}
-        isMovingToCompleted={isUpdatingWatchlistStatus}
-      />
+        title={isShowCompleted ? 'Show Completed!' : 'Resume Playback?'}
+        width="sm"
+      >
+        {isShowCompleted ? (
+          <>
+            <Modal.Body>
+              <p>Congratulations! You&apos;ve finished the final episode of this series.</p>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button
+                onClick={handleMoveToCompletedAndNavigate}
+                disabled={isUpdatingWatchlistStatus}
+              >
+                {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
+              </Button>
+            </Modal.Actions>
+          </>
+        ) : (
+          <>
+            <Modal.Body>
+              <p>
+                You were watching at <strong>{player.actions.formatTime(state.resumeTime)}</strong>.
+                Would you like to continue?
+              </p>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="secondary" onClick={handleStartOver}>
+                Start Over
+              </Button>
+              <Button onClick={handleResume}>Resume</Button>
+            </Modal.Actions>
+          </>
+        )}
+      </Modal>
 
       <AnimePaheCookieModal
         isOpen={!!state.showCookieModal}

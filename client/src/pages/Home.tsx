@@ -8,7 +8,7 @@ import LatestReleasesList from '../components/anime/LatestReleasesList'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
+import { Modal } from '../components/common/Modal'
 import SpotlightBanner from '../components/anime/SpotlightBanner'
 import QueueRail from '../components/player/QueueRail'
 import {
@@ -43,6 +43,7 @@ const Home: React.FC = () => {
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
+  const [alsoRemoveFromWatchlist, setAlsoRemoveFromWatchlist] = React.useState(false)
   const removeWatchlistMutation = useRemoveFromWatchlist()
   const { data: queueData = [] } = useQueue()
 
@@ -130,15 +131,13 @@ const Home: React.FC = () => {
     [cwList, titlePreference]
   )
 
-  const handleConfirmRemove = useCallback(
-    (options: { removeFromWatchlist?: boolean }) => {
-      if (!itemToRemove) return
-      removeCw.mutate(itemToRemove.id)
-      if (options.removeFromWatchlist) removeWatchlistMutation.mutate(itemToRemove.id)
-      setItemToRemove(null)
-    },
-    [itemToRemove, removeCw, removeWatchlistMutation]
-  )
+  const handleConfirmRemove = useCallback(() => {
+    if (!itemToRemove) return
+    removeCw.mutate(itemToRemove.id)
+    if (alsoRemoveFromWatchlist) removeWatchlistMutation.mutate(itemToRemove.id)
+    setItemToRemove(null)
+    setAlsoRemoveFromWatchlist(false)
+  }, [itemToRemove, removeCw, removeWatchlistMutation, alsoRemoveFromWatchlist])
 
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'latest', label: 'Latest Releases' },
@@ -292,7 +291,6 @@ const Home: React.FC = () => {
           )
         }
       />
-      {/* ── Continue Watching ── */}
       <AnimeSection
         title="Continue Watching"
         titleLink="/watchlist/Continue Watching"
@@ -327,7 +325,6 @@ const Home: React.FC = () => {
         }
       />
 
-      {/* ── Tab Selector ── */}
       <div className={styles.tabBar}>
         {tabsWithWeek.map((tab) => (
           <Button
@@ -342,18 +339,47 @@ const Home: React.FC = () => {
         ))}
       </div>
 
-      {/* ── Tab Content ── */}
       <div className={styles.tabContent}>{renderTabContent()}</div>
 
       <Schedule />
 
-      <RemoveConfirmationModal
+      <Modal
         isOpen={!!itemToRemove}
-        onClose={() => setItemToRemove(null)}
-        onConfirm={handleConfirmRemove}
-        animeName={itemToRemove?.name || ''}
-        scenario="continueWatching"
-      />
+        onClose={() => {
+          setItemToRemove(null)
+          setAlsoRemoveFromWatchlist(false)
+        }}
+        title="Reset Progress"
+      >
+        <Modal.Body>
+          <p>
+            Are you sure you want to remove your watch progress for &quot;{itemToRemove?.name}
+            &quot;?
+          </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={alsoRemoveFromWatchlist}
+              onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
+            />
+            Also remove from my watchlist
+          </label>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setItemToRemove(null)
+              setAlsoRemoveFromWatchlist(false)
+            }}
+          >
+            No
+          </Button>
+          <Button variant="danger" onClick={handleConfirmRemove}>
+            Yes
+          </Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   )
 }

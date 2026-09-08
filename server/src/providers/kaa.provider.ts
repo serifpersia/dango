@@ -1,6 +1,4 @@
-import NodeCache from 'node-cache'
 import {
-  Provider,
   Show,
   VideoSource,
   VideoLink,
@@ -8,8 +6,8 @@ import {
   EpisodeDetails,
   SearchOptions,
 } from './provider.interface'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
 import logger from '../logger'
+import { BaseProvider } from './base-provider'
 
 const KAA_BASE = 'https://kaa.lt'
 const KAA_HLS_BASE = 'https://hls.krussdomi.com/manifest'
@@ -72,14 +70,8 @@ interface KaaEpisodeServers {
   language?: string
 }
 
-export class KaaProvider implements Provider {
+export class KaaProvider extends BaseProvider {
   name = 'kaa'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private stripSlug(showId: string): string | null {
     if (!showId) return null
@@ -188,34 +180,6 @@ export class KaaProvider implements Provider {
       logger.error({ error }, '[KAA] Search failed')
       return []
     }
-  }
-
-  async resolveShowId(
-    title: string,
-    romaji?: string,
-    _mode?: 'sub' | 'dub'
-  ): Promise<string | null> {
-    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
-    if (targets.length === 0) return null
-
-    for (const variant of buildQueryVariants(title, romaji)) {
-      let results: Show[]
-      try {
-        results = await this.search({ query: variant })
-      } catch {
-        continue
-      }
-      if (results.length === 0) continue
-
-      const candidates = results.map((r) => ({
-        title: r.name || r.englishName || '',
-        id: r.id || r._id || '',
-      }))
-      const matchResult = pickBestMatch(candidates, targets)
-      if (matchResult) return matchResult.item.id
-    }
-
-    return null
   }
 
   private async buildEpMap(

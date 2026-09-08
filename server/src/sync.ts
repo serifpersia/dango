@@ -10,6 +10,7 @@ import { DatabaseWrapper } from './db'
 import { dbAll, dbGet } from './utils/db-utils'
 import { TempShowIdsRepository } from './repositories/temp-show-ids.repository'
 import { isTempSyncRow } from './lib/temp-ids'
+import { notifySyncStart, notifySyncEnd } from './lib/ipc'
 
 const log = logger.child({ module: 'Sync' })
 
@@ -228,10 +229,8 @@ async function getRemoteManifestVersion(
       return { version: await githubSyncService.getRemoteVersion() }
     } else if (activeProvider === 'google') {
       if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      // New JSON sync in appDataFolder (same payload as GitHub, no db file)
       return { version: await googleDriveService.getRemoteVersion() }
     } else if (activeProvider === 'rclone') {
-      // JSON sync in remote folder (same payload as GitHub/Google, no db file)
       return { version: await getRcloneRemotePayloadVersion(remoteFolder) }
     }
   } catch (err) {
@@ -269,43 +268,43 @@ export async function syncDownOnBoot(
   isSyncing = true
 
   try {
-    console.log(`[SYNC_START] Initial sync check (${activeProvider})`)
+    notifySyncStart(`Initial sync check (${activeProvider})`)
     const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
-    console.log('[SYNC_END]')
+    notifySyncEnd()
 
     log.info(`Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
 
     if (remoteVersion > localVersion) {
       if (activeProvider === 'github') {
         if (!githubSyncService.isAuthenticated()) return false
-        console.log(`[SYNC_START] Importing GitHub sync data (Remote v${remoteVersion})`)
+        notifySyncStart(`Importing GitHub sync data (Remote v${remoteVersion})`)
         const importedVersion = await githubSyncService.syncDown(db)
         await setLocalManifestVersion(importedVersion || remoteVersion)
-        console.log('[SYNC_END]')
+        notifySyncEnd()
         log.info('GitHub sync down complete.')
         return false
       }
 
       if (activeProvider === 'google') {
         if (!googleDriveService.isAuthenticated()) return false
-        console.log(`[SYNC_START] Importing Google sync data (Remote v${remoteVersion})`)
+        notifySyncStart(`Importing Google sync data (Remote v${remoteVersion})`)
         const importedVersion = await googleDriveService.syncDown(db)
         await setLocalManifestVersion(importedVersion || remoteVersion)
-        console.log('[SYNC_END]')
+        notifySyncEnd()
         log.info('Google sync down complete.')
         return false
       }
 
       if (activeProvider === 'rclone') {
-        console.log(`[SYNC_START] Importing Rclone sync data (Remote v${remoteVersion})`)
+        notifySyncStart(`Importing Rclone sync data (Remote v${remoteVersion})`)
         const importedVersion = await rcloneSyncDown(db, remoteFolderName)
         await setLocalManifestVersion(importedVersion || remoteVersion)
-        console.log('[SYNC_END]')
+        notifySyncEnd()
         log.info('Rclone sync down complete.')
         return false
       }
 
-      console.log(`[SYNC_START] Downloading remote database (Remote v${remoteVersion})`)
+      notifySyncStart(`Downloading remote database (Remote v${remoteVersion})`)
       await closeMainDb()
 
       const backupPath = `${dbPath}.bak`
@@ -332,11 +331,11 @@ export async function syncDownOnBoot(
           await fs.unlink(backupPath)
         }
 
-        console.log('[SYNC_END]')
+        notifySyncEnd()
         log.info('Sync down complete.')
         return true
       } catch (err) {
-        console.log('[SYNC_END]')
+        notifySyncEnd()
         log.error({ err }, 'Sync down failed. Restoring backup.')
         if (existsSync(backupPath)) {
           try {
@@ -356,7 +355,7 @@ export async function syncDownOnBoot(
       return false
     }
   } catch (err) {
-    console.log('[SYNC_END]')
+    notifySyncEnd()
     log.error({ err }, 'Sync boot error.')
     return false
   } finally {
@@ -381,7 +380,7 @@ export async function syncUp(
 
   try {
     const localVersion = await getLocalManifestVersion()
-    console.log(`[SYNC_START] Syncing up (Local v${localVersion})`)
+    notifySyncStart(`Syncing up (Local v${localVersion})`)
 
     const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
 
@@ -396,14 +395,14 @@ export async function syncUp(
         await rcloneSyncUp(db, remoteFolderName)
       }
 
-      console.log('[SYNC_END]')
+      notifySyncEnd()
       log.info('Sync up complete.')
     } else {
-      console.log('[SYNC_END]')
+      notifySyncEnd()
       log.info('No changes to sync up or remote is newer.')
     }
   } catch (err) {
-    console.log('[SYNC_END]')
+    notifySyncEnd()
     log.error({ err }, 'Sync up failed.')
   } finally {
     isSyncing = false

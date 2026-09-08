@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../common/Button'
-import StatusModal from '../common/StatusModal'
+import { Modal } from '../common/Modal'
 import styles from './GoogleAuthSettings.module.css'
 
 interface User {
@@ -241,12 +241,18 @@ const GoogleAuthSettings: React.FC = () => {
         </div>
       </details>
 
-      <StatusModal
-        show={statusModal.show}
-        message={statusModal.message}
-        type={statusModal.type}
+      <Modal
+        isOpen={statusModal.show}
         onClose={() => setStatusModal((prev) => ({ ...prev, show: false }))}
-      />
+        width="sm"
+      >
+        <Modal.Body>
+          <p>{statusModal.message}</p>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button onClick={() => setStatusModal((prev) => ({ ...prev, show: false }))}>OK</Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   )
 }

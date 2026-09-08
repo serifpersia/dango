@@ -1,10 +1,11 @@
-const log = (message: string) =>
-  console.log(`[Sync Config] ${new Date().toISOString()} - ${message}`)
+import logger from './logger'
+
+const log = logger.child({ module: 'SyncConfig' })
 
 let activeRemote: 'mega' | 'gdrive' | undefined
 
 export function setActiveRemote(remote: 'mega' | 'gdrive') {
-  log(`Setting active sync remote to: ${remote}`)
+  log.info({ remote }, 'Setting active sync remote')
   activeRemote = remote
 }
 
@@ -14,10 +15,10 @@ export function getActiveRemote(): 'mega' | 'gdrive' | undefined {
 
 export async function initialize(): Promise<void> {
   if (activeRemote !== 'gdrive') {
-    log('Active remote is not gdrive, skipping gdrive-specific initialization.')
+    log.info('Active remote is not gdrive, skipping gdrive-specific initialization.')
     return
   }
-  log('gdrive is the active remote.')
+  log.info('gdrive is the active remote.')
 }
 
 export function getRemoteString(remoteDir: string): string {

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router'
-import { useQueryClient } from '@tanstack/react-query'
 import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
-import { fixThumbnailUrl } from '../../lib/utils'
+import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -22,38 +21,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const { lowEndMode } = useLowEndMode()
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const top6 = animeList.slice(0, 6)
-
-  useEffect(() => {
-    const items = animeList.slice(0, 6)
-    for (const anime of items) {
-      if (!anime._id || !/^\d+$/.test(anime._id)) continue
-      const existing = queryClient.getQueryData(['show-preview', anime._id])
-      if (!existing) {
-        queryClient.setQueryData(['show-preview', anime._id], {
-          id: anime._id,
-          name: anime.name,
-          nativeName: anime.nativeName,
-          englishName: anime.englishName,
-          thumbnail: anime.thumbnail,
-          bannerImage: anime.bannerImage,
-          description: anime.description,
-          genres: anime.genres || [],
-          score: anime.score,
-          type: anime.type,
-          status: anime.status,
-          episodeCount: anime.episodeCount,
-          isAdult: anime.isAdult,
-          names: {
-            romaji: anime.name,
-            english: anime.englishName || anime.name,
-            native: anime.nativeName || anime.name,
-          },
-        })
-      }
-    }
-  }, [animeList, queryClient])
 
   const getTitle = (anime: Anime) => {
     switch (titlePreference) {
@@ -112,7 +80,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const anime = top6[currentIndex]
 
   const rawDesc = anime.description ?? ''
-  const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
+  const synopsis = sanitizeText(rawDesc)
   const genres = anime.genres ?? []
 
   const bannerSrc = anime.bannerImage

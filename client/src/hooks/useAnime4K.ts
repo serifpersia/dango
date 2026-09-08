@@ -3,6 +3,7 @@ import type { ModeA, ModeB, ModeC, ModeAA, ModeBB, ModeCA } from 'anime4k-webgpu
 
 type Preset = 'ModeA' | 'ModeB' | 'ModeC' | 'ModeAA' | 'ModeBB' | 'ModeCA'
 type Profile = 'low' | 'balanced' | 'high' | 'denoise'
+type Pipeline = ModeA | ModeB | ModeC | ModeAA | ModeBB | ModeCA
 
 interface UseAnime4KOptions {
   videoRef: { current: HTMLVideoElement | null }
@@ -34,6 +35,16 @@ export default function useAnime4K({
   const [isInitializing, setIsInitializing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const firstMount = useRef(true)
+  const generationRef = useRef(0)
+  const deviceRef = useRef<GPUDevice | null>(null)
+  const contextRef = useRef<GPUCanvasContext | null>(null)
+  const pipelineRef = useRef<Pipeline | null>(null)
+  const inputTextureRef = useRef<GPUTexture | null>(null)
+  const outputTextureRef = useRef<GPUTexture | null>(null)
+  const renderPipelineRef = useRef<GPURenderPipeline | null>(null)
+  const samplerRef = useRef<GPUSampler | null>(null)
+  const bindGroupLayoutRef = useRef<GPUBindGroupLayout | null>(null)
+  const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
     async function checkWebGPU() {

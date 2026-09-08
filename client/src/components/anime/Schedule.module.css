@@ -2,6 +2,16 @@
   margin-bottom: 2.5rem;
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sectionTitleNoMargin {
+  margin-bottom: 0;
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;

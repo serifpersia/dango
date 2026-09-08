@@ -194,13 +194,7 @@
   inset: 0;
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, var(--shimmer-highlight), transparent);
-  animation: shimmer var(--duration-shimmer) infinite;
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
+  animation: skeleton-wave var(--duration-shimmer) infinite;
 }
 
 .pagination {

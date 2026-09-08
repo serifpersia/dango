@@ -1,19 +1,17 @@
 import * as cheerio from 'cheerio'
-import NodeCache from 'node-cache'
 import { gotScraping } from 'got-scraping'
 
 import {
-  Provider,
   Show,
   VideoSource,
   EpisodeDetails,
   EpisodeDetail,
   SearchOptions,
 } from './provider.interface'
-import { pickBestMatch, buildQueryVariants } from './title-matching'
 import logger from '../logger'
 import { requestContext } from '../utils/request-context'
 import { sanitizeCfClearance } from '../utils/cookie.utils'
+import { BaseProvider } from './base-provider'
 
 interface AnimePaheSearchResult {
   session: string
@@ -48,16 +46,10 @@ interface AnimePaheApiResponse<T> {
   lastPage?: number
 }
 
-export class AnimePaheProvider implements Provider {
+export class AnimePaheProvider extends BaseProvider {
   name = 'AnimePahe'
   private readonly BASE_URL = 'https://animepahe.pw'
   private readonly API_URL = 'https://animepahe.pw/api'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private async getRequestHeaders(
     isApi: boolean = false,
@@ -76,11 +68,8 @@ export class AnimePaheProvider implements Provider {
     if (customCookie) {
       // Sanitize cookie: remove 'cf_clearance' label (with : or =), spaces, and quotes
       let sanitized = customCookie.trim()
-      // Remove "cf_clearance" prefix case-insensitively
       sanitized = sanitized.replace(/^cf_clearance/i, '')
-      // Remove leading : or = and any whitespace
       sanitized = sanitized.replace(/^[:=]\s*/, '')
-      // Remove all quotes and trim again
       sanitized = sanitized.replace(/["']/g, '').trim()
 
       cookieStr = `cf_clearance=${sanitized}`
@@ -169,28 +158,6 @@ export class AnimePaheProvider implements Provider {
       if ((e as Error).message === 'AUTH_REQUIRED') throw e
       return []
     }
-  }
-
-  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
-    const targets = [title, romaji].filter((t): t is string => !!t && t.trim().length > 0)
-    if (targets.length === 0) return null
-
-    for (const variant of buildQueryVariants(title, romaji)) {
-      const results = await this.search({ query: variant })
-      if (results.length === 0) continue
-
-      const candidates = results.map((r) => ({
-        title: r.name || r.englishName || '',
-        id: r.session ?? r._id ?? r.id ?? '',
-      }))
-
-      const matchResult = pickBestMatch(candidates, targets)
-      if (matchResult) {
-        return matchResult.item.id
-      }
-    }
-
-    return null
   }
 
   async getEpisodes(
@@ -456,7 +423,7 @@ export class AnimePaheProvider implements Provider {
             if (m) return { m3u8: m[1], referer: kwikUrl }
           }
         } catch {
-          // ignore and keep scanning
+          // ignore
         }
         searchFrom = parenEnd + 1
       }

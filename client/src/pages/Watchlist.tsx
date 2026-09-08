@@ -19,7 +19,7 @@ import {
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import ErrorMessage from '../components/common/ErrorMessage'
-import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
+import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 
 import {
@@ -108,6 +108,8 @@ const Watchlist: React.FC = () => {
     ids?: string[]
     name?: string
   } | null>(null)
+  const [confirmRemoveFromWatchlist, setConfirmRemoveFromWatchlist] = useState(false)
+  const [confirmRememberPreference, setConfirmRememberPreference] = useState(false)
 
   const [manageMode, setManageMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -276,12 +278,12 @@ const Watchlist: React.FC = () => {
     }
   }
 
-  const confirmRemove = (opts: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => {
+  const confirmRemove = () => {
     if (!itemToRemove) return
     if (itemToRemove.ids) {
       if (isCW) {
         bulkRemoveCw.mutate(itemToRemove.ids)
-        if (opts.removeFromWatchlist) {
+        if (confirmRemoveFromWatchlist) {
           bulkRemove.mutate(itemToRemove.ids)
         }
       } else {
@@ -289,19 +291,29 @@ const Watchlist: React.FC = () => {
       }
       setSelectedIds(new Set())
       setItemToRemove(null)
+      setConfirmRemoveFromWatchlist(false)
+      setConfirmRememberPreference(false)
       return
     }
     if (isCW) {
       removeCw.mutate(itemToRemove.id)
-      if (opts.removeFromWatchlist) {
+      if (confirmRemoveFromWatchlist) {
         removeWl.mutate(itemToRemove.id)
       }
     } else {
       removeWl.mutate(itemToRemove.id)
     }
-    if (opts.rememberPreference)
+    if (confirmRememberPreference)
       updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true })
     setItemToRemove(null)
+    setConfirmRemoveFromWatchlist(false)
+    setConfirmRememberPreference(false)
+  }
+
+  const closeConfirm = () => {
+    setItemToRemove(null)
+    setConfirmRemoveFromWatchlist(false)
+    setConfirmRememberPreference(false)
   }
 
   const handleStatusChange = (id: string, status: string) => {
@@ -829,14 +841,51 @@ const Watchlist: React.FC = () => {
         </div>
       )}
 
-      <RemoveConfirmationModal
+      <Modal
         isOpen={!!itemToRemove}
-        onClose={() => setItemToRemove(null)}
-        onConfirm={confirmRemove}
-        animeName={itemToRemove?.name || ''}
-        scenario={isCW ? 'continueWatching' : 'watchlist'}
-        count={itemToRemove?.ids?.length}
-      />
+        onClose={closeConfirm}
+        title={isCW ? 'Reset Progress' : 'Remove from Watchlist'}
+      >
+        <Modal.Body>
+          <p>
+            {itemToRemove?.ids && itemToRemove.ids.length > 1
+              ? isCW
+                ? `Are you sure you want to remove watch progress for ${itemToRemove.ids.length} items?`
+                : `Are you sure you want to remove ${itemToRemove.ids.length} items from your watchlist?`
+              : isCW
+                ? `Are you sure you want to remove your watch progress for "${itemToRemove?.name}"?`
+                : `Are you sure you want to remove "${itemToRemove?.name}" from your watchlist?`}
+          </p>
+          {isCW && (
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmRemoveFromWatchlist}
+                onChange={(e) => setConfirmRemoveFromWatchlist(e.target.checked)}
+              />
+              Also remove from my watchlist
+            </label>
+          )}
+          {!isCW && !(itemToRemove?.ids && itemToRemove.ids.length > 1) && (
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmRememberPreference}
+                onChange={(e) => setConfirmRememberPreference(e.target.checked)}
+              />
+              Remember my choice
+            </label>
+          )}
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="secondary" onClick={closeConfirm}>
+            No
+          </Button>
+          <Button variant="danger" onClick={confirmRemove}>
+            Yes
+          </Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   )
 }

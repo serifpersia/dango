@@ -5,6 +5,7 @@ import styles from './Schedule.module.css'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
 import ErrorMessage from '../common/ErrorMessage'
 import { useCarousel } from '../../hooks/useCarousel'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
 
 interface Anime {
   _id: string
@@ -29,15 +30,9 @@ const Schedule: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [format, setFormat] = useState(() => {
-    return localStorage.getItem('schedule_format') || 'TV'
-  })
+  const [format, setFormat] = useLocalStorage<string>('schedule_format', 'TV')
   const { emblaRef, canScroll, stepBy, scrollToStart } = useCarousel()
   const dayRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    localStorage.setItem('schedule_format', format)
-  }, [format])
 
   useEffect(() => {
     const fetchEpisodeSchedule = async (date: string) => {
@@ -109,10 +104,8 @@ const Schedule: React.FC = () => {
   return (
     <div className={styles.scheduleSection}>
       <div className={styles.sectionHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h2 className="section-title" style={{ marginBottom: 0 }}>
-            Episode Schedule
-          </h2>
+        <div className={styles.sectionTitleRow}>
+          <h2 className={`section-title ${styles.sectionTitleNoMargin}`}>Episode Schedule</h2>
           {scheduleData.length > 0 && canScroll && (
             <div className={styles.navArrows}>
               <button

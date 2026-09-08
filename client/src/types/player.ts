@@ -127,7 +127,6 @@ export interface PlayerState {
     | 'hn'
     | 'anilight'
     | 'kaa'
-    | 'anidb'
     | 'ht'
     | 'op'
   loadingShowData: boolean

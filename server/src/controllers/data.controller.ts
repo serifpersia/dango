@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface'
 import { pickBestMatch } from '../providers/title-matching'
-import { genres, tags, studios } from '../constants.json'
 import {
   getTrending,
   getLatestReleases,
@@ -11,7 +10,6 @@ import {
   getSchedule,
   searchAnilist,
   searchAnilistByTitle,
-  setCachedAnilist,
   getSpotlightBanners,
   getBatchedHomeData,
   anilistUnavailable,
@@ -179,7 +177,7 @@ export class DataController {
               const show = await getShowMetaById(showId)
               romaji = show?.names?.romaji
             } catch {
-              // A title from local metadata is still enough to attempt provider resolution.
+              // ignore
             }
           }
           const resolved = await this.providers[providerKey]?.resolveShowId?.(
@@ -306,13 +304,6 @@ export class DataController {
       let episodes: string[] = []
       try {
         episodes = await getAnilistEpisodes(showId)
-
-        if (episodes.length === 0) {
-          episodes = await this.tryProviderEpisodesFallback(showId, req.query.mode as 'sub' | 'dub')
-          if (episodes.length > 0) {
-            setCachedAnilist(`eps:${showId}`, episodes)
-          }
-        }
       } catch (e) {
         logger.error({ err: e, showId }, 'Episodes fetch failed')
       }
@@ -322,7 +313,7 @@ export class DataController {
     }
 
     const providerName = (req.query.provider as string)?.toLowerCase()
-    const provider = providerName ? this.providers[providerName] : this.providers['anidb']
+    const provider = providerName ? this.providers[providerName] : undefined
     if (provider) {
       try {
         const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
@@ -645,10 +636,6 @@ export class DataController {
     res.json({})
   }
 
-  getGenresAndTags = (_req: Request, res: Response) => {
-    res.json({ genres, tags, studios })
-  }
-
   allocateTempShow = async (req: Request, res: Response) => {
     try {
       const provider = String(req.body?.provider || '').toLowerCase()
@@ -714,34 +701,6 @@ export class DataController {
     } catch (e) {
       logger.error({ err: e }, 'Batched home fetch failed')
       res.json({ trending: [], seasonal: [], spotlight: [] })
-    }
-  }
-
-  private tryProviderEpisodesFallback = async (
-    showId: string,
-    mode: 'sub' | 'dub'
-  ): Promise<string[]> => {
-    try {
-      const meta = await getShowMetaById(showId)
-      const title = meta?.name || meta?.englishName || meta?.nativeName
-      if (!title) return []
-
-      // anidb provides complete, normalized episode lists even when AniList
-      // has no episodeCount (e.g. One Piece) or wrong data (e.g. Detective Conan)
-      const provider = this.providers['anidb']
-      if (!provider) return []
-
-      const searchResults = await provider.search({ query: title })
-      if (!searchResults || searchResults.length === 0) return []
-
-      const providerShowId = searchResults[0]._id || searchResults[0].id
-      if (!providerShowId) return []
-
-      const episodesData = await provider.getEpisodes(providerShowId, mode)
-      if (episodesData?.episodes?.length) return episodesData.episodes
-      return []
-    } catch {
-      return []
     }
   }
 }

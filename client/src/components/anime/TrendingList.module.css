@@ -1,4 +1,12 @@
 /* ===== SECTION HEADER — matches AnimeSection ===== */
+.sectionWrapper {
+  margin-bottom: 2.5rem;
+}
+
+.sectionTitleNoMargin {
+  margin-bottom: 0;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -179,7 +187,7 @@
     rgba(255, 255, 255, 0.12) 60%,
     rgba(255, 255, 255, 0)
   );
-  animation: shimmer 1.8s infinite ease-in-out;
+  animation: skeleton-wave 1.8s infinite ease-in-out;
 }
 
 .skeletonPoster {
@@ -191,10 +199,4 @@
   width: 80%;
   height: 12px;
   margin-top: var(--space-2);
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
 }
