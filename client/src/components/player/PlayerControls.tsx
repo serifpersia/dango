@@ -18,6 +18,7 @@ import {
 import { MdReplay10, MdForward10, MdFastForward, MdSkipNext } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
+import type { Anime4KProfile } from '../../hooks/useAnime4K'
 
 const PlayerSettings = lazy(() => import('./PlayerSettings'))
 
@@ -40,8 +41,10 @@ interface PlayerControlsProps {
   anime4kEnabled: boolean
   onAnime4kToggle: (value: boolean) => void
   anime4kSupported: boolean
-  anime4kProfile: 'low' | 'balanced' | 'high' | 'denoise'
-  onAnime4kProfileChange: (profile: 'low' | 'balanced' | 'high' | 'denoise') => void
+  anime4kProfile: Anime4KProfile
+  onAnime4kProfileChange: (profile: Anime4KProfile) => void
+  anime4kInitializing: boolean
+  anime4kError: string | null
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -65,6 +68,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   anime4kSupported,
   anime4kProfile,
   onAnime4kProfileChange,
+  anime4kInitializing,
+  anime4kError,
 }) => {
   const { state, refs, actions } = player
   const { showSettings, showVolumeSlider } = state
@@ -533,6 +538,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           anime4kSupported={anime4kSupported}
           anime4kProfile={anime4kProfile}
           onAnime4kProfileChange={onAnime4kProfileChange}
+          anime4kInitializing={anime4kInitializing}
+          anime4kError={anime4kError}
         />
       </Suspense>
     </div>

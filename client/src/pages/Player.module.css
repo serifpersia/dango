@@ -432,6 +432,21 @@
   opacity: 1;
 }
 
+.upscalerStatusBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35em 0.8em;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  pointer-events: none;
+}
+
 .subtitleOverlay {
   position: absolute;
   top: 0;

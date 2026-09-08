@@ -127,6 +127,21 @@
   font-weight: 500;
 }
 
+.menuNote {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+}
+
+.menuError {
+  color: #f87171;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  word-break: break-word;
+}
+
 .sliderGroup {
   padding: 1.25rem;
   display: flex;

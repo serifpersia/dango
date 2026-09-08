@@ -34,7 +34,7 @@ import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
-import useAnime4K from '../hooks/useAnime4K'
+import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
 import { usePlayerData } from '../hooks/usePlayerData'
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
@@ -115,18 +115,16 @@ const Player: React.FC = () => {
   const resumeTimeRef = useRef(state.resumeTime)
   const showResumeModalRef = useRef(state.showResumeModal)
 
-  const [anime4kProfile, setAnime4kProfile] = useState<'low' | 'balanced' | 'high' | 'denoise'>(
-    () => {
-      try {
-        return (
-          (localStorage.getItem('anime4kProfile') as 'low' | 'balanced' | 'high' | 'denoise') ||
-          'balanced'
-        )
-      } catch {
-        return 'balanced'
-      }
+  const [anime4kProfile, setAnime4kProfile] = useState<Anime4KProfile>(() => {
+    try {
+      const stored = localStorage.getItem('anime4kProfile')
+      return (['low', 'balanced', 'high', 'denoise'] as const).includes(stored as Anime4KProfile)
+        ? (stored as Anime4KProfile)
+        : 'balanced'
+    } catch {
+      return 'balanced'
     }
-  )
+  })
 
   const upscaler = useAnime4K({
     videoRef: refs.videoRef,
@@ -1084,14 +1082,12 @@ const Player: React.FC = () => {
   ])
 
   useEffect(() => {
-    if (!upscaler.isEnabled || !upscaler.isWebGPUSupported) return
-    if (!anime4kProfile) return
     try {
       localStorage.setItem('anime4kProfile', anime4kProfile)
     } catch {
       // ignore
     }
-  }, [anime4kProfile, upscaler.isEnabled, upscaler.isWebGPUSupported])
+  }, [anime4kProfile])
 
   const handleResume = () => {
     if (refs.videoRef.current) {
@@ -1531,6 +1527,8 @@ const Player: React.FC = () => {
                     anime4kSupported={upscaler.isWebGPUSupported}
                     anime4kProfile={anime4kProfile}
                     onAnime4kProfileChange={setAnime4kProfile}
+                    anime4kInitializing={upscaler.isInitializing}
+                    anime4kError={upscaler.error}
                   />
                 )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
@@ -1572,6 +1570,9 @@ const Player: React.FC = () => {
                   ref={canvasRef}
                   className={`${styles.upscalerCanvas} ${upscaler.isEnabled ? styles.upscalerActive : ''}`}
                 />
+              )}
+              {upscaler.isEnabled && upscaler.isWebGPUSupported && upscaler.isInitializing && (
+                <div className={styles.upscalerStatusBadge}>Preparing upscaler…</div>
               )}
               {upscaler.isEnabled && upscaler.isWebGPUSupported && (
                 <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />

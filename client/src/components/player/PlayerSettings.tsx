@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { FaChevronLeft, FaClosedCaptioning, FaCog, FaCheck } from 'react-icons/fa'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
+import type { Anime4KProfile } from '../../hooks/useAnime4K'
 
 interface PlayerSettingsProps {
   isOpen: boolean
@@ -23,8 +24,10 @@ interface PlayerSettingsProps {
   anime4kEnabled: boolean
   onAnime4kToggle: (value: boolean) => void
   anime4kSupported: boolean
-  anime4kProfile: 'low' | 'balanced' | 'high' | 'denoise'
-  onAnime4kProfileChange: (profile: 'low' | 'balanced' | 'high' | 'denoise') => void
+  anime4kProfile: Anime4KProfile
+  onAnime4kProfileChange: (profile: Anime4KProfile) => void
+  anime4kInitializing: boolean
+  anime4kError: string | null
 }
 
 type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler'
@@ -49,6 +52,8 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     anime4kSupported,
     anime4kProfile,
     onAnime4kProfileChange,
+    anime4kInitializing,
+    anime4kError,
   } = props
   const [view, setView] = useState<SettingsView>('main')
 
@@ -90,7 +95,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             onAnime4kToggle(!anime4kEnabled)
           }}
         >
-          <span>AI Upscaler</span>
+          <span>Anime4K Upscaler</span>
           {anime4kEnabled && <FaCheck size={12} />}
         </button>
       )}
@@ -184,6 +189,16 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
 
   const renderUpscaler = () => (
     <div className={styles.menuContent}>
+      {anime4kInitializing && (
+        <div className={styles.menuNote} role="status">
+          Preparing GPU, this can take a few seconds…
+        </div>
+      )}
+      {anime4kError && (
+        <div className={styles.menuError} role="alert">
+          Upscaler failed: {anime4kError}
+        </div>
+      )}
       <button
         className={`${styles.menuItem} ${anime4kProfile === 'low' ? styles.selected : ''}`}
         onClick={() => onAnime4kProfileChange('low')}
@@ -227,7 +242,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         <div>
           <div>Denoise</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-            Clean noisy/compressed sources
+            Denoise + upscale noisy, compressed sources
           </div>
         </div>
         {anime4kProfile === 'denoise' && <FaCheck size={12} />}

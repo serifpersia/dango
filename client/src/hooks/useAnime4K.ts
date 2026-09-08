@@ -1,29 +1,35 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import type { ModeA, ModeB, ModeC, ModeAA, ModeBB, ModeCA } from 'anime4k-webgpu-async'
+import type { ModeA, ModeB, ModeC, ModeAA } from 'anime4k-webgpu-async'
 
-type Preset = 'ModeA' | 'ModeB' | 'ModeC' | 'ModeAA' | 'ModeBB' | 'ModeCA'
-type Profile = 'low' | 'balanced' | 'high' | 'denoise'
-type Pipeline = ModeA | ModeB | ModeC | ModeAA | ModeBB | ModeCA
+export type Anime4KProfile = 'low' | 'balanced' | 'high' | 'denoise'
+
+type Preset = 'ModeA' | 'ModeB' | 'ModeC' | 'ModeAA'
+type Pipeline = ModeA | ModeB | ModeC | ModeAA
 
 interface UseAnime4KOptions {
   videoRef: { current: HTMLVideoElement | null }
   canvasRef: { current: HTMLCanvasElement | null }
-  profile?: Profile
+  profile?: Anime4KProfile
 }
 
-const PROFILE_SCALES: Record<Profile, { sd: number; hd: number; fhd: number }> = {
-  low: { sd: 1.5, hd: 1.2, fhd: 1.1 },
+// Presets only run their CNN upscale stages when target > 1.2x native
+// (strict `>` in the lib), so scales must stay clearly above 1.2.
+const PROFILE_SCALES: Record<Anime4KProfile, { sd: number; hd: number; fhd: number }> = {
+  low: { sd: 1.5, hd: 1.3, fhd: 1.25 },
   balanced: { sd: 2, hd: 1.5, fhd: 1.25 },
   high: { sd: 2.5, hd: 2, fhd: 1.5 },
-  denoise: { sd: 1.5, hd: 1.25, fhd: 1.1 },
+  denoise: { sd: 1.5, hd: 1.5, fhd: 1.5 },
 }
 
-const PROFILE_PRESETS: Record<Profile, Preset> = {
+const PROFILE_PRESETS: Record<Anime4KProfile, Preset> = {
   low: 'ModeB',
   balanced: 'ModeA',
   high: 'ModeAA',
   denoise: 'ModeC',
 }
+
+const MAX_CONSECUTIVE_ERRORS = 5
+const METADATA_TIMEOUT_MS = 15000
 
 export default function useAnime4K({
   videoRef,
@@ -34,7 +40,7 @@ export default function useAnime4K({
   const [isEnabled, setIsEnabled] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const firstMount = useRef(true)
+  const [rebuildKey, setRebuildKey] = useState(0)
   const generationRef = useRef(0)
   const deviceRef = useRef<GPUDevice | null>(null)
   const contextRef = useRef<GPUCanvasContext | null>(null)
@@ -45,6 +51,9 @@ export default function useAnime4K({
   const samplerRef = useRef<GPUSampler | null>(null)
   const bindGroupLayoutRef = useRef<GPUBindGroupLayout | null>(null)
   const rafRef = useRef<number | null>(null)
+  const inFlightRef = useRef(false)
+  const lastFrameRef = useRef(-1)
+  const errorCountRef = useRef(0)
 
   useEffect(() => {
     async function checkWebGPU() {
@@ -60,15 +69,7 @@ export default function useAnime4K({
       }
     }
     checkWebGPU()
-  }, [videoRef, canvasRef])
-
-  useEffect(() => {
-    if (firstMount.current) {
-      firstMount.current = false
-      return
-    }
-    setIsEnabled(false)
-  }, [profile])
+  }, [])
 
   useEffect(() => {
     if (!isEnabled || !isWebGPUSupported) return
@@ -76,15 +77,32 @@ export default function useAnime4K({
     let cancelled = false
     const generation = ++generationRef.current
 
+    function cancelScheduled() {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+
     async function setup() {
-      const video = videoRef.current
+      let video = videoRef.current
       const canvas = canvasRef.current
       if (!video || !canvas) return
       if (generationRef.current !== generation) return
 
-      while (video.videoWidth === 0 || video.videoHeight === 0) {
+      const deadline = performance.now() + METADATA_TIMEOUT_MS
+      while ((!video || video.videoWidth === 0) && performance.now() < deadline) {
         await new Promise((r) => requestAnimationFrame(r))
         if (cancelled || generationRef.current !== generation) return
+        video = videoRef.current
+      }
+      if (!video || video.videoWidth === 0) {
+        if (!cancelled && generationRef.current === generation) {
+          setError('Timed out waiting for video metadata')
+          setIsInitializing(false)
+          setIsEnabled(false)
+        }
+        return
       }
 
       const width = video.videoWidth
@@ -109,9 +127,12 @@ export default function useAnime4K({
 
       setIsInitializing(true)
       setError(null)
+      errorCountRef.current = 0
+      lastFrameRef.current = -1
+      inFlightRef.current = false
 
       try {
-        const { ModeA, ModeB, ModeC, ModeAA, ModeBB, ModeCA } = await import('anime4k-webgpu-async')
+        const { ModeA, ModeB, ModeC, ModeAA } = await import('anime4k-webgpu-async')
         if (!navigator.gpu) throw new Error('WebGPU not available')
         const adapter = await navigator.gpu.requestAdapter()
         if (!adapter) throw new Error('No GPU adapter found')
@@ -125,12 +146,12 @@ export default function useAnime4K({
         context.configure({
           device,
           format,
-          alphaMode: 'opaque',
+          alphaMode: 'premultiplied',
         })
 
         const inputTexture = device.createTexture({
           size: [width, height],
-          format: 'rgba8unorm',
+          format: 'rgba16float',
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.COPY_DST |
@@ -158,20 +179,6 @@ export default function useAnime4K({
               })
             case 'ModeAA':
               return new ModeAA({
-                device,
-                inputTexture,
-                nativeDimensions: { width, height },
-                targetDimensions: { width: targetWidth, height: targetHeight },
-              })
-            case 'ModeBB':
-              return new ModeBB({
-                device,
-                inputTexture,
-                nativeDimensions: { width, height },
-                targetDimensions: { width: targetWidth, height: targetHeight },
-              })
-            case 'ModeCA':
-              return new ModeCA({
                 device,
                 inputTexture,
                 nativeDimensions: { width, height },
@@ -264,10 +271,43 @@ export default function useAnime4K({
 
         setIsInitializing(false)
 
+        function schedule() {
+          if (cancelled || generationRef.current !== generation) return
+          cancelScheduled()
+          rafRef.current = requestAnimationFrame(() => {
+            void frame()
+          })
+        }
+
         async function frame() {
-          if (generationRef.current !== generation) return
+          if (cancelled || generationRef.current !== generation) return
+          const current = videoRef.current
+          if (!current || current.videoWidth === 0) {
+            schedule()
+            return
+          }
+          if (current !== video || current.videoWidth !== width || current.videoHeight !== height) {
+            setRebuildKey((k) => k + 1)
+            return
+          }
+          const presented = current.getVideoPlaybackQuality().totalVideoFrames
+          if (
+            current.paused ||
+            current.ended ||
+            document.hidden ||
+            current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+            presented === lastFrameRef.current
+          ) {
+            schedule()
+            return
+          }
+          if (inFlightRef.current) {
+            schedule()
+            return
+          }
+          inFlightRef.current = true
           try {
-            const bitmap = await createImageBitmap(video)
+            const bitmap = await createImageBitmap(current)
             device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: inputTexture }, [
               width,
               height,
@@ -293,19 +333,30 @@ export default function useAnime4K({
             pass.end()
 
             device.queue.submit([encoder.finish()])
+            lastFrameRef.current = presented
+            errorCountRef.current = 0
+            device.queue.onSubmittedWorkDone().then(() => {
+              if (generationRef.current === generation) inFlightRef.current = false
+            })
           } catch (err) {
-            if (!cancelled && generationRef.current === generation) {
+            inFlightRef.current = false
+            errorCountRef.current += 1
+            if (
+              errorCountRef.current >= MAX_CONSECUTIVE_ERRORS &&
+              !cancelled &&
+              generationRef.current === generation
+            ) {
               console.error(err)
               setError(err instanceof Error ? err.message : 'Render error')
+              setIsEnabled(false)
+              return
             }
           }
 
-          if (generationRef.current === generation) {
-            rafRef.current = requestAnimationFrame(frame)
-          }
+          schedule()
         }
 
-        rafRef.current = requestAnimationFrame(frame)
+        schedule()
       } catch (err) {
         if (!cancelled && generationRef.current === generation) {
           setError(err instanceof Error ? err.message : 'Failed to initialize upscaler')
@@ -320,10 +371,7 @@ export default function useAnime4K({
     return () => {
       cancelled = true
       generationRef.current += 1
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
+      cancelScheduled()
       if (inputTextureRef.current) {
         inputTextureRef.current.destroy()
         inputTextureRef.current = null
@@ -341,8 +389,9 @@ export default function useAnime4K({
       samplerRef.current = null
       bindGroupLayoutRef.current = null
       contextRef.current = null
+      inFlightRef.current = false
     }
-  }, [isEnabled, isWebGPUSupported, videoRef, canvasRef, profile])
+  }, [isEnabled, isWebGPUSupported, videoRef, canvasRef, profile, rebuildKey])
 
   const toggle = useCallback(() => {
     setIsEnabled((prev) => !prev)
