@@ -2,7 +2,7 @@
 
 <img src="client/public/logo.png" alt="dango logo" width="400"/>
 
-_A local-first anime media client focused on performance, privacy, and personal library tracking._
+_A local-first anime web app focused on performance, privacy, and personal library tracking._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-897cff?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
@@ -16,265 +16,223 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 ---
 
-**dango** is a lightweight Node.js application for browsing anime metadata, managing a personal
-watchlist, and tracking viewing progress through a clean frontend running on your own machine.
 
-<div align="center">
-  <sub>If dango is useful to you, consider giving the repo a ⭐. It helps others find the project.</sub>
-</div>
+**dango** is a lightweight, self-hosted Node.js application built for querying anime metadata, managing personal watchlists, and logging viewing progress through a fast local interface.
 
-## Features
+## Highlights
 
-Based on a lightweight architecture, dango includes:
+* **Hardware Efficient:** Engineered with a minimal footprint to run effortlessly on low-spec hardware, SBCs, and mobile environments.
+* **Metadata & Discovery:** Browse trending titles, search catalog entries, and view release schedules locally.
+* **Multi-Provider Playback:** Switch seamlessly between multiple third-party streaming providers directly within the player interface.
+* **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
+* **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
+* **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
+* **Expanded Media Hub:** Dedicated interfaces for ASMR, Internet Radio, and TV/Movies.
+* **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
 
-- **Performance First:** Designed specifically to run smoothly on low-end hardware.
-- **Built-in Search & Discovery:** Explore trending and popular anime metadata.
-- **Watchlist Management:** Keep track of current, completed, and planned titles.
-- **User Insights:** View personal library and progress statistics.
-- **MAL Integration:** Seamlessly import your lists from MyAnimeList.
-- **AniList Sync:** Connect your AniList account and sync your local watchlist with Anilist.
-- **ASMR, Radio & TV/Movies Sections:** Dedicated sections alongside the anime library.
-- **LAN Authentication:** Optional LAN Authentication - configure password to protect server access/api use from external devices on your local network.
+---
 
-## Join dango Discord server
-
-Be part of the dango Discord Server Community where you can connect with fellow users, ask questions, and share your experiences:
-
-## [![Discord](https://invidget.switchblade.xyz/2FTSPXCsvn)](https://discord.gg/2FTSPXCsvn)
-
-## Getting Started
+## Installation
 
 ### Prerequisites
 
-- **Node.js**: Version 22.5.0 or higher ([Download here](https://nodejs.org/)).
+| Requirement | Supported Version | Notes |
+| :--- | :--- | :--- |
+| **Node.js** | `>= 22.5.0` | Required runtime ([Download](https://nodejs.org/)) |
+| **npm** | Latest with Node | Global binary installation |
 
-### ⚡ Quick Install
+---
 
-Open a terminal and run:
+### Quick Install (CLI)
+
+Install the global CLI binary via npm:
 
 ```bash
 npm install -g @serifpersia/dango
 ```
 
-> **Note:** After the one-time setup, you can start the application anytime, from any directory, by simply opening a terminal and typing `dango`.
+Launch the interface from anywhere:
 
-### 📱 Android Installation (Termux)
+```bash
+dango
+```
 
-You can run **dango** on your Android device using the [Termux](https://termux.dev/) app. No root is required.
+> [!IMPORTANT]
+> Once the server initializes, navigate to `http://localhost:3000` in your browser. The background process runs locally until terminated (`Ctrl + C or q key press as well as window X button closing action`).
 
-1. **Install Termux:** Download and install it from [F-Droid](https://f-droid.org/en/packages/com.termux/) or the [Termux website](https://termux.dev/).
-2. **Update packages:**
+---
+
+### Android Installation
+
+<details>
+<summary><b>Option 1: Termux Environment</b></summary>
+
+<br>
+
+Run standard dango via Termux:
+
+1. Install **[Termux](https://termux.dev/)** (obtain via [F-Droid](https://f-droid.org/en/packages/com.termux/)).
+2. Update base dependencies:
    ```bash
-   pkg update && pkg upgrade
+   pkg update
    ```
-   _Press `y` and `Enter` when prompted to confirm updates._
-3. **Install Node.js:**
    ```bash
-   pkg install nodejs
+   pkg upgrade -y
    ```
-   _Press `y` and `Enter` when prompted._
-4. **Install dango:**
+3. Install Node.js:
+   ```bash
+   pkg install nodejs -y
+   ```
+4. Install and run dango:
    ```bash
    npm install -g @serifpersia/dango
-   ```
-5. **Run the app:**
-   ```bash
    dango
    ```
+5. Open your mobile browser at `http://localhost:3000`.
 
-Once running, you can access the interface by navigating to `http://localhost:3000/` in your mobile browser.
+</details>
 
-### Android APK (No Termux Required)
+<details>
+<summary><b>Option 2: Standalone APK</b></summary>
 
-A standalone Android app that bundles Node.js + dango with a WebView UI.
+<br>
 
-1. **Download** the APK from [Releases](https://github.com/serifpersia/dango/releases) or build it yourself.
-2. **Install** the APK on your Android device (enable "Install from unknown sources" if prompted).
+A standalone bundle packaging Node.js, dango, and a local WebView container.
 
-Features:
+1. Grab the latest `.apk` from [Releases](https://github.com/serifpersia/dango/releases).
+2. Install the APK (allow *Install from Unknown Sources* when prompted).
+3. Open the app. Core runtimes auto-provision on first launch.
 
-- Auto-installs everything on first launch
-- Checks for dango updates on each launch
-
-**Build from source:**
-
+**Compiling from Source:**
 ```bash
 cd android-app
 python fetch-termux-node.py
 
-# Windows:
+# Windows
 build-debug.bat
-# Linux/macOS:
+
+# Linux / macOS
 chmod +x build-debug.sh && ./build-debug.sh
 ```
+*Build requirements: Python 3, JDK 17+, Android SDK (Platform 36, Build-Tools 36.0.0).*
 
-Requires: Python 3, Java 17+, Android SDK (build-tools 36.0.0, platform android-36).
-
----
-
-## Uninstalling
-
-If you need to remove the application from your system, simply open a terminal and run:
-
-```bash
-npm uninstall -g @serifpersia/dango
-```
-
-_This safely deletes the application files and removes the `dango` command from your system's PATH._
+</details>
 
 ---
 
-## Manual Installation (For Developers)
+## Manual Setup (Development)
 
-Want to poke around the source code or contribute? You can build the project manually.
-
-**1. Clone the repository:**
+The project is structured as an **npm workspace** (`client` and `server`) managed by a unified root lockfile.
 
 ```bash
+# Clone the repository
 git clone https://github.com/serifpersia/dango.git
 cd dango
+
+# Install dependencies (root + workspaces hoisted)
+npm install
+
+# Compile workspaces (Vite frontend + tsc backend)
+npm run build
 ```
 
-**2. Install, Build, and Run:**
-This project uses **npm workspaces** (`client` + `server`) with a single `package-lock.json` at the root. All dependencies are installed and hoisted together.
-
-1. Run `npm install` to install all dependencies (root + workspaces, deduped).
-2. Run `npm run build` to build both workspaces (`client` via Vite, `server` via `tsc`).
-
-Use the provided run scripts that offer a menu to choose between a **Development** or **Production** setup:
-
-**On Linux / macOS:**
+Run via interactive environment scripts:
 
 ```bash
-chmod +x run.sh
-./run.sh
-```
+# Linux / macOS
+chmod +x run.sh && ./run.sh
 
-**On Windows:**
-
-```bat
+# Windows
 run.bat
 ```
 
-### Commands
+### Command Reference
 
-Once installed globally, you can use the following commands:
-
-- `dango` - Start the application.
-- `dango --version` (or `-v`) - Check your installed version.
-
-**For developers (workspaces):**
-
-- `npm install` - Install all workspaces (hoisted, single lockfile).
-- `npm run build` - Build both `client` and `server` (`npm run build --workspaces`).
-- `npm run dev` / `npm start` - Run via `orchestrator.js` (spawns `dango-server` + `dango-client` with `npm --workspace`).
-- `npm run --workspace=dango-client dev` - Run only the frontend (Vite).
-- `npm run --workspace=dango-server dev` - Run only the backend (`nodemon` + `ts-node`).
-- `npm run lint --workspaces` - Lint both workspaces.
-
-### Data Location
-
-dango stores your persistent files in your OS app-data folder instead of inside the globally installed npm package:
-
-- **Windows:** `%APPDATA%\dango`
-- **macOS:** `~/Library/Application Support/dango`
-- **Linux:** `$XDG_DATA_HOME/dango` or `~/.local/share/dango`
-
-This folder contains your `.env`, database files, sync manifests, and Google token file. Existing installs will automatically migrate legacy files from the old `server/` folder on first launch when those files are still present.
+| Command | Action |
+| :--- | :--- |
+| `dango` | Start the installed client daemon |
+| `dango --version` | Display current installed version |
+| `npm run dev` | Start full dev stack via `orchestrator.js` |
+| `npm run --workspace=dango-client dev` | Run Vite frontend independently |
+| `npm run --workspace=dango-server dev` | Run backend via `nodemon` + `ts-node` |
+| `npm run lint --workspaces` | Run ESLint passes across all packages |
 
 ---
 
-## Cloud Sync (Optional)
+## Storage & Persistence
 
-**dango** can automatically sync your local data to the cloud. The app stays local-first: your
-main database is a local SQLite file, and cloud sync exports/imports the app data as JSON when
-needed.
+dango stores SQLite databases, cached indices, and credentials in the OS application data registry rather than the global `node_modules` path:
 
-Sync provider priority is:
+| Platform | Default Path |
+| :--- | :--- |
+| **Windows** | `%APPDATA%\dango` |
+| **macOS** | `~/Library/Application Support/dango` |
+| **Linux** | `$XDG_DATA_HOME/dango` or `~/.local/share/dango` |
 
-1. **GitHub Cloud Sync**
-2. **Google Drive Sync**
-3. **Rclone Sync**
-
-If GitHub is connected, it is used first. Google Drive and Rclone remain available as fallback or
-legacy sync options.
-
-### 2. Google Drive Sync
-
-Google Drive sync is preconfigured with a default dango-managed Google client. No Google Cloud
-project setup is required:
-
-1. Open **dango**.
-2. Go to **Settings** -> **Synchronization**.
-3. Click **Sign in with Google** and approve access.
-
-Your sync data is stored in a private Google Drive appdata folder in JSON format:
-
-- Production mode uses `sync.json`.
-- Development mode uses `sync.dev.json`.
-
-To fully disconnect Google Drive sync and remove stored data, go to **Google Drive settings** → **Manage apps**, find **dango**, and revoke access. Then delete the hidden appdata sync files from your Drive.
-
-If you prefer to use your own Google OAuth client, you can override the default in the Google
-authentication advanced settings.
-
-### 1. GitHub Cloud Sync
-
-1. Open **dango**.
-2. Go to **Settings** -> **Synchronization**.
-3. Click **Sign in with GitHub**.
-4. Open the shown GitHub device URL, enter the code, and approve access.
-
-dango will create a private GitHub repository named `dango-sync-data` in your account and store
-your sync data in JSON:
-
-- Production mode uses `sync.json`.
-- Development mode uses `sync.dev.json`.
-
-The app requests GitHub repository access because it needs to create and update this private sync
-repository. The GitHub token is stored locally in your dango app-data `.env` file.
-
-To fully remove synced data, delete the `dango-sync-data` repository from your GitHub account.
-
-### 3. Rclone Sync
-
-If you prefer using **Mega**, **Dropbox**, or other providers, you can use [Rclone](https://rclone.org/):
-
-1. Install Rclone on your system and ensure it's in your PATH.
-2. Configure a remote using `rclone config`.
-3. In **dango**, go to **Settings** -> **Synchronization** and select your remote name from the
-   Rclone dropdown.
-
-Rclone is used only when GitHub and Google Drive sync are not active.
+> [!IMPORTANT]
+> Legacy installs will automatically migrate `.env` variables and SQLite records from older `server/` structures into the proper user directory on launch.
 
 ---
 
-## AniList Sync (Optional)
+## Data Synchronization
 
-**dango** can sync your local watchlist with your AniList account. This is a bidirectional sync:
-local progress (status, episode count) is pushed to AniList, and remote changes are pulled into
-your local database.
+dango is **local-first**: primary application state lives in your local SQLite store. Cloud syncing creates point-in-time JSON snapshots to maintain seamless backups across multiple installations.
 
-### Syncing
+```
+Sync Priority Engine:
+[1] GitHub Sync ──(fallback)──> [2] Google Drive ──(fallback)──> [3] Rclone
+```
 
-Go to **Trackers** in the side menu and click **Sync Now**, or let dango sync automatically when
-configured. The sync compares your local database against your AniList list and applies changes
-non-destructively.
+### 1. GitHub Sync
+1. Open **Settings → Synchronization**.
+2. Click **Sign in with GitHub**.
+3. Authorize via the OAuth device code flow.
+
+dango creates a private repository named `dango-sync-data` to read/write JSON snapshots (`sync.json` for production, `sync.dev.json` for development).
+
+### 2. Google Drive
+1. Open **Settings → Synchronization**.
+2. Click **Sign in with Google** and authorize permissions.
+
+Data writes directly to a sandbox `appDataFolder` on your personal Drive. To clear backups, revoke app permissions under Google Drive's *Manage Apps* menu.
+
+> [!IMPORTANT]
+> Advanced users can supply their own custom Github and Google OAuth Client ID & Secret in settings.
+
+### 3. Rclone (Third-Party Remotes)
+Used as a manual fallback for services like Mega, Dropbox, or custom WebDAV:
+1. Ensure `rclone` is installed and mapped to your system `PATH`.
+2. Configure your desired target via `rclone config`.
+3. Pick your configured remote profile inside **Settings → Synchronization**.
 
 ---
 
-## Disclaimer
+## Tracker Integrations
 
-dango is a local-first media client. It does not host, upload, store, or distribute copyrighted
-video content.
+### AniList
+Bidirectional sync is fully supported:
+* Go to **Trackers** in the navigation panel.
+* Select **Sync Now**.
+* Local episode progress updates remotely; external catalog updates merge safely into your local database without overwriting uncommitted states.
 
-Users are responsible for configuring and using the application in compliance with applicable laws
-in their jurisdiction. All trademarks, titles, artwork, metadata, and copyrighted material belong to
-their respective owners.
+---
 
-This project is provided for personal library management, metadata browsing, and local application
-experimentation. The maintainers do not endorse or encourage copyright infringement.
+## Community
+
+Need help configuring your setup, troubleshooting builds, discussing feature requests or simply just chat about anime?
+
+<div align="left">
+
+[![Join Discord](https://invidget.switchblade.xyz/2FTSPXCsvn)](https://discord.gg/2FTSPXCsvn)
+
+</div>
+
+---
+
+## Disclaimer & Legal
+
+dango is an open-source, local-first web app. It does not scrape, host or distribute unauthorized media or copyrighted video assets. Users are solely responsible for ensuring their usage aligns with relevant local laws and digital copyright regulations.
 
 ## License
 
-This project is open-source and licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+Distributed under the terms of the [MIT License](LICENSE).
