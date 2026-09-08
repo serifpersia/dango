@@ -66,7 +66,6 @@ const Header: React.FC = () => {
   const autoHideTimer = useRef<number | null>(null)
   const mobileSearchRef = useRef<HTMLDivElement>(null)
   const mobileInputRef = useRef<HTMLInputElement>(null)
-  const isHome = location.pathname === '/'
 
   const { data: user } = useQuery<UserProfile | null>({
     queryKey: ['sync-profile'],

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import {
   FaSpinner,
   FaSyncAlt,

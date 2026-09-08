@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router'
 import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
-import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'

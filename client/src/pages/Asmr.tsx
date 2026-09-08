@@ -9,6 +9,7 @@ import AsmrCard from '../components/asmr/AsmrCard'
 import AsmrDetail from '../components/asmr/AsmrDetail'
 import AsmrPlayer from '../components/asmr/AsmrPlayer'
 import JasmrCookieModal from '../components/asmr/JasmrCookieModal'
+import { subscribeAuthRequired } from '../lib/auth-bus'
 import { useAsmrBrowse, useAsmrWork } from '../hooks/useAsmr'
 import { useTranslate } from '../hooks/useTranslate'
 import type { AsmrTrack, AsmrWork } from '../hooks/useAsmr'
@@ -96,9 +97,7 @@ const Asmr: React.FC = () => {
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    const handleAuthRequired = () => setShowJasmrModal(true)
-    window.addEventListener('JASMR_AUTH_REQUIRED', handleAuthRequired)
-    return () => window.removeEventListener('JASMR_AUTH_REQUIRED', handleAuthRequired)
+    return subscribeAuthRequired('jasmr', () => setShowJasmrModal(true))
   }, [])
 
   useEffect(() => {

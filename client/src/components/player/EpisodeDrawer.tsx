@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import { FaTimes } from 'react-icons/fa'
 import EpisodeList from './EpisodeList'
 import styles from './EpisodeDrawer.module.css'

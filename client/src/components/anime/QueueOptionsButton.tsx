@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import { useFloating, useDismiss, autoUpdate, flip, shift, offset } from '@floating-ui/react'
 import { FaCheck, FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa'
 import { useQuery } from '@tanstack/react-query'

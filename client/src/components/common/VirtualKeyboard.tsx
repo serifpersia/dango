@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from 'preact/compat'
 import styles from './VirtualKeyboard.module.css'
 
 type KeyboardSize = 'small' | 'medium' | 'large'
