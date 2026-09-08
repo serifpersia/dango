@@ -10,6 +10,7 @@ interface UseAnime4KOptions {
   videoRef: { current: HTMLVideoElement | null }
   canvasRef: { current: HTMLCanvasElement | null }
   profile?: Anime4KProfile
+  delayMs?: number
 }
 
 // Presets only run their CNN upscale stages when target > 1.2x native
@@ -35,6 +36,7 @@ export default function useAnime4K({
   videoRef,
   canvasRef,
   profile = 'balanced',
+  delayMs = 0,
 }: UseAnime4KOptions) {
   const [isWebGPUSupported, setIsWebGPUSupported] = useState(false)
   const [isEnabled, setIsEnabled] = useState(false)
@@ -54,6 +56,13 @@ export default function useAnime4K({
   const inFlightRef = useRef(false)
   const lastFrameRef = useRef(-1)
   const errorCountRef = useRef(0)
+  const delayMsRef = useRef(delayMs)
+  delayMsRef.current = delayMs
+  const delayQueueRef = useRef<{ bitmap: ImageBitmap; capture: number }[]>([])
+  const lastTimeRef = useRef(-1)
+  const lastCapturedRef = useRef(-1)
+  const hasPrimedRef = useRef(false)
+  const primedDelayRef = useRef(0)
 
   useEffect(() => {
     async function checkWebGPU() {
@@ -76,6 +85,22 @@ export default function useAnime4K({
 
     let cancelled = false
     const generation = ++generationRef.current
+
+    const closeBitmap = (bitmap: ImageBitmap | undefined) => {
+      if (!bitmap) return
+      try {
+        bitmap.close()
+      } catch {
+        // ignore
+      }
+    }
+
+    const flushDelayQueue = () => {
+      for (const entry of delayQueueRef.current) closeBitmap(entry.bitmap)
+      delayQueueRef.current = []
+    }
+
+    const queueCapFor = (delay: number) => Math.max(8, Math.min(40, Math.ceil(delay / 16.7) + 4))
 
     function cancelScheduled() {
       if (rafRef.current !== null) {
@@ -290,14 +315,17 @@ export default function useAnime4K({
             setRebuildKey((k) => k + 1)
             return
           }
-          const presented = current.getVideoPlaybackQuality().totalVideoFrames
           if (
             current.paused ||
             current.ended ||
             document.hidden ||
-            current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
-            presented === lastFrameRef.current
+            current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
           ) {
+            schedule()
+            return
+          }
+          const presented = current.getVideoPlaybackQuality().totalVideoFrames
+          if (presented === lastCapturedRef.current) {
             schedule()
             return
           }
@@ -305,14 +333,73 @@ export default function useAnime4K({
             schedule()
             return
           }
+          const mediaTime = current.currentTime
+          if (
+            current.seeking ||
+            (lastTimeRef.current >= 0 && Math.abs(mediaTime - lastTimeRef.current) > 0.5)
+          ) {
+            flushDelayQueue()
+            hasPrimedRef.current = false
+            primedDelayRef.current = 0
+            lastCapturedRef.current = -1
+          }
+          lastTimeRef.current = mediaTime
+          const effectiveDelay = Math.max(0, delayMsRef.current || 0)
+          if (effectiveDelay > primedDelayRef.current) hasPrimedRef.current = false
           inFlightRef.current = true
           try {
-            const bitmap = await createImageBitmap(current)
+            const fresh = await createImageBitmap(current)
+            const now = performance.now()
+            lastCapturedRef.current = presented
+            let bitmap: ImageBitmap | null = null
+            let retainFresh = false
+            if (effectiveDelay <= 0) {
+              if (delayQueueRef.current.length > 0) flushDelayQueue()
+              hasPrimedRef.current = false
+              primedDelayRef.current = 0
+              bitmap = fresh
+            } else {
+              const queue = delayQueueRef.current
+              queue.push({ bitmap: fresh, capture: now })
+              const cap = queueCapFor(effectiveDelay)
+              while (queue.length > cap) closeBitmap(queue.shift()?.bitmap)
+              let idx = -1
+              for (let i = queue.length - 1; i >= 0; i--) {
+                if (now - queue[i].capture >= effectiveDelay) {
+                  idx = i
+                  break
+                }
+              }
+              if (idx !== -1) {
+                for (let i = 0; i < idx; i++) closeBitmap(queue.shift()?.bitmap)
+                const chosen = queue.shift()
+                if (chosen) {
+                  bitmap = chosen.bitmap
+                  hasPrimedRef.current = true
+                  primedDelayRef.current = effectiveDelay
+                } else {
+                  bitmap = fresh
+                  retainFresh = true
+                }
+              } else if (!hasPrimedRef.current) {
+                bitmap = fresh
+                retainFresh = true
+              } else {
+                const oldest = queue.shift()
+                bitmap = oldest ? oldest.bitmap : fresh
+                if (!oldest) retainFresh = true
+              }
+            }
+            if (!bitmap) {
+              inFlightRef.current = false
+              schedule()
+              return
+            }
             device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: inputTexture }, [
               width,
               height,
             ])
-            bitmap.close()
+            if (!retainFresh) closeBitmap(bitmap)
 
             const encoder = device.createCommandEncoder()
             await pipeline.pass(encoder)
@@ -372,6 +459,7 @@ export default function useAnime4K({
       cancelled = true
       generationRef.current += 1
       cancelScheduled()
+      flushDelayQueue()
       if (inputTextureRef.current) {
         inputTextureRef.current.destroy()
         inputTextureRef.current = null

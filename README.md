@@ -6,7 +6,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-897cff?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
-[![App version](https://img.shields.io/badge/dango-2.9.0-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-2.9.1-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -16,19 +16,18 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 ---
 
-
 **dango** is a lightweight, self-hosted Node.js application built for querying anime metadata, managing personal watchlists, and logging viewing progress through a fast local interface.
 
 ## Highlights
 
-* **Hardware Efficient:** Engineered with a minimal footprint to run effortlessly on low-spec hardware, SBCs, and mobile environments.
-* **Metadata & Discovery:** Browse trending titles, search catalog entries, and view release schedules locally.
-* **Multi-Provider Playback:** Switch seamlessly between multiple third-party streaming providers directly within the player interface.
-* **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
-* **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
-* **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
-* **Expanded Media Hub:** Dedicated interfaces for ASMR, Internet Radio, and TV/Movies.
-* **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
+- **Hardware Efficient:** Engineered with a minimal footprint to run effortlessly on low-spec hardware, SBCs, and mobile environments.
+- **Metadata & Discovery:** Browse trending titles, search catalog entries, and view release schedules locally.
+- **Multi-Provider Playback:** Switch seamlessly between multiple third-party streaming providers directly within the player interface.
+- **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
+- **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
+- **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
+- **Expanded Media Hub:** Dedicated interfaces for ASMR, Internet Radio, and TV/Movies.
+- **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
 
 ---
 
@@ -36,10 +35,10 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 ### Prerequisites
 
-| Requirement | Supported Version | Notes |
-| :--- | :--- | :--- |
-| **Node.js** | `>= 22.5.0` | Required runtime ([Download](https://nodejs.org/)) |
-| **npm** | Latest with Node | Global binary installation |
+| Requirement | Supported Version | Notes                                              |
+| :---------- | :---------------- | :------------------------------------------------- |
+| **Node.js** | `>= 22.5.0`       | Required runtime ([Download](https://nodejs.org/)) |
+| **npm**     | Latest with Node  | Global binary installation                         |
 
 ---
 
@@ -100,10 +99,11 @@ Run standard dango via Termux:
 A standalone bundle packaging Node.js, dango, and a local WebView container.
 
 1. Grab the latest `.apk` from [Releases](https://github.com/serifpersia/dango/releases).
-2. Install the APK (allow *Install from Unknown Sources* when prompted).
+2. Install the APK (allow _Install from Unknown Sources_ when prompted).
 3. Open the app. Core runtimes auto-provision on first launch.
 
 **Compiling from Source:**
+
 ```bash
 cd android-app
 python fetch-termux-node.py
@@ -114,7 +114,8 @@ build-debug.bat
 # Linux / macOS
 chmod +x build-debug.sh && ./build-debug.sh
 ```
-*Build requirements: Python 3, JDK 17+, Android SDK (Platform 36, Build-Tools 36.0.0).*
+
+_Build requirements: Python 3, JDK 17+, Android SDK (Platform 36, Build-Tools 36.0.0)._
 
 </details>
 
@@ -148,14 +149,14 @@ run.bat
 
 ### Command Reference
 
-| Command | Action |
-| :--- | :--- |
-| `dango` | Start the installed client daemon |
-| `dango --version` | Display current installed version |
-| `npm run dev` | Start full dev stack via `orchestrator.js` |
-| `npm run --workspace=dango-client dev` | Run Vite frontend independently |
-| `npm run --workspace=dango-server dev` | Run backend via `nodemon` + `ts-node` |
-| `npm run lint --workspaces` | Run ESLint passes across all packages |
+| Command                                | Action                                     |
+| :------------------------------------- | :----------------------------------------- |
+| `dango`                                | Start the installed client daemon          |
+| `dango --version`                      | Display current installed version          |
+| `npm run dev`                          | Start full dev stack via `orchestrator.js` |
+| `npm run --workspace=dango-client dev` | Run Vite frontend independently            |
+| `npm run --workspace=dango-server dev` | Run backend via `nodemon` + `ts-node`      |
+| `npm run lint --workspaces`            | Run ESLint passes across all packages      |
 
 ---
 
@@ -163,11 +164,11 @@ run.bat
 
 dango stores SQLite databases, cached indices, and credentials in the OS application data registry rather than the global `node_modules` path:
 
-| Platform | Default Path |
-| :--- | :--- |
-| **Windows** | `%APPDATA%\dango` |
-| **macOS** | `~/Library/Application Support/dango` |
-| **Linux** | `$XDG_DATA_HOME/dango` or `~/.local/share/dango` |
+| Platform    | Default Path                                     |
+| :---------- | :----------------------------------------------- |
+| **Windows** | `%APPDATA%\dango`                                |
+| **macOS**   | `~/Library/Application Support/dango`            |
+| **Linux**   | `$XDG_DATA_HOME/dango` or `~/.local/share/dango` |
 
 > [!IMPORTANT]
 > Legacy installs will automatically migrate `.env` variables and SQLite records from older `server/` structures into the proper user directory on launch.
@@ -184,6 +185,7 @@ Sync Priority Engine:
 ```
 
 ### 1. GitHub Sync
+
 1. Open **Settings → Synchronization**.
 2. Click **Sign in with GitHub**.
 3. Authorize via the OAuth device code flow.
@@ -191,16 +193,19 @@ Sync Priority Engine:
 dango creates a private repository named `dango-sync-data` to read/write JSON snapshots (`sync.json` for production, `sync.dev.json` for development).
 
 ### 2. Google Drive
+
 1. Open **Settings → Synchronization**.
 2. Click **Sign in with Google** and authorize permissions.
 
-Data writes directly to a sandbox `appDataFolder` on your personal Drive. To clear backups, revoke app permissions under Google Drive's *Manage Apps* menu.
+Data writes directly to a sandbox `appDataFolder` on your personal Drive. To clear backups, revoke app permissions under Google Drive's _Manage Apps_ menu.
 
 > [!IMPORTANT]
 > Advanced users can supply their own custom Github and Google OAuth Client ID & Secret in settings.
 
 ### 3. Rclone (Third-Party Remotes)
+
 Used as a manual fallback for services like Mega, Dropbox, or custom WebDAV:
+
 1. Ensure `rclone` is installed and mapped to your system `PATH`.
 2. Configure your desired target via `rclone config`.
 3. Pick your configured remote profile inside **Settings → Synchronization**.
@@ -210,10 +215,12 @@ Used as a manual fallback for services like Mega, Dropbox, or custom WebDAV:
 ## Tracker Integrations
 
 ### AniList
+
 Bidirectional sync is fully supported:
-* Go to **Trackers** in the navigation panel.
-* Select **Sync Now**.
-* Local episode progress updates remotely; external catalog updates merge safely into your local database without overwriting uncommitted states.
+
+- Go to **Trackers** in the navigation panel.
+- Select **Sync Now**.
+- Local episode progress updates remotely; external catalog updates merge safely into your local database without overwriting uncommitted states.
 
 ---
 

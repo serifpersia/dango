@@ -28,9 +28,14 @@ interface PlayerSettingsProps {
   onAnime4kProfileChange: (profile: Anime4KProfile) => void
   anime4kInitializing: boolean
   anime4kError: string | null
+  videoDelayEnabled: boolean
+  onVideoDelayToggle: (value: boolean) => void
+  videoDelayMs: number
+  onVideoDelayChange: (ms: number) => void
+  onCalibrateAvSync: () => void
 }
 
-type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler'
+type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler' | 'av-sync'
 
 const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
   const {
@@ -54,8 +59,22 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onAnime4kProfileChange,
     anime4kInitializing,
     anime4kError,
+    videoDelayEnabled,
+    onVideoDelayToggle,
+    videoDelayMs,
+    onVideoDelayChange,
+    onCalibrateAvSync,
   } = props
   const [view, setView] = useState<SettingsView>('main')
+  const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
+  const shownDelayMs = pendingDelayMs ?? videoDelayMs
+
+  const commitDelay = () => {
+    if (pendingDelayMs !== null) {
+      onVideoDelayChange(pendingDelayMs)
+      setPendingDelayMs(null)
+    }
+  }
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -63,6 +82,10 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       return () => clearTimeout(timer)
     }
   }, [isOpen])
+
+  React.useEffect(() => {
+    setPendingDelayMs(null)
+  }, [videoDelayMs])
 
   const renderMain = () => (
     <div className={styles.menuContent}>
@@ -104,6 +127,12 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
           <span>Upscaler Settings</span>
         </button>
       )}
+      <button className={styles.menuItem} onClick={() => setView('av-sync')}>
+        <span>A/V Sync</span>
+        <span className={styles.currentValue}>
+          {videoDelayEnabled ? `${videoDelayMs}ms` : 'Off'}
+        </span>
+      </button>
     </div>
   )
 
@@ -250,6 +279,41 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     </div>
   )
 
+  const renderAvSync = () => (
+    <div className={styles.menuContent}>
+      <button
+        className={`${styles.menuItem} ${videoDelayEnabled ? styles.selected : ''}`}
+        onClick={() => onVideoDelayToggle(!videoDelayEnabled)}
+      >
+        <span>Video delay</span>
+        {videoDelayEnabled && <FaCheck size={12} />}
+      </button>
+      <div className={styles.sliderGroup}>
+        <label>Video delay ({shownDelayMs}ms)</label>
+        <input
+          type="range"
+          min="0"
+          max="500"
+          step="5"
+          value={shownDelayMs}
+          onInput={(e) => setPendingDelayMs(Number((e.target as HTMLInputElement).value))}
+          onPointerUp={commitDelay}
+          onTouchEnd={commitDelay}
+          onKeyUp={commitDelay}
+          onBlur={commitDelay}
+          style={{ '--slider-percent': `${(shownDelayMs / 500) * 100}%` } as React.CSSProperties}
+        />
+      </div>
+      <div className={styles.menuNote}>
+        For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
+        untouched.
+      </div>
+      <button className={styles.menuItem} onClick={onCalibrateAvSync}>
+        <span>Calibrate…</span>
+      </button>
+    </div>
+  )
+
   if (!isOpen) return null
 
   return (
@@ -273,6 +337,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         {view === 'subtitles' && renderSubtitles()}
         {view === 'subtitle-style' && renderSubtitleStyle()}
         {view === 'upscaler' && renderUpscaler()}
+        {view === 'av-sync' && renderAvSync()}
       </div>
     </div>
   )

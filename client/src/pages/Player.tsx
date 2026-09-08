@@ -35,6 +35,8 @@ import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
+import useDelayCanvas from '../hooks/useDelayCanvas'
+import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import { usePlayerData } from '../hooks/usePlayerData'
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
@@ -126,11 +128,49 @@ const Player: React.FC = () => {
     }
   })
 
+  const [videoDelayMs, setVideoDelayMs] = useState<number>(() => {
+    try {
+      const stored = Number(localStorage.getItem('playerVideoDelayMs'))
+      if (Number.isFinite(stored) && stored >= 0 && stored <= 500) return Math.round(stored)
+    } catch {
+      // ignore
+    }
+    return 180
+  })
+  const [videoDelayEnabled, setVideoDelayEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('playerVideoDelayEnabled') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [isCalibrating, setIsCalibrating] = useState(false)
+  const wasPlayingBeforeCalibRef = useRef(false)
+  const resumeAfterCalib = () => {
+    if (wasPlayingBeforeCalibRef.current) {
+      wasPlayingBeforeCalibRef.current = false
+      refs.videoRef.current?.play()?.catch(() => {})
+    }
+  }
+  const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
+  const delayCanvasRef = useRef<HTMLCanvasElement>(null)
+
   const upscaler = useAnime4K({
     videoRef: refs.videoRef,
     canvasRef,
     profile: anime4kProfile,
+    delayMs: effectiveVideoDelayMs,
   })
+
+  const upscalerActive = upscaler.isEnabled && upscaler.isWebGPUSupported
+  useDelayCanvas({
+    videoRef: refs.videoRef,
+    canvasRef: delayCanvasRef,
+    delayMs: effectiveVideoDelayMs,
+    enabled: videoDelayEnabled && !upscalerActive,
+  })
+  const delayCanvasActive = videoDelayEnabled && !upscalerActive
+  const canvasPresentationActive = upscalerActive || delayCanvasActive
 
   useEffect(() => {
     resumeTimeRef.current = state.resumeTime
@@ -1006,17 +1046,13 @@ const Player: React.FC = () => {
   ])
 
   useEffect(() => {
-    if (!upscaler.isEnabled || !upscaler.isWebGPUSupported) return
+    if (!canvasPresentationActive) return
     const video = refs.videoRef.current
     const overlay = subtitleOverlayRef.current
     if (!video || !overlay) return
 
     const enabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
     const activeTrackLabel = player.state.activeSubtitleTrack
-
-    function getShowingTrack(): TextTrack | undefined {
-      return Array.from(video.textTracks).find((t) => t.mode === 'showing')
-    }
 
     function renderCues() {
       overlay.innerHTML = ''
@@ -1027,7 +1063,14 @@ const Player: React.FC = () => {
       )
       if (!track || track.mode !== 'showing') return
 
-      const cues = Array.from(track.activeCues ?? [])
+      const delaySec = effectiveVideoDelayMs / 1000
+      let cues: ArrayLike<TextTrackCue> | TextTrackCue[]
+      if (delaySec > 0 && track.cues) {
+        const t = video.currentTime - delaySec
+        cues = Array.from(track.cues).filter((c) => c.startTime <= t && t <= c.endTime)
+      } else {
+        cues = Array.from(track.activeCues ?? [])
+      }
       if (cues.length === 0) return
 
       const fontSize = `${player.state.subtitleFontSize}rem`
@@ -1079,6 +1122,8 @@ const Player: React.FC = () => {
     player.state.subtitlePosition,
     player.state.activeSubtitleTrack,
     refs.videoRef,
+    canvasPresentationActive,
+    effectiveVideoDelayMs,
   ])
 
   useEffect(() => {
@@ -1529,6 +1574,31 @@ const Player: React.FC = () => {
                     onAnime4kProfileChange={setAnime4kProfile}
                     anime4kInitializing={upscaler.isInitializing}
                     anime4kError={upscaler.error}
+                    videoDelayEnabled={videoDelayEnabled}
+                    onVideoDelayToggle={(v) => {
+                      setVideoDelayEnabled(v)
+                      try {
+                        localStorage.setItem('playerVideoDelayEnabled', String(v))
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    videoDelayMs={videoDelayMs}
+                    onVideoDelayChange={(ms) => {
+                      const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+                      setVideoDelayMs(clamped)
+                      try {
+                        localStorage.setItem('playerVideoDelayMs', String(clamped))
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onCalibrateAvSync={() => {
+                      const v = refs.videoRef.current
+                      wasPlayingBeforeCalibRef.current = !!v && !v.paused && !v.ended
+                      v?.pause()
+                      setIsCalibrating(true)
+                    }}
                   />
                 )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
@@ -1558,25 +1628,53 @@ const Player: React.FC = () => {
                   onWaiting={actions.onWaiting}
                   onPlaying={actions.onPlaying}
                   onError={handleVideoSourceError}
-                  className={
-                    upscaler.isEnabled && upscaler.isWebGPUSupported
-                      ? styles.videoElementHidden
-                      : ''
-                  }
+                  className={canvasPresentationActive ? styles.videoElementHidden : ''}
                 />
               )}
               {upscaler.isWebGPUSupported && !isVideoLoading && state.videoSources.length > 0 && (
                 <canvas
                   ref={canvasRef}
-                  className={`${styles.upscalerCanvas} ${upscaler.isEnabled ? styles.upscalerActive : ''}`}
+                  className={`${styles.upscalerCanvas} ${upscalerActive ? styles.upscalerActive : ''}`}
+                />
+              )}
+              {!upscalerActive && !isVideoLoading && state.videoSources.length > 0 && (
+                <canvas
+                  ref={delayCanvasRef}
+                  className={`${styles.upscalerCanvas} ${delayCanvasActive ? styles.upscalerActive : ''}`}
                 />
               )}
               {upscaler.isEnabled && upscaler.isWebGPUSupported && upscaler.isInitializing && (
                 <div className={styles.upscalerStatusBadge}>Preparing upscaler…</div>
               )}
-              {upscaler.isEnabled && upscaler.isWebGPUSupported && (
+              {delayCanvasActive && (
+                <div className={styles.upscalerStatusBadge}>
+                  A/V sync: video delayed {videoDelayMs}ms
+                </div>
+              )}
+              {canvasPresentationActive && (
                 <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
               )}
+              <AvSyncCalibrator
+                isOpen={isCalibrating}
+                initialMs={videoDelayMs}
+                onClose={() => {
+                  setIsCalibrating(false)
+                  resumeAfterCalib()
+                }}
+                onApply={(ms) => {
+                  const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+                  setVideoDelayMs(clamped)
+                  setVideoDelayEnabled(true)
+                  try {
+                    localStorage.setItem('playerVideoDelayMs', String(clamped))
+                    localStorage.setItem('playerVideoDelayEnabled', 'true')
+                  } catch {
+                    // ignore
+                  }
+                  setIsCalibrating(false)
+                  resumeAfterCalib()
+                }}
+              />
             </>
           )}
           {queueCountdown !== null && pendingQueueTransition?.nextItem && (

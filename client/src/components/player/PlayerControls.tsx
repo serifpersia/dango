@@ -45,6 +45,11 @@ interface PlayerControlsProps {
   onAnime4kProfileChange: (profile: Anime4KProfile) => void
   anime4kInitializing: boolean
   anime4kError: string | null
+  videoDelayEnabled: boolean
+  onVideoDelayToggle: (value: boolean) => void
+  videoDelayMs: number
+  onVideoDelayChange: (ms: number) => void
+  onCalibrateAvSync: () => void
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -70,6 +75,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onAnime4kProfileChange,
   anime4kInitializing,
   anime4kError,
+  videoDelayEnabled,
+  onVideoDelayToggle,
+  videoDelayMs,
+  onVideoDelayChange,
+  onCalibrateAvSync,
 }) => {
   const { state, refs, actions } = player
   const { showSettings, showVolumeSlider } = state
@@ -540,6 +550,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           onAnime4kProfileChange={onAnime4kProfileChange}
           anime4kInitializing={anime4kInitializing}
           anime4kError={anime4kError}
+          videoDelayEnabled={videoDelayEnabled}
+          onVideoDelayToggle={onVideoDelayToggle}
+          videoDelayMs={videoDelayMs}
+          onVideoDelayChange={onVideoDelayChange}
+          onCalibrateAvSync={onCalibrateAvSync}
         />
       </Suspense>
     </div>
