@@ -12,6 +12,8 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 ![Provider Status](https://dango-users-badge.ramiserifpersia.workers.dev/?view=all)
 
+![Animation](docs/showcase.webp)
+
 </div>
 
 ---
