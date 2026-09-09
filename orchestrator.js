@@ -410,5 +410,7 @@ process.on('SIGHUP', () => {
   shutdown()
 })
 process.on('exit', restoreTerminal)
-checkForUpdates().catch(() => {})
-main()
+;(async () => {
+  await checkForUpdates().catch(() => {})
+  main()
+})()
