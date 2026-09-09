@@ -83,6 +83,22 @@ export default function Search() {
   const [sort, setSort] = useState(searchParams.get('sortBy') || 'POPULARITY_DESC')
   const [status, setStatus] = useState(searchParams.get('status') || '')
   const [showFilters, setShowFilters] = useState(false)
+  const [anilistAvailable, setAnilistAvailable] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/anilist-status')
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setAnilistAvailable(j.available)
+      })
+      .catch(() => {
+        if (!cancelled) setAnilistAvailable(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (type === 'TV_SHORT') {
@@ -254,7 +270,7 @@ export default function Search() {
                 value={type}
                 onChange={(e) => {
                   if (e.currentTarget.value === 'ADULT') {
-                    navigate('/mature')
+                    navigate('/mature?provider=mal')
                     return
                   }
                   setType(e.currentTarget.value)
@@ -299,7 +315,21 @@ export default function Search() {
               </select>
             </div>
             <div className={styles.filterItem}>
-              <label>Country</label>
+              <label>
+                Country
+                {anilistAvailable === false && (
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      color: 'var(--text-muted)',
+                      fontWeight: 400,
+                    }}
+                  >
+                    AniList only — ignored by fallback providers
+                  </span>
+                )}
+              </label>
               <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
                 {countryOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>

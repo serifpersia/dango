@@ -370,6 +370,16 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
 export function getMigratedId(db: DatabaseWrapper, legacyId: string): Promise<string> {
   if (isTempShowId(legacyId)) return Promise.resolve(legacyId)
 
+  if (/^(mal-\d+|-\d+)$/i.test(legacyId)) {
+    const mapping = dbGet<{ numericId: string }>(
+      db,
+      'SELECT numericId FROM legacy_id_mapping WHERE legacyId = ?',
+      [legacyId]
+    )
+    if (mapping) return consolidateFromNumeric(db, mapping.numericId)
+    return Promise.resolve(legacyId)
+  }
+
   if (/^\d+$/.test(legacyId)) {
     const existing = inFlightMigrations.get(legacyId)
     if (existing) return existing

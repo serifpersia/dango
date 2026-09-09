@@ -7,17 +7,25 @@
 // This stub provides no-op validators so the legacy import resolves
 // at bundle time without pulling an unneeded dependency.
 
-const validator = () => null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(validator as any).isRequired = validator
+interface PropTypesValidator {
+  (...args: unknown[]): null
+  isRequired: PropTypesValidator
+}
 
-const handler = {
+interface PropTypesModule extends PropTypesValidator {
+  [key: string]: PropTypesValidator
+}
+
+const baseValidator = (): null => null
+const validator = baseValidator as PropTypesValidator
+validator.isRequired = validator
+
+const handler: ProxyHandler<PropTypesValidator> = {
   get: () => validator,
   apply: () => validator,
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PropTypes: any = new Proxy(validator, handler)
+const PropTypes = new Proxy(validator, handler) as PropTypesModule
 
 export default PropTypes
 

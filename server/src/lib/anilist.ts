@@ -10,10 +10,23 @@ import {
   kitsuSearchAnime,
   kitsuTrending,
   kitsuSeasonal,
+  kitsuSpotlight,
+  kitsuLatestReleases,
   kitsuMetaByAnilistId,
   kitsuMetaByMalId,
   kitsuEpisodes,
 } from './kitsu'
+import {
+  malSearchMedia,
+  malSeasonal,
+  malTop,
+  malLatestReleases,
+  malSearchAnime,
+  malAnimeDetail,
+  toAnilistSearchMedia,
+  toAnilistDetailMedia,
+} from './mal'
+import { malCacheStore } from '../repositories/mal-cache.repository'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
@@ -243,6 +256,32 @@ export interface BatchedHomeData {
   spotlight: Show[]
 }
 
+async function tryFallback<T>(
+  malFn: () => Promise<T[]>,
+  kitsuFn: () => Promise<T[]>
+): Promise<T[]> {
+  for (const fn of [malFn, kitsuFn]) {
+    try {
+      const result = await fn()
+      if (result && result.length > 0) return result
+    } catch {
+      // ignore
+    }
+  }
+  return []
+}
+
+function mapFallbackResults(fb: AnilistMedia[]): Show[] {
+  const seen = new Set<number>()
+  const results: Show[] = []
+  for (const m of fb) {
+    if (!m.id || seen.has(m.id)) continue
+    seen.add(m.id)
+    results.push(fromAnilistMedia(m))
+  }
+  return results
+}
+
 export async function getBatchedHomeData(format?: string): Promise<BatchedHomeData> {
   const now = new Date()
   const year = now.getFullYear()
@@ -280,7 +319,32 @@ export async function getBatchedHomeData(format?: string): Promise<BatchedHomeDa
   }>(query, { season: currentSeason, seasonYear: year, seasonFormat: formatVar })
 
   if (!result?.data) {
-    return { trending: [], seasonal: [], spotlight: [] }
+    if (!anilistIsDown()) return { trending: [], seasonal: [], spotlight: [] }
+    try {
+      const [trending, seasonal, spotlight] = await Promise.all([
+        tryFallback(
+          () => malTop(malCacheStore(), 'airing', 1).then((m) => m.map(fromAnilistMedia)),
+          () => kitsuTrending(1, 20).then((m) => m.map(fromAnilistMedia))
+        ),
+        tryFallback(
+          () =>
+            malSeasonal(malCacheStore(), currentSeason, year, formatVar, 1, 14).then((m) =>
+              m.map(fromAnilistMedia)
+            ),
+          () =>
+            kitsuSeasonal(currentSeason, year, formatVar, 1, 14).then((m) =>
+              m.map(fromAnilistMedia)
+            )
+        ),
+        tryFallback(
+          () => malTop(malCacheStore(), 'airing', 1).then((m) => m.map(fromAnilistMedia)),
+          () => kitsuSpotlight(1, 20).then((m) => m.map(fromAnilistMedia))
+        ),
+      ])
+      return { trending, seasonal, spotlight }
+    } catch {
+      return { trending: [], seasonal: [], spotlight: [] }
+    }
   }
 
   return {
@@ -415,6 +479,58 @@ export function anilistRequest<T>(
   return request
 }
 
+export interface GenreTagLists {
+  genres: string[]
+  tags: string[]
+  studios: string[]
+}
+
+const STATIC_GENRES = [
+  'Action',
+  'Adventure',
+  'Comedy',
+  'Drama',
+  'Fantasy',
+  'Horror',
+  'Mahou Shoujo',
+  'Mecha',
+  'Music',
+  'Mystery',
+  'Psychological',
+  'Romance',
+  'Sci-Fi',
+  'Slice of Life',
+  'Sports',
+  'Supernatural',
+  'Thriller',
+]
+
+let genreTagCache: { genres: string[]; tags: string[]; at: number } | null = null
+const GENRE_TAG_TTL_MS = 24 * 3600 * 1000
+
+export async function getGenreTagLists(): Promise<GenreTagLists> {
+  if (genreTagCache && Date.now() - genreTagCache.at < GENRE_TAG_TTL_MS) {
+    return { genres: genreTagCache.genres, tags: genreTagCache.tags, studios: [] }
+  }
+  try {
+    const result = await anilistRequest<{
+      GenreCollection?: string[]
+      TagCollection?: { name: string; isAdult?: boolean }[]
+    }>(`query { GenreCollection TagCollection { name isAdult } }`)
+    const genres = result?.data?.GenreCollection?.filter((g) => typeof g === 'string')
+    const tags = (result?.data?.TagCollection ?? [])
+      .filter((t) => t && !t.isAdult && typeof t.name === 'string')
+      .map((t) => t.name)
+    if (genres && genres.length > 0) {
+      genreTagCache = { genres, tags, at: Date.now() }
+      return { genres, tags, studios: [] }
+    }
+  } catch {
+    // ignore
+  }
+  return { genres: STATIC_GENRES, tags: [], studios: [] }
+}
+
 function stripHtml(input?: string | null): string {
   if (!input) return ''
   return input
@@ -429,7 +545,7 @@ function stripHtml(input?: string | null): string {
 }
 
 export function fromAnilistMedia(m: AnilistMedia): Show {
-  const id = m.id.toString()
+  const id = m.id < 0 ? `mal-${Math.abs(m.id)}` : m.id.toString()
   const title = m.title
   const name = title?.romaji || title?.english || title?.native || 'Unknown'
 
@@ -446,7 +562,7 @@ export function fromAnilistMedia(m: AnilistMedia): Show {
   return {
     _id: id,
     id,
-    anilistId: m.id,
+    anilistId: m.id > 0 ? m.id : undefined,
     name,
     englishName: title?.english,
     nativeName: title?.native,
@@ -564,7 +680,12 @@ export async function getLatestReleases(
   }
 
   if (apiFailed) {
-    return []
+    return (
+      await tryFallback(
+        () => malLatestReleases(malCacheStore(), format, page, size),
+        () => kitsuLatestReleases(format, page, size)
+      )
+    ).map(fromAnilistMedia)
   }
 
   const start = (page - 1) * size
@@ -636,7 +757,12 @@ export async function getSeasonal(
 
   if (!result?.data) {
     if (anilistIsDown()) {
-      return (await kitsuSeasonal(currentSeason, year, format, page, size)).map(fromAnilistMedia)
+      return (
+        await tryFallback(
+          () => malSeasonal(malCacheStore(), currentSeason, year, format, page, size),
+          () => kitsuSeasonal(currentSeason, year, format, page, size)
+        )
+      ).map(fromAnilistMedia)
     }
     return []
   }
@@ -659,8 +785,23 @@ export async function getTrending(
   }
 
   if (anilistIsDown()) {
-    const kitsuMedia = await kitsuTrending(page, perPage)
-    return kitsuMedia.map(fromAnilistMedia)
+    return (
+      await tryFallback<AnilistMedia>(
+        async () => {
+          if (status === 'RELEASING') return malTop(malCacheStore(), 'airing', page)
+          switch (sort) {
+            case 'POPULARITY_DESC':
+            case 'FAVOURITES_DESC':
+              return malTop(malCacheStore(), 'bypopularity', page)
+            case 'SCORE_DESC':
+              return malTop(malCacheStore(), null, page)
+            default:
+              return malTop(malCacheStore(), 'airing', page)
+          }
+        },
+        () => kitsuTrending(page, perPage)
+      )
+    ).map(fromAnilistMedia)
   }
 
   return []
@@ -701,7 +842,10 @@ export async function getSpotlightBanners(page: number = 1, perPage: number = 20
     const month = now.getMonth() + 1
     const currentSeason =
       month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
-    const kitsuMedia = await kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
+    const kitsuMedia = await tryFallback<AnilistMedia>(
+      () => malTop(malCacheStore(), 'airing', 1),
+      () => kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
+    )
     if (!kitsuMedia || kitsuMedia.length === 0) {
       return []
     }
@@ -709,15 +853,17 @@ export async function getSpotlightBanners(page: number = 1, perPage: number = 20
     const results: Show[] = []
     for (const m of shuffled) {
       if (results.length >= 6) break
-      const tmdbBackdrop = await findTmdbDefaultBackdrop({
+      const artwork = await findTmdbDefaultBackdrop({
         english: m.title?.english,
         romaji: m.title?.romaji,
         native: m.title?.native,
       })
-      if (tmdbBackdrop) {
+      if (artwork) {
+        const show = fromAnilistMedia(m)
         results.push({
-          ...fromAnilistMedia(m),
-          bannerImage: tmdbBackdrop,
+          ...show,
+          bannerImage: artwork.backdrop,
+          description: show.description || artwork.overview || '',
         })
       }
     }
@@ -727,24 +873,38 @@ export async function getSpotlightBanners(page: number = 1, perPage: number = 20
   const results: Show[] = []
   for (const m of source) {
     if (results.length >= 6) break
-    const tmdbBackdrop = await findTmdbDefaultBackdrop({
+    const artwork = await findTmdbDefaultBackdrop({
       english: m.title?.english,
       romaji: m.title?.romaji,
       native: m.title?.native,
     })
-    if (tmdbBackdrop) {
+    if (artwork) {
+      const show = fromAnilistMedia(m)
       results.push({
-        ...fromAnilistMedia(m),
-        bannerImage: tmdbBackdrop,
+        ...show,
+        bannerImage: artwork.backdrop,
+        description: show.description || artwork.overview || '',
       })
     }
   }
   return results
 }
 
+export function parseMalId(id: string | number): number | null {
+  if (typeof id === 'number') return id < 0 ? Math.abs(id) : null
+  const prefixed = /^mal-(\d+)$/i.exec(id.trim())
+  if (prefixed) return parseInt(prefixed[1], 10)
+  if (/^-\d+$/.test(id.trim())) return Math.abs(parseInt(id, 10))
+  return null
+}
+
 export async function getShowMetaById(id: string): Promise<Show | null> {
+  const malId = parseMalId(id)
+  if (malId) return getShowMetaByMalId(malId)
+
   const numericId = parseInt(id)
   if (isNaN(numericId)) return null
+  if (numericId < 0) return getShowMetaByMalId(Math.abs(numericId))
 
   const fields = mediaFields()
   const cacheKey = `meta:${id}`
@@ -778,6 +938,57 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
     }
   }
 
+  return null
+}
+
+export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
+  const absMal = Math.abs(malId)
+  if (!absMal) return null
+  const cacheKey = `meta:-${absMal}`
+  const cached = getCachedAnilist<Show>(cacheKey)
+  if (cached && cached.anilistId != null && cached.anilistId > 0) return cached
+  const anilistUp = !anilistUnavailable()
+  if (cached && !anilistUp) return cached
+
+  if (anilistUp) {
+    try {
+      const byMal = await anilistRequest<{ Media?: AnilistMedia | null }>(
+        `query ($id: Int) { Media(idMal: $id, type: ANIME) { ${mediaFields()} } }`,
+        { id: absMal }
+      )
+      if (byMal?.data?.Media) {
+        const show = fromAnilistMedia(byMal.data.Media)
+        setCachedAnilist(cacheKey, show)
+        return show
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    const fb = await kitsuMetaByMalId(absMal)
+    if (fb) {
+      const show = fromAnilistMedia(fb)
+      setCachedAnilist(cacheKey, show)
+      return show
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const d = await malAnimeDetail(malCacheStore(), absMal)
+    if (d.detail) {
+      const show = fromAnilistMedia(toAnilistDetailMedia(d.detail))
+      setCachedAnilist(cacheKey, show)
+      return show
+    }
+  } catch {
+    // ignore
+  }
+
+  logger.warn({ malId: absMal }, 'MAL id unresolvable on all metadata providers')
   return null
 }
 
@@ -832,8 +1043,12 @@ export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, s
 }
 
 export async function getAnilistEpisodes(id: string): Promise<string[]> {
+  const malId = parseMalId(id)
+  if (malId) return getEpisodesByMalId(malId)
+
   const numericId = parseInt(id)
   if (isNaN(numericId)) return []
+  if (numericId < 0) return getEpisodesByMalId(Math.abs(numericId))
 
   const cacheKey = `eps:${id}`
   const cached = getCachedAnilist<string[]>(cacheKey)
@@ -881,6 +1096,36 @@ export async function getAnilistEpisodes(id: string): Promise<string[]> {
   const episodes = extractEpisodes(media)
   setCachedAnilist(cacheKey, episodes)
   return episodes
+}
+
+async function getEpisodesByMalId(malId: number): Promise<string[]> {
+  const cacheKey = `eps:-${malId}`
+  const cached = getCachedAnilist<string[]>(cacheKey)
+  if (cached) return cached
+
+  try {
+    const episodes = await kitsuEpisodes(0, malId)
+    if (episodes.length > 0) {
+      setCachedAnilist(cacheKey, episodes)
+      return episodes
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const d = await malAnimeDetail(malCacheStore(), malId)
+    const total = d.detail?.episodes
+    if (total && total > 0 && total <= 2000) {
+      const episodes = Array.from({ length: total }, (_, i) => (i + 1).toString())
+      setCachedAnilist(cacheKey, episodes)
+      return episodes
+    }
+  } catch {
+    // ignore
+  }
+
+  return []
 }
 
 function extractEpisodes(result: {
@@ -967,7 +1212,7 @@ export async function searchAnilistByTitle(
       const fb = await kitsuSearchAnime({ query: title, page: 1, perPage: 5 })
       if (fb.length > 0) {
         const best = fb[0]
-        return { id: Math.abs(best.id), title: best.title ?? {} }
+        return { id: best.id, title: best.title ?? {} }
       }
     }
     return null
@@ -1306,27 +1551,78 @@ export async function searchAnilist(options: AnilistSearchOptions = {}): Promise
 
   if (!result?.data) {
     if (anilistIsDown()) {
-      const fb = await kitsuSearchAnime({
-        query,
-        page,
-        perPage,
-        format: format && format !== 'ALL' && format !== 'ADULT' ? format : undefined,
-        status,
-        season,
-        seasonYear,
-        genre,
-        genre_not_in,
-        averageScore_greater,
-        episodes_greater,
-        isAdult: format === 'ADULT' ? true : isAdult,
-        sort,
-      })
-      const seen = new Set<number>()
-      const results: Show[] = []
-      for (const m of fb) {
-        if (!m.id || seen.has(m.id)) continue
-        seen.add(m.id)
-        results.push(fromAnilistMedia(m))
+      const malSearch = async (): Promise<AnilistMedia[]> => {
+        const store = malCacheStore()
+        let fb = await malSearchMedia(store, {
+          query,
+          page,
+          perPage,
+          format: format && format !== 'ALL' && format !== 'ADULT' ? format : undefined,
+          status,
+          season,
+          seasonYear,
+          genre,
+          genre_not_in,
+          averageScore_greater,
+          episodes_greater,
+          isAdult: format === 'ADULT' ? true : isAdult,
+          sort,
+        })
+        if (fb.length > 0) {
+          try {
+            const hentai = await malSearchMedia(
+              store,
+              {
+                query,
+                page,
+                perPage,
+                format: format && format !== 'ALL' && format !== 'ADULT' ? format : undefined,
+                status,
+                season,
+                seasonYear,
+                genre,
+                averageScore_greater,
+                episodes_greater,
+                sort,
+                isAdult: true,
+              },
+              false
+            )
+            if (hentai.length > 0) {
+              const hentaiIds = new Set(hentai.map((m) => m.id))
+              fb = fb.filter((m) => !hentaiIds.has(m.id))
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return fb
+      }
+      const fb = await tryFallback<AnilistMedia>(malSearch, () =>
+        kitsuSearchAnime({
+          query,
+          page,
+          perPage,
+          format: format && format !== 'ALL' && format !== 'ADULT' ? format : undefined,
+          status,
+          season,
+          seasonYear,
+          genre,
+          genre_not_in,
+          averageScore_greater,
+          episodes_greater,
+          isAdult: format === 'ADULT' ? true : isAdult,
+          sort,
+        })
+      )
+      let results = mapFallbackResults(fb)
+      if (results.length === 0 && query?.trim()) {
+        try {
+          const mal = await malSearchAnime(malCacheStore(), query, page)
+          results = mal.entries.map((e) => fromAnilistMedia(toAnilistSearchMedia(e)))
+        } catch {
+          // ignore
+        }
       }
       return results
     }

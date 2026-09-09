@@ -57,6 +57,8 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
     return Number.isFinite(saved) ? saved : 1
   })
   const sessionIdRef = useRef<string>('')
+  const volumeRef = useRef(volume)
+  volumeRef.current = volume
   if (!sessionIdRef.current) {
     sessionIdRef.current =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -80,13 +82,12 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
     setIsPlaying(false)
     audio.src = station.streamUrl
     audio.load()
-    audio.volume = volume
+    audio.volume = volumeRef.current
     audio.play().catch(() => setIsPlaying(false))
     return () => {
       audio.removeAttribute('src')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [station.id])
+  }, [station.id, station.streamUrl])
 
   useEffect(() => {
     const audio = audioRef.current

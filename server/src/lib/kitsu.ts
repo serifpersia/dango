@@ -412,7 +412,7 @@ async function kitsuDetail(
   knownIds?: { anilistId?: number | null; malId?: number | null }
 ): Promise<AnilistMedia | null> {
   const [animeJson, studiosJson] = await Promise.all([
-    kitsuFetch(`/anime/${kitsuId}?include=categories`),
+    kitsuFetch(`/anime/${kitsuId}?include=categories,mappings`),
     kitsuFetch(`/anime/${kitsuId}/anime-productions?include=producer&page[limit]=10`),
   ])
   if (!animeJson) return null
@@ -450,6 +450,52 @@ export async function kitsuMetaByMalId(malId: number): Promise<AnilistMedia | nu
   const item = mappingItem(entries[0], json?.included ?? [])
   if (!item) return null
   return kitsuDetail(item.id, { malId })
+}
+
+export interface KitsuTitles {
+  english?: string
+  native?: string
+}
+
+/** Batch-resolves English/Japanese titles for MAL ids via the mappings endpoint. */
+export async function kitsuTitlesByMalIds(malIds: number[]): Promise<Map<number, KitsuTitles>> {
+  const result = new Map<number, KitsuTitles>()
+  const unique = [...new Set(malIds.filter((n) => Number.isFinite(n) && n > 0))]
+  const CHUNK = 20
+  const chunks: number[][] = []
+  for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK))
+  await Promise.all(
+    chunks.map(async (ids) => {
+      try {
+        const json = await kitsuFetch(
+          `/mappings?filter[externalSite]=myanimelist%2Fanime&filter[externalId]=${ids.join(',')}&include=item&page[limit]=${CHUNK}`
+        )
+        if (!json) return
+        const animeById = new Map<string, KitsuEntry>()
+        for (const inc of json.included ?? []) {
+          if (inc.type === 'anime') animeById.set(inc.id, inc)
+        }
+        for (const entry of asArray(json.data)) {
+          const rel = entry.relationships?.item?.data
+          const single = Array.isArray(rel) ? rel[0] : rel
+          if (!single) continue
+          const titles = (animeById.get(single.id)?.attributes?.titles ?? {}) as Record<
+            string,
+            string | undefined
+          >
+          const english = titles.en || titles.en_us || undefined
+          const native = titles.ja_jp || undefined
+          if (!english && !native) continue
+          const malId = Number(entry.attributes?.externalId as string | number | undefined)
+          if (!Number.isFinite(malId) || malId <= 0) continue
+          result.set(malId, { english, native })
+        }
+      } catch {
+        // ignore
+      }
+    })
+  )
+  return result
 }
 
 /** Episode numbers for a show, via the episodes relationship. */

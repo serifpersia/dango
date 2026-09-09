@@ -10,17 +10,25 @@ import {
   getSchedule,
   searchAnilist,
   searchAnilistByTitle,
+  parseMalId,
+  getShowMetaByMalId,
   getSpotlightBanners,
   getBatchedHomeData,
+  getGenreTagLists,
   anilistUnavailable,
   wasAnilistDownAtBoot,
   checkAnilistStatus,
+  fromAnilistMedia,
 } from '../lib/anilist'
+import type { AnilistMedia } from '../lib/anilist'
+import { malSearchMedia, malSearchTitle, malAnimeDetail, toAnilistDetailMedia } from '../lib/mal'
+import { malCacheStore } from '../repositories/mal-cache.repository'
 import { getMigratedId } from '../lib/migration'
 import { isTempShowId, isTempMatureProvider } from '../lib/temp-ids'
 import { TempShowIdsRepository } from '../repositories/temp-show-ids.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
+import { dbRun } from '../utils/db-utils'
 import logger from '../logger'
 
 export class DataController {
@@ -30,6 +38,27 @@ export class DataController {
     const providerName = (req.query.provider as string)?.toLowerCase()
     if (!providerName) return null
     return this.providers[providerName] || null
+  }
+
+  private async resolveMatureStreamingId(
+    title: string,
+    wanted?: string
+  ): Promise<{ provider: Provider; nativeId: string } | null> {
+    const names = [wanted, 'wh', 'op'].filter(
+      (p): p is string => !!p && p !== 'mal' && !!this.providers[p]
+    )
+    const seen = new Set<string>()
+    for (const name of names) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      try {
+        const resolved = await this.providers[name].resolveShowId?.(title)
+        if (resolved) return { provider: this.providers[name], nativeId: resolved }
+      } catch {
+        // ignore
+      }
+    }
+    return null
   }
 
   getTrending = async (_req: Request, res: Response) => {
@@ -102,22 +131,34 @@ export class DataController {
     try {
       let showId = req.query.showId as string
 
+      const videoMalId = parseMalId(showId)
+      if (videoMalId) {
+        try {
+          const malMeta = await getShowMetaByMalId(videoMalId)
+          if (malMeta?.anilistId && malMeta.anilistId > 0) showId = String(malMeta.anilistId)
+        } catch {
+          // ignore
+        }
+      }
+
       if (isTempShowId(showId)) {
         try {
           const row = TempShowIdsRepository.getById(req.db, showId)
           if (!row || !isTempMatureProvider(row.provider)) return res.json([])
-          let tempProvider = this.providers[row.provider]
-          let nativeId = row.nativeId
           const wanted = String(req.query.provider || '').toLowerCase()
-          if (wanted && wanted !== row.provider && isTempMatureProvider(wanted)) {
-            const resolved = await this.providers[wanted].resolveShowId?.(row.title)
-            if (!resolved) return res.json([])
-            tempProvider = this.providers[wanted]
-            nativeId = resolved
+          const own = this.providers[row.provider]
+          if (own && (!wanted || wanted === row.provider)) {
+            const urls = await own.getStreamUrls(
+              row.nativeId,
+              req.query.episodeNumber as string,
+              req.query.mode as 'sub' | 'dub'
+            )
+            return res.json(urls || [])
           }
-          if (tempProvider) {
-            const urls = await tempProvider.getStreamUrls(
-              nativeId,
+          const hit = await this.resolveMatureStreamingId(row.title, wanted)
+          if (hit) {
+            const urls = await hit.provider.getStreamUrls(
+              hit.nativeId,
               req.query.episodeNumber as string,
               req.query.mode as 'sub' | 'dub'
             )
@@ -132,7 +173,8 @@ export class DataController {
       const providerName = req.query.provider as string
 
       const providerKey = providerName?.toLowerCase()
-      if (providerKey && /^\d+$/.test(showId) && providerKey !== 'megaplay') {
+      const stillMal = parseMalId(showId) !== null
+      if (providerKey && ((/^\d+$/.test(showId) && providerKey !== 'megaplay') || stillMal)) {
         const meta = (await ShowsMetaRepository.getById(req.db, showId)) as {
           name?: string
           englishName?: string
@@ -172,19 +214,41 @@ export class DataController {
 
         if (targetTitle) {
           let romaji = anilistShow?.names?.romaji
-          if (!romaji) {
+          let nativeName: string | undefined = anilistShow?.names?.native
+          let synonyms: string[] | undefined = anilistShow?.names?.synonyms
+          if (!romaji || !nativeName) {
             try {
               const show = await getShowMetaById(showId)
-              romaji = show?.names?.romaji
+              romaji = romaji || show?.names?.romaji
+              nativeName = nativeName || show?.names?.native
+              synonyms = synonyms || show?.names?.synonyms
             } catch {
               // ignore
             }
           }
-          const resolved = await this.providers[providerKey]?.resolveShowId?.(
+          const titleTargets = [
             targetTitle,
             romaji,
-            req.query.mode as 'sub' | 'dub' | undefined
+            nativeName,
+            ...(synonyms ?? []).slice(0, 2),
+          ].filter((t): t is string => !!t && t.trim().length > 0)
+          const distinctTargets = [...new Set(titleTargets.map((t) => t.trim()))].filter(
+            (t, i, a) => a.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i
           )
+          let resolved: string | null = null
+          for (const variant of distinctTargets) {
+            try {
+              resolved =
+                (await this.providers[providerKey]?.resolveShowId?.(
+                  variant,
+                  romaji,
+                  req.query.mode as 'sub' | 'dub' | undefined
+                )) ?? null
+            } catch {
+              resolved = null
+            }
+            if (resolved) break
+          }
           if (resolved) {
             showId = resolved
           } else {
@@ -196,15 +260,12 @@ export class DataController {
               const fallbackResults = await this.providers[providerKey]?.search?.({
                 query: targetTitle,
               })
-              const targets = [targetTitle, romaji].filter(
-                (t): t is string => !!t && t.trim().length > 0
-              )
               const fallbackMatch = pickBestMatch(
                 (fallbackResults || []).map((r) => ({
                   title: r.name || r.englishName || '',
                   id: r.id || r._id || '',
                 })),
-                targets
+                distinctTargets
               )
               if (fallbackMatch) {
                 showId = fallbackMatch.item.id
@@ -259,23 +320,32 @@ export class DataController {
       return res.json({ episodes: [] })
     }
 
-    const showId = await getMigratedId(req.db, showIdRaw)
+    let showId = await getMigratedId(req.db, showIdRaw)
+
+    const epsMalId = parseMalId(showId)
+    if (epsMalId) {
+      try {
+        const malMeta = await getShowMetaByMalId(epsMalId)
+        if (malMeta?.anilistId && malMeta.anilistId > 0) showId = String(malMeta.anilistId)
+      } catch {
+        // ignore
+      }
+    }
 
     if (isTempShowId(showId)) {
       try {
         const row = TempShowIdsRepository.getById(req.db, showId)
         if (!row || !isTempMatureProvider(row.provider)) return res.json({ episodes: [] })
-        let tempProvider = this.providers[row.provider]
-        let nativeId = row.nativeId
         const wanted = String(req.query.provider || '').toLowerCase()
-        if (wanted && wanted !== row.provider && isTempMatureProvider(wanted)) {
-          const resolved = await this.providers[wanted].resolveShowId?.(row.title)
-          if (!resolved) return res.json({ episodes: [] })
-          tempProvider = this.providers[wanted]
-          nativeId = resolved
+        const own = this.providers[row.provider]
+        if (own && (!wanted || wanted === row.provider)) {
+          const data = await own.getEpisodes(row.nativeId, req.query.mode as 'sub' | 'dub')
+          if (data?.episodes?.length) return res.json(data)
+          return res.json({ episodes: [] })
         }
-        if (tempProvider) {
-          const data = await tempProvider.getEpisodes(nativeId, req.query.mode as 'sub' | 'dub')
+        const hit = await this.resolveMatureStreamingId(row.title, wanted)
+        if (hit) {
+          const data = await hit.provider.getEpisodes(hit.nativeId, req.query.mode as 'sub' | 'dub')
           if (data?.episodes?.length) return res.json(data)
         }
       } catch {
@@ -298,7 +368,7 @@ export class DataController {
       }
     }
 
-    const isNumeric = /^\d+$/.test(showId)
+    const isNumeric = /^(mal-\d+|-?\d+)$/i.test(showId)
 
     if (isNumeric) {
       let episodes: string[] = []
@@ -306,6 +376,23 @@ export class DataController {
         episodes = await getAnilistEpisodes(showId)
       } catch (e) {
         logger.error({ err: e, showId }, 'Episodes fetch failed')
+      }
+
+      if (episodes.length === 0) {
+        const absId = Math.abs(parseInt(showId, 10))
+        if (!Number.isFinite(absId)) {
+          res.set('Cache-Control', 'public, max-age=3600').json({ episodes })
+          return
+        }
+        try {
+          const d = await malAnimeDetail(malCacheStore(), absId)
+          const total = d.detail?.episodes
+          if (total && total > 0 && total <= 500) {
+            episodes = Array.from({ length: total }, (_, i) => (i + 1).toString())
+          }
+        } catch {
+          // ignore
+        }
       }
 
       res.set('Cache-Control', 'public, max-age=3600').json({ episodes })
@@ -490,6 +577,41 @@ export class DataController {
         return res.json({ data: result.shows, hasMore: result.hasMore, genres: result.genres })
       }
 
+      if (provider === 'mal') {
+        const malPage = page
+        const malLimit = 50
+        let result: AnilistMedia[] = []
+        try {
+          result = await malSearchMedia(malCacheStore(), {
+            query,
+            page: malPage,
+            perPage: malLimit,
+            format: req.query.type as string,
+            status: req.query.status as string,
+            genre: undefined,
+            genre_not_in: req.query.excludeGenres
+              ? (req.query.excludeGenres as string).split(',')
+              : undefined,
+            isAdult: true,
+            sort: (req.query.sortBy as string) || undefined,
+            averageScore_greater: req.query.minScore
+              ? parseInt(req.query.minScore as string)
+              : undefined,
+            episodes_greater: req.query.minEpisodes
+              ? parseInt(req.query.minEpisodes as string)
+              : undefined,
+          })
+        } catch (e) {
+          logger.error({ err: e }, 'mal mature search failed')
+        }
+        const shows = result.map((m) => {
+          const show = fromAnilistMedia(m)
+          return { ...show, isAdult: true }
+        })
+        const sliced = shows.slice(0, limit)
+        return res.json({ data: sliced, hasMore: shows.length >= limit })
+      }
+
       return res.status(400).json({ error: 'Unknown mature provider' })
     } catch (e) {
       logger.error({ err: e }, 'mature search failed')
@@ -501,9 +623,17 @@ export class DataController {
     try {
       const title = ((req.query.title as string) || '').trim()
       if (!title) return res.status(400).json({ error: 'title is required' })
-      const result = await searchAnilistByTitle(title)
-      if (!result) return res.status(404).json({ error: 'No match found' })
-      return res.json({ id: result.id })
+
+      const anilistResult = await searchAnilistByTitle(title)
+      if (anilistResult) {
+        const id = anilistResult.id
+        return res.json({ id: typeof id === 'number' && id < 0 ? `mal-${Math.abs(id)}` : id })
+      }
+
+      const malResult = await malSearchTitle(malCacheStore(), title)
+      if (malResult) return res.json({ id: malResult, provider: 'mal' })
+
+      return res.status(404).json({ error: 'No match found' })
     } catch (e) {
       logger.error({ err: e }, 'mature resolve failed')
       res.status(500).json({ error: 'Resolve failed' })
@@ -578,7 +708,7 @@ export class DataController {
       return
     }
 
-    const isNumeric = /^\d+$/.test(id)
+    const isNumeric = /^(mal-\d+|-?\d+)$/i.test(id)
 
     if (isNumeric) {
       let meta: Show | null = null
@@ -629,6 +759,29 @@ export class DataController {
         }
       }
 
+      if (!meta && !/^mal-/i.test(id)) {
+        try {
+          const d = await malAnimeDetail(malCacheStore(), Math.abs(parseInt(id, 10)))
+          if (d.detail) {
+            meta = { ...fromAnilistMedia(toAnilistDetailMedia(d.detail)), isAdult: true }
+          }
+        } catch (e) {
+          logger.warn({ err: e, id }, 'mal show-meta fallback failed')
+        }
+      }
+
+      if (/^(mal-\d+|-\d+)$/i.test(id) && meta?.anilistId && meta.anilistId > 0) {
+        try {
+          dbRun(
+            req.db,
+            'INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)',
+            [id, String(meta.anilistId)]
+          )
+        } catch {
+          // ignore
+        }
+      }
+
       res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
       return
     }
@@ -669,6 +822,15 @@ export class DataController {
     res.json({ available, wasDownAtBoot: wasAnilistDownAtBoot() })
   }
 
+  getGenresAndTags = async (_req: Request, res: Response) => {
+    try {
+      res.json(await getGenreTagLists())
+    } catch (e) {
+      logger.error({ err: e }, 'genres-and-tags failed')
+      res.status(500).json({ error: 'Failed to load genres' })
+    }
+  }
+
   getSystemNotifications = async (_req: Request, res: Response) => {
     interface SystemNotification {
       id: string
@@ -680,12 +842,12 @@ export class DataController {
     }
     const notifications: SystemNotification[] = []
     if (wasAnilistDownAtBoot() && anilistUnavailable()) {
+      const fb = 'MAL + Kitsu'
       notifications.push({
         id: 'system-anilist-down',
         type: 'system',
         title: 'AniList API',
-        message:
-          'AniList metadata API is currently down. dango is experiencing degraded performance. Kitsu is being used as a fallback in the meantime. Some features may be limited until service is restored.',
+        message: `AniList metadata API is currently down. dango is experiencing degraded performance. ${fb} is being used as a fallback in the meantime. Some features may be limited until service is restored.`,
         icon: 'warning',
         createdAt: Date.now(),
       })

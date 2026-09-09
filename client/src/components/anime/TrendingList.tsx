@@ -19,33 +19,9 @@ const PAGE_SIZE = 10
 export default function TrendingList({ title }: TrendingListProps) {
   const { lowEndMode } = useLowEndMode()
   const [sort, setSort] = useLocalStorage<string>('trending_sort', SORT_TRENDING)
-  const [anilistAvailable, setAnilistAvailable] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/anilist-status')
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled) setAnilistAvailable(j.available)
-      })
-      .catch(() => {
-        if (!cancelled) setAnilistAvailable(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (anilistAvailable === false && sort === SORT_TRENDING) {
-      setSort(SORT_ALL_TIME)
-    }
-  }, [anilistAvailable, sort, setSort])
-
-  const showTrendingOption = anilistAvailable !== false
 
   const sortOptions = [
-    ...(showTrendingOption ? [{ value: SORT_TRENDING, label: 'Trending' }] : []),
+    { value: SORT_TRENDING, label: 'Trending' },
     { value: SORT_ALL_TIME, label: 'All Time' },
   ]
 

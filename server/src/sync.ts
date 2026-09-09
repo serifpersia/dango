@@ -9,6 +9,7 @@ import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
 import { dbAll, dbGet } from './utils/db-utils'
 import { TempShowIdsRepository } from './repositories/temp-show-ids.repository'
+import { malCachePruneExpired } from './repositories/mal-cache.repository'
 import { isTempSyncRow } from './lib/temp-ids'
 import { notifySyncStart, notifySyncEnd } from './lib/ipc'
 
@@ -476,6 +477,13 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       if (purged > 0) logger.info({ purged }, 'Purged stale temp show ids on boot')
     } catch (e) {
       logger.warn({ err: e }, 'Temp show purge on boot failed')
+    }
+
+    try {
+      const pruned = malCachePruneExpired()
+      if (pruned > 0) logger.info({ pruned }, 'Pruned expired mal cache rows on boot')
+    } catch (e) {
+      logger.warn({ err: e }, 'Mal cache prune on boot failed')
     }
 
     db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`)

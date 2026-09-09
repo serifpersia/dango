@@ -26,10 +26,13 @@ interface TmdbSearchResult {
   media_type?: string
   id: number
   vote_count: number
+  overview?: string
+  backdrop_path?: string | null
 }
 
 interface TmdbTvDetails {
-  backdrop_path: string
+  backdrop_path: string | null
+  overview?: string
 }
 
 export async function tmdbSearch(query: string): Promise<TmdbSearchResult[] | null> {
@@ -50,11 +53,16 @@ export async function tmdbTvDetails(tmdbId: number): Promise<TmdbTvDetails | nul
   return json
 }
 
+export interface TmdbArtwork {
+  backdrop: string
+  overview?: string
+}
+
 export async function findTmdbDefaultBackdrop(titleParts: {
   english?: string
   romaji?: string
   native?: string
-}): Promise<string | null> {
+}): Promise<TmdbArtwork | null> {
   const searchNames = [titleParts.english, titleParts.romaji, titleParts.native].filter(
     Boolean
   ) as string[]
@@ -69,7 +77,10 @@ export async function findTmdbDefaultBackdrop(titleParts: {
     const details = await tmdbTvDetails(bestMatch.id)
     if (!details?.backdrop_path) continue
 
-    return `${TMDB_IMAGE}/original${details.backdrop_path}`
+    return {
+      backdrop: `${TMDB_IMAGE}/original${details.backdrop_path}`,
+      overview: details.overview || bestMatch.overview || undefined,
+    }
   }
 
   return null

@@ -42,6 +42,7 @@ interface MatureFilters {
 
 const providerOptions = [
   { value: 'anilist', label: 'AniList' },
+  { value: 'mal', label: 'MAL' },
   { value: 'wh', label: 'WH' },
   { value: 'op', label: 'OP' },
   { value: 'ht', label: 'HT' },
@@ -109,7 +110,11 @@ export default function Mature() {
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [submittedQuery, setSubmittedQuery] = useState(searchParams.get('query') || '')
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10) || 1)
-  const [sort, setSort] = useState(searchParams.get('sortBy') || 'POPULARITY_DESC')
+  const [sort, setSort] = useState(() => {
+    const urlSort = searchParams.get('sortBy')
+    if (urlSort) return urlSort
+    return provider === 'mal' ? 'SCORE_DESC' : 'POPULARITY_DESC'
+  })
   const [hnSort, setHnSort] = useState(
     (searchParams.get('provider') === 'hn' && searchParams.get('sortBy')) || ''
   )
@@ -150,6 +155,10 @@ export default function Mature() {
       if (s.status) p.set('status', s.status)
       if (s.season !== 'ALL') p.set('season', s.season)
       if (s.year !== 'ALL') p.set('year', s.year)
+    }
+    if (s.provider === 'mal') {
+      if (s.sort !== 'SCORE_DESC') p.set('sortBy', s.sort)
+      if (s.status) p.set('status', s.status)
     }
     if (s.provider === 'hn' && s.hnSort) p.set('sortBy', s.hnSort)
     if (s.provider === 'wh' || s.provider === 'ht' || s.provider === 'hn') {
@@ -197,9 +206,13 @@ export default function Mature() {
       if (season !== 'ALL') params.set('season', season)
       if (year !== 'ALL') params.set('year', year)
     }
+    if (provider === 'mal') {
+      params.set('sortBy', sort)
+      if (status) params.set('status', status)
+    }
     if (provider === 'hn' && hnSort) params.set('sortBy', hnSort)
-    if ((provider === 'wh' || provider === 'ht' || provider === 'hn') && genre) {
-      params.set('genre', genre)
+    if (provider === 'wh' || provider === 'ht' || provider === 'hn') {
+      if (genre) params.set('genre', genre)
     }
     if (provider === 'op') {
       params.set('order', opOrder)
@@ -267,6 +280,11 @@ export default function Mature() {
     setPage(1)
     setHnSort('')
     setGenre('')
+    if (value === 'mal') {
+      setSort('SCORE_DESC')
+    } else if (value === 'anilist') {
+      setSort('POPULARITY_DESC')
+    }
     setSubmittedQuery(query)
     writeParams(snapshot({ provider: value, page: 1, hnSort: '', genre: '', query }))
   }
@@ -289,6 +307,7 @@ export default function Mature() {
 
   const handleCardClick = async (e: React.MouseEvent, show: MatureShow) => {
     const id = show.id || show._id
+    if (provider === 'mal') return
     if (/^\d+$/.test(id)) return
     e.preventDefault()
     e.stopPropagation()
@@ -411,6 +430,14 @@ export default function Mature() {
                 <FaFilter /> Filters
               </button>
             )}
+            {provider === 'mal' && (
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
+              >
+                <FaFilter /> Filters
+              </button>
+            )}
             {provider === 'hn' && (
               <select
                 value={hnSort}
@@ -432,7 +459,7 @@ export default function Mature() {
           </div>
         </div>
 
-        {provider === 'anilist' && (
+        {(provider === 'anilist' || provider === 'mal') && (
           <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
             <div className={styles.filterDivider} />
             <div className={styles.filterGrid}>
@@ -456,26 +483,30 @@ export default function Mature() {
                   ))}
                 </select>
               </div>
-              <div className={styles.filterItem}>
-                <label>Season</label>
-                <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
-                  {seasonOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.filterItem}>
-                <label>Year</label>
-                <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
-                  {yearOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {provider === 'anilist' && (
+                <>
+                  <div className={styles.filterItem}>
+                    <label>Season</label>
+                    <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
+                      {seasonOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.filterItem}>
+                    <label>Year</label>
+                    <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
+                      {yearOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             <div className={styles.filterActions}>
               <Button onClick={handleSearch} className={styles.searchBtn}>
