@@ -25,6 +25,16 @@ if (mode === '--version' || mode === '-v') {
   process.exit(0)
 }
 
+if (mode === '--help' || mode === '-h') {
+  console.log('Usage: dango [dev|prod] [--no-update] [--version] [--help]')
+  console.log('  dev          Run with hot-reload (server + client)')
+  console.log('  prod         Run pre-built version (default)')
+  console.log('  --no-update  Skip update checks')
+  console.log('  --version, -v  Print version and exit')
+  console.log('  --help, -h     Show this help and exit')
+  process.exit(0)
+}
+
 async function checkForUpdates() {
   if (process.argv.includes('--no-update') || mode === 'dev') return
 
@@ -104,7 +114,7 @@ async function checkForUpdates() {
     } else {
       const { data } = await axios.get(
         'https://api.github.com/repos/serifpersia/dango/releases/latest',
-        { timeout: 3000 }
+        { timeout: 3000, headers: { 'User-Agent': 'dango-cli' } }
       )
       const remoteVersion = (data.name && data.name.match(/v(\d+\.\d+\.\d+)/)?.[1]) || null
       if (remoteVersion) {
@@ -153,6 +163,7 @@ let syncMessage = ''
 let syncDots = 0
 
 const startSpinner = (msg) => {
+  stopSpinner()
   syncMessage = msg
   syncDots = 0
   process.stdout.write(`${colors.system}[System]${colors.reset} ${msg}`)
@@ -178,14 +189,13 @@ const log = (prefix, color, data) => {
   if (str.includes('[SYNC_START]')) {
     const parts = str.split('[SYNC_START]')
     if (parts[1]) startSpinner(parts[1].split('\n')[0].trim())
-    return
   }
   if (str.includes('[SYNC_END]')) {
     stopSpinner()
-    return
   }
 
   if (str.includes('[SERVER_EXIT]')) {
+    isShuttingDown = true
     stopSpinner()
     console.log(
       `${colors.system}[System]${colors.reset} Server sync complete. Shutting down cleanly.`
@@ -194,6 +204,10 @@ const log = (prefix, color, data) => {
     terminateProcess(clientProcess)
     setTimeout(() => process.exit(0), 2000)
     return
+  }
+
+  if (str.includes('[SYNC_START]') || str.includes('[SYNC_END]')) {
+    // Fall through so remaining buffered lines are not swallowed
   }
 
   const lines = str.split('\n').filter((line) => line.trim() !== '')
@@ -283,7 +297,7 @@ async function main() {
     const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
     serverProcess = spawn(
       'node',
-      ['--max-old-space-size=256', serverPath],
+      ['--max-old-space-size=512', serverPath],
       spawnOpts(SERVER_DIR, {
         NODE_ENV: 'production',
         INTERNAL_SHUTDOWN_TOKEN: shutdownToken,
@@ -335,10 +349,11 @@ const shutdown = () => {
     }, 5000)
   }
 
+  const serverPort = Number(process.env.PORT) || 3000
   const req = http.request(
     {
       hostname: '127.0.0.1',
-      port: 3000,
+      port: serverPort,
       path: '/api/internal/shutdown',
       method: 'POST',
       headers: {
@@ -374,13 +389,26 @@ const shutdown = () => {
   }, 15000)
 }
 
+const restoreTerminal = () => {
+  try {
+    if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
+      process.stdin.setRawMode(false)
+      process.stdin.pause()
+    }
+  } catch {
+    // ignore terminal restore errors
+  }
+}
+
 process.on('SIGINT', () => {
+  shutdown()
+})
+process.on('SIGTERM', () => {
   shutdown()
 })
 process.on('SIGHUP', () => {
   shutdown()
 })
-;(async () => {
-  await checkForUpdates()
-  main()
-})()
+process.on('exit', restoreTerminal)
+checkForUpdates().catch(() => {})
+main()

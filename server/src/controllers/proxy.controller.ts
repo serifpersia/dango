@@ -488,6 +488,49 @@ export class ProxyController {
         signal: abortController.signal,
       })
       const body = String(response.data ?? '').replace(/^\uFEFF/, '')
+      if (/#EXTM3U/i.test(body.slice(0, 1000))) {
+        const segUrls = body
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l && !l.startsWith('#'))
+          .slice(0, 200)
+          .map((u) => {
+            try {
+              return new URL(u, subUrl).href
+            } catch {
+              return null
+            }
+          })
+          .filter((u): u is string => Boolean(u))
+        const parts: string[] = []
+        for (const seg of segUrls) {
+          try {
+            const segRes = await axiosInstance.get(seg, {
+              headers,
+              responseType: 'text',
+              signal: abortController.signal,
+            })
+            let segBody = String(segRes.data ?? '').replace(/^\uFEFF/, '')
+            if (/#EXTM3U/i.test(segBody.slice(0, 200))) continue
+            segBody = segBody
+              .replace(/\r\n/g, '\n')
+              .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+            if (/^\s*WEBVTT/i.test(segBody)) {
+              segBody = segBody.replace(/^\s*WEBVTT[^\n]*\n(\n|.*\n)?/, '')
+            }
+            segBody = segBody.trim()
+            if (segBody) parts.push(segBody)
+            if (parts.join('\n').length > 2_000_000) break
+          } catch (e) {
+            if (axios.isCancel(e)) return
+          }
+        }
+        if (parts.length === 0) {
+          return res.status(502).send('Subtitle playlist empty')
+        }
+        res.set('Content-Type', 'text/vtt; charset=utf-8')
+        return res.send(`WEBVTT\n\n${parts.join('\n\n')}\n`)
+      }
       res.set('Content-Type', 'text/vtt; charset=utf-8')
       if (/^\s*WEBVTT/i.test(body)) return res.send(body)
       return res.send(

@@ -43,7 +43,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
       toast.success('Cookie updated successfully!')
       onSuccess?.()
       onClose()
-    } catch (e) {
+    } catch {
       toast.error('Failed to save cookie')
     } finally {
       setIsSubmitting(false)

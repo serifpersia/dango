@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { FaSearch, FaFilter, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import GenericModal from '../components/common/GenericModal'
+import MatureConsentModal from '../components/common/MatureConsentModal'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useMatureConsent } from '../hooks/useMatureConsent'
@@ -374,12 +374,7 @@ export default function Mature() {
           : []
 
   if (!hasConsent) {
-    return (
-      <GenericModal isOpen title="Content Warning" onClose={() => navigate('/home')}>
-        <p>This section contains mature 18+ content. Please confirm you are of legal age.</p>
-        <Button onClick={grant}>I&apos;m 18+, Continue</Button>
-      </GenericModal>
-    )
+    return <MatureConsentModal isOpen onClose={() => navigate('/')} onGrant={grant} />
   }
 
   return (

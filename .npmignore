@@ -1,9 +1,0 @@
-# Exclude source code to keep the package small
-client/src/
-server/src/
-docs/
-.github/
-
-# Ensure build artifacts are NOT ignored
-!client/dist/
-!server/dist/

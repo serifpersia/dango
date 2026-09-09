@@ -57,7 +57,7 @@ const RcloneSettings: React.FC = () => {
       } else {
         throw new Error('Failed to save')
       }
-    } catch (error) {
+    } catch {
       setStatusModal({
         show: true,
         message: 'Failed to save Rclone configuration.',

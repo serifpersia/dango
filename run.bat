@@ -47,23 +47,32 @@ goto end
 echo Running in PRODUCTION mode...
 echo.
 
+if /i "%~2"=="rebuild" goto force_build
+if /i "%~2"=="--rebuild" goto force_build
 if exist "server\dist\server.js" if exist "client\dist" (
-    echo --^> Pre-built files found. Skipping build...
-) else (
-    echo --^> Build missing. Installing and Building...
-    call npm install
-    if !errorlevel! neq 0 (
-        echo Error: Install failed!
-        pause
-        exit /b 1
-    )
-    call npm run build
-    if !errorlevel! neq 0 (
-        echo Error: Build failed!
-        pause
-        exit /b 1
-    )
+    echo --^> Pre-built files found. Skipping build... (use 'run.bat 2 rebuild' to force rebuild after git pull)
+    goto after_build
 )
+:do_build
+echo --^> Build missing. Installing and Building...
+call npm install
+if !errorlevel! neq 0 (
+    echo Error: Install failed!
+    pause
+    exit /b 1
+)
+call npm run build
+if !errorlevel! neq 0 (
+    echo Error: Build failed!
+    pause
+    exit /b 1
+)
+goto after_build
+:force_build
+echo --^> Rebuild requested. Installing and Building...
+call npm install
+call npm run build
+:after_build
 
 echo.
 echo --^> Starting application in production mode...

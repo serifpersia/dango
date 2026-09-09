@@ -11,10 +11,10 @@ const AnimeCardSkeleton: React.FC<AnimeCardSkeletonProps> = ({ layout = 'vertica
 
   return (
     <div className={`${styles.skeletonCard} ${styles[layout]} ${lowEndMode ? styles.lowEnd : ''}`}>
-      {!lowEndMode && <div className={styles.poster}></div>}
+      <div className={styles.poster}></div>
       <div className={styles.info}>
         <div className={styles.line}></div>
-        {!lowEndMode && <div className={`${styles.line} ${styles.short}`}></div>}
+        <div className={`${styles.line} ${styles.short}`}></div>
       </div>
     </div>
   )

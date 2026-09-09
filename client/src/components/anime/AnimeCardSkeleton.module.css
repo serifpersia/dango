@@ -95,15 +95,18 @@
 }
 
 .skeletonCard.lowEnd {
-  min-height: 40px;
-  flex-direction: row;
+  min-height: 0;
+}
+
+.skeletonCard.lowEnd .poster::after,
+.skeletonCard.lowEnd .line::after {
+  animation: none;
 }
 
 .skeletonCard.lowEnd .line {
-  animation: none;
-  opacity: 0.3;
+  opacity: 0.6;
 }
 
 .skeletonCard.lowEnd .info {
-  padding: var(--space-2);
+  padding: var(--space-3);
 }

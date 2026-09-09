@@ -101,7 +101,7 @@ const GoogleAuthSettings: React.FC = () => {
       } else {
         throw new Error('Auth URL not available')
       }
-    } catch (error) {
+    } catch {
       setStatusModal({
         show: true,
         message: 'Authentication failed. Ensure server is configured correctly.',

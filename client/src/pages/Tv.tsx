@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
-import { FaSearch, FaPlay, FaFilm, FaTv, FaArrowLeft, FaSpinner } from 'react-icons/fa'
+import { FaSearch, FaTv, FaArrowLeft, FaSpinner } from 'react-icons/fa'
 import TvCard from '../components/tv/TvCard'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import GenericModal from '../components/common/GenericModal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
+import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
+import useDelayCanvas from '../hooks/useDelayCanvas'
+import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import type Hls from 'hls.js'
 import styles from './Tv.module.css'
 
@@ -134,7 +137,7 @@ const Tv: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [selectedItem, setSelectedItem] = useState<TvSearchResult | null>(null)
   const [details, setDetails] = useState<TvDetails | null>(null)
-  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [_detailsLoading, setDetailsLoading] = useState(false)
   const [season, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
@@ -177,6 +180,41 @@ const Tv: React.FC = () => {
   }, [selectedSubtitle])
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
+  const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
+  const delayCanvasRef = useRef<HTMLCanvasElement>(null)
+  const subtitleOverlayRef = useRef<HTMLDivElement>(null)
+  const [videoDelayMs, setVideoDelayMs] = useState<number>(() => {
+    try {
+      const stored = Number(localStorage.getItem('playerVideoDelayMs'))
+      if (Number.isFinite(stored) && stored >= 0 && stored <= 500) return Math.round(stored)
+    } catch {
+      // ignore
+    }
+    return 180
+  })
+  const [videoDelayEnabled, setVideoDelayEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('playerVideoDelayEnabled') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [isCalibrating, setIsCalibrating] = useState(false)
+  const wasPlayingBeforeCalibRef = useRef(false)
+  const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
+  useDelayCanvas({
+    videoRef,
+    canvasRef: delayCanvasRef,
+    delayMs: effectiveVideoDelayMs,
+    enabled: videoDelayEnabled,
+  })
+  const delayCanvasActive = videoDelayEnabled
+  const resumeAfterCalib = () => {
+    if (wasPlayingBeforeCalibRef.current) {
+      wasPlayingBeforeCalibRef.current = false
+      videoRef.current?.play().catch(() => {})
+    }
+  }
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const discordSessionRef = useRef<string>('')
   if (!discordSessionRef.current) {
@@ -187,6 +225,48 @@ const Tv: React.FC = () => {
     details?.seasons === undefined && details?.number_of_seasons === undefined
       ? selectedItem?.type === 'movie'
       : false
+
+  const pickDefaultSubtitle = useCallback((subs: SubtitleTrack[]): number => {
+    let lastKey: string | null = null
+    let enabled = true
+    try {
+      lastKey = localStorage.getItem('tvLastSubtitle')
+      enabled = localStorage.getItem('tvSubtitlesEnabled') !== 'false'
+    } catch {
+      // ignore
+    }
+    return pickSubtitleIndex(subs, { lastKey, enabled })
+  }, [])
+
+  const persistSubtitlePick = useCallback((pick: number) => {
+    if (pick < 0) return
+    try {
+      localStorage.setItem('tvSubtitlesEnabled', 'true')
+      localStorage.setItem('tvSelectedSubtitle', String(pick))
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const pickDefaultAudio = useCallback((tracks: AudioTrack[]): number => {
+    if (tracks.length === 0) return 0
+    let lastKey: string | null = null
+    try {
+      lastKey = localStorage.getItem('tvLastAudio')
+    } catch {
+      // ignore
+    }
+    if (lastKey) {
+      const exact = tracks.findIndex((t) => subtitleKey(t) === lastKey)
+      if (exact >= 0) return exact
+      const sep = lastKey.indexOf('|||')
+      const lastLang = sep >= 0 ? lastKey.slice(0, sep) : lastKey
+      const lastLabel = sep >= 0 ? lastKey.slice(sep + 3) : lastKey
+      const fuzzy = tracks.findIndex((t) => t.language === lastLang || t.label === lastLabel)
+      if (fuzzy >= 0) return fuzzy
+    }
+    return pickSubtitleIndex(tracks, { lastKey: null, enabled: true })
+  }, [])
 
   const isEmbedProvider = ['embedmaster', 'vidfast', 'videasy', 'vidrock'].includes(source)
 
@@ -332,35 +412,15 @@ const Tv: React.FC = () => {
               const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
               if (osSubs.length === 0) return
               setSubtitles(osSubs)
-              const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
-              if (savedEnabled === 'false') {
-                setSelectedSubtitle(-1)
-              } else {
-                const englishIdx = osSubs.findIndex(
-                  (s) =>
-                    s.language.toLowerCase().startsWith('en') ||
-                    s.label.toLowerCase().includes('english')
-                )
-                const pick = englishIdx >= 0 ? englishIdx : 0
-                setSelectedSubtitle(pick)
-                try {
-                  localStorage.setItem('tvSubtitlesEnabled', 'true')
-                  localStorage.setItem('tvSelectedSubtitle', String(pick))
-                } catch {
-                  // ignore
-                }
-              }
+              const pick = pickDefaultSubtitle(osSubs)
+              setSelectedSubtitle(pick)
+              persistSubtitlePick(pick)
             })
             .catch(() => {})
           if (data.audioTracks?.length) {
             const tracks = data.audioTracks as AudioTrack[]
             setAudioTracks(tracks)
-            const englishIdx = tracks.findIndex(
-              (t) =>
-                t.language.toLowerCase().startsWith('en') ||
-                t.label.toLowerCase().includes('english')
-            )
-            setSelectedAudioTrack(englishIdx >= 0 ? englishIdx : 0)
+            setSelectedAudioTrack(pickDefaultAudio(tracks))
           } else {
             setAudioTracks([])
           }
@@ -385,26 +445,14 @@ const Tv: React.FC = () => {
         const tracks = data.audioTracks || []
         setAudioTracks(tracks)
         if (tracks.length > 0) {
-          const englishIdx = tracks.findIndex(
-            (t: AudioTrack) =>
-              t.language.toLowerCase().startsWith('en') || t.label.toLowerCase().includes('english')
-          )
-          setSelectedAudioTrack(englishIdx >= 0 ? englishIdx : 0)
+          setSelectedAudioTrack(pickDefaultAudio(tracks))
         }
         const subs = data.subtitles || []
         setSubtitles(subs)
         if (subs.length > 0) {
-          const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
-          if (savedEnabled === 'false') {
-            setSelectedSubtitle(-1)
-          } else {
-            const englishIdx = subs.findIndex(
-              (s: SubtitleTrack) =>
-                s.language.toLowerCase().startsWith('en') ||
-                s.label.toLowerCase().includes('english')
-            )
-            setSelectedSubtitle(englishIdx >= 0 ? englishIdx : 0)
-          }
+          const pick = pickDefaultSubtitle(subs)
+          setSelectedSubtitle(pick)
+          persistSubtitlePick(pick)
         } else {
           setSelectedSubtitle(-1)
         }
@@ -418,22 +466,9 @@ const Tv: React.FC = () => {
             setSubtitles((prev) => {
               const merged = [...prev, ...osSubs.filter((s) => !prev.some((p) => p.url === s.url))]
               if (prev.length === 0) {
-                const savedEnabled = localStorage.getItem('tvSubtitlesEnabled')
-                if (savedEnabled !== 'false') {
-                  const englishIdx = merged.findIndex(
-                    (s) =>
-                      s.language.toLowerCase().startsWith('en') ||
-                      s.label.toLowerCase().includes('english')
-                  )
-                  const pick = englishIdx >= 0 ? englishIdx : 0
-                  setSelectedSubtitle(pick)
-                  try {
-                    localStorage.setItem('tvSubtitlesEnabled', 'true')
-                    localStorage.setItem('tvSelectedSubtitle', String(pick))
-                  } catch {
-                    // ignore
-                  }
-                }
+                const pick = pickDefaultSubtitle(merged)
+                setSelectedSubtitle(pick)
+                persistSubtitlePick(pick)
               }
               return merged
             })
@@ -454,6 +489,9 @@ const Tv: React.FC = () => {
     isEmbedProvider,
     hasMatureConsent,
     selectedMovyServer,
+    pickDefaultSubtitle,
+    persistSubtitlePick,
+    pickDefaultAudio,
   ])
 
   const handleMovyServerSelect = useCallback((city: string) => {
@@ -550,14 +588,21 @@ const Tv: React.FC = () => {
             }
           }
           hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-            hls.audioTrack = selectedAudioTrackRef.current
-            setTimeout(() => {
-              setSelectedAudioTrack(hls.audioTrack)
-            }, 300)
+            const count = Array.isArray(hls.audioTracks) ? hls.audioTracks.length : 0
+            const want = selectedAudioTrackRef.current
+            const target = count > 0 ? Math.min(Math.max(0, want), count - 1) : want
+            hls.audioTrack = target
+            if (target !== want) setSelectedAudioTrack(target)
             applySubtitlePreference()
             video.play().catch(() => {})
           })
           hls.on(HlsClass.Events.AUDIO_TRACK_SWITCHED, (_e, data) => {
+            const want = selectedAudioTrackRef.current
+            const count = Array.isArray(hls.audioTracks) ? hls.audioTracks.length : 0
+            if (data.id !== want && want >= 0 && want < count) {
+              if (hls.audioTrack !== want) hls.audioTrack = want
+              return
+            }
             setSelectedAudioTrack(data.id)
           })
           hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
@@ -625,6 +670,7 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     if (!video || isEmbedProvider) return
     video.querySelectorAll('track').forEach((el) => el.remove())
+    manualTrackElsRef.current = []
     if (subtitles.length === 0) return
     subtitles.forEach((sub) => {
       const track = document.createElement('track')
@@ -635,7 +681,13 @@ const Tv: React.FC = () => {
         source === 'movybz' ? 'https://www.movy.bz/' : referer || 'https://vixsrc.to/'
       const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(subReferer)}`
       track.src = subUrl
+      track.addEventListener('load', () => {
+        const idx = manualTrackElsRef.current.indexOf(track)
+        const t = track.track as unknown as { mode?: string } | null
+        if (t && idx >= 0) t.mode = idx === selectedSubtitleRef.current ? 'showing' : 'hidden'
+      })
       video.appendChild(track)
+      manualTrackElsRef.current.push(track)
     })
   }, [subtitles, referer, isEmbedProvider, source])
 
@@ -652,6 +704,14 @@ const Tv: React.FC = () => {
       hls.subtitleTrack = -1
     }
     const sync = () => {
+      const els = manualTrackElsRef.current
+      if (els.length > 0) {
+        els.forEach((el, idx) => {
+          const t = el.track as unknown as { mode?: string } | null
+          if (t) t.mode = idx === selectedSubtitle ? 'showing' : 'hidden'
+        })
+        return
+      }
       const tracks = Array.from(video.textTracks)
       if (tracks.length === 0) return
       tracks.forEach((track, idx) => {
@@ -668,7 +728,76 @@ const Tv: React.FC = () => {
       video.removeEventListener('loadedmetadata', sync)
       window.clearTimeout(timeout)
     }
-  }, [selectedSubtitle, subtitles, isEmbedProvider])
+  }, [selectedSubtitle, subtitles, isEmbedProvider, source])
+
+  useEffect(() => {
+    if (!delayCanvasActive) return
+    const video = videoRef.current
+    const overlay = subtitleOverlayRef.current
+    if (!video || !overlay) return
+
+    const renderCues = () => {
+      overlay.innerHTML = ''
+      if (selectedSubtitleRef.current < 0) return
+      const showing = manualTrackElsRef.current
+        .map((el) => el.track as unknown as TextTrack | null)
+        .find((t) => t && t.mode === 'showing')
+      if (!showing) return
+      const delaySec = effectiveVideoDelayMs / 1000
+      let cues: ArrayLike<TextTrackCue> | TextTrackCue[]
+      if (delaySec > 0 && showing.cues) {
+        const t = video.currentTime - delaySec
+        cues = Array.from(showing.cues).filter((c) => c.startTime <= t && t <= c.endTime)
+      } else {
+        cues = Array.from(showing.activeCues ?? [])
+      }
+      if (cues.length === 0) return
+      let fontSize = 1.8
+      let bottom = 10
+      try {
+        const fs = parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
+        if (!isNaN(fs)) fontSize = fs
+        const pos = parseInt(localStorage.getItem('subtitlePosition') || '10')
+        if (!isNaN(pos)) bottom = Math.max(0, Math.min(100, pos))
+      } catch {
+        // ignore
+      }
+      cues.forEach((cue) => {
+        const text = String((cue as { text?: unknown }).text ?? '').replace(/<[^>]*>/g, '')
+        if (!text) return
+        const div = document.createElement('div')
+        div.style.cssText = `
+          font-size: ${fontSize}rem;
+          color: white;
+          background-color: rgba(0, 0, 0, 0.5);
+          text-shadow: 0 0 4px black;
+          padding: 0.2em 0.5em;
+          text-align: center;
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: ${bottom}%;
+          white-space: pre-wrap;
+          line-height: 1.4;
+        `
+        div.textContent = text
+        overlay.appendChild(div)
+      })
+    }
+
+    const handleCueChange = () => renderCues()
+    const manualTracks = manualTrackElsRef.current
+      .map((el) => el.track)
+      .filter((t): t is TextTrack => Boolean(t))
+    manualTracks.forEach((t) => t.addEventListener('cuechange', handleCueChange))
+    video.addEventListener('timeupdate', handleCueChange)
+    renderCues()
+    return () => {
+      manualTracks.forEach((t) => t.removeEventListener('cuechange', handleCueChange))
+      video.removeEventListener('timeupdate', handleCueChange)
+      overlay.innerHTML = ''
+    }
+  }, [delayCanvasActive, selectedSubtitle, subtitles, effectiveVideoDelayMs])
 
   const doSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -694,7 +823,7 @@ const Tv: React.FC = () => {
     doSearch()
   }
 
-  const handleSelectItem = (item: TvSearchResult) => {
+  const _handleSelectItem = (item: TvSearchResult) => {
     const isTV = item.type === 'tv' || item.type === 'tvSeries' || item.type === 'tvMiniSeries'
     navigate(`/tv/${item.id}?type=${isTV ? 'tv' : 'movie'}`)
   }
@@ -709,6 +838,12 @@ const Tv: React.FC = () => {
 
   const handleAudioTrackChange = (index: number) => {
     setSelectedAudioTrack(index)
+    try {
+      const chosen = audioTracks[index]
+      if (chosen) localStorage.setItem('tvLastAudio', subtitleKey(chosen))
+    } catch {
+      // ignore
+    }
     const hls = hlsRef.current
     if (hls && hls.audioTrack !== undefined) {
       hls.audioTrack = index
@@ -723,6 +858,8 @@ const Tv: React.FC = () => {
       } else {
         localStorage.setItem('tvSubtitlesEnabled', 'true')
         localStorage.setItem('tvSelectedSubtitle', String(index))
+        const chosen = subtitles[index]
+        if (chosen) localStorage.setItem('tvLastSubtitle', subtitleKey(chosen))
       }
     } catch {
       // ignore
@@ -1067,16 +1204,69 @@ const Tv: React.FC = () => {
                 selectedMovyServer={selectedMovyServer}
                 onMovyServerSelect={handleMovyServerSelect}
                 isMovySource={source === 'movybz'}
+                videoDelayEnabled={videoDelayEnabled}
+                onVideoDelayToggle={(v) => {
+                  setVideoDelayEnabled(v)
+                  try {
+                    localStorage.setItem('playerVideoDelayEnabled', String(v))
+                  } catch {
+                    // ignore
+                  }
+                }}
+                videoDelayMs={videoDelayMs}
+                onVideoDelayChange={(ms) => {
+                  const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+                  setVideoDelayMs(clamped)
+                  try {
+                    localStorage.setItem('playerVideoDelayMs', String(clamped))
+                  } catch {
+                    // ignore
+                  }
+                }}
+                onCalibrateAvSync={() => {
+                  const v = videoRef.current
+                  wasPlayingBeforeCalibRef.current = !!v && !v.paused && !v.ended
+                  v?.pause()
+                  setIsCalibrating(true)
+                }}
               >
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
                   disablePictureInPicture
-                  className={styles.video}
+                  className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
                   onError={() => {
                     setStreamError('Video failed to load. Try another server or reload.')
                     setStreamLoading(false)
+                  }}
+                />
+                <canvas
+                  ref={delayCanvasRef}
+                  className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
+                />
+                {delayCanvasActive && (
+                  <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                )}
+                <AvSyncCalibrator
+                  isOpen={isCalibrating}
+                  initialMs={videoDelayMs}
+                  onClose={() => {
+                    setIsCalibrating(false)
+                    resumeAfterCalib()
+                  }}
+                  onApply={(ms) => {
+                    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+                    setVideoDelayMs(clamped)
+                    setVideoDelayEnabled(true)
+                    try {
+                      localStorage.setItem('playerVideoDelayMs', String(clamped))
+                      localStorage.setItem('playerVideoDelayEnabled', 'true')
+                    } catch {
+                      // ignore
+                    }
+                    setIsCalibrating(false)
+                    resumeAfterCalib()
                   }}
                 />
               </TvPlayerControls>

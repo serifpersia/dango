@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { useQuery } from '@tanstack/react-query'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
@@ -25,39 +26,44 @@ interface Anime {
   airTime?: string
 }
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const fetchEpisodeSchedule = async (date: string, format: string): Promise<Anime[]> => {
+  const url = `/api/schedule/${date}?format=${format}`
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to fetch episode schedule')
+  return response.json()
+}
+
 const Schedule: React.FC = () => {
-  const [scheduleData, setScheduleData] = useState<Anime[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
   const [format, setFormat] = useLocalStorage<string>('schedule_format', 'TV')
   const { emblaRef, canScroll, stepBy, scrollToStart } = useCarousel()
   const dayRef = useRef<HTMLDivElement>(null)
+  const isInitialMount = useRef(true)
 
-  useEffect(() => {
-    const fetchEpisodeSchedule = async (date: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const url = `/api/schedule/${date}?format=${format}`
-        const response = await fetch(url)
-        if (!response.ok) throw new Error('Failed to fetch episode schedule')
-        const data = await response.json()
-        setScheduleData(data)
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'An unknown error occurred')
-        console.error('Error fetching episode schedule:', e)
-      } finally {
-        setLoading(false)
-      }
-    }
+  const {
+    data: scheduleData = [],
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ['schedule', selectedDate, format],
+    queryFn: () => fetchEpisodeSchedule(selectedDate, format),
+    staleTime: 1000 * 60 * 5,
+  })
 
-    fetchEpisodeSchedule(selectedDate)
-  }, [selectedDate, format])
-
-  const getDayButtons = () => {
+  const dayButtons = useMemo(() => {
     const days = []
     const today = new Date()
+    const todayString = formatLocalDate(today)
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    const yesterdayString = formatLocalDate(yesterday)
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = -6; i <= 6; i++) {
@@ -66,10 +72,9 @@ const Schedule: React.FC = () => {
       days.push(date)
     }
     return days.map((date) => {
-      const dateString = date.toISOString().split('T')[0]
-      const isToday = dateString === today.toISOString().split('T')[0]
-      const isYesterday =
-        dateString === new Date(today.getTime() - 86400000).toISOString().split('T')[0]
+      const dateString = formatLocalDate(date)
+      const isToday = dateString === todayString
+      const isYesterday = dateString === yesterdayString
 
       const dayLabel = isToday ? 'Today' : isYesterday ? 'Yest' : dayNames[date.getDay()]
       const dayNum = date.getDate()
@@ -77,9 +82,13 @@ const Schedule: React.FC = () => {
 
       return { dateString, dayLabel, dayNum, monthName }
     })
-  }
+  }, [])
 
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
     if (dayRef.current) {
       const active = dayRef.current.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
       if (active) {
@@ -144,7 +153,7 @@ const Schedule: React.FC = () => {
       <div className={styles.daySelectorContainer}>
         <div className={styles.daySelector} ref={dayRef}>
           <div className={styles.daySelectorInner}>
-            {getDayButtons().map((dayButton) => (
+            {dayButtons.map((dayButton) => (
               <button
                 key={dayButton.dateString}
                 type="button"
@@ -174,7 +183,9 @@ const Schedule: React.FC = () => {
               ))
             ) : error ? (
               <div style={{ width: '100%' }}>
-                <ErrorMessage message={error} />
+                <ErrorMessage
+                  message={error instanceof Error ? error.message : 'An unknown error occurred'}
+                />
               </div>
             ) : scheduleData.length === 0 ? (
               <p style={{ textAlign: 'center', marginTop: '1rem', width: '100%' }}>

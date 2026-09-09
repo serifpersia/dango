@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react'
+import React, { useEffect, Suspense, lazy } from 'react'
 import styles from './PlayerControls.module.css'
 import {
   FaPlay,
@@ -12,13 +12,13 @@ import {
   FaCog,
   FaTv,
   FaChevronLeft,
-  FaForward,
   FaClosedCaptioning,
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10, MdFastForward, MdSkipNext } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
+import { pickSubtitleIndex, subtitleKey } from '../../lib/subtitles'
 
 const PlayerSettings = lazy(() => import('./PlayerSettings'))
 
@@ -62,7 +62,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   selectedSource,
   selectedLink,
   onSourceChange,
-  loadingVideo,
   skipIntervals,
   animeTitle,
   episodeNumber,
@@ -204,6 +203,20 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!refs.videoRef.current) return
     actions.setActiveSubtitleTrack(trackId)
+    try {
+      if (trackId === null || trackId === 'off') {
+        localStorage.setItem('playerSubtitlesEnabled', 'false')
+      } else {
+        localStorage.setItem('playerSubtitlesEnabled', 'true')
+        const chosen = state.availableSubtitles.find(
+          (t) => t.label === trackId || t.lang === trackId
+        )
+        if (chosen) localStorage.setItem('playerLastSubtitle', subtitleKey(chosen))
+        else localStorage.setItem('playerLastSubtitle', trackId)
+      }
+    } catch {
+      // ignore
+    }
     let matched = false
     Array.from(refs.videoRef.current.textTracks).forEach((track) => {
       const isMatch =
@@ -222,16 +235,19 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     if (!refs.videoRef.current) return
     if (isSubtitleActive) {
       handleSubtitleSelection('off')
-      localStorage.setItem('playerSubtitlesEnabled', 'false')
       return
     }
     if (state.availableSubtitles.length === 0) return
-    const englishTrack = state.availableSubtitles.find(
-      (t) => t.lang === 'en' || t.label === 'English'
-    )
-    const trackToActivate = englishTrack || state.availableSubtitles[0]
+    let lastKey: string | null = null
+    try {
+      lastKey = localStorage.getItem('playerLastSubtitle')
+    } catch {
+      // ignore
+    }
+    const idx = pickSubtitleIndex(state.availableSubtitles, { lastKey, enabled: true })
+    if (idx < 0) return
+    const trackToActivate = state.availableSubtitles[idx]
     handleSubtitleSelection(trackToActivate.label || trackToActivate.lang)
-    localStorage.setItem('playerSubtitlesEnabled', 'true')
   }
 
   const renderVolumeIcon = () => {

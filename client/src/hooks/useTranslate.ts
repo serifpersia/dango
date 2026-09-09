@@ -46,7 +46,7 @@ function toTitleCase(s: string): string {
     .replace(/\bX\b/g, 'x')
 }
 
-function normalizeTranslation(s: string): string {
+function _normalizeTranslation(s: string): string {
   const trimmed = s.trim()
   if (!trimmed) return trimmed
   return toTitleCase(trimmed)

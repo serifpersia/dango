@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router'
+import { useParams, useNavigate, useLocation } from 'react-router'
 import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
 import { loadHls } from '../lib/hls'
+import { pickSubtitleIndex } from '../lib/subtitles'
 import type Hls from 'hls.js'
 import GenericModal from '../components/common/GenericModal'
 import { Modal } from '../components/common/Modal'
@@ -48,7 +49,6 @@ import QueueOptionsButton from '../components/anime/QueueOptionsButton'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
-  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const location = useLocation()
@@ -177,7 +177,7 @@ const Player: React.FC = () => {
     showResumeModalRef.current = state.showResumeModal
   }, [state.resumeTime, state.showResumeModal])
 
-  const [skipIndicator, setSkipIndicator] = useState<{
+  const [skipIndicator, _setSkipIndicator] = useState<{
     side: 'left' | 'right'
     visible: boolean
   } | null>(null)
@@ -368,6 +368,17 @@ const Player: React.FC = () => {
 
     if (state.selectedSource.subtitles) {
       const subtitlesEnabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+      let lastKey: string | null = null
+      try {
+        lastKey = localStorage.getItem('playerLastSubtitle')
+      } catch {
+        // ignore
+      }
+      const pickedIdx = pickSubtitleIndex(state.selectedSource.subtitles, {
+        lastKey,
+        enabled: subtitlesEnabled,
+      })
+      const pickedTrack = pickedIdx >= 0 ? state.selectedSource.subtitles[pickedIdx] : null
       state.selectedSource.subtitles.forEach((sub) => {
         const track = document.createElement('track')
         track.kind = 'subtitles'
@@ -383,7 +394,7 @@ const Player: React.FC = () => {
           track.src = subUrl
         }
 
-        if (subtitlesEnabled && (sub.lang === 'en' || sub.label === 'English')) {
+        if (pickedTrack && sub.label === pickedTrack.label && sub.lang === pickedTrack.lang) {
           track.default = true
         }
         videoElement.appendChild(track)
@@ -884,10 +895,21 @@ const Player: React.FC = () => {
       player.state.availableSubtitles.length > 0 &&
       localStorage.getItem('playerSubtitlesEnabled') !== 'false'
     ) {
-      const englishTrack = player.state.availableSubtitles.find(
-        (t) => t.lang === 'en' || t.label === 'English'
-      )
-      const trackToActivate = englishTrack || player.state.availableSubtitles[0]
+      let lastKey: string | null = null
+      try {
+        lastKey = localStorage.getItem('playerLastSubtitle')
+      } catch {
+        // ignore
+      }
+      const idx = pickSubtitleIndex(player.state.availableSubtitles, {
+        lastKey,
+        enabled: true,
+      })
+      if (idx < 0) {
+        setActiveSubtitleTrack('off')
+        return
+      }
+      const trackToActivate = player.state.availableSubtitles[idx]
       setActiveSubtitleTrack(trackToActivate.lang || trackToActivate.label)
     }
   }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, setActiveSubtitleTrack])
@@ -1645,11 +1667,6 @@ const Player: React.FC = () => {
               )}
               {upscaler.isEnabled && upscaler.isWebGPUSupported && upscaler.isInitializing && (
                 <div className={styles.upscalerStatusBadge}>Preparing upscaler…</div>
-              )}
-              {delayCanvasActive && (
-                <div className={styles.upscalerStatusBadge}>
-                  A/V sync: video delayed {videoDelayMs}ms
-                </div>
               )}
               {canvasPresentationActive && (
                 <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />

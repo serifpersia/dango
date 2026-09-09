@@ -57,7 +57,7 @@ const SyncProviderSelector: React.FC = () => {
       } else {
         toast.error('Failed to update sync provider')
       }
-    } catch (err) {
+    } catch {
       toast.error('Error updating sync provider')
     }
   }

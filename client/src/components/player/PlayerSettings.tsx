@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { FaChevronLeft, FaClosedCaptioning, FaCog, FaCheck } from 'react-icons/fa'
+import { FaChevronLeft, FaCheck } from 'react-icons/fa'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -40,8 +40,8 @@ type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upsca
 const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
   const {
     isOpen,
-    onClose,
-    videoSources,
+    onClose: _onClose,
+    videoSources: _videoSources,
     currentSource,
     currentLink,
     onSourceChange,

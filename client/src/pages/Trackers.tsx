@@ -49,7 +49,7 @@ const CLIENT_ID_SETTING = 'tracker_anilist_client_id'
 const SHIPPED_ANILIST_CLIENT_ID = (import.meta.env.VITE_ANILIST_CLIENT_ID || '').trim()
 
 const Trackers: React.FC = () => {
-  const { setIsOpen } = useSidebar()
+  const { setIsOpen: _setIsOpen } = useSidebar()
   const queryClient = useQueryClient()
 
   React.useEffect(() => {
@@ -92,8 +92,8 @@ const Trackers: React.FC = () => {
 
   const hasShipped = !!SHIPPED_ANILIST_CLIENT_ID
   const savedTrim = (savedClientId || '').trim()
-  const isUsingShipped = !savedTrim && hasShipped
-  const effectiveClientId = savedTrim || SHIPPED_ANILIST_CLIENT_ID
+  const _isUsingShipped = !savedTrim && hasShipped
+  const _effectiveClientId = savedTrim || SHIPPED_ANILIST_CLIENT_ID
 
   const handleAniListLogin = async () => {
     const inputTrim = clientIdInput.trim()
@@ -123,14 +123,14 @@ const Trackers: React.FC = () => {
     }
     const frontendBase = window.location.origin + window.location.pathname
     const isDevFrontend = window.location.port === '5173'
-    const backendOrigin = isDevFrontend
+    const _backendOrigin = isDevFrontend
       ? `${window.location.protocol}//${window.location.hostname}:3000`
       : window.location.origin
     const state = encodeURIComponent(frontendBase)
     window.location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&state=${state}`
   }
 
-  const handleUseShipped = async () => {
+  const _handleUseShipped = async () => {
     setClientIdInput('')
     if (!savedTrim) {
       toast.success('Using Dango app client')

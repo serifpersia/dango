@@ -16,7 +16,9 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  white-space: normal;
   -webkit-line-clamp: var(--synopsis-lines, 2);
+  line-clamp: var(--synopsis-lines, 2);
 }
 
 .toggleButton {

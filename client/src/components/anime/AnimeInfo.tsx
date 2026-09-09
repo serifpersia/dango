@@ -91,7 +91,10 @@ export default function AnimeInfo() {
     >
       <div className={styles.heroSection}>
         <div className={styles.bannerContainer}>
-          <div className={styles.banner} style={{ backgroundImage: `url(${bannerUrl})` }} />
+          <div
+            className={styles.banner}
+            style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
+          />
           <div className={styles.bannerOverlay} />
         </div>
 
@@ -200,7 +203,7 @@ export default function AnimeInfo() {
       </div>
 
       {matureBlocked && (
-        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/home')}>
+        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/')}>
           <div style={{ padding: '1rem', textAlign: 'center' }}>
             <p>This title contains mature content intended for adult audiences.</p>
             <p>
@@ -215,7 +218,7 @@ export default function AnimeInfo() {
                 justifyContent: 'center',
               }}
             >
-              <Button variant="secondary" onClick={() => navigate('/home')}>
+              <Button variant="secondary" onClick={() => navigate('/')}>
                 Go Back
               </Button>
               <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>

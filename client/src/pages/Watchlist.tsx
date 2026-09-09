@@ -316,7 +316,7 @@ const Watchlist: React.FC = () => {
     setConfirmRememberPreference(false)
   }
 
-  const handleStatusChange = (id: string, status: string) => {
+  const _handleStatusChange = (id: string, status: string) => {
     updateStatus.mutate({ id, status })
   }
 

@@ -15,8 +15,10 @@ import {
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import styles from './TvPlayerControls.module.css'
+import { pickSubtitleIndex } from '../../lib/subtitles'
 
-type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | null
+type SettingsView =
+  'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
 
 interface TvPlayerControlsProps {
   videoRef: React.RefObject<HTMLVideoElement | null>
@@ -36,6 +38,11 @@ interface TvPlayerControlsProps {
   selectedMovyServer?: string
   onMovyServerSelect?: (city: string) => void
   isMovySource?: boolean
+  videoDelayEnabled?: boolean
+  onVideoDelayToggle?: (value: boolean) => void
+  videoDelayMs?: number
+  onVideoDelayChange?: (ms: number) => void
+  onCalibrateAvSync?: () => void
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -56,6 +63,11 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   selectedMovyServer = 'atlanta',
   onMovyServerSelect,
   isMovySource = false,
+  videoDelayEnabled = false,
+  onVideoDelayToggle,
+  videoDelayMs = 0,
+  onVideoDelayChange,
+  onCalibrateAvSync,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [showControls, setShowControls] = useState(true)
@@ -85,6 +97,17 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     const saved = parseInt(localStorage.getItem('subtitlePosition') || '10')
     return isNaN(saved) || saved < 0 || saved > 100 ? 10 : saved
   })
+  const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
+  const shownDelayMs = pendingDelayMs ?? videoDelayMs
+  useEffect(() => {
+    setPendingDelayMs(null)
+  }, [videoDelayMs])
+  const commitDelay = () => {
+    if (pendingDelayMs !== null) {
+      onVideoDelayChange?.(pendingDelayMs)
+      setPendingDelayMs(null)
+    }
+  }
   const inactivityTimer = useRef<number | null>(null)
   const lastInteractionTimeRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
@@ -434,7 +457,17 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   }
 
   const toggleSubtitles = () => {
-    onSubtitleChange(isSubtitleActive ? -1 : 0)
+    if (isSubtitleActive) {
+      onSubtitleChange(-1)
+      return
+    }
+    let lastKey: string | null = null
+    try {
+      lastKey = localStorage.getItem('tvLastSubtitle')
+    } catch {
+      // ignore
+    }
+    onSubtitleChange(pickSubtitleIndex(subtitles, { lastKey, enabled: true }))
   }
 
   const closeSettings = () => {
@@ -485,6 +518,12 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           </span>
         </button>
       )}
+      <button className={styles.menuItem} onClick={() => setSettingsView('av-sync')}>
+        <span>A/V Sync</span>
+        <span className={styles.currentValue}>
+          {videoDelayEnabled ? `${videoDelayMs}ms` : 'Off'}
+        </span>
+      </button>
     </>
   )
 
@@ -579,6 +618,41 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           {selectedMovyServer === city && <FaCheck size={12} />}
         </button>
       ))}
+    </>
+  )
+
+  const renderAvSyncSettings = () => (
+    <>
+      <button
+        className={`${styles.menuItem} ${videoDelayEnabled ? styles.active : ''}`}
+        onClick={() => onVideoDelayToggle?.(!videoDelayEnabled)}
+      >
+        <span>Video delay</span>
+        {videoDelayEnabled && <FaCheck size={12} />}
+      </button>
+      <div className={styles.sliderGroup}>
+        <label>Video delay ({shownDelayMs}ms)</label>
+        <input
+          type="range"
+          min="0"
+          max="500"
+          step="5"
+          value={shownDelayMs}
+          onInput={(e) => setPendingDelayMs(Number((e.target as HTMLInputElement).value))}
+          onPointerUp={commitDelay}
+          onTouchEnd={commitDelay}
+          onKeyUp={commitDelay}
+          onBlur={commitDelay}
+          style={{ '--slider-percent': `${(shownDelayMs / 500) * 100}%` } as React.CSSProperties}
+        />
+      </div>
+      <div className={styles.menuNote}>
+        For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
+        untouched.
+      </div>
+      <button className={styles.menuItem} onClick={() => onCalibrateAvSync?.()}>
+        <span>Calibrate…</span>
+      </button>
     </>
   )
 
@@ -737,7 +811,9 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                     ? 'Audio Track'
                     : settingsView === 'server'
                       ? 'Movy Server'
-                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)}
+                      : settingsView === 'av-sync'
+                        ? 'A/V Sync'
+                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)}
             </span>
           </div>
           <div className={styles.settingsContent}>
@@ -747,6 +823,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
             {settingsView === 'audio' && renderAudioSettings()}
             {settingsView === 'server' && renderServerSettings()}
+            {settingsView === 'av-sync' && renderAvSyncSettings()}
           </div>
         </div>
       )}

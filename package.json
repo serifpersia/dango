@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "workspaces": [
@@ -34,7 +34,6 @@
     "orchestrator.js",
     "client/dist",
     "server/dist",
-    "server/.env",
     "LICENSE",
     "README.md",
     "package.json"
@@ -48,7 +47,7 @@
     "cli"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
@@ -86,5 +85,5 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "versionDate": "2026-09-09T13:14:44.528Z"
+  "versionDate": "2026-09-09T15:39:03.123Z"
 }

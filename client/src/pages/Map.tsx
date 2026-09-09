@@ -72,7 +72,7 @@ const Map: React.FC = () => {
 
   const spots: Spot[] = []
   if (data) {
-    const maxCount = Math.max(1, ...Object.values(data.locations))
+    const _maxCount = Math.max(1, ...Object.values(data.locations))
     for (const [tz, count] of Object.entries(data.locations)) {
       const pos = TIMEZONE_COORDS[tz]
       if (!pos) continue

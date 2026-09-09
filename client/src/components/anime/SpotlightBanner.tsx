@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, Link } from 'react-router'
 import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
-import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 
 interface SpotlightBannerProps {
@@ -17,10 +16,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [isPaused, setIsPaused] = useState(false)
   const lastScrollTime = useRef(0)
   const touchStartX = useRef<number>(0)
-  const { lowEndMode } = useLowEndMode()
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
-  const top6 = animeList.slice(0, 6)
+  const top6 = useMemo(() => animeList.slice(0, 6), [animeList])
 
   const getTitle = (anime: Anime) => {
     switch (titlePreference) {
@@ -61,11 +59,20 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
       if (e.key === 'ArrowRight') {
         e.preventDefault()
         nextSlide()
-      }
-      if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
         prevSlide()
       }
@@ -74,9 +81,16 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     return () => window.removeEventListener('keydown', handleKey)
   }, [nextSlide, prevSlide])
 
+  useEffect(() => {
+    if (currentIndex >= top6.length) {
+      setCurrentIndex(0)
+    }
+  }, [top6.length, currentIndex])
+
   if (top6.length === 0) return null
 
-  const anime = top6[currentIndex]
+  const safeIndex = currentIndex >= top6.length ? 0 : currentIndex
+  const anime = top6[safeIndex]
 
   const rawDesc = anime.description ?? ''
   const synopsis = sanitizeText(rawDesc)
@@ -99,7 +113,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
   const handleWheel = (e: React.WheelEvent) => {
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
-      e.preventDefault()
       e.stopPropagation()
       const now = Date.now()
       if (now - lastScrollTime.current < 300) return
@@ -135,12 +148,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <img
-          key={`${currentIndex}-${autoplayResetKey}`}
-          src={bannerSrc}
-          alt={getTitle(anime)}
-          className={`${styles.posterImage} ${!lowEndMode ? styles.fadeIn : ''}`}
-        />
+        <img src={bannerSrc} alt={getTitle(anime)} className={styles.posterImage} />
 
         {top6.length > 1 && (
           <>

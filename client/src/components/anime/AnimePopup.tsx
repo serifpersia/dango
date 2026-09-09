@@ -132,18 +132,17 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                   )}
                   {Array.isArray(showMeta.genres) && showMeta.genres.length > 0 && (
                     <div className={styles.genres}>
-                      {Array.isArray(showMeta.genres) &&
-                        showMeta.genres
-                          .filter(Boolean)
-                          .slice(0, 4)
-                          .map((g) => {
-                            const genreName = typeof g === 'string' ? g : g?.name
-                            return (
-                              <span key={genreName} className={styles.genre}>
-                                {genreName}
-                              </span>
-                            )
-                          })}
+                      {showMeta.genres
+                        .filter(Boolean)
+                        .slice(0, 4)
+                        .map((g) => {
+                          const genreName = typeof g === 'string' ? g : g?.name
+                          return (
+                            <span key={genreName} className={styles.genre}>
+                              {genreName}
+                            </span>
+                          )
+                        })}
                     </div>
                   )}
                 </div>

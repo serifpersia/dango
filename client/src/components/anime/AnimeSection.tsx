@@ -102,14 +102,10 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
     }
   }, [animeList.length, continueWatching, isExpanded, scrollToStart])
 
-  const shouldRenderSection = !(!loading && animeList.length === 0 && !emptyState && !collapsible)
-  if (!shouldRenderSection) return null
+  if (!loading && animeList.length === 0 && !emptyState && !collapsible) return null
 
-  const isActuallyCarousel = carousel
   const defaultLayout = 'vertical'
   const currentLayout = layout || defaultLayout
-
-  if (!loading && animeList.length === 0 && !emptyState) return null
 
   return (
     <section
@@ -129,6 +125,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               <button
                 className={styles['nav-button']}
                 type="button"
+                aria-label="Scroll left"
                 onClick={(e) => {
                   e.preventDefault()
                   stepBy('left', lowEndMode)
@@ -139,6 +136,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               <button
                 className={styles['nav-button']}
                 type="button"
+                aria-label="Scroll right"
                 onClick={(e) => {
                   e.preventDefault()
                   stepBy('right', lowEndMode)
@@ -165,7 +163,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
       </div>
 
       {isExpanded &&
-        (isActuallyCarousel ? (
+        (carousel ? (
           !loading && animeList.length === 0 && emptyState ? (
             <div>{emptyState}</div>
           ) : (
@@ -178,13 +176,12 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                           <AnimeCardSkeleton layout={currentLayout} />
                         </div>
                       ))
-                    : animeList.map((anime, index) => (
+                    : animeList.map((anime) => (
                         <div key={anime._id} className={styles['carousel-card']}>
                           <AnimeCard
                             anime={anime}
                             continueWatching={continueWatching}
                             onRemove={onRemove}
-                            isLCP={index < 4 && title === 'Latest Releases'}
                             config={cardConfig}
                             layout={currentLayout}
                           />
@@ -204,13 +201,12 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
             {loading && animeList.length === 0 ? (
               <SkeletonGrid count={6} layout={currentLayout} />
             ) : animeList.length > 0 ? (
-              animeList.map((anime, index) => (
+              animeList.map((anime) => (
                 <AnimeCard
                   key={anime._id}
                   anime={anime}
                   continueWatching={continueWatching}
                   onRemove={onRemove}
-                  isLCP={index < 4 && title === 'Latest Releases'}
                   config={cardConfig}
                   layout={currentLayout}
                 />

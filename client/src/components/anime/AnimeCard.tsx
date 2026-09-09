@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react'
+import React, { memo, useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate, type To } from 'react-router'
 import {
   FaMicrophone,
@@ -87,27 +87,24 @@ interface AnimeCardProps {
   anime: Anime
   continueWatching?: boolean
   onRemove?: (id: string) => void
-  isLCP?: boolean
   config?: AnimeCardConfig
   layout?: 'vertical' | 'horizontal'
   rank?: number
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({
-    anime,
-    continueWatching = false,
-    onRemove,
-    isLCP = false,
-    config,
-    layout = 'vertical',
-    rank,
-  }) => {
+  ({ anime, continueWatching = false, onRemove, config, layout = 'vertical', rank }) => {
     const navigate = useNavigate()
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
+    const [imgError, setImgError] = useState(false)
+
+    useEffect(() => {
+      setIsLoaded(false)
+      setImgError(false)
+    }, [anime.thumbnail])
     const [isHovered, setIsHovered] = useState(false)
     const [isPopupVisible, setIsPopupVisible] = useState(false)
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
@@ -201,11 +198,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             type: anime.type,
           },
         }
-      : episodeToPlay && anime.episodeNumber
-        ? `/watch/${anime._id}/${anime.episodeNumber}`
-        : hasProgress
-          ? `/watch/${anime._id}/${anime.episodeNumber}`
-          : `/anime/${anime._id}`
+      : episodeToPlay
+        ? `/watch/${anime._id}/${episodeToPlay}`
+        : `/anime/${anime._id}`
 
     const isWatchLink = (() => {
       if (typeof linkTarget === 'string') return linkTarget.startsWith('/watch/')
@@ -312,20 +307,33 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {shouldBlur && (
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
             )}
-            <img
-              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
-              alt={displayTitle}
-              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
-                shouldBlur && !lowEndMode ? styles.blurred : ''
-              }`}
-              loading="lazy"
-              decoding="async"
-              onLoad={() => setIsLoaded(true)}
-            />
+            {!imgError ? (
+              <img
+                src={fixThumbnailUrl(
+                  anime.thumbnail,
+                  lowEndMode ? 100 : 150,
+                  lowEndMode ? 150 : 200
+                )}
+                alt={displayTitle}
+                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
+                  shouldBlur && !lowEndMode ? styles.blurred : ''
+                }`}
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setIsLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className={styles.placeholder} aria-label={displayTitle}>
+                <span className={styles.placeholderText}>{displayTitle.charAt(0) || '?'}</span>
+              </div>
+            )}
 
             {!isMobile && (
               <>
-                {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
+                {showTypeBadge && rank === undefined && (
+                  <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
+                )}
                 {showEpBadge && (progressString || anime.episodeNumber) && (
                   <div className={styles.epBadge}>
                     {progressString ? progressString : `EP ${anime.episodeNumber}`}
@@ -355,7 +363,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
           </div>
 
-          {showProgress && (continueWatching || lowEndMode) && showAnyBar && (
+          {showProgress && continueWatching && showAnyBar && (
             <div className={styles.progressSection}>
               <div className={styles.progressContainer}>
                 <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
@@ -450,6 +458,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             className={styles.infoBtn}
             onMouseEnter={handleInfoMouseEnter}
             onMouseLeave={handleInfoMouseLeave}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openPopup((e.currentTarget as HTMLElement).getBoundingClientRect())
+            }}
             aria-label="Info"
           >
             <FaInfo size={11} />

@@ -1,6 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'preact/compat'
-import { useFloating, useDismiss, autoUpdate, flip, shift, offset } from '@floating-ui/react'
+import {
+  useFloating,
+  useDismiss,
+  useInteractions,
+  autoUpdate,
+  flip,
+  shift,
+  offset,
+} from '@floating-ui/react'
 import { FaCheck, FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -64,6 +72,8 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
     referencePress: false,
   })
 
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss])
+
   const queuedItems = useMemo(() => queue.filter((item) => item.showId === showId), [queue, showId])
 
   const { data: suggestedEpisode } = useQuery({
@@ -90,6 +100,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
 
   const isQueued = queuedItems.length > 0
   const hasRemaining = remaining.length > 0
+  const suggestedId = suggestedEpisode?.episodeNumber
 
   const queueEpisodes = useCallback(
     (episodeNumbers: string[]) => {
@@ -120,8 +131,10 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
   const queueOne = useCallback(() => {
     if (hasRemaining) {
       queueEpisodes([remaining[0]])
+    } else if (suggestedId) {
+      queueEpisodes([String(suggestedId)])
     }
-  }, [hasRemaining, remaining, queueEpisodes])
+  }, [hasRemaining, remaining, suggestedId, queueEpisodes])
 
   const queueThree = useCallback(() => {
     if (hasRemaining) {
@@ -137,7 +150,6 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
 
   const firstEpisode = remaining[0]
   const lastOfThree = remaining[Math.min(2, remaining.length - 1)]
-  const suggestedId = suggestedEpisode?.episodeNumber
 
   const trigger = (
     <div className={styles.trigger} ref={refs.setReference}>
@@ -148,6 +160,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         aria-label={isQueued ? 'Queued' : 'Queue'}
+        {...getReferenceProps()}
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -186,7 +199,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
             className={styles.menu}
             style={floatingStyles}
             role="menu"
-            {...dismiss}
+            {...getFloatingProps()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.preventDefault()

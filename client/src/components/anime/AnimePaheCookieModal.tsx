@@ -17,7 +17,6 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
   const [step, setStep] = useState<1 | 2>(1)
   const [userAgent, setUserAgent] = useState(navigator.userAgent)
   const [cookie, setCookie] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -27,28 +26,26 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
     }
   }, [isOpen])
 
-  const handleStartVerification = async () => {
+  const handleStartVerification = () => {
     localStorage.setItem('animepahe_ua', userAgent)
     window.open('https://animepahe.pw', '_blank', 'noopener,noreferrer')
     setStep(2)
   }
 
-  const handleSubmitCookie = async () => {
-    if (!cookie.trim()) {
+  const handleSubmitCookie = () => {
+    const trimmed = cookie.trim()
+    if (!trimmed) {
       toast.error('Please enter the cf_clearance cookie')
       return
     }
 
-    setIsSubmitting(true)
     try {
-      localStorage.setItem('animepahe_cookie', cookie.trim())
+      localStorage.setItem('animepahe_cookie', trimmed)
       toast.success('Cookie updated successfully!')
       onSuccess?.()
       onClose()
-    } catch (e) {
+    } catch {
       toast.error('Failed to save cookie')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -62,12 +59,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
             </p>
             <div className={styles.field}>
               <label>Your User-Agent (will be used for requests):</label>
-              <textarea
-                value={userAgent}
-                onChange={(e) => setUserAgent(e.target.value)}
-                rows={3}
-                className={styles.textarea}
-              />
+              <textarea value={userAgent} readOnly rows={3} className={styles.textarea} />
             </div>
             <div className={styles.actions}>
               <button className={styles.secondaryButton} onClick={onClose}>
@@ -124,12 +116,8 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
               <button className={styles.secondaryButton} onClick={() => setStep(1)}>
                 Back
               </button>
-              <button
-                className={styles.button}
-                onClick={handleSubmitCookie}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Saving...' : 'Submit'}
+              <button className={styles.button} onClick={handleSubmitCookie}>
+                Submit
               </button>
             </div>
           </>

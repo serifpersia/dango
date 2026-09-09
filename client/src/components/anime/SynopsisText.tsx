@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import useIsMobile from '../../hooks/useIsMobile'
 import styles from './SynopsisText.module.css'
 
@@ -18,11 +18,8 @@ export default function SynopsisText({
   const isMobile = useIsMobile()
   const cleanedText = text?.trim() || ''
   const shouldCollapse = isMobile && cleanedText.length > COLLAPSE_THRESHOLD
-  const [isExpanded, setIsExpanded] = useState(!shouldCollapse)
-
-  useEffect(() => {
-    setIsExpanded(!shouldCollapse)
-  }, [shouldCollapse])
+  const [userExpanded, setUserExpanded] = useState(false)
+  const isExpanded = !shouldCollapse || userExpanded
 
   if (!cleanedText) {
     return <p className={styles.description}>{emptyText}</p>
@@ -41,7 +38,7 @@ export default function SynopsisText({
         <button
           type="button"
           className={styles.toggleButton}
-          onClick={() => setIsExpanded((value) => !value)}
+          onClick={() => setUserExpanded((value) => !value)}
           aria-expanded={isExpanded}
         >
           {isExpanded ? 'Show less' : 'Read more'}

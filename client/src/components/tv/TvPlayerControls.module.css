@@ -460,6 +460,7 @@
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
   min-width: 220px;
+  max-width: 280px;
   max-height: 320px;
   z-index: 60;
   backdrop-filter: blur(12px);
@@ -622,6 +623,15 @@
 .currentValue {
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+.menuNote {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .spin {

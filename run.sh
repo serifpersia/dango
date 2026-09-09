@@ -43,8 +43,12 @@ elif [ "$choice" == "2" ]; then
     echo -e "\033[1;32mRunning in PRODUCTION mode... \033[0m"
     echo
 
-    if [ -f "server/dist/server.js" ] && [ -d "client/dist" ]; then
-        echo "--> Pre-built files found. Skipping build..."
+    if [ "$2" = "rebuild" ] || [ "$2" = "--rebuild" ]; then
+        echo "--> Rebuild requested. Installing and Building..."
+        npm install
+        npm run build
+    elif [ -f "server/dist/server.js" ] && [ -d "client/dist" ]; then
+        echo "--> Pre-built files found. Skipping build... (use '$0 2 rebuild' to force rebuild after git pull)"
     else
         echo "--> Build missing. Installing and Building..."
         npm install

@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from 'react'
+import { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router'
 import toast from 'react-hot-toast'
 import Header from './components/layout/Header'
@@ -11,8 +11,6 @@ import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { useAnimePaheCookie } from './hooks/useAnimePaheCookie'
 import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
-import PlayerRedirect from './pages/PlayerRedirect'
-
 const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -26,6 +24,7 @@ const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
+const PlayerRedirect = lazy(() => import('./pages/PlayerRedirect'))
 
 import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
@@ -48,11 +47,14 @@ function App() {
   useTelemetry()
   useDiscordPageStatus()
 
+  const [lanLocked, setLanLocked] = useState(false)
+
   useEffect(() => {
     fetch('/api/auth/app-status')
       .then((res) => res.json())
       .then((data) => {
         if (data.hasPassword && !data.isAuthenticated) {
+          setLanLocked(true)
           openLanAuthModal()
         }
       })
@@ -63,9 +65,11 @@ function App() {
     'lan_auth_notice_shown',
     'false'
   )
+  const lanNoticeScheduled = useRef(false)
 
   useEffect(() => {
-    if (lanNoticeShown === 'true') return
+    if (lanNoticeShown === 'true' || lanNoticeScheduled.current) return
+    lanNoticeScheduled.current = true
     setLanNoticeShown('true')
     const timer = setTimeout(() => {
       toast(
@@ -108,7 +112,14 @@ function App() {
         onClose={closeAnimePaheModal}
         onSuccess={onSuccess}
       />
-      <LanAuthModal isOpen={lanAuthOpen} onClose={closeLanAuthModal} onSuccess={() => {}} />
+      <LanAuthModal
+        isOpen={lanAuthOpen}
+        onClose={lanLocked ? () => {} : closeLanAuthModal}
+        onSuccess={() => {
+          setLanLocked(false)
+          closeLanAuthModal()
+        }}
+      />
       <Toaster
         position="top-center"
         toastOptions={{
@@ -159,6 +170,7 @@ function App() {
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
               <Route path="/player/:id/:episodeNumber?" element={<PlayerRedirect />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

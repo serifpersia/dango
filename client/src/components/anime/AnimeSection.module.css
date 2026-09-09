@@ -54,7 +54,7 @@
   transition: all var(--transition-base);
 }
 
-.title-link .section-title {
+.title-link :global(.section-title) {
   position: relative;
   font-size: 1.5rem;
   font-weight: 800;
@@ -82,7 +82,7 @@
     justify-content: space-between;
   }
 
-  .title-link .section-title {
+  .title-link :global(.section-title) {
     font-size: 1.25rem;
   }
 }
