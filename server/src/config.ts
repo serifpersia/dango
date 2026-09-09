@@ -2,6 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import dotenv from 'dotenv'
+import { SHIPPED_DEFAULTS } from './shipped-defaults'
 
 export const SERVER_ROOT = path.resolve(__dirname, '..')
 const PACKAGE_ROOT = path.resolve(SERVER_ROOT, '..')
@@ -141,9 +142,11 @@ export const CONFIG = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI,
-  GOOGLE_AUTH_WORKER_URL: process.env.GOOGLE_AUTH_WORKER_URL || '',
+  GOOGLE_AUTH_WORKER_URL:
+    process.env.GOOGLE_AUTH_WORKER_URL || SHIPPED_DEFAULTS.GOOGLE_AUTH_WORKER_URL || '',
   RCLONE_REMOTE: process.env.RCLONE_REMOTE,
   SYNC_PROVIDER: process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined,
-  DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+  DISCORD_CLIENT_ID:
+    process.env.DISCORD_CLIENT_ID || SHIPPED_DEFAULTS.DISCORD_CLIENT_ID || undefined,
   APP_PASSWORD_HASH: process.env.APP_PASSWORD_HASH || '',
 }

@@ -1,0 +1,5 @@
+export const SHIPPED_DEFAULTS = {
+  GITHUB_CLIENT_ID: '',
+  GOOGLE_AUTH_WORKER_URL: '',
+  DISCORD_CLIENT_ID: '',
+} as const

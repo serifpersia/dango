@@ -4,6 +4,7 @@ import { dbAll } from './utils/db-utils'
 import { isTempSyncRow } from './lib/temp-ids'
 import { updateEnvFile } from './utils/env.utils'
 import { CONFIG } from './config'
+import { SHIPPED_DEFAULTS } from './shipped-defaults'
 
 const log = logger.child({ module: 'GitHubSync' })
 
@@ -104,7 +105,7 @@ type OctokitInstance = {
 }
 
 function getGitHubClientId() {
-  const id = process.env.GITHUB_CLIENT_ID || ''
+  const id = process.env.GITHUB_CLIENT_ID || SHIPPED_DEFAULTS.GITHUB_CLIENT_ID || ''
   if (!id) {
     throw new Error('GITHUB_CLIENT_ID is not configured')
   }
