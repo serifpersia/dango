@@ -667,6 +667,7 @@ export class ProxyController {
   }
 
   private sendPlaceholder(res: Response) {
+    if (!res.headersSent) res.set('Cache-Control', 'no-store')
     const possiblePaths = [
       path.join(CONFIG.PACKAGE_ROOT, 'client/public/placeholder.svg'),
       path.join(CONFIG.PACKAGE_ROOT, 'client/dist/placeholder.svg'),

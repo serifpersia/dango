@@ -39,9 +39,18 @@
   background-color: #000;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  /* overflow: clip keeps the radius strict without creating a scroll container.
+     isolation forces a stacking context so Firefox (esp. mobile, where <video> /
+     <canvas> / <iframe> decode to their own compositor surface) clips children
+     to the rounded corners instead of painting square over them. */
+  overflow: clip;
+  isolation: isolate;
   position: relative;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   border: 1px solid var(--glass-border);
+  /* Belt & braces for engines that refuse to clip replaced elements to an
+     ancestor's radius: children inherit the radius themselves (see
+     Player.module.css video / iframe / canvas rules). */
 }
 
 .playerInfoHeader {

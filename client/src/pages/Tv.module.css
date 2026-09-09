@@ -258,7 +258,13 @@
   margin: 1.5rem 0;
   border-radius: 8px;
   overflow: hidden;
+  /* See PlayerPageLayout .videoPlayerWrapper: isolation + clip keep Firefox
+     (esp. mobile compositor surfaces) from painting video/canvas square over
+     the rounded corners. */
+  overflow: clip;
+  isolation: isolate;
   background: black;
+  position: relative;
 }
 
 .video {
@@ -271,6 +277,7 @@
   display: block;
   background: black;
   border: none;
+  border-radius: inherit;
 }
 
 .videoHidden {
@@ -288,6 +295,7 @@
   opacity: 0;
   pointer-events: none;
   z-index: 2;
+  border-radius: inherit;
 }
 
 .delayCanvasActive {
@@ -303,6 +311,7 @@
   z-index: 3;
   pointer-events: none;
   overflow: hidden;
+  border-radius: inherit;
 }
 
 @media (max-width: 900px) and (orientation: landscape) {

@@ -34,6 +34,13 @@ import logger from '../logger'
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
 
+  private setDataCache(res: Response, maxAgeSeconds: number, body: unknown): void {
+    const isEmpty = Array.isArray(body)
+      ? body.length === 0
+      : body == null || (typeof body === 'object' && Object.keys(body).length === 0)
+    res.set('Cache-Control', isEmpty ? 'no-store' : `public, max-age=${maxAgeSeconds}`)
+  }
+
   private getProvider(req: Request): Provider | null {
     const providerName = (req.query.provider as string)?.toLowerCase()
     if (!providerName) return null
@@ -64,20 +71,22 @@ export class DataController {
   getTrending = async (_req: Request, res: Response) => {
     try {
       const data = await getTrending(1, 20, 'TRENDING_DESC', 'RELEASING')
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e }, 'Trending fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
   getSpotlight = async (_req: Request, res: Response) => {
     try {
       const data = await getSpotlightBanners(1, 20)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e }, 'Spotlight fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
@@ -88,10 +97,11 @@ export class DataController {
     const size = parseInt(req.query.size as string) || 20
     try {
       const data = await getTrending(page, size, sort)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e }, 'Popular list fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
@@ -101,10 +111,11 @@ export class DataController {
       const format = (req.query.format as string) || undefined
       const adult = format === 'ADULT'
       const data = await getSchedule(date, adult ? undefined : format, adult)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e, date: req.params.date }, 'Schedule fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
@@ -663,10 +674,11 @@ export class DataController {
     const format = req.query.format as string | undefined
     try {
       const data = await getSeasonal(page, size, format)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e }, 'Seasonal fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
@@ -676,10 +688,11 @@ export class DataController {
     const size = parseInt(req.query.size as string) || 12
     try {
       const data = await getLatestReleases(format, page, size)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      this.setDataCache(res, 300, data)
+      res.json(data)
     } catch (e) {
       logger.error({ err: e }, 'Latest releases fetch failed')
-      res.json([])
+      res.set('Cache-Control', 'no-store').json([])
     }
   }
 
@@ -782,7 +795,8 @@ export class DataController {
         }
       }
 
-      res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
+      this.setDataCache(res, 3600, meta || {})
+      res.json(meta || {})
       return
     }
 
@@ -859,10 +873,12 @@ export class DataController {
     try {
       const format = (req.query.format as string) || undefined
       const data = await getBatchedHomeData(format)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
+      const isEmpty =
+        data.trending.length === 0 && data.seasonal.length === 0 && data.spotlight.length === 0
+      res.set('Cache-Control', isEmpty ? 'no-store' : 'public, max-age=300').json(data)
     } catch (e) {
       logger.error({ err: e }, 'Batched home fetch failed')
-      res.json({ trending: [], seasonal: [], spotlight: [] })
+      res.set('Cache-Control', 'no-store').json({ trending: [], seasonal: [], spotlight: [] })
     }
   }
 }

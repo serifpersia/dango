@@ -319,7 +319,7 @@ export async function getBatchedHomeData(format?: string): Promise<BatchedHomeDa
   }>(query, { season: currentSeason, seasonYear: year, seasonFormat: formatVar })
 
   if (!result?.data) {
-    if (!anilistIsDown()) return { trending: [], seasonal: [], spotlight: [] }
+    if (!anilistUnavailable()) return { trending: [], seasonal: [], spotlight: [] }
     try {
       const [trending, seasonal, spotlight] = await Promise.all([
         tryFallback(
@@ -756,7 +756,7 @@ export async function getSeasonal(
   }>(query, { page, perPage: size, season: currentSeason, seasonYear: year, format: formatVar })
 
   if (!result?.data) {
-    if (anilistIsDown()) {
+    if (anilistUnavailable()) {
       return (
         await tryFallback(
           () => malSeasonal(malCacheStore(), currentSeason, year, format, page, size),
@@ -784,7 +784,7 @@ export async function getTrending(
     return media.map(fromAnilistMedia)
   }
 
-  if (anilistIsDown()) {
+  if (anilistUnavailable()) {
     return (
       await tryFallback<AnilistMedia>(
         async () => {
@@ -929,7 +929,7 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
   }
 
   const apiFailed = !byId?.data && !byMal?.data
-  if (apiFailed && anilistIsDown()) {
+  if (apiFailed && anilistUnavailable()) {
     const fb = (await kitsuMetaByAnilistId(numericId)) ?? (await kitsuMetaByMalId(numericId))
     if (fb) {
       const show = fromAnilistMedia(fb)
@@ -1079,7 +1079,7 @@ export async function getAnilistEpisodes(id: string): Promise<string[]> {
       } | null
     }>(queryMal, { id: numericId })
     if (!byMal?.data) {
-      if (anilistIsDown()) {
+      if (anilistUnavailable()) {
         const episodes = await kitsuEpisodes(numericId, numericId)
         if (episodes.length > 0) {
           setCachedAnilist(cacheKey, episodes)
@@ -1208,7 +1208,7 @@ export async function searchAnilistByTitle(
   }
 
   if (!media || media.length === 0) {
-    if (anyFailed && anilistIsDown()) {
+    if (anyFailed && anilistUnavailable()) {
       const fb = await kitsuSearchAnime({ query: title, page: 1, perPage: 5 })
       if (fb.length > 0) {
         const best = fb[0]
@@ -1550,7 +1550,7 @@ export async function searchAnilist(options: AnilistSearchOptions = {}): Promise
   }>(queryStr, searchVars)
 
   if (!result?.data) {
-    if (anilistIsDown()) {
+    if (anilistUnavailable()) {
       const malSearch = async (): Promise<AnilistMedia[]> => {
         const store = malCacheStore()
         let fb = await malSearchMedia(store, {

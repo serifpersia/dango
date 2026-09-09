@@ -331,6 +331,7 @@
   align-items: center;
   z-index: 10;
   background: rgba(0, 0, 0, 0.5);
+  border-radius: inherit;
 }
 
 .loadingDots {
@@ -399,6 +400,9 @@
   top: 0;
   left: 0;
   object-fit: cover;
+  /* Inherit the wrapper radius: Firefox does not always clip replaced elements
+     (video/iframe/canvas) to an ancestor's border-radius, so round them directly. */
+  border-radius: inherit;
 }
 
 .videoContainer video {
@@ -409,6 +413,8 @@
   height: 100%;
   z-index: 1;
   object-fit: contain;
+  background-color: #000;
+  border-radius: inherit;
 }
 
 .videoContainer video.videoElementHidden {
@@ -426,6 +432,7 @@
   object-fit: contain;
   opacity: 0;
   pointer-events: none;
+  border-radius: inherit;
 }
 
 .upscalerCanvas.upscalerActive {
@@ -456,6 +463,7 @@
   z-index: 3;
   pointer-events: none;
   overflow: hidden;
+  border-radius: inherit;
 }
 
 .controlsOverlay {
@@ -471,6 +479,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  border-radius: inherit;
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0.35) 0%,
@@ -1481,6 +1490,7 @@
   padding: 2rem;
   text-align: center;
   gap: 1rem;
+  border-radius: inherit;
 }
 
 .errorOverlay p {

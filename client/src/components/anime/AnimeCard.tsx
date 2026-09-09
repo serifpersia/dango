@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback, useEffect } from 'react'
+import React, { memo, useState, useCallback } from 'react'
 import { Link, useNavigate, type To } from 'react-router'
 import {
   FaMicrophone,
@@ -99,12 +99,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
-    const [imgError, setImgError] = useState(false)
-
-    useEffect(() => {
-      setIsLoaded(false)
-      setImgError(false)
-    }, [anime.thumbnail])
     const [isHovered, setIsHovered] = useState(false)
     const [isPopupVisible, setIsPopupVisible] = useState(false)
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
@@ -307,27 +301,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {shouldBlur && (
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
             )}
-            {!imgError ? (
-              <img
-                src={fixThumbnailUrl(
-                  anime.thumbnail,
-                  lowEndMode ? 100 : 150,
-                  lowEndMode ? 150 : 200
-                )}
-                alt={displayTitle}
-                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
-                  shouldBlur && !lowEndMode ? styles.blurred : ''
-                }`}
-                loading="lazy"
-                decoding="async"
-                onLoad={() => setIsLoaded(true)}
-                onError={() => setImgError(true)}
-              />
-            ) : (
-              <div className={styles.placeholder} aria-label={displayTitle}>
-                <span className={styles.placeholderText}>{displayTitle.charAt(0) || '?'}</span>
-              </div>
-            )}
+            <img
+              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
+              alt={displayTitle}
+              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
+                shouldBlur && !lowEndMode ? styles.blurred : ''
+              }`}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setIsLoaded(true)}
+            />
 
             {!isMobile && (
               <>
@@ -458,11 +441,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             className={styles.infoBtn}
             onMouseEnter={handleInfoMouseEnter}
             onMouseLeave={handleInfoMouseLeave}
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              openPopup((e.currentTarget as HTMLElement).getBoundingClientRect())
-            }}
             aria-label="Info"
           >
             <FaInfo size={11} />
