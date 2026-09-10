@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import GenericModal from '../common/GenericModal'
 import { Button } from '../common/Button'
-import settingsStyles from './PlayerSettings.module.css'
+import { MenuSlider } from './MenuControls'
+import useDelayCanvas from '../../hooks/useDelayCanvas'
 
 interface AvSyncCalibratorProps {
   isOpen: boolean
@@ -10,25 +11,9 @@ interface AvSyncCalibratorProps {
   onClose: () => void
 }
 
-const BEAT_MS = 1000
-const FLASH_MS = 150
 const STEP_MS = 10
 const MAX_MS = 500
-
-function playClick(ctx: AudioContext) {
-  const t = ctx.currentTime
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.type = 'sine'
-  osc.frequency.value = 2000
-  gain.gain.setValueAtTime(0, t)
-  gain.gain.linearRampToValueAtTime(0.6, t + 0.005)
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06)
-  osc.connect(gain)
-  gain.connect(ctx.destination)
-  osc.start(t)
-  osc.stop(t + 0.08)
-}
+const TEST_CLIP = '/av-sync-test.mp4'
 
 const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
   isOpen,
@@ -37,43 +22,50 @@ const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
   onClose,
 }) => {
   const [tempMs, setTempMs] = useState(initialMs)
-  const [flash, setFlash] = useState(false)
-  const tempRef = useRef(initialMs)
-  tempRef.current = tempMs
-  const ctxRef = useRef<AudioContext | null>(null)
-  const timersRef = useRef<number[]>([])
+  const [videoFailed, setVideoFailed] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useDelayCanvas({
+    videoRef,
+    canvasRef,
+    delayMs: tempMs,
+    enabled: isOpen && !videoFailed,
+  })
 
   useEffect(() => {
-    if (isOpen) setTempMs(Math.max(0, Math.min(MAX_MS, Math.round(initialMs))))
+    if (isOpen) {
+      setTempMs(Math.max(0, Math.min(MAX_MS, Math.round(initialMs))))
+      setVideoFailed(false)
+    }
   }, [isOpen, initialMs])
 
   useEffect(() => {
     if (!isOpen) return
-    const Ctx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    ctxRef.current = ctx
-    void ctx.resume().catch(() => {})
-    const beat = window.setInterval(() => {
-      if (ctx.state === 'suspended') void ctx.resume().catch(() => {})
-      playClick(ctx)
-      const delay = Math.max(0, tempRef.current)
-      const show = window.setTimeout(() => {
-        setFlash(true)
-        const hide = window.setTimeout(() => setFlash(false), FLASH_MS)
-        timersRef.current.push(hide)
-      }, delay)
-      timersRef.current.push(show)
-    }, BEAT_MS)
-    return () => {
-      window.clearInterval(beat)
-      for (const t of timersRef.current) window.clearTimeout(t)
-      timersRef.current = []
-      setFlash(false)
-      void ctx.close().catch(() => {})
-      ctxRef.current = null
+    const video = videoRef.current
+    if (!video) return
+    video.currentTime = 0
+    const start = () => {
+      video.play().catch(() => {})
+    }
+    if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) start()
+    else {
+      video.addEventListener('canplay', start, { once: true })
+      return () => video.removeEventListener('canplay', start)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) {
+      const video = videoRef.current
+      if (video) {
+        video.pause()
+        try {
+          video.currentTime = 0
+        } catch {
+          // ignore
+        }
+      }
     }
   }, [isOpen])
 
@@ -81,29 +73,58 @@ const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
 
   return (
     <GenericModal isOpen={isOpen} onClose={onClose} title="Calibrate A/V sync">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: '50%',
-            background: flash ? '#a78bfa' : 'rgba(255,255,255,0.12)',
-            boxShadow: flash ? '0 0 32px rgba(167,139,250,0.9)' : 'none',
-            border: '2px solid rgba(255,255,255,0.25)',
-            transition: 'background 60ms linear, box-shadow 60ms linear',
-          }}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        {!videoFailed ? (
+          <button
+            type="button"
+            aria-label="Replay test clip"
+            onClick={() => videoRef.current?.play().catch(() => {})}
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              aspectRatio: '16 / 9',
+              padding: 0,
+              border: '1px solid var(--glass-border)',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+              background: 'black',
+              cursor: 'pointer',
+            }}
+          >
+            <video
+              ref={videoRef}
+              src={TEST_CLIP}
+              loop
+              playsInline
+              preload="auto"
+              onError={() => setVideoFailed(true)}
+              style={{ display: 'none' }}
+            />
+            <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+          </button>
+        ) : (
+          <div
+            style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-tertiary)',
+              textAlign: 'center',
+              maxWidth: 320,
+            }}
+          >
+            Test clip failed to load. You can still set the delay manually below.
+          </div>
+        )}
         <div
           style={{
             fontSize: '0.85rem',
             color: 'var(--text-tertiary)',
             textAlign: 'center',
-            maxWidth: 320,
+            maxWidth: 340,
           }}
         >
-          A click plays every second. Adjust ms until the circle flash lands exactly on the heard
-          click (Bluetooth delays the click). That value is your video delay.
+          The circle flashes white with a click every second. Adjust ms until the flash lands
+          exactly on the heard click — this runs through the same video-delay pipeline as playback.
+          The clip loops, so judge the average over several beats.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button
@@ -122,17 +143,16 @@ const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
             + {STEP_MS}ms
           </Button>
         </div>
-        <div className={settingsStyles.sliderGroup} style={{ width: '100%' }}>
-          <label>Video delay ({tempMs}ms)</label>
-          <input
-            type="range"
+        <div style={{ width: '100%' }}>
+          <MenuSlider
+            label="Video delay"
+            display={`${tempMs}ms`}
             min={0}
             max={MAX_MS}
             step={5}
             value={tempMs}
-            onChange={(e) => setTempMs(clamp(Number((e.target as HTMLInputElement).value)))}
-            style={{ '--slider-percent': `${(tempMs / MAX_MS) * 100}%` } as React.CSSProperties}
-            aria-label="Video delay milliseconds"
+            percent={(tempMs / MAX_MS) * 100}
+            onChange={(v) => setTempMs(clamp(v))}
           />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
