@@ -18,6 +18,13 @@ import {
 import { fixThumbnailUrl } from '../lib/utils'
 import { loadHls } from '../lib/hls'
 import { pickSubtitleIndex } from '../lib/subtitles'
+import {
+  buildCueCss,
+  buildOverlayCss,
+  renderCueHtml,
+  stripCueTags,
+  type SubtitleStyleSettings,
+} from '../lib/subtitleStyle'
 import type Hls from 'hls.js'
 import GenericModal from '../components/common/GenericModal'
 import { Modal } from '../components/common/Modal'
@@ -425,9 +432,6 @@ const Player: React.FC = () => {
     }
 
     if (state.selectedLink.hls) {
-      // HLS attaches asynchronously (bundled hls.js is lazy-loaded).
-      // Autoplay must wait until the manifest is parsed — calling play()
-      // before attach aborts the media fetch and rejects the promise.
       void (async () => {
         const HlsClass = await loadHls()
         if (cancelled) return
@@ -949,16 +953,17 @@ const Player: React.FC = () => {
       document.head.appendChild(styleTag)
     }
 
-    const fontSize = `${player.state.subtitleFontSize}rem`
+    const subtitleStyle: SubtitleStyleSettings = {
+      fontSize: player.state.subtitleFontSize,
+      position: player.state.subtitlePosition,
+      bgOpacity: player.state.subtitleBgOpacity,
+      bgColor: player.state.subtitleBgColor,
+      textColor: player.state.subtitleTextColor,
+      edge: player.state.subtitleEdge,
+      bold: player.state.subtitleBold,
+    }
 
-    styleTag.textContent = `
-  video::cue {
-    font-size: ${fontSize} !important;
-    background-color: rgba(0, 0, 0, 0.5) !important;
-    color: white !important;
-    text-shadow: 0 0 4px black;
-  }
-  `
+    styleTag.textContent = buildCueCss(subtitleStyle)
 
     const video = refs.videoRef.current
     if (!video) return
@@ -1060,6 +1065,11 @@ const Player: React.FC = () => {
   }, [
     player.state.subtitleFontSize,
     player.state.subtitlePosition,
+    player.state.subtitleBgOpacity,
+    player.state.subtitleBgColor,
+    player.state.subtitleTextColor,
+    player.state.subtitleEdge,
+    player.state.subtitleBold,
     player.state.activeSubtitleTrack,
     player.state.availableSubtitles,
     state.selectedSource,
@@ -1095,28 +1105,26 @@ const Player: React.FC = () => {
       }
       if (cues.length === 0) return
 
-      const fontSize = `${player.state.subtitleFontSize}rem`
-      const bottom = `${player.state.subtitlePosition}%`
+      const subtitleStyle: SubtitleStyleSettings = {
+        fontSize: player.state.subtitleFontSize,
+        position: player.state.subtitlePosition,
+        bgOpacity: player.state.subtitleBgOpacity,
+        bgColor: player.state.subtitleBgColor,
+        textColor: player.state.subtitleTextColor,
+        edge: player.state.subtitleEdge,
+        bold: player.state.subtitleBold,
+      }
+      const baseCss = buildOverlayCss(subtitleStyle)
+      const baseBottom = subtitleStyle.position
+      const cueArray = Array.from(cues as ArrayLike<TextTrackCue>)
 
-      cues.forEach((cue) => {
-        const text = String((cue as { text?: unknown }).text ?? '').replace(/<[^>]*>/g, '')
-        if (!text) return
+      cueArray.forEach((cue, index) => {
+        const raw = String((cue as { text?: unknown }).text ?? '')
+        if (!stripCueTags(raw).trim()) return
         const div = document.createElement('div')
-        div.style.cssText = `
-          font-size: ${fontSize};
-          color: white;
-          background-color: rgba(0, 0, 0, 0.5);
-          text-shadow: 0 0 4px black;
-          padding: 0.2em 0.5em;
-          text-align: center;
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          bottom: ${bottom};
-          white-space: pre-wrap;
-          line-height: 1.4;
-        `
-        div.textContent = text
+        const stackOffset = (cueArray.length - 1 - index) * 1.7
+        div.style.cssText = `${baseCss}\nbottom: calc(${baseBottom}% + ${stackOffset}em);`
+        div.innerHTML = renderCueHtml(raw)
         overlay.appendChild(div)
       })
     }
@@ -1142,6 +1150,11 @@ const Player: React.FC = () => {
     upscaler.isWebGPUSupported,
     player.state.subtitleFontSize,
     player.state.subtitlePosition,
+    player.state.subtitleBgOpacity,
+    player.state.subtitleBgColor,
+    player.state.subtitleTextColor,
+    player.state.subtitleEdge,
+    player.state.subtitleBold,
     player.state.activeSubtitleTrack,
     refs.videoRef,
     canvasPresentationActive,

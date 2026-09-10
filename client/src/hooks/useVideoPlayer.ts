@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
+import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
 
 interface VideoPlayerProps {
   skipIntervals: SkipInterval[]
@@ -75,23 +76,14 @@ const useVideoPlayer = ({
   )
   const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null)
   const [showCCMenu, setShowCCMenu] = useState(false)
-  const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
-    try {
-      const parsed = parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
-      return isNaN(parsed) ? 1.8 : parsed
-    } catch {
-      return 1.8
-    }
-  })
-  const [subtitlePosition, setSubtitlePosition] = useState(() => {
-    try {
-      const parsed = parseInt(localStorage.getItem('subtitlePosition') || '0')
-      if (isNaN(parsed)) return 0
-      return Math.max(0, Math.min(100, parsed))
-    } catch {
-      return 0
-    }
-  })
+  const [initialSubtitleStyle] = useState(loadSubtitleStyle)
+  const [subtitleFontSize, setSubtitleFontSize] = useState(initialSubtitleStyle.fontSize)
+  const [subtitlePosition, setSubtitlePosition] = useState(initialSubtitleStyle.position)
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(initialSubtitleStyle.bgOpacity)
+  const [subtitleBgColor, setSubtitleBgColor] = useState(initialSubtitleStyle.bgColor)
+  const [subtitleTextColor, setSubtitleTextColor] = useState(initialSubtitleStyle.textColor)
+  const [subtitleEdge, setSubtitleEdge] = useState<SubtitleEdge>(initialSubtitleStyle.edge)
+  const [subtitleBold, setSubtitleBold] = useState(initialSubtitleStyle.bold)
   const [availableSubtitles, setAvailableSubtitles] = useState<SubtitleTrack[]>([])
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -630,6 +622,11 @@ const useVideoPlayer = ({
       setShowCCMenu,
       setSubtitleFontSize,
       setSubtitlePosition,
+      setSubtitleBgOpacity,
+      setSubtitleBgColor,
+      setSubtitleTextColor,
+      setSubtitleEdge,
+      setSubtitleBold,
       setAvailableSubtitles,
       setActiveSubtitleTrack,
       setShowSettings,
@@ -678,6 +675,11 @@ const useVideoPlayer = ({
       showCCMenu,
       subtitleFontSize,
       subtitlePosition,
+      subtitleBgOpacity,
+      subtitleBgColor,
+      subtitleTextColor,
+      subtitleEdge,
+      subtitleBold,
       availableSubtitles,
       activeSubtitleTrack,
       showSettings,
