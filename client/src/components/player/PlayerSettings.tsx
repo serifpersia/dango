@@ -3,6 +3,13 @@ import { FaChevronLeft, FaCheck } from 'react-icons/fa'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
+import {
+  BG_COLOR_PRESETS,
+  DEFAULT_SUBTITLE_STYLE,
+  TEXT_COLOR_PRESETS,
+  type SubtitleEdge,
+} from '../../lib/subtitleStyle'
+import { MenuSlider, SegmentedRow, SwatchRow } from './MenuControls'
 
 interface PlayerSettingsProps {
   isOpen: boolean
@@ -17,8 +24,16 @@ interface PlayerSettingsProps {
   subtitleSettings: {
     fontSize: number
     position: number
+    bgOpacity: number
+    bgColor: string
+    textColor: string
+    edge: SubtitleEdge
+    bold: boolean
   }
-  onSubtitleSettingsChange: (key: 'fontSize' | 'position', value: number) => void
+  onSubtitleSettingsChange: (
+    key: 'fontSize' | 'position' | 'bgOpacity' | 'bgColor' | 'textColor' | 'edge' | 'bold',
+    value: number | string | boolean
+  ) => void
   useNativeControls: boolean
   onNativeControlsToggle: (value: boolean) => void
   anime4kEnabled: boolean
@@ -181,38 +196,77 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
 
   const renderSubtitleStyle = () => (
     <div className={styles.menuContent}>
-      <div className={styles.sliderGroup}>
-        <label>Font Size ({subtitleSettings.fontSize.toFixed(1)})</label>
-        <input
-          type="range"
-          min="0.5"
-          max="10"
-          step="0.5"
-          value={subtitleSettings.fontSize}
-          onInput={(e) =>
-            onSubtitleSettingsChange('fontSize', parseFloat((e.target as HTMLInputElement).value))
-          }
-          style={
-            {
-              '--slider-percent': `${((subtitleSettings.fontSize - 0.5) / 9.5) * 100}%`,
-            } as React.CSSProperties
-          }
-        />
-      </div>
-      <div className={styles.sliderGroup}>
-        <label>Vertical Position (Lift)</label>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={subtitleSettings.position}
-          onInput={(e) =>
-            onSubtitleSettingsChange('position', parseInt((e.target as HTMLInputElement).value))
-          }
-          style={{ '--slider-percent': `${subtitleSettings.position}%` } as React.CSSProperties}
-        />
-      </div>
+      <MenuSlider
+        label="Font Size"
+        display={subtitleSettings.fontSize.toFixed(1)}
+        min={0.5}
+        max={10}
+        step={0.5}
+        value={subtitleSettings.fontSize}
+        percent={((subtitleSettings.fontSize - 0.5) / 9.5) * 100}
+        onChange={(v) => onSubtitleSettingsChange('fontSize', v)}
+      />
+      <MenuSlider
+        label="Vertical Position"
+        display={`${subtitleSettings.position}`}
+        min={0}
+        max={100}
+        step={1}
+        value={subtitleSettings.position}
+        percent={subtitleSettings.position}
+        onChange={(v) => onSubtitleSettingsChange('position', Math.round(v))}
+      />
+      <MenuSlider
+        label="Background Opacity"
+        display={`${Math.round(subtitleSettings.bgOpacity * 100)}%`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={subtitleSettings.bgOpacity}
+        percent={subtitleSettings.bgOpacity * 100}
+        onChange={(v) => onSubtitleSettingsChange('bgOpacity', v)}
+      />
+      <SwatchRow
+        label="Text Color"
+        colors={TEXT_COLOR_PRESETS}
+        value={subtitleSettings.textColor}
+        onChange={(c) => onSubtitleSettingsChange('textColor', c)}
+      />
+      <SwatchRow
+        label="Background Color"
+        colors={BG_COLOR_PRESETS}
+        value={subtitleSettings.bgColor}
+        onChange={(c) => onSubtitleSettingsChange('bgColor', c)}
+      />
+      <SegmentedRow
+        label="Text Edge"
+        options={['shadow', 'outline', 'none'] as const}
+        value={subtitleSettings.edge}
+        onChange={(edge) => onSubtitleSettingsChange('edge', edge)}
+      />
+      <button
+        type="button"
+        className={`${styles.menuItem} ${subtitleSettings.bold ? styles.selected : ''}`}
+        onClick={() => onSubtitleSettingsChange('bold', !subtitleSettings.bold)}
+      >
+        <span>Bold Text</span>
+        {subtitleSettings.bold && <FaCheck size={12} />}
+      </button>
+      <button
+        type="button"
+        className={styles.menuItem}
+        onClick={() => {
+          onSubtitleSettingsChange('fontSize', DEFAULT_SUBTITLE_STYLE.fontSize)
+          onSubtitleSettingsChange('position', DEFAULT_SUBTITLE_STYLE.position)
+          onSubtitleSettingsChange('bgOpacity', DEFAULT_SUBTITLE_STYLE.bgOpacity)
+          onSubtitleSettingsChange('bgColor', DEFAULT_SUBTITLE_STYLE.bgColor)
+          onSubtitleSettingsChange('textColor', DEFAULT_SUBTITLE_STYLE.textColor)
+          onSubtitleSettingsChange('edge', DEFAULT_SUBTITLE_STYLE.edge)
+          onSubtitleSettingsChange('bold', DEFAULT_SUBTITLE_STYLE.bold)
+        }}
+      >
+        <span>Reset to Defaults</span>
+      </button>
     </div>
   )
 
@@ -288,22 +342,17 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         <span>Video delay</span>
         {videoDelayEnabled && <FaCheck size={12} />}
       </button>
-      <div className={styles.sliderGroup}>
-        <label>Video delay ({shownDelayMs}ms)</label>
-        <input
-          type="range"
-          min="0"
-          max="500"
-          step="5"
-          value={shownDelayMs}
-          onInput={(e) => setPendingDelayMs(Number((e.target as HTMLInputElement).value))}
-          onPointerUp={commitDelay}
-          onTouchEnd={commitDelay}
-          onKeyUp={commitDelay}
-          onBlur={commitDelay}
-          style={{ '--slider-percent': `${(shownDelayMs / 500) * 100}%` } as React.CSSProperties}
-        />
-      </div>
+      <MenuSlider
+        label="Video delay"
+        display={`${shownDelayMs}ms`}
+        min={0}
+        max={500}
+        step={5}
+        value={shownDelayMs}
+        percent={(shownDelayMs / 500) * 100}
+        onChange={(v) => setPendingDelayMs(Math.round(v))}
+        onCommit={commitDelay}
+      />
       <div className={styles.menuNote}>
         For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
         untouched.
