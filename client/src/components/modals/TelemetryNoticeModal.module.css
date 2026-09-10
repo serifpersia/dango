@@ -1,0 +1,120 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--text-primary);
+}
+
+.description {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.dataList {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.dataTitle {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dataList ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dataList li {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.toggleLabel {
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.okButton {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.okButton:hover {
+  opacity: 0.9;
+}
+
+.previewToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.previewToggle:hover {
+  color: var(--text-primary);
+}
+
+.chevron {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.previewBox {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.previewItem {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.previewKey {
+  color: var(--text-secondary);
+}
+
+.previewVal {
+  color: var(--text-primary);
+}

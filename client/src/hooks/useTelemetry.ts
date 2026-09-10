@@ -1,11 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import toast from 'react-hot-toast'
 import packageJson from '../../package.json'
 
 const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL
 
-const getPrivacyFriendlyUserAgent = () => {
+export const getPrivacyFriendlyUserAgent = () => {
   const ua = navigator.userAgent
   let browser = 'Unknown Browser'
   let os = 'Unknown OS'
@@ -29,29 +28,74 @@ const getPrivacyFriendlyUserAgent = () => {
 
 export const deleteTelemetryData = async () => {
   localStorage.removeItem('last_telemetry_ping')
+  const installationId = localStorage.getItem('installation_id')
+  if (installationId && TELEMETRY_URL) {
+    try {
+      await fetch(TELEMETRY_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: installationId, action: 'delete' }),
+      })
+    } catch (err) {
+      console.error('Telemetry delete request failed:', err)
+    }
+  }
+}
+
+export const sendTelemetryPing = async () => {
+  if (!TELEMETRY_URL) return
+  try {
+    let installationId = localStorage.getItem('installation_id')
+
+    if (!installationId || installationId.length === 36) {
+      try {
+        const res = await fetch('/api/installation-id')
+        const data = await res.json()
+        if (data.id) {
+          installationId = data.id
+          localStorage.setItem('installation_id', installationId!)
+        }
+      } catch (err) {
+        console.error('Failed to fetch hardware ID:', err)
+      }
+    }
+
+    if (!installationId) {
+      installationId = uuidv4()
+      localStorage.setItem('installation_id', installationId)
+    }
+
+    await fetch(TELEMETRY_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: installationId,
+        version: packageJson.version,
+        userAgent: getPrivacyFriendlyUserAgent(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    })
+    localStorage.setItem('last_telemetry_ping', Date.now().toString())
+  } catch (err) {
+    console.error('Telemetry ping failed:', err)
+  }
 }
 
 export const useTelemetry = () => {
+  const [showTelemetryModal, setShowTelemetryModal] = useState(false)
+
+  useEffect(() => {
+    const noticeShown = localStorage.getItem('telemetry_notice_v2')
+    if (!noticeShown) {
+      const timer = setTimeout(() => setShowTelemetryModal(true), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
   useEffect(() => {
     const isTelemetryEnabled = localStorage.getItem('telemetry_enabled') !== 'false'
-
-    if (isTelemetryEnabled) {
-      const noticeShown = localStorage.getItem('telemetry_notice_shown')
-      if (!noticeShown) {
-        localStorage.setItem('telemetry_notice_shown', 'true')
-        setTimeout(() => {
-          toast('Optional install data is collected. You can opt out in Settings.', {
-            duration: 8000,
-            icon: 'ℹ️',
-            style: {
-              background: '#1a3a5c',
-              color: '#fff',
-              border: '1px solid #2a5a8c',
-            },
-          })
-        }, 3000)
-      }
-    }
 
     if (!isTelemetryEnabled || !TELEMETRY_URL) return
 
@@ -63,47 +107,8 @@ export const useTelemetry = () => {
       return
     }
 
-    const sendPing = async () => {
-      try {
-        let installationId = localStorage.getItem('installation_id')
-
-        if (!installationId || installationId.length === 36) {
-          try {
-            const res = await fetch('/api/installation-id')
-            const data = await res.json()
-            if (data.id) {
-              installationId = data.id
-              localStorage.setItem('installation_id', installationId!)
-            }
-          } catch (err) {
-            console.error('Failed to fetch hardware ID:', err)
-          }
-        }
-
-        if (!installationId) {
-          installationId = uuidv4()
-          localStorage.setItem('installation_id', installationId)
-        }
-
-        await fetch(TELEMETRY_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: installationId,
-            version: packageJson.version,
-            userAgent: getPrivacyFriendlyUserAgent(),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          }),
-        })
-        localStorage.setItem('last_telemetry_ping', now.toString())
-      } catch (err) {
-        console.error('Telemetry ping failed:', err)
-      }
-    }
-
-    sendPing()
+    sendTelemetryPing()
   }, [])
+
+  return { showTelemetryModal, setShowTelemetryModal }
 }

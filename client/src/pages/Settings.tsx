@@ -14,7 +14,11 @@ import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
-import { deleteTelemetryData } from '../hooks/useTelemetry'
+import {
+  deleteTelemetryData,
+  getPrivacyFriendlyUserAgent,
+  sendTelemetryPing,
+} from '../hooks/useTelemetry'
 import {
   getVirtualKeyboardEnabled,
   VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT,
@@ -114,7 +118,9 @@ const Settings: React.FC = () => {
   const toggleTelemetry = (enabled: boolean) => {
     setTelemetryEnabled(enabled)
     localStorage.setItem('telemetry_enabled', String(enabled))
-    if (!enabled) {
+    if (enabled) {
+      sendTelemetryPing()
+    } else {
       deleteTelemetryData()
     }
   }
@@ -420,10 +426,10 @@ const Settings: React.FC = () => {
                         color: 'var(--text-secondary)',
                       }}
                     >
-                      Share anonymous installation data to help track active users and timezone.
-                      Collected: Hardware-based Anonymous ID, App Version, First Seen/Last Seen
-                      timestamps, User Agent string, and timezone (e.g. 'Europe/Berlin'). No other
-                      personal information or usage habits are collected.
+                      Share anonymous installation data to help track active users. Collected:
+                      Browser type and OS (e.g. 'Chrome on Windows'), App Version, First Seen/Last
+                      Seen timestamps, and timezone (e.g. 'Europe/Berlin'). No other personal
+                      information or usage habits are collected.
                     </p>
                   </div>
                   <ToggleSwitch
@@ -459,7 +465,7 @@ const Settings: React.FC = () => {
                         <strong>Version:</strong> {packageJson.version}
                       </p>
                       <p style={{ margin: '0' }}>
-                        <strong>Browser:</strong> {navigator.userAgent.substring(0, 60)}...
+                        <strong>Browser:</strong> {getPrivacyFriendlyUserAgent()}
                       </p>
                       <p style={{ margin: '0' }}>
                         <strong>Timezone:</strong>{' '}

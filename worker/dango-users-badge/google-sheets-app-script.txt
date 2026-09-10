@@ -39,6 +39,17 @@ function doPost(e) {
 
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Analytics");
     var postData = JSON.parse(e.postData.contents);
+
+    if (postData.action === "delete") {
+        var data = sheet.getDataRange().getValues();
+        for (var i = data.length - 1; i >= 1; i--) {
+            if (String(data[i][0]) === String(postData.id)) {
+                sheet.deleteRow(i + 1);
+            }
+        }
+        return ContentService.createTextOutput("Deleted");
+    }
+
     var now = new Date();
 
     var data = sheet.getDataRange().getValues();

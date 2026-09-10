@@ -5,6 +5,7 @@ import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import { useTelemetry } from './hooks/useTelemetry'
+import TelemetryNoticeModal from './components/modals/TelemetryNoticeModal'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import VirtualKeyboard from './components/common/VirtualKeyboard'
@@ -44,7 +45,7 @@ function App() {
   } = useLanAuth()
   const location = useLocation()
   const virtualKeyboard = useVirtualKeyboard()
-  useTelemetry()
+  const { showTelemetryModal, setShowTelemetryModal } = useTelemetry()
   useDiscordPageStatus()
 
   const [lanLocked, setLanLocked] = useState(false)
@@ -111,6 +112,10 @@ function App() {
         isOpen={animePaheOpen}
         onClose={closeAnimePaheModal}
         onSuccess={onSuccess}
+      />
+      <TelemetryNoticeModal
+        isOpen={showTelemetryModal}
+        onClose={() => setShowTelemetryModal(false)}
       />
       <LanAuthModal
         isOpen={lanAuthOpen}
