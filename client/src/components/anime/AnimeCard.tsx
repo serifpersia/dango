@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback, useEffect } from 'react'
+import React, { memo, useState, useCallback } from 'react'
 import { Link, useNavigate, type To } from 'react-router'
 import {
   FaMicrophone,
@@ -100,16 +100,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
-    const [imgError, setImgError] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
-    const { thumbnail: healedThumbnail, reportImageError } = useEnrichedThumbnail(
-      anime._id,
-      anime.thumbnail
-    )
-    useEffect(() => {
-      setImgError(false)
-      setIsLoaded(false)
-    }, [healedThumbnail])
+    const { thumbnail: healedThumbnail } = useEnrichedThumbnail(anime._id, anime.thumbnail)
     const [isPopupVisible, setIsPopupVisible] = useState(false)
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
 
@@ -312,11 +304,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
             )}
             <img
-              src={
-                imgError
-                  ? '/placeholder.svg'
-                  : fixThumbnailUrl(healedThumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)
-              }
+              src={fixThumbnailUrl(healedThumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
               alt={displayTitle}
               className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
                 shouldBlur && !lowEndMode ? styles.blurred : ''
@@ -324,10 +312,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               loading="lazy"
               decoding="async"
               onLoad={() => setIsLoaded(true)}
-              onError={() => {
-                reportImageError()
-                setImgError(true)
-              }}
             />
 
             {!isMobile && (

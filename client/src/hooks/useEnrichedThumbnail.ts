@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchApi } from '../lib/fetchApi'
 
 const isMissing = (url: string | undefined | null): boolean => {
@@ -9,46 +9,31 @@ const isMissing = (url: string | undefined | null): boolean => {
 export function useEnrichedThumbnail(
   showId: string | undefined,
   thumbnail: string | undefined
-): { thumbnail: string | undefined; reportImageError: () => void } {
+): { thumbnail: string | undefined } {
   const [resolved, setResolved] = useState<string | undefined>(thumbnail)
-  const retriedRef = useRef(false)
 
   useEffect(() => {
     setResolved(thumbnail)
-    retriedRef.current = false
   }, [thumbnail])
-
-  const refresh = useCallback(async () => {
-    if (!showId) return
-    try {
-      const meta = await fetchApi(`/api/show-meta/${showId}`)
-      const fresh = (meta as { thumbnail?: string } | null)?.thumbnail
-      if (fresh && fresh.trim() !== '' && !fresh.includes('placeholder')) {
-        setResolved((prev) => (prev === fresh ? prev : fresh))
-      }
-    } catch {
-      // ignore
-    }
-  }, [showId])
 
   useEffect(() => {
     if (!isMissing(thumbnail)) return
     if (!showId) return
     let cancelled = false
-    void (async () => {
-      if (cancelled) return
-      await refresh()
-    })()
+    fetchApi(`/api/show-meta/${showId}`)
+      .then((meta) => {
+        const fresh = (meta as { thumbnail?: string } | null)?.thumbnail
+        if (!cancelled && fresh && fresh.trim() !== '' && !fresh.includes('placeholder')) {
+          setResolved(fresh)
+        }
+      })
+      .catch(() => {
+        // ignore
+      })
     return () => {
       cancelled = true
     }
-  }, [showId, thumbnail, refresh])
+  }, [showId, thumbnail])
 
-  const reportImageError = useCallback(() => {
-    if (retriedRef.current) return
-    retriedRef.current = true
-    void refresh()
-  }, [refresh])
-
-  return { thumbnail: resolved, reportImageError }
+  return { thumbnail: resolved }
 }
