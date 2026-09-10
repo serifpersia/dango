@@ -28,11 +28,11 @@ export const QueueRepository = {
         q.showId,
         q.episodeNumber,
         q.queue_order,
-        COALESCE(sm.name, w.name) as name,
-        COALESCE(sm.thumbnail, w.thumbnail) as thumbnail,
-        COALESCE(sm.nativeName, w.nativeName) as nativeName,
-        COALESCE(sm.englishName, w.englishName) as englishName,
-        COALESCE(sm.type, w.type) as type
+        COALESCE(NULLIF(sm.name, ''), w.name) as name,
+        COALESCE(NULLIF(sm.thumbnail, ''), NULLIF(w.thumbnail, ''), '') as thumbnail,
+        COALESCE(NULLIF(sm.nativeName, ''), w.nativeName) as nativeName,
+        COALESCE(NULLIF(sm.englishName, ''), w.englishName) as englishName,
+        COALESCE(NULLIF(sm.type, ''), w.type) as type
       FROM queue q
       LEFT JOIN shows_meta sm ON q.showId = sm.id
       LEFT JOIN watchlist w ON q.showId = w.id

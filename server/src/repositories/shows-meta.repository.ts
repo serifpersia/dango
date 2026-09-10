@@ -34,15 +34,15 @@ export const ShowsMetaRepository = {
       `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type, anilistId, isAdult)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-          name = COALESCE(EXCLUDED.name, shows_meta.name),
-          thumbnail = COALESCE(EXCLUDED.thumbnail, shows_meta.thumbnail),
-          nativeName = COALESCE(EXCLUDED.nativeName, shows_meta.nativeName),
-          englishName = COALESCE(EXCLUDED.englishName, shows_meta.englishName),
-          genres = COALESCE(EXCLUDED.genres, shows_meta.genres),
+          name = COALESCE(NULLIF(EXCLUDED.name, ''), shows_meta.name),
+          thumbnail = COALESCE(NULLIF(EXCLUDED.thumbnail, ''), shows_meta.thumbnail),
+          nativeName = COALESCE(NULLIF(EXCLUDED.nativeName, ''), shows_meta.nativeName),
+          englishName = COALESCE(NULLIF(EXCLUDED.englishName, ''), shows_meta.englishName),
+          genres = COALESCE(NULLIF(EXCLUDED.genres, ''), shows_meta.genres),
           popularityScore = COALESCE(EXCLUDED.popularityScore, shows_meta.popularityScore),
-          status = COALESCE(EXCLUDED.status, shows_meta.status),
+          status = COALESCE(NULLIF(EXCLUDED.status, ''), shows_meta.status),
           episodeCount = COALESCE(EXCLUDED.episodeCount, shows_meta.episodeCount),
-          type = COALESCE(EXCLUDED.type, shows_meta.type),
+          type = COALESCE(NULLIF(EXCLUDED.type, ''), shows_meta.type),
           anilistId = COALESCE(EXCLUDED.anilistId, shows_meta.anilistId),
           isAdult = COALESCE(EXCLUDED.isAdult, shows_meta.isAdult)`,
       [

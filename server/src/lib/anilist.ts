@@ -898,6 +898,122 @@ export function parseMalId(id: string | number): number | null {
   return null
 }
 
+function hasPoster(show: Show | null | undefined): boolean {
+  return !!show?.thumbnail && show.thumbnail.trim() !== ''
+}
+
+function posterFromMedia(m: AnilistMedia | null | undefined): string | null {
+  const url =
+    m?.coverImage?.extraLarge ||
+    m?.coverImage?.large ||
+    m?.coverImage?.medium ||
+    (m?.coverImage as { small?: string; tiny?: string; original?: string } | undefined)?.original ||
+    (m?.coverImage as { small?: string; tiny?: string } | undefined)?.small ||
+    (m?.coverImage as { tiny?: string } | undefined)?.tiny
+  return url && url.trim() !== '' ? url : null
+}
+
+export interface PosterExpectation {
+  anilistId?: number
+  malId?: number
+  titles: string[]
+}
+
+function titleWords(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 2)
+  )
+}
+
+function titleSimilarity(a: string, b: string): number {
+  if (!a.trim() || !b.trim()) return 0
+  const an = a.trim().toLowerCase()
+  const bn = b.trim().toLowerCase()
+  if (an === bn || an.includes(bn) || bn.includes(an)) return 1
+  const wa = titleWords(a)
+  const wb = titleWords(b)
+  if (wa.size === 0 || wb.size === 0) return 0
+  const overlap = [...wa].filter((w) => wb.has(w)).length
+  return overlap / Math.min(wa.size, wb.size)
+}
+
+function titlesMatchAny(candidate: string | null | undefined, expected: string[]): boolean {
+  if (!candidate) return false
+  return expected.some((t) => titleSimilarity(candidate, t) >= 0.6)
+}
+
+export async function findPosterByTitle(
+  title: string | null | undefined,
+  expected?: PosterExpectation
+): Promise<string | null> {
+  const clean = title?.trim()
+  if (!clean) return null
+  const expectedTitles = (expected?.titles ?? []).filter((t) => t.trim() !== '')
+  try {
+    const { entries } = await malSearchAnime(malCacheStore(), clean, 1)
+    for (const e of entries) {
+      if (!e.imageUrl || e.imageUrl.trim() === '') continue
+      if (expected?.malId && e.idMal === expected.malId) return e.imageUrl
+      if (expected && titlesMatchAny(e.title, expectedTitles)) return e.imageUrl
+      if (!expected) return e.imageUrl
+    }
+  } catch {
+    // ignore, try Kitsu next
+  }
+  try {
+    const kitsu = await kitsuSearchAnime({ query: clean, page: 1, perPage: 5 })
+    for (const m of kitsu) {
+      const url = posterFromMedia(m)
+      if (!url) continue
+      if (expected?.anilistId && m.id === expected.anilistId) return url
+      if (expected?.malId && m.idMal === expected.malId) return url
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+async function withPosterBackfill(
+  show: Show | null,
+  cacheKey: string,
+  expected?: PosterExpectation
+): Promise<Show | null> {
+  if (!show) return null
+  if (hasPoster(show)) {
+    setCachedAnilist(cacheKey, show)
+    return show
+  }
+  const candidates = [show.names?.english, show.englishName, show.name, show.names?.romaji]
+    .filter((t): t is string => !!t && t.trim().length >= 4)
+    .filter((t, i, a) => a.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i)
+  const exp: PosterExpectation = expected ?? { titles: [] }
+  if (exp.titles.length === 0) exp.titles = [...candidates]
+  if (show.names?.native) exp.titles.push(show.names.native)
+  const seen = new Set<string>()
+  for (const title of candidates) {
+    const key = title.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    try {
+      const poster = await findPosterByTitle(title, exp)
+      if (poster) {
+        show.thumbnail = poster
+        setCachedAnilist(cacheKey, show)
+        return show
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return show
+}
+
 export async function getShowMetaById(id: string): Promise<Show | null> {
   const malId = parseMalId(id)
   if (malId) return getShowMetaByMalId(malId)
@@ -907,9 +1023,14 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
   if (numericId < 0) return getShowMetaByMalId(Math.abs(numericId))
 
   const fields = mediaFields()
-  const cacheKey = `meta:${id}`
-  const cached = getCachedAnilist<Show>(cacheKey)
-  if (cached) return cached
+  const cacheKey = `meta:v2:${id}`
+  const legacyCached = getCachedAnilist<Show>(`meta:${id}`)
+  const cached = getCachedAnilist<Show>(cacheKey) ?? legacyCached
+  if (cached && hasPoster(cached)) {
+    setCachedAnilist(cacheKey, cached)
+    return cached
+  }
+  const expected: PosterExpectation = { anilistId: numericId, titles: [] }
 
   const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${fields} } }`
   const queryMal = `query ($id: Int) { Media(idMal: $id, type: ANIME) { ${fields} } }`
@@ -917,15 +1038,13 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
   const byId = await anilistRequest<{ Media?: AnilistMedia | null }>(query, { id: numericId })
   if (byId?.data?.Media) {
     const show = fromAnilistMedia(byId.data.Media)
-    setCachedAnilist(cacheKey, show)
-    return show
+    return withPosterBackfill(show, cacheKey, expected)
   }
 
   const byMal = await anilistRequest<{ Media?: AnilistMedia | null }>(queryMal, { id: numericId })
   if (byMal?.data?.Media) {
     const show = fromAnilistMedia(byMal.data.Media)
-    setCachedAnilist(cacheKey, show)
-    return show
+    return withPosterBackfill(show, cacheKey, expected)
   }
 
   const apiFailed = !byId?.data && !byMal?.data
@@ -933,9 +1052,24 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
     const fb = (await kitsuMetaByAnilistId(numericId)) ?? (await kitsuMetaByMalId(numericId))
     if (fb) {
       const show = fromAnilistMedia(fb)
-      setCachedAnilist(cacheKey, show)
-      return show
+      if (hasPoster(show)) {
+        if (fb.idMal) {
+          try {
+            const d = await malAnimeDetail(malCacheStore(), fb.idMal)
+            if (d.detail?.imageUrl) show.thumbnail = d.detail.imageUrl
+          } catch {
+            // ignore
+          }
+        }
+        setCachedAnilist(cacheKey, show)
+        return show
+      }
+      return withPosterBackfill(show, cacheKey, expected)
     }
+  }
+
+  if (cached && !hasPoster(cached)) {
+    return withPosterBackfill(cached, cacheKey, expected)
   }
 
   return null
@@ -944,11 +1078,18 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
 export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
   const absMal = Math.abs(malId)
   if (!absMal) return null
-  const cacheKey = `meta:-${absMal}`
-  const cached = getCachedAnilist<Show>(cacheKey)
-  if (cached && cached.anilistId != null && cached.anilistId > 0) return cached
+  const cacheKey = `meta:v2:-${absMal}`
+  const cached = getCachedAnilist<Show>(cacheKey) ?? getCachedAnilist<Show>(`meta:-${absMal}`)
+  const expected: PosterExpectation = { malId: absMal, titles: [] }
+  if (cached && cached.anilistId != null && cached.anilistId > 0 && hasPoster(cached)) {
+    setCachedAnilist(cacheKey, cached)
+    return cached
+  }
   const anilistUp = !anilistUnavailable()
-  if (cached && !anilistUp) return cached
+  if (cached && !anilistUp && hasPoster(cached)) {
+    setCachedAnilist(cacheKey, cached)
+    return cached
+  }
 
   if (anilistUp) {
     try {
@@ -958,8 +1099,7 @@ export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
       )
       if (byMal?.data?.Media) {
         const show = fromAnilistMedia(byMal.data.Media)
-        setCachedAnilist(cacheKey, show)
-        return show
+        return withPosterBackfill(show, cacheKey, expected)
       }
     } catch {
       // ignore
@@ -970,8 +1110,21 @@ export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
     const fb = await kitsuMetaByMalId(absMal)
     if (fb) {
       const show = fromAnilistMedia(fb)
-      setCachedAnilist(cacheKey, show)
-      return show
+      try {
+        const d = await malAnimeDetail(malCacheStore(), absMal)
+        if (d.detail?.imageUrl) {
+          show.thumbnail = d.detail.imageUrl
+          setCachedAnilist(cacheKey, show)
+          return show
+        }
+      } catch {
+        // ignore
+      }
+      if (hasPoster(show)) {
+        setCachedAnilist(cacheKey, show)
+        return show
+      }
+      return withPosterBackfill(show, cacheKey, expected)
     }
   } catch {
     // ignore
@@ -981,11 +1134,14 @@ export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
     const d = await malAnimeDetail(malCacheStore(), absMal)
     if (d.detail) {
       const show = fromAnilistMedia(toAnilistDetailMedia(d.detail))
-      setCachedAnilist(cacheKey, show)
-      return show
+      return withPosterBackfill(show, cacheKey, expected)
     }
   } catch {
     // ignore
+  }
+
+  if (cached && !hasPoster(cached)) {
+    return withPosterBackfill(cached, cacheKey, expected)
   }
 
   logger.warn({ malId: absMal }, 'MAL id unresolvable on all metadata providers')

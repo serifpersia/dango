@@ -71,7 +71,14 @@ export const WatchlistRepository = {
   ) =>
     dbRun(
       db,
-      'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO watchlist (id, name, thumbnail, status, nativeName, englishName, type) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+          name = COALESCE(NULLIF(EXCLUDED.name, ''), watchlist.name),
+          thumbnail = COALESCE(NULLIF(EXCLUDED.thumbnail, ''), watchlist.thumbnail),
+          status = COALESCE(NULLIF(EXCLUDED.status, ''), watchlist.status),
+          nativeName = COALESCE(NULLIF(EXCLUDED.nativeName, ''), watchlist.nativeName),
+          englishName = COALESCE(NULLIF(EXCLUDED.englishName, ''), watchlist.englishName),
+          type = COALESCE(NULLIF(EXCLUDED.type, ''), watchlist.type)`,
       [
         data.id,
         data.name,
@@ -86,8 +93,10 @@ export const WatchlistRepository = {
   updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
     dbRun(db, 'UPDATE watchlist SET status = ? WHERE id = ?', [status, id]),
 
-  updateThumbnail: (db: DatabaseWrapper, id: string, thumbnail: string) =>
-    dbRun(db, 'UPDATE watchlist SET thumbnail = ? WHERE id = ?', [thumbnail, id]),
+  updateThumbnail: (db: DatabaseWrapper, id: string, thumbnail: string) => {
+    if (!thumbnail || thumbnail.trim() === '') return Promise.resolve()
+    return dbRun(db, 'UPDATE watchlist SET thumbnail = ? WHERE id = ?', [thumbnail, id])
+  },
 
   delete: (db: DatabaseWrapper, id: string) =>
     dbRun(db, 'DELETE FROM watchlist WHERE id = ?', [id]),

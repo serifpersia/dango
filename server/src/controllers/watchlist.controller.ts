@@ -20,6 +20,7 @@ import {
   searchAnilistByTitle,
   getAiredEpisodesForShows,
   getAnilistEpisodes,
+  getShowMetaById,
   isAnilistRateLimited,
   batchGetShowStatuses,
 } from '../lib/anilist'
@@ -577,6 +578,40 @@ export class WatchlistController {
     return this.sortFilteredRows(filtered, filters)
   }
 
+  private async backfillMissingPosters(
+    db: DatabaseWrapper,
+    rows: { id: string; _id?: string; name?: string; thumbnail?: string }[]
+  ): Promise<void> {
+    const missing = rows.filter((r) => !r.thumbnail || r.thumbnail.trim() === '')
+    if (missing.length === 0) return
+    const slice = missing.slice(0, 10)
+    await Promise.allSettled(
+      slice.map(async (row) => {
+        try {
+          const meta = await getShowMetaById(row.id)
+          const poster = meta?.thumbnail?.trim()
+          if (!poster) return
+          row.thumbnail = poster
+          const dual = row as { _id: string } & Record<string, unknown>
+          if (dual._id !== undefined) dual._id = row.id
+          try {
+            ShowsMetaRepository.upsert(db, { id: row.id, thumbnail: poster })
+          } catch {
+            // ignore
+          }
+          try {
+            await WatchlistRepository.updateThumbnail(db, row.id, poster)
+          } catch {
+            // ignore
+          }
+        } catch {
+          // ignore
+        }
+      })
+    )
+    db.scheduleSave()
+  }
+
   private async getContinueWatchingData(
     req: Request,
     limit?: number
@@ -602,6 +637,8 @@ export class WatchlistController {
         type: show.type || show.smType,
         thumbnail: show.thumbnail ?? '',
       }))
+
+    await this.backfillMissingPosters(req.db, enrichedRows)
 
     return enrichedRows
   }
@@ -788,6 +825,22 @@ export class WatchlistController {
     const allRows = await WatchlistRepository.getAll(req.db, status as string)
     const filteredRows = await this.filterWatchlistRows(allRows, filters, req.db)
     const rows = filteredRows.slice(offset, offset + limit)
+
+    for (const row of rows) {
+      if (!row.thumbnail || row.thumbnail.trim() === '') {
+        try {
+          const meta = ShowsMetaRepository.getById(req.db, row.id) as {
+            thumbnail?: string
+          } | null
+          if (meta?.thumbnail && meta.thumbnail.trim() !== '') {
+            row.thumbnail = meta.thumbnail
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    await this.backfillMissingPosters(req.db, rows)
 
     res.json({
       data: rows.map((row) => ({

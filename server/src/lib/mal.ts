@@ -177,6 +177,9 @@ export function parseDetail(html: string, malId: number): ScrapedDetail | null {
   const title =
     metaContent(html, 'og:title') || decodeHtml(html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1] ?? '')
   if (!title) return null
+  if (/^(404\b|not found\b)/i.test(title.trim())) return null
+  const rawImage = metaContent(html, 'og:image')
+  const imageUrl = rawImage && !/apple-touch-icon|404|error/i.test(rawImage) ? rawImage : null
   const genres = [...html.matchAll(/\/anime\/genre\/\d+\/[^"']*"[^>]*>([^<]+)</gi)]
     .map((m) => decodeHtml(m[1]).trim())
     .filter((g, i, a) => g && a.indexOf(g) === i)
@@ -188,7 +191,7 @@ export function parseDetail(html: string, malId: number): ScrapedDetail | null {
     title,
     titleEnglish: infoField(html, 'English'),
     titleJapanese: infoField(html, 'Japanese'),
-    imageUrl: metaContent(html, 'og:image'),
+    imageUrl,
     synopsis: metaContent(html, 'og:description'),
     type: infoField(html, 'Type'),
     episodes: numeric(infoField(html, 'Episodes')),
@@ -196,6 +199,20 @@ export function parseDetail(html: string, malId: number): ScrapedDetail | null {
     score: numeric(infoField(html, 'Score')),
     rating: infoField(html, 'Rating'),
     genres,
+  }
+}
+
+function detailToSearchEntry(d: ScrapedDetail): ScrapedSearchEntry {
+  return {
+    id: d.id,
+    idMal: d.idMal,
+    url: d.url,
+    title: d.title,
+    imageUrl: d.imageUrl,
+    synopsis: d.synopsis,
+    type: d.type,
+    episodes: d.episodes,
+    score: d.score,
   }
 }
 
@@ -300,13 +317,20 @@ export async function malSearchAnime(
   const show = (page - 1) * 50
   const params = new URLSearchParams({ q: query, cat: 'anime' })
   if (show > 0) params.set('show', String(show))
-  const { status, html } = await fetchHtml(`https://myanimelist.net/anime.php?${params.toString()}`)
+  const res = await fetchHtml(`https://myanimelist.net/anime.php?${params.toString()}`)
   const ms = Date.now() - t0
-  if (status !== 200) {
+  if (res.status !== 200) {
     if (hit) return { entries: JSON.parse(hit.payload) as ScrapedSearchEntry[], cached: true, ms }
-    throw new Error(`MAL search failed with status ${status}`)
+    throw new Error(`MAL search failed with status ${res.status}`)
   }
-  const entries = parseSearchResults(html)
+  const detailMatch = res.url.match(/myanimelist\.net\/anime\/(\d+)/i)
+  if (detailMatch && !res.html.includes('Search Anime - MyAnimeList.net')) {
+    const detail = parseDetail(res.html, Number(detailMatch[1]))
+    const entries = detail ? [detailToSearchEntry(detail)] : []
+    if (entries.length > 0) store.put(key, JSON.stringify(entries), DEFAULT_TTL_SECONDS)
+    return { entries, cached: false, ms }
+  }
+  const entries = parseSearchResults(res.html)
   store.put(key, JSON.stringify(entries), DEFAULT_TTL_SECONDS)
   return { entries, cached: false, ms }
 }

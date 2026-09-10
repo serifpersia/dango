@@ -314,6 +314,8 @@ function normalizeKitsuEntry(
 
   const poster = (a.posterImage as Record<string, string> | undefined) ?? {}
   const cover = (a.coverImage as Record<string, string> | undefined) ?? {}
+  const posterUrl =
+    poster.large || poster.original || poster.medium || poster.small || poster.tiny || null
   const coverUrl = cover.large || cover.original
 
   const genres = includedMap(entry, included, 'categories')
@@ -329,8 +331,8 @@ function normalizeKitsuEntry(
     idMal: malId,
     title,
     bannerImage: coverUrl || null,
-    coverImage: poster.large
-      ? { extraLarge: poster.large, large: poster.large, medium: poster.medium || poster.large }
+    coverImage: posterUrl
+      ? { extraLarge: posterUrl, large: posterUrl, medium: posterUrl }
       : undefined,
     description:
       (a.synopsis as string | undefined) || (a.description as string | undefined) || null,

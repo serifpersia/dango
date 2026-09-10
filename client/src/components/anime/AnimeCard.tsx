@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react'
+import React, { memo, useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate, type To } from 'react-router'
 import {
   FaMicrophone,
@@ -14,6 +14,7 @@ import { Button } from '../common/Button'
 
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import { useEnrichedThumbnail } from '../../hooks/useEnrichedThumbnail'
 import styles from './AnimeCard.module.css'
 import useIsMobile from '../../hooks/useIsMobile'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
@@ -99,7 +100,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
+    const [imgError, setImgError] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
+    const { thumbnail: healedThumbnail, reportImageError } = useEnrichedThumbnail(
+      anime._id,
+      anime.thumbnail
+    )
+    useEffect(() => {
+      setImgError(false)
+      setIsLoaded(false)
+    }, [healedThumbnail])
     const [isPopupVisible, setIsPopupVisible] = useState(false)
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
 
@@ -186,7 +196,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           pathname: episodeToPlay ? `/watch/${anime._id}/${episodeToPlay}` : `/watch/${anime._id}`,
           state: {
             name: anime.name,
-            thumbnail: anime.thumbnail,
+            thumbnail: healedThumbnail ?? anime.thumbnail,
             nativeName: anime.nativeName,
             englishName: anime.englishName,
             type: anime.type,
@@ -302,7 +312,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
             )}
             <img
-              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
+              src={
+                imgError
+                  ? '/placeholder.svg'
+                  : fixThumbnailUrl(healedThumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)
+              }
               alt={displayTitle}
               className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
                 shouldBlur && !lowEndMode ? styles.blurred : ''
@@ -310,6 +324,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               loading="lazy"
               decoding="async"
               onLoad={() => setIsLoaded(true)}
+              onError={() => {
+                reportImageError()
+                setImgError(true)
+              }}
             />
 
             {!isMobile && (

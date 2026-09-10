@@ -747,39 +747,41 @@ export class DataController {
       }
 
       if (meta) {
-        ShowsMetaRepository.upsert(req.db, {
-          id,
-          name: meta.name,
-          thumbnail: meta.thumbnail,
-          nativeName: meta.nativeName,
-          englishName: meta.englishName,
-          genres: meta.genres
-            ? JSON.stringify(
-                meta.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
-              )
-            : undefined,
-          status: meta.status,
-          episodeCount: meta.episodeCount != null ? Number(meta.episodeCount) : undefined,
-          type: meta.type,
-          anilistId: meta.anilistId,
-        })
-
-        const existingWatchlist = (await WatchlistRepository.getById(req.db, id)) as {
-          thumbnail?: string
-        } | null
-        if (existingWatchlist && existingWatchlist.thumbnail !== (meta.thumbnail || '')) {
-          WatchlistRepository.updateThumbnail(req.db, id, meta.thumbnail || '')
-        }
-      }
-
-      if (!meta && !/^mal-/i.test(id)) {
+        const poster = meta.thumbnail?.trim() ? meta.thumbnail : undefined
+        const hasPoster = !!poster
         try {
-          const d = await malAnimeDetail(malCacheStore(), Math.abs(parseInt(id, 10)))
-          if (d.detail) {
-            meta = { ...fromAnilistMedia(toAnilistDetailMedia(d.detail)), isAdult: true }
+          ShowsMetaRepository.upsert(req.db, {
+            id,
+            name: meta.name,
+            thumbnail: poster,
+            nativeName: meta.nativeName,
+            englishName: meta.englishName,
+            genres: meta.genres
+              ? JSON.stringify(
+                  meta.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
+                )
+              : undefined,
+            status: meta.status,
+            episodeCount: meta.episodeCount != null ? Number(meta.episodeCount) : undefined,
+            type: meta.type,
+            anilistId: meta.anilistId,
+          })
+        } catch {
+          // ignore
+        }
+
+        if (hasPoster && poster) {
+          const existingWatchlist = (await WatchlistRepository.getById(req.db, id)) as {
+            thumbnail?: string
+          } | null
+          if (existingWatchlist && existingWatchlist.thumbnail !== poster) {
+            try {
+              await WatchlistRepository.updateThumbnail(req.db, id, poster)
+            } catch {
+              // ignore
+            }
           }
-        } catch (e) {
-          logger.warn({ err: e, id }, 'mal show-meta fallback failed')
+          req.db.scheduleSave()
         }
       }
 
