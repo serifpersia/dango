@@ -16,6 +16,16 @@ import {
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import styles from './TvPlayerControls.module.css'
 import { pickSubtitleIndex } from '../../lib/subtitles'
+import { MenuSlider, SegmentedRow, SwatchRow } from '../player/MenuControls'
+import {
+  BG_COLOR_PRESETS,
+  DEFAULT_SUBTITLE_STYLE,
+  TEXT_COLOR_PRESETS,
+  buildCueCss,
+  loadSubtitleStyle,
+  type SubtitleEdge,
+  type SubtitleStyleSettings,
+} from '../../lib/subtitleStyle'
 
 type SettingsView =
   'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
@@ -89,14 +99,21 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     position: null,
   })
   const [isScrubbing, setIsScrubbing] = useState(false)
-  const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
-    const saved = parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
-    return isNaN(saved) || saved < 0.5 || saved > 10 ? 1.8 : saved
-  })
-  const [subtitlePosition, setSubtitlePosition] = useState(() => {
-    const saved = parseInt(localStorage.getItem('subtitlePosition') || '10')
-    return isNaN(saved) || saved < 0 || saved > 100 ? 10 : saved
-  })
+  const [initialSubtitleStyle] = useState(loadSubtitleStyle)
+  const [subtitleFontSize, setSubtitleFontSize] = useState(initialSubtitleStyle.fontSize)
+  const [subtitlePosition, setSubtitlePosition] = useState(initialSubtitleStyle.position)
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(initialSubtitleStyle.bgOpacity)
+  const [subtitleBgColor, setSubtitleBgColor] = useState(initialSubtitleStyle.bgColor)
+  const [subtitleTextColor, setSubtitleTextColor] = useState(initialSubtitleStyle.textColor)
+  const [subtitleEdge, setSubtitleEdge] = useState<SubtitleEdge>(initialSubtitleStyle.edge)
+  const [subtitleBold, setSubtitleBold] = useState(initialSubtitleStyle.bold)
+  const persistSubtitleSetting = (key: string, value: string | number | boolean) => {
+    try {
+      localStorage.setItem(key, String(value))
+    } catch {
+      // ignore
+    }
+  }
   const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
   const shownDelayMs = pendingDelayMs ?? videoDelayMs
   useEffect(() => {
@@ -154,15 +171,16 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       document.head.appendChild(styleTag)
     }
 
-    const fontSize = `${subtitleFontSize}rem`
-    styleTag.textContent = `
-      video::cue {
-        font-size: ${fontSize} !important;
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
-        text-shadow: 0 0 4px black;
-      }
-    `
+    const subtitleStyle: SubtitleStyleSettings = {
+      fontSize: subtitleFontSize,
+      position: subtitlePosition,
+      bgOpacity: subtitleBgOpacity,
+      bgColor: subtitleBgColor,
+      textColor: subtitleTextColor,
+      edge: subtitleEdge,
+      bold: subtitleBold,
+    }
+    styleTag.textContent = buildCueCss(subtitleStyle)
 
     const video = videoRef.current
     if (video) {
@@ -244,10 +262,19 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         trackElements.forEach((el) => el.removeEventListener('load', handleTrackLoad))
       }
     }
-  }, [subtitleFontSize, subtitlePosition, selectedSubtitle, subtitles, videoRef])
+  }, [
+    subtitleFontSize,
+    subtitlePosition,
+    subtitleBgOpacity,
+    subtitleBgColor,
+    subtitleTextColor,
+    subtitleEdge,
+    subtitleBold,
+    selectedSubtitle,
+    subtitles,
+    videoRef,
+  ])
 
-  // Show controls and reset the hide timer on user activity — mirrors the
-  // anime player (touch-aware, cursor management, interaction throttling).
   const handleUserActivity = useCallback(
     (e: MouseEvent | TouchEvent) => {
       const container = containerRef.current
@@ -298,7 +325,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     }
   }, [handleUserActivity])
 
-  // Keep controls visible while the user is interacting with UI.
   useEffect(() => {
     if (isScrubbing || settingsView) {
       setShowControls(true)
@@ -372,6 +398,36 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     video.pause()
   }
 
+  const scrubTouchTo = (clientX: number) => {
+    const video = videoRef.current
+    if (!video || !progressBarRef.current || !duration) return
+    const rect = progressBarRef.current.getBoundingClientRect()
+    const percent = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    video.currentTime = percent * duration
+    setHoverTime({ time: percent * duration, position: clientX - rect.left })
+  }
+
+  const handleProgressTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const video = videoRef.current
+    if (!video || e.touches.length === 0) return
+    setIsScrubbing(true)
+    video.pause()
+    scrubTouchTo(e.touches[0].clientX)
+  }
+
+  const handleProgressTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isScrubbing || e.touches.length === 0) return
+    scrubTouchTo(e.touches[0].clientX)
+  }
+
+  const handleProgressTouchEnd = () => {
+    if (isScrubbing) {
+      setIsScrubbing(false)
+      setHoverTime({ time: 0, position: null })
+      videoRef.current?.play().catch(() => {})
+    }
+  }
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isScrubbing || !progressBarRef.current || !duration) return
@@ -436,20 +492,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
   const hasSubtitles = subtitles.length > 0
   const isSubtitleActive = selectedSubtitle >= 0
-
-  const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value)
-    if (isNaN(value)) return
-    setSubtitleFontSize(value)
-    localStorage.setItem('subtitleFontSize', value.toString())
-  }
-
-  const handlePositionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value)
-    if (isNaN(value)) return
-    setSubtitlePosition(value)
-    localStorage.setItem('subtitlePosition', value.toString())
-  }
 
   const openSettings = () => {
     setSettingsView('main')
@@ -563,34 +605,110 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
 
   const renderSubtitleStyleSettings = () => (
     <>
-      <div className={styles.sliderGroup}>
-        <label>Font Size</label>
-        <input
-          type="range"
-          min="0.5"
-          max="10"
-          step="0.5"
-          value={subtitleFontSize}
-          onInput={handleFontSizeChange}
-          style={
-            {
-              '--slider-percent': `${((subtitleFontSize - 0.5) / 9.5) * 100}%`,
-            } as React.CSSProperties
+      <MenuSlider
+        label="Font Size"
+        display={subtitleFontSize.toFixed(1)}
+        min={0.5}
+        max={10}
+        step={0.5}
+        value={subtitleFontSize}
+        percent={((subtitleFontSize - 0.5) / 9.5) * 100}
+        onChange={(v) => {
+          if (Number.isFinite(v)) {
+            setSubtitleFontSize(v)
+            persistSubtitleSetting('subtitleFontSize', v)
           }
-        />
-      </div>
-      <div className={styles.sliderGroup}>
-        <label>Vertical Position (Lift)</label>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={subtitlePosition}
-          onInput={handlePositionChange}
-          style={{ '--slider-percent': `${subtitlePosition}%` } as React.CSSProperties}
-        />
-      </div>
+        }}
+      />
+      <MenuSlider
+        label="Vertical Position"
+        display={`${subtitlePosition}`}
+        min={0}
+        max={100}
+        step={1}
+        value={subtitlePosition}
+        percent={subtitlePosition}
+        onChange={(v) => {
+          if (Number.isFinite(v)) {
+            const rounded = Math.round(v)
+            setSubtitlePosition(rounded)
+            persistSubtitleSetting('subtitlePosition', rounded)
+          }
+        }}
+      />
+      <MenuSlider
+        label="Background Opacity"
+        display={`${Math.round(subtitleBgOpacity * 100)}%`}
+        min={0}
+        max={1}
+        step={0.05}
+        value={subtitleBgOpacity}
+        percent={subtitleBgOpacity * 100}
+        onChange={(v) => {
+          if (Number.isFinite(v)) {
+            setSubtitleBgOpacity(v)
+            persistSubtitleSetting('subtitleBgOpacity', v)
+          }
+        }}
+      />
+      <SwatchRow
+        label="Text Color"
+        colors={TEXT_COLOR_PRESETS}
+        value={subtitleTextColor}
+        onChange={(c) => {
+          setSubtitleTextColor(c)
+          persistSubtitleSetting('subtitleTextColor', c)
+        }}
+      />
+      <SwatchRow
+        label="Background Color"
+        colors={BG_COLOR_PRESETS}
+        value={subtitleBgColor}
+        onChange={(c) => {
+          setSubtitleBgColor(c)
+          persistSubtitleSetting('subtitleBgColor', c)
+        }}
+      />
+      <SegmentedRow
+        label="Text Edge"
+        options={['shadow', 'outline', 'none'] as const}
+        value={subtitleEdge}
+        onChange={(edge) => {
+          setSubtitleEdge(edge)
+          persistSubtitleSetting('subtitleEdge', edge)
+        }}
+      />
+      <button
+        className={`${styles.menuItem} ${subtitleBold ? styles.active : ''}`}
+        onClick={() => {
+          setSubtitleBold(!subtitleBold)
+          persistSubtitleSetting('subtitleBold', !subtitleBold)
+        }}
+      >
+        <span>Bold Text</span>
+        {subtitleBold && <FaCheck size={12} />}
+      </button>
+      <button
+        className={styles.menuItem}
+        onClick={() => {
+          setSubtitleFontSize(DEFAULT_SUBTITLE_STYLE.fontSize)
+          persistSubtitleSetting('subtitleFontSize', DEFAULT_SUBTITLE_STYLE.fontSize)
+          setSubtitlePosition(DEFAULT_SUBTITLE_STYLE.position)
+          persistSubtitleSetting('subtitlePosition', DEFAULT_SUBTITLE_STYLE.position)
+          setSubtitleBgOpacity(DEFAULT_SUBTITLE_STYLE.bgOpacity)
+          persistSubtitleSetting('subtitleBgOpacity', DEFAULT_SUBTITLE_STYLE.bgOpacity)
+          setSubtitleBgColor(DEFAULT_SUBTITLE_STYLE.bgColor)
+          persistSubtitleSetting('subtitleBgColor', DEFAULT_SUBTITLE_STYLE.bgColor)
+          setSubtitleTextColor(DEFAULT_SUBTITLE_STYLE.textColor)
+          persistSubtitleSetting('subtitleTextColor', DEFAULT_SUBTITLE_STYLE.textColor)
+          setSubtitleEdge(DEFAULT_SUBTITLE_STYLE.edge)
+          persistSubtitleSetting('subtitleEdge', DEFAULT_SUBTITLE_STYLE.edge)
+          setSubtitleBold(DEFAULT_SUBTITLE_STYLE.bold)
+          persistSubtitleSetting('subtitleBold', DEFAULT_SUBTITLE_STYLE.bold)
+        }}
+      >
+        <span>Reset to Defaults</span>
+      </button>
     </>
   )
 
@@ -630,22 +748,17 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         <span>Video delay</span>
         {videoDelayEnabled && <FaCheck size={12} />}
       </button>
-      <div className={styles.sliderGroup}>
-        <label>Video delay ({shownDelayMs}ms)</label>
-        <input
-          type="range"
-          min="0"
-          max="500"
-          step="5"
-          value={shownDelayMs}
-          onInput={(e) => setPendingDelayMs(Number((e.target as HTMLInputElement).value))}
-          onPointerUp={commitDelay}
-          onTouchEnd={commitDelay}
-          onKeyUp={commitDelay}
-          onBlur={commitDelay}
-          style={{ '--slider-percent': `${(shownDelayMs / 500) * 100}%` } as React.CSSProperties}
-        />
-      </div>
+      <MenuSlider
+        label="Video delay"
+        display={`${shownDelayMs}ms`}
+        min={0}
+        max={500}
+        step={5}
+        value={shownDelayMs}
+        percent={(shownDelayMs / 500) * 100}
+        onChange={(v) => setPendingDelayMs(Math.round(v))}
+        onCommit={commitDelay}
+      />
       <div className={styles.menuNote}>
         For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
         untouched.
@@ -709,7 +822,13 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             ref={progressBarRef}
             onClick={handleProgressClick}
             onMouseMove={handleProgressMouseMove}
-            onMouseLeave={() => setHoverTime({ time: 0, position: null })}
+            onMouseLeave={() => {
+              if (!isScrubbing) setHoverTime({ time: 0, position: null })
+            }}
+            onTouchStart={handleProgressTouchStart}
+            onTouchMove={handleProgressTouchMove}
+            onTouchEnd={handleProgressTouchEnd}
+            onTouchCancel={handleProgressTouchEnd}
           >
             {hoverTime.position !== null && (
               <div className={styles.timeBubble} style={{ left: hoverTime.position }}>
