@@ -14,7 +14,7 @@ import {
   FaChevronLeft,
   FaClosedCaptioning,
 } from 'react-icons/fa'
-import { MdReplay10, MdForward10, MdFastForward, MdSkipNext } from 'react-icons/md'
+import { MdReplay10, MdForward10, MdContentCut, MdPlaylistPlay } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -200,6 +200,44 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     refs.videoRef.current.pause()
   }
 
+  const scrubTouchTo = (clientX: number) => {
+    if (!refs.videoRef.current || !refs.progressBarRef.current || !state.duration) return
+    const rect = refs.progressBarRef.current.getBoundingClientRect()
+    const percent = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    const scrubTime = percent * state.duration
+    refs.videoRef.current.currentTime = scrubTime
+    const percent100 = (scrubTime / state.duration) * 100 || 0
+    if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent100}%`
+    if (thumbRef.current) thumbRef.current.style.left = `${percent100}%`
+    if (timeDisplayRef.current) {
+      timeDisplayRef.current.innerText = `${actions.formatTime(scrubTime)} / ${actions.formatTime(state.duration)}`
+    }
+    actions.setHoverTime({ time: scrubTime, position: clientX - rect.left })
+  }
+
+  const handleProgressTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!refs.videoRef.current || e.touches.length === 0) return
+    actions.setIsScrubbing(true)
+    actions.wasPlayingBeforeScrub.current = !refs.videoRef.current.paused
+    refs.videoRef.current.pause()
+    scrubTouchTo(e.touches[0].clientX)
+  }
+
+  const handleProgressTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!state.isScrubbing || e.touches.length === 0) return
+    scrubTouchTo(e.touches[0].clientX)
+  }
+
+  const handleProgressTouchEnd = () => {
+    if (state.isScrubbing) {
+      actions.setIsScrubbing(false)
+      actions.setHoverTime({ time: 0, position: null })
+      if (actions.wasPlayingBeforeScrub.current) {
+        refs.videoRef.current?.play()
+      }
+    }
+  }
+
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!refs.videoRef.current) return
     actions.setActiveSubtitleTrack(trackId)
@@ -356,7 +394,13 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           ref={refs.progressBarRef}
           onClick={handleProgressBarClick}
           onMouseMove={handleProgressBarMouseMove}
-          onMouseLeave={() => actions.setHoverTime({ time: 0, position: null })}
+          onMouseLeave={() => {
+            if (!state.isScrubbing) actions.setHoverTime({ time: 0, position: null })
+          }}
+          onTouchStart={handleProgressTouchStart}
+          onTouchMove={handleProgressTouchMove}
+          onTouchEnd={handleProgressTouchEnd}
+          onTouchCancel={handleProgressTouchEnd}
         >
           {state.hoverTime.position !== null && (
             <div className={styles.timeBubble} style={{ left: state.hoverTime.position }}>
@@ -476,19 +520,25 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 actions.setIsAutoSkipEnabled(newValue)
                 localStorage.setItem('autoSkipEnabled', newValue.toString())
               }}
-              title={state.isAutoSkipEnabled ? 'Disable Auto Skip' : 'Enable Auto Skip'}
-              aria-label="Auto Skip"
+              title={
+                state.isAutoSkipEnabled
+                  ? 'Disable auto-skip of openings and endings'
+                  : 'Auto-skip openings and endings'
+              }
+              aria-label="Auto-skip openings and endings"
             >
-              <MdFastForward size={22} />
+              <MdContentCut size={22} />
             </button>
 
             <button
               className={`${styles.controlBtn} ${isAutoplayEnabled ? styles.active : ''}`}
               onClick={() => onAutoplayChange(!isAutoplayEnabled)}
-              title={isAutoplayEnabled ? 'Disable Autoplay' : 'Enable Autoplay'}
-              aria-label="Autoplay"
+              title={
+                isAutoplayEnabled ? 'Disable autoplay of next episode' : 'Autoplay next episode'
+              }
+              aria-label="Autoplay next episode"
             >
-              <MdSkipNext size={24} />
+              <MdPlaylistPlay size={24} />
             </button>
 
             <button
@@ -510,7 +560,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </button>
 
             <button
-              className={`${styles.controlBtn} ${isTheaterMode ? styles.active : ''} `}
+              className={`${styles.controlBtn} ${styles.theaterBtn} ${isTheaterMode ? styles.active : ''} `}
               onClick={(e) => {
                 e.stopPropagation()
                 onTheaterModeToggle()
@@ -547,14 +597,49 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           subtitleSettings={{
             fontSize: state.subtitleFontSize,
             position: state.subtitlePosition,
+            bgOpacity: state.subtitleBgOpacity,
+            bgColor: state.subtitleBgColor,
+            textColor: state.subtitleTextColor,
+            edge: state.subtitleEdge,
+            bold: state.subtitleBold,
           }}
           onSubtitleSettingsChange={(key, value) => {
-            if (key === 'fontSize') {
-              actions.setSubtitleFontSize(value)
-              localStorage.setItem('subtitleFontSize', value.toString())
-            } else {
-              actions.setSubtitlePosition(value)
-              localStorage.setItem('subtitlePosition', value.toString())
+            const persist = (storageKey: string, v: string | number | boolean) => {
+              try {
+                localStorage.setItem(storageKey, String(v))
+              } catch {
+                // ignore
+              }
+            }
+            switch (key) {
+              case 'fontSize':
+                actions.setSubtitleFontSize(value as number)
+                persist('subtitleFontSize', value as number)
+                break
+              case 'position':
+                actions.setSubtitlePosition(value as number)
+                persist('subtitlePosition', value as number)
+                break
+              case 'bgOpacity':
+                actions.setSubtitleBgOpacity(value as number)
+                persist('subtitleBgOpacity', value as number)
+                break
+              case 'bgColor':
+                actions.setSubtitleBgColor(value as string)
+                persist('subtitleBgColor', value as string)
+                break
+              case 'textColor':
+                actions.setSubtitleTextColor(value as string)
+                persist('subtitleTextColor', value as string)
+                break
+              case 'edge':
+                actions.setSubtitleEdge(value as 'shadow' | 'outline' | 'none')
+                persist('subtitleEdge', value as string)
+                break
+              case 'bold':
+                actions.setSubtitleBold(value as boolean)
+                persist('subtitleBold', value as boolean)
+                break
             }
           }}
           useNativeControls={state.useNativeControls}

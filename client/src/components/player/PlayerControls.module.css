@@ -93,7 +93,8 @@
   transform: translate(-50%, -50%) scale(1);
   display: flex;
   align-items: center;
-  gap: var(--space-12);
+  gap: 3rem;
+  gap: clamp(1rem, 5cqw, 3rem);
   z-index: 10;
   pointer-events: auto;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -106,7 +107,10 @@
   color: rgba(255, 255, 255, 0.9);
   width: 56px;
   height: 56px;
+  width: clamp(2.5rem, 6.5cqw, 3.5rem);
+  height: clamp(2.5rem, 6.5cqw, 3.5rem);
   font-size: 1.8rem;
+  font-size: clamp(1.1rem, 2.8cqw, 1.8rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -131,10 +135,20 @@
   color: white;
   width: 76px;
   height: 76px;
+  width: clamp(3rem, 8cqw, 5rem);
+  height: clamp(3rem, 8cqw, 5rem);
   font-size: 2.2rem;
+  font-size: clamp(1.4rem, 3.4cqw, 2.3rem);
   cursor: pointer;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
+}
+
+@media (pointer: coarse) {
+  .centerSkipBtn {
+    width: clamp(2.75rem, 7cqw, 3.75rem);
+    height: clamp(2.75rem, 7cqw, 3.75rem);
+  }
 }
 
 .centerPlayPause:hover {
@@ -161,7 +175,7 @@
     rgba(0, 0, 0, 0.25) 80%,
     transparent 100%
   );
-  padding: 0 var(--space-8) var(--space-6) var(--space-8);
+  padding: 0 clamp(1rem, 4cqw, 2rem) clamp(0.75rem, 2.5cqw, 1.5rem);
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -173,6 +187,20 @@
   touch-action: none;
   display: flex;
   align-items: center;
+}
+
+@media (pointer: coarse) {
+  .progressBarContainer {
+    padding: 14px 0 10px 0;
+  }
+
+  .progressBarContainer .progressBar {
+    height: 6px;
+  }
+
+  .progressBarContainer .thumb {
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .progressBar {
@@ -257,7 +285,8 @@
   border-top-color: rgba(15, 15, 17, 0.95);
 }
 
-.progressBarContainer:hover .timeBubble {
+.progressBarContainer:hover .timeBubble,
+.progressBarContainer.scrubbing .timeBubble {
   opacity: 1;
 }
 
@@ -293,7 +322,8 @@
 .rightControls {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: 1.25rem;
+  gap: clamp(0.5rem, 2.5cqw, 1.25rem);
 }
 
 .controlBtn {
@@ -308,6 +338,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 2.125rem;
+  min-height: 2.125rem;
+}
+
+@media (pointer: coarse) {
+  .controlBtn {
+    padding: 10px;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
+@container (max-width: 30rem) {
+  .bottomControls {
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .leftControls,
+  .rightControls {
+    gap: 0.2rem;
+  }
+
+  .controlBtn {
+    padding: 5px;
+    min-width: 2.125rem;
+    min-height: 2.125rem;
+    font-size: 1rem;
+  }
+
+  .theaterBtn {
+    display: none;
+  }
+
+  .nextEpisodeBtn {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+  }
 }
 
 .controlBtn:hover {
@@ -534,34 +601,8 @@
     font-size: 0.75rem;
   }
 
-  .centerControls {
-    gap: 1.25rem;
-  }
-
-  .centerSkipBtn {
-    width: 40px;
-    height: 40px;
-    font-size: 1.2rem;
-  }
-
-  .centerPlayPause {
-    width: 56px;
-    height: 56px;
-    font-size: 1.5rem;
-  }
-
   .bottomControls {
     padding: 0 16px 16px 16px;
-  }
-
-  .leftControls,
-  .rightControls {
-    gap: 0.4rem;
-  }
-
-  .controlBtn {
-    padding: 6px;
-    font-size: 1rem;
   }
 
   .timeDisplay {
@@ -614,17 +655,8 @@
 
 /* Extra small screens (portrait phones) */
 @media (max-width: 480px) {
-  .leftControls,
-  .rightControls {
-    gap: 0.2rem;
-  }
-
   .shortcuts {
     gap: 0.25rem;
-  }
-
-  .controlBtn {
-    padding: 4px;
   }
 
   .timeDisplay {
@@ -633,9 +665,5 @@
 
   .topControls {
     padding: 8px 12px;
-  }
-
-  .centerControls {
-    gap: 1rem;
   }
 }

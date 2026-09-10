@@ -318,6 +318,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  container-type: inline-size;
 }
 
 .loadingOverlay {
