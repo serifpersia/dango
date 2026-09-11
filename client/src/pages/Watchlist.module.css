@@ -626,7 +626,7 @@
   margin-top: var(--space-2);
   padding: 0.7rem 1.6rem;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-  color: #ffffff;
+  color: var(--accent-text);
   font-size: var(--font-size-sm);
   font-weight: 700;
   border: none;

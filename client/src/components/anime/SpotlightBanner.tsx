@@ -271,10 +271,15 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         <div className={styles.overlay}>
           <div className={styles.content}>
             <div className={styles.badgeRow}>
-              <span className={styles.featureLabel}>Featured</span>
+              <span className={styles.featureLabel}>Spotlight</span>
+              {top6.length > 1 && (
+                <span className={styles.index}>
+                  {String(safeIndex + 1).padStart(2, '0')} / {String(top6.length).padStart(2, '0')}
+                </span>
+              )}
               {anime.score && (
-                <div className={styles.metaRow} style={{ color: '#fbbf24' }}>
-                  <FaStar size={14} />
+                <div className={styles.scoreChip}>
+                  <FaStar size={12} />
                   <span>{anime.score}</span>
                 </div>
               )}
@@ -300,12 +305,13 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
             {genres.length > 0 && (
               <div className={styles.genres}>
-                {genres.map((g) => {
+                {genres.map((g, idx) => {
                   const genreName = typeof g === 'string' ? g : g?.name
                   return (
-                    <span key={genreName} className={styles.genreTag}>
-                      {genreName}
-                    </span>
+                    <React.Fragment key={genreName}>
+                      <span className={styles.genreTag}>{genreName}</span>
+                      {idx < genres.length - 1 && <div className={styles.metaDivider} />}
+                    </React.Fragment>
                   )
                 })}
               </div>

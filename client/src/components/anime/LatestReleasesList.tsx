@@ -19,7 +19,7 @@ const formatOptions = [
 
 const PAGE_SIZE = 10
 
-export default function LatestReleasesList() {
+export default function LatestReleasesList({ eyebrow }: { eyebrow?: string }) {
   const { lowEndMode } = useLowEndMode()
   const [format, setFormat] = useLocalStorage<string>('latest_releases_format', 'TV')
 
@@ -42,7 +42,10 @@ export default function LatestReleasesList() {
     <section className={styles.sectionWrapper}>
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          <div className={`section-title ${styles.sectionTitleNoMargin}`}>Latest Releases</div>
+          <div className="title-stack">
+            {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
+            <div className={`section-title ${styles.sectionTitleNoMargin}`}>Latest Releases</div>
+          </div>
           <div className={styles['nav-arrows']}>
             <button
               className={styles['nav-button']}

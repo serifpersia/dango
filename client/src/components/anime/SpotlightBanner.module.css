@@ -6,7 +6,7 @@
   margin-left: -50vw;
   margin-right: -50vw;
   margin-top: calc(-1 * var(--header-height));
-  margin-bottom: 3rem;
+  margin-bottom: 2.5rem;
   overflow: hidden;
   background-color: var(--bg-main);
   z-index: 2;
@@ -15,7 +15,7 @@
 .posterWrapper {
   position: relative;
   width: 100%;
-  height: clamp(520px, 70vh, 820px);
+  height: clamp(440px, 56vh, 620px);
   overflow: hidden;
   background-color: var(--bg-main);
 }
@@ -40,13 +40,13 @@
 
 @media (max-width: 600px) {
   .posterWrapper {
-    height: clamp(640px, 83vh, 980px);
+    height: clamp(420px, 60vh, 560px);
   }
 }
 
 @media (max-width: 900px) and (orientation: landscape) {
   .posterWrapper {
-    height: clamp(640px, 84vh, 980px);
+    height: clamp(420px, 62vh, 560px);
   }
 }
 
@@ -79,7 +79,7 @@
   align-items: flex-start;
   justify-content: center;
   min-height: 100%;
-  gap: 1.25rem;
+  gap: 1rem;
   z-index: 4;
 }
 
@@ -91,14 +91,37 @@
 
 .featureLabel {
   padding: 0.3rem 0.75rem;
-  background: rgba(138, 79, 255, 0.15);
-  border: 1px solid rgba(138, 79, 255, 0.3);
+  background: var(--accent-subtle);
+  border: 1px solid var(--border-accent);
   color: var(--accent-light);
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  border-radius: var(--radius-sm);
-  letter-spacing: 0.05em;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.08em;
+}
+
+.index {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--accent-lighter);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
 }
 
 .metaRow {
@@ -125,7 +148,7 @@
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   line-height: 1.1;
   cursor: pointer;
   max-width: 800px;
@@ -151,29 +174,25 @@
 .genres {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.6rem;
 }
 
 .genreTag {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-full);
-  backdrop-filter: blur(4px);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .summary {
-  font-size: 1.15rem;
+  font-size: 1rem;
   line-height: 1.6;
   margin: 0;
   opacity: 0.9;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 750px;
@@ -194,7 +213,7 @@
   gap: 0.6rem;
   padding: 0.8rem 2rem;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-  color: #ffffff;
+  color: var(--accent-text);
   font-size: 0.95rem;
   font-weight: 700;
   border: none;

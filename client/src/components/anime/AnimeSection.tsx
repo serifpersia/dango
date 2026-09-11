@@ -46,6 +46,7 @@ interface AnimeSectionConfig {
 
 interface AnimeSectionProps {
   title: string
+  eyebrow?: string
   animeList: Anime[]
   continueWatching?: boolean
   titleLink?: string
@@ -64,6 +65,7 @@ interface AnimeSectionProps {
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
   title,
+  eyebrow,
   animeList,
   continueWatching,
   titleLink,
@@ -113,13 +115,16 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
     >
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          {titleLink ? (
-            <Link to={titleLink} className={styles['title-link']}>
+          <div className="title-stack">
+            {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
+            {titleLink ? (
+              <Link to={titleLink} className={styles['title-link']}>
+                <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
+              </Link>
+            ) : (
               <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
-            </Link>
-          ) : (
-            <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
-          )}
+            )}
+          </div>
           {carousel && animeList.length > 0 && isExpanded && (
             <div className={styles['nav-arrows']}>
               <button

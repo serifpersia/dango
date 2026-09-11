@@ -40,7 +40,7 @@ const fetchEpisodeSchedule = async (date: string, format: string): Promise<Anime
   return response.json()
 }
 
-const Schedule: React.FC = () => {
+const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
   const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
   const [format, setFormat] = useLocalStorage<string>('schedule_format', 'TV')
   const { emblaRef, canScroll, stepBy, scrollToStart } = useCarousel()
@@ -114,7 +114,10 @@ const Schedule: React.FC = () => {
     <div className={styles.scheduleSection}>
       <div className={styles.sectionHeader}>
         <div className={styles.sectionTitleRow}>
-          <h2 className={`section-title ${styles.sectionTitleNoMargin}`}>Episode Schedule</h2>
+          <div className="title-stack">
+            {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
+            <h2 className={`section-title ${styles.sectionTitleNoMargin}`}>Episode Schedule</h2>
+          </div>
           {scheduleData.length > 0 && canScroll && (
             <div className={styles.navArrows}>
               <button

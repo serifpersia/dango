@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--accent-text);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   transition: var(--transition-base);

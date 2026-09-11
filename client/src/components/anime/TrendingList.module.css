@@ -115,7 +115,7 @@
 
 .carousel {
   overflow: hidden;
-  padding: 10px 0; /* Add padding to prevent hover transform clipping */
+  padding: 10px 0;
   margin: -10px 0;
 }
 
@@ -127,8 +127,6 @@
 .carouselItem {
   flex: 0 0 calc((100% - (6 * 15px)) / 7);
   min-width: 120px;
-  display: flex;
-  flex-direction: column;
   position: relative;
 }
 
@@ -159,6 +157,40 @@
   .carouselInner {
     gap: 10px;
     align-items: flex-start;
+  }
+}
+
+/* ===== RANK — plain number below card ===== */
+.rankCard {
+  width: 100%;
+}
+
+.rankPill {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankPill.rankGold {
+  color: #d8b56b;
+}
+
+.rankPill.rankSilver {
+  color: #c3c9d1;
+}
+
+.rankPill.rankBronze {
+  color: #c08d5f;
+}
+
+@media (max-width: 768px) {
+  .rankPill {
+    font-size: 1.3rem;
   }
 }
 

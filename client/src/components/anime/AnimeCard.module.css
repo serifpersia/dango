@@ -223,7 +223,8 @@
   bottom: var(--space-2);
   left: var(--space-2);
   background-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
+  border-radius: var(--radius-full);
 }
 
 .airTime {
@@ -265,20 +266,6 @@
   padding: 4px 8px;
   z-index: 5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.rankBadge {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  background: rgba(0, 0, 0, 0.75);
-  color: #ffd700;
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  padding: 3px 8px;
-  border-radius: 4px;
-  backdrop-filter: blur(4px);
-  z-index: 2;
 }
 
 .metaRow {
@@ -404,7 +391,7 @@
 .mobileEp {
   composes: mobileBadgeBase;
   background-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
 }
 
 @media (max-width: 768px) {

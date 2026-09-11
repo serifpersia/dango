@@ -1,9 +1,10 @@
 :root {
-  /* ===== COLOR: ACCENT — Deep Iris ===== */
+  /* ===== COLOR: ACCENT — Taro ===== */
   --accent: #6d5dfc;
   --accent-light: #897cff;
   --accent-lighter: #b3a8ff;
   --accent-dark: #5646db;
+  --accent-text: #ffffff;
   --accent-subtle: rgba(109, 93, 252, 0.12);
   --accent-glow: rgba(109, 93, 252, 0.18);
   --accent-h: 245;
@@ -195,4 +196,86 @@
     --font-size-base: 1.125rem;
     --max-width: 2000px;
   }
+}
+
+/* ===== THEMES — default is Taro (:root, top ball). Mochi (middle) + Sakura (bottom). ===== */
+
+/* Mochi: middle ball (#f0f0f0) — monochrome pearl on neutral charcoal, flat (no glow) */
+html[data-theme='mochi'] {
+  --accent: #e3e1ee;
+  --accent-light: #f4f3fa;
+  --accent-lighter: #ffffff;
+  --accent-dark: #b3b1c6;
+  --accent-text: #17171c;
+  --accent-subtle: rgba(227, 225, 238, 0.12);
+  --accent-glow: rgba(227, 225, 238, 0);
+  --accent-h: 248;
+  --accent-s: 18%;
+  --accent-l: 89%;
+
+  --bg-main: #131316;
+  --bg-primary: #1b1b1f;
+  --bg-secondary: #1b1b1f;
+  --bg-tertiary: #232329;
+  --bg-elevated: #2b2b32;
+  --header-bg: rgba(19, 19, 22, 0.88);
+
+  --text-primary: #f2f2f5;
+  --text-secondary: #a9a9b3;
+  --text-tertiary: #85858f;
+  --text-muted: #a9a9b3;
+
+  --border-primary: #2c2c33;
+  --border-secondary: #3a3a43;
+
+  --glass-bg: rgba(27, 27, 31, 0.96);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(227, 225, 238, 0.25);
+}
+
+/* Sakura: bottom ball (#e0b0e0) — soft pink on dark plum, flat (no glow) */
+html[data-theme='sakura'] {
+  --accent: #d9a3d9;
+  --accent-light: #eccbec;
+  --accent-lighter: #f9e8f9;
+  --accent-dark: #a978a9;
+  --accent-text: #fff;
+  --accent-subtle: rgba(217, 163, 217, 0.12);
+  --accent-glow: rgba(217, 163, 217, 0);
+  --accent-h: 300;
+  --accent-s: 45%;
+  --accent-l: 74%;
+
+  --bg-main: #141116;
+  --bg-primary: #1c171e;
+  --bg-secondary: #1c171e;
+  --bg-tertiary: #241e26;
+  --bg-elevated: #2e262f;
+  --header-bg: rgba(20, 17, 22, 0.88);
+
+  --text-primary: #f3eaf3;
+  --text-secondary: #b3a3b5;
+  --text-tertiary: #8d7c8f;
+  --text-muted: #b3a3b5;
+
+  --border-primary: #322a34;
+  --border-secondary: #403640;
+
+  --glass-bg: rgba(28, 23, 30, 0.96);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(217, 163, 217, 0.25);
 }
