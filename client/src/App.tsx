@@ -136,10 +136,10 @@ function App() {
           success: {
             style: {
               background: 'var(--accent)',
-              color: '#fff',
+              color: 'var(--accent-text)',
             },
             iconTheme: {
-              primary: '#fff',
+              primary: 'var(--accent-text)',
               secondary: 'var(--accent)',
             },
           },

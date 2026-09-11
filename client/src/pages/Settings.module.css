@@ -29,8 +29,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  position: sticky;
-  top: var(--space-8);
+  position: relative;
+}
+
+.sidebarIndicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  transition:
+    top 0.22s cubic-bezier(0.2, 1.2, 0.3, 1),
+    height 0.22s cubic-bezier(0.2, 1.2, 0.3, 1),
+    left 0.22s cubic-bezier(0.2, 1.2, 0.3, 1),
+    width 0.22s cubic-bezier(0.2, 1.2, 0.3, 1);
+  z-index: 0;
+  pointer-events: none;
 }
 
 .sidebarItem {
@@ -45,20 +59,18 @@
   font-weight: 600;
   font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color 0.22s ease;
   text-align: left;
+  position: relative;
+  z-index: 1;
 }
 
 .sidebarItem:hover {
-  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
 }
 
 .sidebarItem.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  box-shadow: 0 4px 15px var(--accent-glow);
+  color: var(--accent-text);
 }
 
 .sidebarItem svg {
@@ -74,7 +86,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  animation: fadeIn 0.4s var(--ease-smooth);
+  animation: tabFadeIn 0.3s ease;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sectionCard {
@@ -165,7 +188,13 @@
     flex-direction: row;
     overflow-x: auto;
     padding-bottom: var(--space-2);
-    position: static;
+  }
+
+  .sidebarIndicator {
+    right: auto;
+    top: auto !important;
+    bottom: 0;
+    height: 3px !important;
   }
 
   .sidebarItem {

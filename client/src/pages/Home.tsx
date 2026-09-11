@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useCallback, useRef, useState, useLayoutEffect } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa'
 import { Button } from '../components/common/Button'
@@ -152,17 +152,38 @@ const Home: React.FC = () => {
 
   const displayTab = activeTab === 'week' && !hasThisWeek ? 'latest' : activeTab
 
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 })
+
+  useLayoutEffect(() => {
+    const activeKey = displayTab
+    const el = tabRefs.current.get(activeKey)
+    const bar = tabBarRef.current
+    if (el && bar) {
+      const barRect = bar.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      setIndicator({
+        left: elRect.left - barRect.left,
+        width: elRect.width,
+      })
+    }
+  }, [displayTab, tabsWithWeek.length])
+
   const renderTabContent = () => {
     switch (displayTab) {
       case 'latest':
-        return <LatestReleasesList />
+        return <LatestReleasesList eyebrow="Fresh episodes" />
       case 'season':
         return (
           <section style={{ marginBottom: '2.5rem' }}>
             <div className={styles['section-header']} ref={seasonalRef}>
               <div className={styles['title-wrapper']}>
-                <div className="section-title" style={{ marginBottom: 0 }}>
-                  Current Season
+                <div className="title-stack">
+                  <div className="section-eyebrow">This season</div>
+                  <div className="section-title" style={{ marginBottom: 0 }}>
+                    Current Season
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -254,11 +275,12 @@ const Home: React.FC = () => {
           </section>
         )
       case 'popular':
-        return <TrendingList title="Trending" />
+        return <TrendingList title="Trending" eyebrow="Discover" />
       case 'week':
         return (
           <AnimeSection
             title="This Week"
+            eyebrow="Aired this week"
             animeList={thisWeekList || []}
             continueWatching={false}
             carousel
@@ -273,26 +295,9 @@ const Home: React.FC = () => {
   return (
     <div style={{ paddingBottom: '2rem' }}>
       <SpotlightBanner animeList={spotlightAnime || []} />
-      <QueueRail
-        title="Queue"
-        items={queueData}
-        onRemove={(item) =>
-          removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
-        }
-        showClearAll
-        onClear={() => clearQueue.mutate()}
-        onReorder={(items) =>
-          reorderQueue.mutate(
-            items.map((item) => ({
-              id: item.id,
-              showId: item.showId,
-              episodeNumber: item.episodeNumber,
-            }))
-          )
-        }
-      />
       <AnimeSection
         title="Continue Watching"
+        eyebrow="Pick up where you left off"
         titleLink="/watchlist/Continue Watching"
         animeList={cwList}
         continueWatching
@@ -310,7 +315,7 @@ const Home: React.FC = () => {
             <div>
               <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
               <p className={styles.emptyStateText}>
-                You haven't watched anything yet. Start exploring and watch something first!
+                You haven&apos;t watched anything yet. Start exploring and watch something first!
               </p>
             </div>
             <Button
@@ -325,11 +330,38 @@ const Home: React.FC = () => {
         }
       />
 
-      <div className={styles.tabBar}>
+      <QueueRail
+        title="Queue"
+        eyebrow="Up next"
+        items={queueData}
+        onRemove={(item) =>
+          removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
+        }
+        showClearAll
+        onClear={() => clearQueue.mutate()}
+        onReorder={(items) =>
+          reorderQueue.mutate(
+            items.map((item) => ({
+              id: item.id,
+              showId: item.showId,
+              episodeNumber: item.episodeNumber,
+            }))
+          )
+        }
+      />
+
+      <div className={styles.tabBar} ref={tabBarRef}>
+        <div
+          className={styles.tabIndicator}
+          style={{ left: indicator.left, width: indicator.width }}
+        />
         {tabsWithWeek.map((tab) => (
           <Button
             key={tab.key}
-            variant={displayTab === tab.key ? 'primary' : 'secondary'}
+            ref={(el) => {
+              if (el) tabRefs.current.set(tab.key, el)
+            }}
+            variant="secondary"
             size="sm"
             className={`${styles.tabButton} ${displayTab === tab.key ? styles.tabActive : ''}`}
             onClick={() => setActiveTab(tab.key)}
@@ -341,7 +373,7 @@ const Home: React.FC = () => {
 
       <div className={styles.tabContent}>{renderTabContent()}</div>
 
-      <Schedule />
+      <Schedule eyebrow="Never miss an episode" />
 
       <Modal
         isOpen={!!itemToRemove}

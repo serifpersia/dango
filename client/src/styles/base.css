@@ -188,6 +188,42 @@ main {
   line-height: 1;
 }
 
+.section-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-light);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.section-eyebrow::before {
+  content: '';
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
+  box-shadow: 0 0 8px var(--accent-glow);
+  flex: none;
+}
+
+.title-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  justify-content: center;
+}
+
+html[data-theme='mochi'] .section-eyebrow,
+html[data-theme='sakura'] .section-eyebrow {
+  color: var(--accent);
+}
+
 @media (max-width: 768px) {
   .section-title {
     font-size: 1.5rem;

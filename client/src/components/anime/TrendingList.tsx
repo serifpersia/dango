@@ -10,13 +10,14 @@ import { useLocalStorage } from '../../hooks/useLocalStorage'
 
 interface TrendingListProps {
   title: string
+  eyebrow?: string
 }
 
 const SORT_TRENDING = 'TRENDING_DESC'
 const SORT_ALL_TIME = 'POPULARITY_DESC'
 const PAGE_SIZE = 10
 
-export default function TrendingList({ title }: TrendingListProps) {
+export default function TrendingList({ title, eyebrow }: TrendingListProps) {
   const { lowEndMode } = useLowEndMode()
   const [sort, setSort] = useLocalStorage<string>('trending_sort', SORT_TRENDING)
 
@@ -44,7 +45,10 @@ export default function TrendingList({ title }: TrendingListProps) {
     <section className={styles.sectionWrapper}>
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
+          <div className="title-stack">
+            {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
+            <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
+          </div>
           <div className={styles['nav-arrows']}>
             <button
               className={styles['nav-button']}
@@ -109,7 +113,22 @@ export default function TrendingList({ title }: TrendingListProps) {
             <div className={styles.carouselInner}>
               {trendingList.map((item, i) => (
                 <div key={item._id} className={styles.carouselItem}>
-                  <AnimeCard anime={item} rank={i + 1} />
+                  <div className={styles.rankCard}>
+                    <AnimeCard anime={item} />
+                  </div>
+                  <div
+                    className={`${styles.rankPill} ${
+                      i === 0
+                        ? styles.rankGold
+                        : i === 1
+                          ? styles.rankSilver
+                          : i === 2
+                            ? styles.rankBronze
+                            : ''
+                    }`}
+                  >
+                    {i + 1}
+                  </div>
                 </div>
               ))}
               {isFetchingNextPage && (

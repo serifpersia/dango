@@ -45,7 +45,6 @@ interface Anime {
   }
   isAdult?: boolean
   rating?: string
-  rank?: number
   airTime?: string
   aired?: boolean
   nextEpisodeAirDate?: string
@@ -90,11 +89,10 @@ interface AnimeCardProps {
   onRemove?: (id: string) => void
   config?: AnimeCardConfig
   layout?: 'vertical' | 'horizontal'
-  rank?: number
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({ anime, continueWatching = false, onRemove, config, layout = 'vertical', rank }) => {
+  ({ anime, continueWatching = false, onRemove, config, layout = 'vertical' }) => {
     const navigate = useNavigate()
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
@@ -316,9 +314,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
             {!isMobile && (
               <>
-                {showTypeBadge && rank === undefined && (
-                  <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
-                )}
+                {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
                 {showEpBadge && (progressString || anime.episodeNumber) && (
                   <div className={styles.epBadge}>
                     {progressString ? progressString : `EP ${anime.episodeNumber}`}
@@ -338,8 +334,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
 
             {anime.aired === false && <div className={styles.notAiredBadge}>NOT AIRED</div>}
-
-            {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
 
             {!isMobile && isHovered && (
               <div className={styles.hoverOverlay}>

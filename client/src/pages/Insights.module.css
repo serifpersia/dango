@@ -64,27 +64,19 @@
 
 .statCard {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(138, 79, 255, 0.12);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-6);
   display: flex;
   align-items: center;
   gap: var(--space-5);
   transition: all var(--transition-base);
-  box-shadow:
-    var(--glass-shadow),
-    0 0 28px -12px var(--accent-glow);
 }
 
 .statCard:hover {
   transform: translateY(-5px);
   border-color: var(--border-accent);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow:
-    0 20px 40px -10px rgba(0, 0, 0, 0.5),
-    0 0 40px -8px var(--accent-glow);
+  background: var(--bg-tertiary);
 }
 
 .statIcon {
@@ -229,9 +221,9 @@
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s var(--ease-smooth);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  transition: all 0.15s ease;
 }
 
 .heatBox.hiddenBox {
@@ -242,31 +234,27 @@
 .heatBox:hover {
   transform: scale(1.6);
   z-index: 10;
-  border-color: white;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  border-color: var(--accent);
 }
 
 .level0 {
-  background: rgba(138, 79, 255, 0.06);
+  background: var(--bg-tertiary);
 }
 .level1 {
-  background: rgba(109, 40, 217, 0.4);
-  border-color: rgba(109, 40, 217, 0.5);
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .level2 {
-  background: rgba(139, 92, 246, 0.6);
-  border-color: rgba(139, 92, 246, 0.7);
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .level3 {
-  background: rgba(168, 85, 247, 0.8);
-  border-color: rgba(168, 85, 247, 0.9);
+  background: color-mix(in srgb, var(--accent) 75%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
 .level4 {
-  background: #c084fc;
-  border-color: #e9d5ff;
-  box-shadow:
-    0 0 12px var(--accent-glow),
-    0 0 4px rgba(192, 132, 252, 0.8);
+  background: var(--accent);
+  border-color: var(--accent-light);
 }
 
 .heatmapFooter {
@@ -365,7 +353,7 @@
 .chartSubtext {
   margin-top: var(--space-8);
   padding: var(--space-4);
-  background: rgba(138, 79, 255, 0.1);
+  background: var(--accent-subtle);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   font-size: 0.9rem;
@@ -380,23 +368,21 @@
 
 .popTrack {
   height: 14px;
-  background: linear-gradient(to right, #10b981, #f59e0b, #ef4444);
+  background: linear-gradient(to right, var(--accent-dark), var(--accent), var(--accent-light));
   border-radius: var(--radius-full);
   position: relative;
   margin-bottom: var(--space-6);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .popThumb {
   width: 26px;
   height: 26px;
-  background: white;
-  border: 5px solid var(--bg-secondary);
+  background: #fff;
+  border: 4px solid var(--bg-secondary);
   border-radius: 50%;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
   transition: left 1s var(--ease-spring);
 }
 
@@ -404,7 +390,7 @@
   font-size: 0.95rem;
   color: var(--text-secondary);
   line-height: 1.6;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-secondary);
   padding: var(--space-5);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-primary);
@@ -434,9 +420,8 @@
 
 .seasonalBar {
   width: 100%;
-  background: linear-gradient(to top, #3b82f6, #60a5fa);
+  background: var(--accent);
   border-radius: 6px 6px 2px 2px;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
   opacity: 0.8;
   transition: all var(--transition-fast);
 }
@@ -490,17 +475,15 @@
 
 .genreBarBg {
   height: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .genreBar {
   height: 100%;
   border-radius: var(--radius-full);
   transition: width 1.5s var(--ease-smooth);
-  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
 }
 
 .warningSection {
@@ -537,8 +520,8 @@
 }
 
 .droppedCard {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   padding: var(--space-6);
   border-radius: var(--radius-lg);
   display: flex;
@@ -549,9 +532,8 @@
 
 .droppedCard:hover {
   transform: translateY(-4px) scale(1.02);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(239, 68, 68, 0.4);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  background: var(--bg-tertiary);
+  border-color: var(--border-secondary);
 }
 
 .droppedName {
@@ -630,15 +612,14 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
 }
 
 .rankNumber {
-  color: white;
+  color: var(--accent-text);
   font-weight: 700;
   font-size: 1.1rem;
 }
@@ -671,14 +652,13 @@
   width: 100%;
   border-radius: var(--radius-sm);
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-primary);
   transition: transform var(--transition-fast);
 }
 
 .miniPoster:hover {
   transform: scale(1.05);
   border-color: var(--accent);
-  box-shadow: 0 4px 15px rgba(138, 79, 255, 0.3);
 }
 
 .genreCardSkeleton {

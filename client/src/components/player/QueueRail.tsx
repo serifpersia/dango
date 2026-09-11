@@ -8,6 +8,7 @@ import styles from './QueueRail.module.css'
 
 interface QueueRailProps {
   title?: string
+  eyebrow?: string
   items: QueueItem[]
   currentShowId?: string
   currentEpisode?: string
@@ -111,6 +112,7 @@ const QueueRailItem = ({
 
 const QueueRail = ({
   title = 'Queue',
+  eyebrow,
   items,
   currentShowId,
   currentEpisode,
@@ -274,7 +276,10 @@ const QueueRail = ({
           aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
         >
           <span className={styles.title}>
-            {title}
+            <span className="title-stack">
+              {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
+              <span>{title}</span>
+            </span>
             <span className={styles.badge}>{localQueue.length}</span>
           </span>
           {isExpanded ? <FaChevronUp /> : <FaChevronDown />}

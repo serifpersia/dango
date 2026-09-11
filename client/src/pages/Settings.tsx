@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
@@ -10,6 +10,7 @@ import RcloneSettings from '../components/settings/RcloneSettings'
 import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import LanAuthSettings from '../components/settings/LanAuthSettings'
+import ThemeSettings from '../components/settings/ThemeSettings'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -40,6 +41,9 @@ const Settings: React.FC = () => {
   )
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const tabBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const [sidebarIndicator, setSidebarIndicator] = useState({ top: 0, height: 0, left: 0, width: 0 })
   const { lowEndMode, setLowEndMode } = useLowEndMode()
   const [telemetryEnabled, setTelemetryEnabled] = useState(
     localStorage.getItem('telemetry_enabled') !== 'false'
@@ -147,6 +151,41 @@ const Settings: React.FC = () => {
     setSearchParams(tab === 'general' ? {} : { tab })
   }
 
+  const updateIndicator = useCallback(() => {
+    const el = tabBtnRefs.current.get(activeTab)
+    const sidebar = sidebarRef.current
+    if (el && sidebar) {
+      const sidebarRect = sidebar.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      const isMobile = window.matchMedia('(max-width: 900px)').matches
+      if (isMobile) {
+        setSidebarIndicator({
+          top: elRect.top - sidebarRect.top,
+          height: elRect.height,
+          left: elRect.left - sidebarRect.left,
+          width: elRect.width,
+        })
+      } else {
+        setSidebarIndicator({
+          top: elRect.top - sidebarRect.top,
+          height: elRect.height,
+          left: 0,
+          width: 0,
+        })
+      }
+    }
+  }, [activeTab])
+
+  useLayoutEffect(() => {
+    updateIndicator()
+  }, [activeTab, updateIndicator])
+
+  useEffect(() => {
+    const handleResize = () => updateIndicator()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [activeTab, updateIndicator])
+
   const handleBackup = () => {
     setStatusMessage('Downloading database backup...')
     const a = document.createElement('a')
@@ -201,6 +240,9 @@ const Settings: React.FC = () => {
               <p>Configure how titles are displayed and other general preferences.</p>
               <div className={styles.settingItem}>
                 <TitlePreferenceToggle />
+              </div>
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <ThemeSettings />
               </div>
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                 <div className={styles.settingRow}>
@@ -314,7 +356,7 @@ const Settings: React.FC = () => {
                     </h4>
                     <p
                       style={{
-                        margin: '0.25rem 0 0',
+                        margin: '0.25rem 0 0.75rem',
                         fontSize: '0.85rem',
                         color: 'var(--text-secondary)',
                       }}
@@ -326,7 +368,7 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
 
-                <Alert variant="warning" style={{ marginTop: '0.75rem' }}>
+                <Alert variant="warning" style={{ marginTop: '1.25rem', paddingTop: '1.25rem' }}>
                   <strong>Use at your own risk.</strong> This feature uses the Discord Gateway API
                   with your user token, which violates Discord's Terms of Service. Discord may
                   detect this usage and take action against your account, including phone number
@@ -564,26 +606,47 @@ const Settings: React.FC = () => {
       </div>
 
       <div className={styles.settingsLayout}>
-        <aside className={styles.sidebar}>
+        <aside className={styles.sidebar} ref={sidebarRef}>
+          <div
+            className={styles.sidebarIndicator}
+            style={{
+              top: sidebarIndicator.top,
+              height: sidebarIndicator.height,
+              left: sidebarIndicator.left,
+              ...(sidebarIndicator.width ? { width: sidebarIndicator.width } : {}),
+            }}
+          />
           <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('general', el)
+            }}
             className={`${styles.sidebarItem} ${activeTab === 'general' ? styles.active : ''}`}
             onClick={() => selectTab('general')}
           >
             <FaCog /> <span>General</span>
           </button>
           <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('sync', el)
+            }}
             className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
             onClick={() => selectTab('sync')}
           >
             <FaCloud /> <span>Synchronization</span>
           </button>
           <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('watchlist', el)
+            }}
             className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
             onClick={() => selectTab('watchlist')}
           >
             <FaList /> <span>Watchlist</span>
           </button>
           <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('database', el)
+            }}
             className={`${styles.sidebarItem} ${activeTab === 'database' ? styles.active : ''}`}
             onClick={() => selectTab('database')}
           >
@@ -591,7 +654,11 @@ const Settings: React.FC = () => {
           </button>
         </aside>
 
-        <main className={styles.mainContent}>{renderTabContent()}</main>
+        <main className={styles.mainContent}>
+          <div key={activeTab} className={styles.tabContent}>
+            {renderTabContent()}
+          </div>
+        </main>
       </div>
     </div>
   )

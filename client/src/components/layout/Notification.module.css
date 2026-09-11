@@ -58,7 +58,7 @@
   top: 6px;
   right: 6px;
   background-color: var(--color-danger);
-  color: white;
+  color: #fff;
   font-size: 0.62rem;
   font-weight: bold;
   min-width: 18px;
@@ -236,8 +236,8 @@
 .itemMeta {
   display: inline-block;
   font-size: 0.7rem;
-  background: var(--primary-color);
-  color: white;
+  background: var(--accent);
+  color: var(--accent-text);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   font-weight: 600;
