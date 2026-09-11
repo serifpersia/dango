@@ -14,11 +14,24 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [autoplayResetKey, setAutoplayResetKey] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null)
+  const [loadedTick, setLoadedTick] = useState(0)
   const lastScrollTime = useRef(0)
   const touchStartX = useRef<number>(0)
+  const loadedSrcs = useRef<Set<string>>(new Set())
+  const pendingTimer = useRef<number | null>(null)
+  const currentIndexRef = useRef(0)
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
   const top6 = useMemo(() => animeList.slice(0, 6), [animeList])
+
+  const bannerSrcFor = useCallback(
+    (anime: Anime) =>
+      anime.bannerImage
+        ? fixThumbnailUrl(anime.bannerImage, 1920, 840)
+        : fixThumbnailUrl(anime.thumbnail, 1280, 450),
+    []
+  )
 
   const getTitle = (anime: Anime) => {
     switch (titlePreference) {
@@ -35,21 +48,93 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     setAutoplayResetKey((k) => k + 1)
   }, [])
 
-  const selectSlide = useCallback(
+  const commitSlide = useCallback(
     (index: number) => {
+      if (pendingTimer.current !== null) {
+        window.clearTimeout(pendingTimer.current)
+        pendingTimer.current = null
+      }
+      setPendingIndex(null)
       resetAutoplay()
       setCurrentIndex(index)
     },
     [resetAutoplay]
   )
 
+  const requestSlide = useCallback(
+    (index: number) => {
+      if (top6.length === 0) return
+      const target = ((index % top6.length) + top6.length) % top6.length
+      if (loadedSrcs.current.has(bannerSrcFor(top6[target]))) {
+        commitSlide(target)
+      } else {
+        setPendingIndex(target)
+      }
+    },
+    [top6, bannerSrcFor, commitSlide]
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    top6.forEach((anime) => {
+      const src = bannerSrcFor(anime)
+      if (loadedSrcs.current.has(src)) return
+      const img = new Image()
+      img.src = src
+      const markDone = () => {
+        if (cancelled || loadedSrcs.current.has(src)) return
+        loadedSrcs.current.add(src)
+        setLoadedTick((t) => t + 1)
+      }
+      img.onload = markDone
+      img.onerror = markDone
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [top6, bannerSrcFor])
+
+  useEffect(() => {
+    if (pendingIndex === null) return
+    if (pendingIndex < 0 || pendingIndex >= top6.length) {
+      setPendingIndex(null)
+      return
+    }
+    if (loadedSrcs.current.has(bannerSrcFor(top6[pendingIndex]))) {
+      commitSlide(pendingIndex)
+    }
+  }, [pendingIndex, loadedTick, top6, bannerSrcFor, commitSlide])
+
+  useEffect(() => {
+    if (pendingIndex === null) return
+    if (pendingTimer.current !== null) window.clearTimeout(pendingTimer.current)
+    const target = pendingIndex
+    pendingTimer.current = window.setTimeout(() => {
+      pendingTimer.current = null
+      commitSlide(target)
+    }, 2500)
+    return () => {
+      if (pendingTimer.current !== null) {
+        window.clearTimeout(pendingTimer.current)
+        pendingTimer.current = null
+      }
+    }
+  }, [pendingIndex, commitSlide])
+
+  const selectSlide = useCallback(
+    (index: number) => {
+      requestSlide(index)
+    },
+    [requestSlide]
+  )
+
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % top6.length)
-  }, [top6.length])
+    requestSlide(currentIndexRef.current + 1)
+  }, [requestSlide])
 
   const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + top6.length) % top6.length)
-  }, [top6.length])
+    requestSlide(currentIndexRef.current - 1)
+  }, [requestSlide])
 
   useEffect(() => {
     if (top6.length === 0 || isPaused) return
@@ -90,6 +175,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   if (top6.length === 0) return null
 
   const safeIndex = currentIndex >= top6.length ? 0 : currentIndex
+  currentIndexRef.current = safeIndex
   const anime = top6[safeIndex]
 
   const rawDesc = anime.description ?? ''
@@ -148,7 +234,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <img src={bannerSrc} alt={getTitle(anime)} className={styles.posterImage} />
+        <img key={safeIndex} src={bannerSrc} alt={getTitle(anime)} className={styles.posterImage} />
 
         {top6.length > 1 && (
           <>

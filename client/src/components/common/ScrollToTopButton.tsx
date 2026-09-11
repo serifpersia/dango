@@ -5,11 +5,8 @@ const ScrollToTopButton = () => {
   const [isVisible, setIsVisible] = useState(false)
 
   const toggleVisibility = () => {
-    if (window.scrollY > 300) {
-      setIsVisible(true)
-    } else {
-      setIsVisible(false)
-    }
+    const next = window.scrollY > 300
+    setIsVisible((prev) => (prev === next ? prev : next))
   }
 
   const scrollToTop = () => {
@@ -20,7 +17,7 @@ const ScrollToTopButton = () => {
   }
 
   useEffect(() => {
-    window.addEventListener('scroll', toggleVisibility)
+    window.addEventListener('scroll', toggleVisibility, { passive: true })
     return () => window.removeEventListener('scroll', toggleVisibility)
   }, [])
 

@@ -13,8 +13,8 @@ import {
   FaClosedCaptioning,
   FaServer,
 } from 'react-icons/fa'
-import { MdReplay10, MdForward10 } from 'react-icons/md'
 import styles from './TvPlayerControls.module.css'
+import CenterControls from '../player/CenterControls'
 import { pickSubtitleIndex } from '../../lib/subtitles'
 import { MenuSlider, SegmentedRow, SwatchRow } from '../player/MenuControls'
 import {
@@ -756,35 +756,18 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           </div>
         </div>
 
-        <div className={styles.centerControls}>
-          <button
-            className={styles.centerSkipBtn}
-            onClick={() => {
-              const v = videoRef.current
-              if (v) v.currentTime = Math.max(0, v.currentTime - 10)
-            }}
-            title="Skip back 10s"
-          >
-            <MdReplay10 />
-          </button>
-          <button
-            className={styles.centerPlayPause}
-            onClick={togglePlay}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
-          </button>
-          <button
-            className={styles.centerSkipBtn}
-            onClick={() => {
-              const v = videoRef.current
-              if (v) v.currentTime = Math.min(duration, v.currentTime + 10)
-            }}
-            title="Skip forward 10s"
-          >
-            <MdForward10 />
-          </button>
-        </div>
+        <CenterControls
+          isPlaying={isPlaying}
+          onTogglePlay={togglePlay}
+          onSkipBack={() => {
+            const v = videoRef.current
+            if (v) v.currentTime = Math.max(0, v.currentTime - 10)
+          }}
+          onSkipForward={() => {
+            const v = videoRef.current
+            if (v) v.currentTime = Math.min(duration, v.currentTime + 10)
+          }}
+        />
 
         <div className={styles.bottomControls}>
           <div

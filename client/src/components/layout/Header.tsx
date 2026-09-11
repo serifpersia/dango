@@ -64,6 +64,8 @@ const Header: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const autoHideTimer = useRef<number | null>(null)
+  const scrollTicking = useRef(false)
+  const scrollRaf = useRef<number | null>(null)
   const mobileSearchRef = useRef<HTMLDivElement>(null)
   const mobileInputRef = useRef<HTMLInputElement>(null)
 
@@ -82,22 +84,21 @@ const Header: React.FC = () => {
     }
 
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-
-      if (currentScrollY <= 10) {
-        setIsAtTop(true)
-        setVisible(true)
+      if (scrollTicking.current) return
+      scrollTicking.current = true
+      scrollRaf.current = requestAnimationFrame(() => {
+        scrollTicking.current = false
+        scrollRaf.current = null
+        const atTop = window.scrollY <= 10
+        setIsAtTop((prev) => (prev === atTop ? prev : atTop))
+        setVisible((prev) => (prev ? prev : true))
         clearTimer()
-        return
-      }
-
-      setIsAtTop(false)
-      setVisible(true)
-      clearTimer()
-
-      autoHideTimer.current = window.setTimeout(() => {
-        setVisible(false)
-      }, 2500)
+        if (!atTop) {
+          autoHideTimer.current = window.setTimeout(() => {
+            setVisible(false)
+          }, 2500)
+        }
+      })
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,6 +116,11 @@ const Header: React.FC = () => {
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('keydown', handleKeyDown)
       clearTimer()
+      if (scrollRaf.current !== null) {
+        cancelAnimationFrame(scrollRaf.current)
+        scrollRaf.current = null
+      }
+      scrollTicking.current = false
     }
   }, [isSearchFocused])
 

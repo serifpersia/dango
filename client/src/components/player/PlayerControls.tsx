@@ -14,7 +14,8 @@ import {
   FaChevronLeft,
   FaClosedCaptioning,
 } from 'react-icons/fa'
-import { MdReplay10, MdForward10, MdContentCut, MdPlaylistPlay } from 'react-icons/md'
+import { MdContentCut, MdPlaylistPlay } from 'react-icons/md'
+import CenterControls from './CenterControls'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -319,32 +320,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       </div>
 
-      <div className={styles.centerControls} onClick={(e) => e.stopPropagation()}>
-        <button
-          className={styles.centerSkipBtn}
-          onClick={() => actions.seek(-10)}
-          title="Skip back 10s"
-          aria-label="Skip back 10 seconds"
-        >
-          <MdReplay10 />
-        </button>
-        <button
-          className={styles.centerPlayPause}
-          data-speed-boost-ignore="true"
-          onClick={actions.togglePlay}
-          aria-label={state.isPlaying ? 'Pause' : 'Play'}
-        >
-          {state.isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
-        </button>
-        <button
-          className={styles.centerSkipBtn}
-          onClick={() => actions.seek(10)}
-          title="Skip forward 10s"
-          aria-label="Skip forward 10 seconds"
-        >
-          <MdForward10 />
-        </button>
-      </div>
+      <CenterControls
+        isPlaying={state.isPlaying}
+        onTogglePlay={actions.togglePlay}
+        onSkipBack={() => actions.seek(-10)}
+        onSkipForward={() => actions.seek(10)}
+      />
 
       <div
         className={styles.bottomControls}
