@@ -586,6 +586,65 @@ function cachedFetch(
 }
 
 const TITLE_TTL_SECONDS = 7 * 24 * 3600
+const EN_TITLE_TTL_SECONDS = 7 * 24 * 3600
+const EN_TITLE_FETCH_TIMEOUT_MS = 10000
+const EN_TITLE_TOP_N = 10
+export const EN_TITLE_CACHE_PREFIX = 'mal:en-title:'
+
+function needsEnglishTitle(m: AnilistMedia): boolean {
+  const romaji = m.title?.romaji?.trim() ?? ''
+  const english = m.title?.english?.trim() ?? ''
+  return !!m.idMal && (!english || (!!romaji && english === romaji))
+}
+
+function cleanEnTitle(raw: string | null, romaji?: string): string | null {
+  const t = (raw ?? '').trim()
+  if (!t || /^(unknown|n\/a|-)$/i.test(t)) return null
+  if (romaji && t.toLowerCase() === romaji.trim().toLowerCase()) return null
+  return t
+}
+
+export async function enrichEnglishFromMalDetail(
+  store: MalCacheStore,
+  items: AnilistMedia[],
+  limit: number = EN_TITLE_TOP_N
+): Promise<AnilistMedia[]> {
+  const targets = items.filter(needsEnglishTitle).slice(0, Math.max(0, limit))
+  if (targets.length === 0) return items
+  await Promise.all(
+    targets.map(async (m) => {
+      const malId = m.idMal as number
+      const key = `${EN_TITLE_CACHE_PREFIX}${malId}`
+      try {
+        const hit = store.get(key)
+        if (hit && typeof hit.payload === 'string') {
+          const titleEnglish = cleanEnTitle(hit.payload, m.title?.romaji)
+          if (titleEnglish && m.title) m.title = { ...m.title, english: titleEnglish }
+          return
+        }
+        const res = await fetch(`https://myanimelist.net/anime/${malId}`, {
+          headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
+          signal: AbortSignal.timeout(EN_TITLE_FETCH_TIMEOUT_MS),
+          redirect: 'follow',
+        })
+        if (res.status !== 200) return
+        const html = await res.text()
+        const raw = infoField(html, 'English')
+        try {
+          store.put(key, (raw ?? '').trim(), EN_TITLE_TTL_SECONDS)
+        } catch {
+          // ignore
+        }
+        const titleEnglish = cleanEnTitle(raw, m.title?.romaji)
+        if (!titleEnglish) return
+        if (m.title) m.title = { ...m.title, english: titleEnglish }
+      } catch {
+        // ignore
+      }
+    })
+  )
+  return items
+}
 
 export async function enrichCardTitles(
   store: MalCacheStore,

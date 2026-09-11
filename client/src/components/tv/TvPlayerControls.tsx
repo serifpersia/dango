@@ -398,36 +398,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     video.pause()
   }
 
-  const scrubTouchTo = (clientX: number) => {
-    const video = videoRef.current
-    if (!video || !progressBarRef.current || !duration) return
-    const rect = progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-    video.currentTime = percent * duration
-    setHoverTime({ time: percent * duration, position: clientX - rect.left })
-  }
-
-  const handleProgressTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    const video = videoRef.current
-    if (!video || e.touches.length === 0) return
-    setIsScrubbing(true)
-    video.pause()
-    scrubTouchTo(e.touches[0].clientX)
-  }
-
-  const handleProgressTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isScrubbing || e.touches.length === 0) return
-    scrubTouchTo(e.touches[0].clientX)
-  }
-
-  const handleProgressTouchEnd = () => {
-    if (isScrubbing) {
-      setIsScrubbing(false)
-      setHoverTime({ time: 0, position: null })
-      videoRef.current?.play().catch(() => {})
-    }
-  }
-
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isScrubbing || !progressBarRef.current || !duration) return
@@ -825,10 +795,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             onMouseLeave={() => {
               if (!isScrubbing) setHoverTime({ time: 0, position: null })
             }}
-            onTouchStart={handleProgressTouchStart}
-            onTouchMove={handleProgressTouchMove}
-            onTouchEnd={handleProgressTouchEnd}
-            onTouchCancel={handleProgressTouchEnd}
           >
             {hoverTime.position !== null && (
               <div className={styles.timeBubble} style={{ left: hoverTime.position }}>

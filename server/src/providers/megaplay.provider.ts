@@ -10,7 +10,8 @@ import {
   SearchOptions,
 } from './provider.interface'
 import logger from '../logger'
-import { anilistRequest } from '../lib/anilist'
+import { anilistRequest, parseMalId } from '../lib/anilist'
+import { kitsuMetaByAnilistId } from '../lib/kitsu'
 
 interface AniListTitle {
   romaji?: string
@@ -460,16 +461,28 @@ export class MegaPlayProvider implements Provider {
         id: Number(anilistId),
       })
       const idMal = data?.data?.Media?.idMal
-      if (!idMal) {
-        this.cache.set(cacheKey, '', 3600)
-        return null
+      if (idMal) {
+        const result = String(idMal)
+        this.cache.set(cacheKey, result, 86400)
+        return result
       }
-      const result = String(idMal)
-      this.cache.set(cacheKey, result, 86400)
-      return result
     } catch {
-      return null
+      // ignore
     }
+
+    try {
+      const fb = await kitsuMetaByAnilistId(Number(anilistId))
+      if (fb?.idMal) {
+        const result = String(fb.idMal)
+        this.cache.set(cacheKey, result, 86400)
+        return result
+      }
+    } catch {
+      // ignore
+    }
+
+    this.cache.set(cacheKey, '', 3600)
+    return null
   }
 
   private async tryFetchStream(
@@ -604,7 +617,9 @@ export class MegaPlayProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
-    if (!/^\d+$/.test(showId)) return null
+    const malId = parseMalId(showId)
+    const isAnilistId = /^\d+$/.test(showId)
+    if (!isAnilistId && malId === null) return null
 
     let targetEpisode = episodeNumber
     if (episodeNumber === '0') {
@@ -616,11 +631,16 @@ export class MegaPlayProvider implements Provider {
       const cached = this.cache.get<VideoSource[]>(cacheKey)
       if (cached) return cached
 
-      let result = await this.tryFetchStream(showId, targetEpisode, mode, 'ani')
-      if (!result) {
-        const malId = await this.getMalId(showId)
-        if (malId) {
-          result = await this.tryFetchStream(malId, targetEpisode, mode, 'mal')
+      let result: VideoSource[] | null
+      if (!isAnilistId && malId !== null) {
+        result = await this.tryFetchStream(String(malId), targetEpisode, mode, 'mal')
+      } else {
+        result = await this.tryFetchStream(showId, targetEpisode, mode, 'ani')
+        if (!result) {
+          const resolvedMalId = await this.getMalId(showId)
+          if (resolvedMalId) {
+            result = await this.tryFetchStream(resolvedMalId, targetEpisode, mode, 'mal')
+          }
         }
       }
 

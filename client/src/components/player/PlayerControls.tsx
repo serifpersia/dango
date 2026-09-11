@@ -200,44 +200,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     refs.videoRef.current.pause()
   }
 
-  const scrubTouchTo = (clientX: number) => {
-    if (!refs.videoRef.current || !refs.progressBarRef.current || !state.duration) return
-    const rect = refs.progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-    const scrubTime = percent * state.duration
-    refs.videoRef.current.currentTime = scrubTime
-    const percent100 = (scrubTime / state.duration) * 100 || 0
-    if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent100}%`
-    if (thumbRef.current) thumbRef.current.style.left = `${percent100}%`
-    if (timeDisplayRef.current) {
-      timeDisplayRef.current.innerText = `${actions.formatTime(scrubTime)} / ${actions.formatTime(state.duration)}`
-    }
-    actions.setHoverTime({ time: scrubTime, position: clientX - rect.left })
-  }
-
-  const handleProgressTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!refs.videoRef.current || e.touches.length === 0) return
-    actions.setIsScrubbing(true)
-    actions.wasPlayingBeforeScrub.current = !refs.videoRef.current.paused
-    refs.videoRef.current.pause()
-    scrubTouchTo(e.touches[0].clientX)
-  }
-
-  const handleProgressTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!state.isScrubbing || e.touches.length === 0) return
-    scrubTouchTo(e.touches[0].clientX)
-  }
-
-  const handleProgressTouchEnd = () => {
-    if (state.isScrubbing) {
-      actions.setIsScrubbing(false)
-      actions.setHoverTime({ time: 0, position: null })
-      if (actions.wasPlayingBeforeScrub.current) {
-        refs.videoRef.current?.play()
-      }
-    }
-  }
-
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!refs.videoRef.current) return
     actions.setActiveSubtitleTrack(trackId)
@@ -397,10 +359,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           onMouseLeave={() => {
             if (!state.isScrubbing) actions.setHoverTime({ time: 0, position: null })
           }}
-          onTouchStart={handleProgressTouchStart}
-          onTouchMove={handleProgressTouchMove}
-          onTouchEnd={handleProgressTouchEnd}
-          onTouchCancel={handleProgressTouchEnd}
         >
           {state.hoverTime.position !== null && (
             <div className={styles.timeBubble} style={{ left: state.hoverTime.position }}>

@@ -185,7 +185,8 @@ export class DataController {
 
       const providerKey = providerName?.toLowerCase()
       const stillMal = parseMalId(showId) !== null
-      if (providerKey && ((/^\d+$/.test(showId) && providerKey !== 'megaplay') || stillMal)) {
+      const needsResolution = providerKey !== 'megaplay' && (/^\d+$/.test(showId) || stillMal)
+      if (providerKey && needsResolution) {
         const meta = (await ShowsMetaRepository.getById(req.db, showId)) as {
           name?: string
           englishName?: string

@@ -170,7 +170,7 @@ export const usePlayerData = (
           nativeName: meta.nativeName as string,
           englishName: meta.englishName as string,
           names: {
-            romaji: (meta.englishName as string) || (meta.name as string),
+            romaji: (meta.name as string) || (meta.englishName as string),
             english: (meta.englishName as string) || (meta.name as string),
             native: meta.nativeName as string,
           },
