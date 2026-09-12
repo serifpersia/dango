@@ -14,7 +14,6 @@ import {
   FaChevronLeft,
   FaClosedCaptioning,
 } from 'react-icons/fa'
-import { MdContentCut, MdPlaylistPlay } from 'react-icons/md'
 import CenterControls from './CenterControls'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
@@ -453,34 +452,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <button
-              className={`${styles.controlBtn} ${state.isAutoSkipEnabled ? styles.active : ''}`}
-              onClick={() => {
-                const newValue = !state.isAutoSkipEnabled
-                actions.setIsAutoSkipEnabled(newValue)
-                localStorage.setItem('autoSkipEnabled', newValue.toString())
-              }}
-              title={
-                state.isAutoSkipEnabled
-                  ? 'Disable auto-skip of openings and endings'
-                  : 'Auto-skip openings and endings'
-              }
-              aria-label="Auto-skip openings and endings"
-            >
-              <MdContentCut size={22} />
-            </button>
-
-            <button
-              className={`${styles.controlBtn} ${isAutoplayEnabled ? styles.active : ''}`}
-              onClick={() => onAutoplayChange(!isAutoplayEnabled)}
-              title={
-                isAutoplayEnabled ? 'Disable autoplay of next episode' : 'Autoplay next episode'
-              }
-              aria-label="Autoplay next episode"
-            >
-              <MdPlaylistPlay size={24} />
-            </button>
-
-            <button
               className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
               onClick={handleCCToggle}
               title={isSubtitleActive ? 'Disable Subtitles' : 'Enable Subtitles'}
@@ -595,6 +566,17 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           videoDelayMs={videoDelayMs}
           onVideoDelayChange={onVideoDelayChange}
           onCalibrateAvSync={onCalibrateAvSync}
+          isAutoSkipEnabled={state.isAutoSkipEnabled}
+          onAutoSkipChange={(value) => {
+            actions.setIsAutoSkipEnabled(value)
+            try {
+              localStorage.setItem('autoSkipEnabled', value.toString())
+            } catch {
+              // ignore
+            }
+          }}
+          isAutoplayEnabled={isAutoplayEnabled}
+          onAutoplayChange={onAutoplayChange}
         />
       </Suspense>
     </div>

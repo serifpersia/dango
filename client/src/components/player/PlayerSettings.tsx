@@ -48,9 +48,14 @@ interface PlayerSettingsProps {
   videoDelayMs: number
   onVideoDelayChange: (ms: number) => void
   onCalibrateAvSync: () => void
+  isAutoSkipEnabled: boolean
+  onAutoSkipChange: (value: boolean) => void
+  isAutoplayEnabled: boolean
+  onAutoplayChange: (value: boolean) => void
 }
 
-type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler' | 'av-sync'
+type SettingsView =
+  'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler' | 'av-sync' | 'playback'
 
 const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
   const {
@@ -79,6 +84,10 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     videoDelayMs,
     onVideoDelayChange,
     onCalibrateAvSync,
+    isAutoSkipEnabled,
+    onAutoSkipChange,
+    isAutoplayEnabled,
+    onAutoplayChange,
   } = props
   const [view, setView] = useState<SettingsView>('main')
   const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
@@ -146,6 +155,14 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         <span>A/V Sync</span>
         <span className={styles.currentValue}>
           {videoDelayEnabled ? `${videoDelayMs}ms` : 'Off'}
+        </span>
+      </button>
+      <button className={styles.menuItem} onClick={() => setView('playback')}>
+        <span>Playback</span>
+        <span className={styles.currentValue}>
+          {[isAutoSkipEnabled ? 'Auto-skip On' : null, isAutoplayEnabled ? 'Autoplay On' : null]
+            .filter(Boolean)
+            .join(' • ') || 'Off'}
         </span>
       </button>
     </div>
@@ -333,6 +350,35 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     </div>
   )
 
+  const renderPlayback = () => (
+    <div className={styles.menuContent}>
+      <button
+        type="button"
+        className={`${styles.menuItem} ${isAutoSkipEnabled ? styles.selected : ''}`}
+        onClick={() => onAutoSkipChange(!isAutoSkipEnabled)}
+        aria-pressed={isAutoSkipEnabled}
+      >
+        <span>Auto-skip openings and endings</span>
+        <span className={styles.currentValue}>{isAutoSkipEnabled ? 'On' : 'Off'}</span>
+      </button>
+      <div className={styles.menuNote}>
+        Automatically jump past opening, ending and recap segments when detected.
+      </div>
+      <button
+        type="button"
+        className={`${styles.menuItem} ${isAutoplayEnabled ? styles.selected : ''}`}
+        onClick={() => onAutoplayChange(!isAutoplayEnabled)}
+        aria-pressed={isAutoplayEnabled}
+      >
+        <span>Autoplay next episode</span>
+        <span className={styles.currentValue}>{isAutoplayEnabled ? 'On' : 'Off'}</span>
+      </button>
+      <div className={styles.menuNote}>
+        Automatically start the next episode when this one ends.
+      </div>
+    </div>
+  )
+
   const renderAvSync = () => (
     <div className={styles.menuContent}>
       <button
@@ -387,6 +433,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         {view === 'subtitle-style' && renderSubtitleStyle()}
         {view === 'upscaler' && renderUpscaler()}
         {view === 'av-sync' && renderAvSync()}
+        {view === 'playback' && renderPlayback()}
       </div>
     </div>
   )
