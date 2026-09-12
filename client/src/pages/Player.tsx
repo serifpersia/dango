@@ -110,6 +110,8 @@ const Player: React.FC = () => {
     episodeNumber: state.currentEpisode?.toString(),
     episodeCount: state.episodes.length || undefined,
     sourceType: state.selectedSource?.type,
+    provider: state.selectedProvider,
+    resumeDuration: state.resumeDuration,
     showMeta: memoizedShowMeta,
   })
   const { refs, actions } = player
@@ -366,7 +368,8 @@ const Player: React.FC = () => {
     }
 
     let proxiedUrl = state.selectedLink.link
-    if (!proxiedUrl.startsWith('/api/proxy')) {
+    const isLocalUrl = proxiedUrl.startsWith('/api/local/')
+    if (!isLocalUrl && !proxiedUrl.startsWith('/api/proxy')) {
       proxiedUrl = `/api/proxy?url=${encodeURIComponent(proxiedUrl)}`
       if (state.selectedLink.headers?.Referer) {
         proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`
@@ -390,18 +393,24 @@ const Player: React.FC = () => {
         const track = document.createElement('track')
         track.kind = 'subtitles'
         track.label = sub.label
-        track.srclang = sub.lang
+        track.srclang = sub.lang ?? (sub as { language?: string }).language ?? ''
 
         const subSrc = sub.src ?? sub.url
         if (subSrc) {
-          let subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(subSrc)}`
-          if (state.selectedLink?.headers?.Referer) {
+          const isLocalSub = subSrc.startsWith('/api/local/')
+          let subUrl = isLocalSub ? subSrc : `/api/subtitle-proxy?url=${encodeURIComponent(subSrc)}`
+          if (!isLocalSub && state.selectedLink?.headers?.Referer) {
             subUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`
           }
           track.src = subUrl
         }
 
-        if (pickedTrack && sub.label === pickedTrack.label && sub.lang === pickedTrack.lang) {
+        const subLang = sub.lang ?? (sub as { language?: string }).language
+        if (
+          pickedTrack &&
+          sub.label === pickedTrack.label &&
+          subLang === (pickedTrack.lang ?? (pickedTrack as { language?: string }).language)
+        ) {
           track.default = true
         }
         videoElement.appendChild(track)
@@ -1749,6 +1758,7 @@ const Player: React.FC = () => {
               <ProviderSelector
                 selectedProvider={state.selectedProvider}
                 isAdult={state.showMeta?.isAdult}
+                showLocal={!!showId?.startsWith('local_')}
                 onProviderChange={(newProvider) => {
                   dispatch({
                     type: 'SET_STATE',
@@ -1761,6 +1771,13 @@ const Player: React.FC = () => {
                     },
                   })
                   localStorage.setItem('preferredProvider', newProvider)
+                  try {
+                    if (showId?.startsWith('local_')) {
+                      localStorage.setItem(`localProvider_${showId}`, newProvider)
+                    }
+                  } catch {
+                    // ignore
+                  }
                 }}
               />
               {episodeNavControls(

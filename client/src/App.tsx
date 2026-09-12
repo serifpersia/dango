@@ -26,6 +26,7 @@ const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 const PlayerRedirect = lazy(() => import('./pages/PlayerRedirect'))
+const LocalLibrary = lazy(() => import('./pages/LocalLibrary'))
 
 import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
@@ -166,6 +167,8 @@ function App() {
               <Route path="/radio" element={<Radio />} />
               <Route path="/tv" element={<Tv />} />
               <Route path="/tv/:id" element={<Tv />} />
+              <Route path="/local" element={<LocalLibrary />} />
+              <Route path="/local/:localId" element={<LocalLibrary />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/trackers" element={<Trackers />} />
               <Route path="/mal" element={<Navigate to="/trackers" replace />} />

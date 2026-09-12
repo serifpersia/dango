@@ -680,9 +680,27 @@ export class WatchlistController {
       isPlaying,
       sessionId,
       isAdult,
+      source,
     } = req.body
 
     const showId = await getMigratedId(req.db, showIdRaw)
+
+    const safeCurrentTime =
+      Number.isFinite(Number(currentTime)) && Number(currentTime) >= 0 ? Number(currentTime) : 0
+    let safeDuration =
+      Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : 0
+    if (safeDuration <= 0 && safeCurrentTime > 0) {
+      const existing = await WatchedEpisodesRepository.getByShowAndEpisode(
+        req.db,
+        showId,
+        episodeNumber
+      )
+      if (existing && existing.duration > 0) {
+        safeDuration = existing.duration
+      } else {
+        safeDuration = safeCurrentTime
+      }
+    }
 
     const titlePreferenceRow = await SettingsRepository.getByKey(req.db, 'titlePreference')
     const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
@@ -698,8 +716,8 @@ export class WatchlistController {
       title: displayName,
       episode: String(episodeNumber),
       totalEpisodes: episodeCount ? String(episodeCount) : undefined,
-      currentTime: currentTime || 0,
-      duration: duration || 0,
+      currentTime: safeCurrentTime,
+      duration: safeDuration,
       thumbnail: showThumbnail || '',
       isPlaying: isPlaying !== false,
       sessionId,
@@ -744,8 +762,9 @@ export class WatchlistController {
       WatchedEpisodesRepository.upsert(tx, {
         showId,
         episodeNumber,
-        currentTime,
-        duration,
+        currentTime: safeCurrentTime,
+        duration: safeDuration,
+        source: source === 'local' ? 'local' : 'stream',
       })
 
       NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)

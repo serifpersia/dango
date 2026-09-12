@@ -7,6 +7,7 @@ export interface WatchedEpisode {
   currentTime: number
   duration: number
   watchedAt: string
+  source?: string
 }
 
 export interface ContinueWatchingResult {
@@ -57,7 +58,7 @@ export const WatchedEpisodesRepository = {
       db,
       `SELECT showId, episodeNumber, currentTime, duration, watchedAt
        FROM watched_episodes
-       WHERE showId = ? AND currentTime > 5 AND (duration <= 0 OR currentTime < duration * 0.8)
+       WHERE showId = ? AND currentTime > 0 AND (currentTime > 5 OR currentTime * 5 >= duration) AND (duration <= 0 OR currentTime < duration * 0.8)
        ORDER BY watchedAt DESC
        LIMIT 1`,
       [showId]
@@ -70,12 +71,13 @@ export const WatchedEpisodesRepository = {
       episodeNumber: string
       currentTime: number
       duration: number
+      source?: string
     }
   ) =>
     dbRun(
       db,
-      'INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)',
-      [data.showId, data.episodeNumber, data.currentTime, data.duration]
+      'INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration, source) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?)',
+      [data.showId, data.episodeNumber, data.currentTime, data.duration, data.source ?? 'stream']
     ),
 
   deleteByShow: (db: DatabaseWrapper, showId: string) =>

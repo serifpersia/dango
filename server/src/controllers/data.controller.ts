@@ -142,6 +142,85 @@ export class DataController {
     try {
       let showId = req.query.showId as string
 
+      if (showId.startsWith('local_')) {
+        const wantedProvider = String(req.query.provider || '').toLowerCase()
+        if (!wantedProvider || wantedProvider === 'local') {
+          const episodeNumber = req.query.episodeNumber as string
+          const { LocalEpisodesRepository } =
+            await import('../repositories/local-episodes.repository')
+          const { parseLocalEpisodeKey } = await import('../lib/local-scan')
+          const episodes = LocalEpisodesRepository.getByLocalId(req.db, showId)
+          const key = parseLocalEpisodeKey(episodeNumber)
+          const ep = key
+            ? episodes.find(
+                (e) => (e.season ?? 1) === key.season && e.episodeNumber === key.episode
+              )
+            : episodes.find((e) => String(e.episodeNumber) === episodeNumber)
+          if (!ep) {
+            return res.json([])
+          }
+          const subtitles = (
+            await import('../repositories/local-subtitles.repository')
+          ).LocalSubtitlesRepository.getByEpisodeId(req.db, ep.id)
+          const { subtitleDisplayName } = await import('../lib/local-scan')
+          const playableSubs = subtitles.filter((s) =>
+            ['vtt', 'srt', 'ass'].includes(s.format.toLowerCase())
+          )
+          const langNames: Record<string, string> = {
+            en: 'English',
+            eng: 'English',
+            ja: 'Japanese',
+            jpn: 'Japanese',
+            jp: 'Japanese',
+            es: 'Spanish',
+            fr: 'French',
+            de: 'German',
+            it: 'Italian',
+            pt: 'Portuguese',
+            ru: 'Russian',
+            zh: 'Chinese',
+            ko: 'Korean',
+            ar: 'Arabic',
+            id: 'Indonesian',
+            th: 'Thai',
+          }
+          const videoSource = {
+            sourceName: 'local',
+            links: [
+              {
+                resolutionStr: 'Local',
+                link: `/api/local/stream?path=${encodeURIComponent(ep.filePath)}`,
+                hls: false,
+              },
+            ],
+            subtitles: playableSubs.map((s) => {
+              const known = s.language && s.language.toLowerCase() !== 'und'
+              return {
+                language: s.language,
+                lang: s.language,
+                label: known
+                  ? (langNames[s.language.toLowerCase()] ?? s.language)
+                  : subtitleDisplayName(ep.filePath, s.filePath),
+                url: `/api/local/subtitle?path=${encodeURIComponent(s.filePath)}`,
+              }
+            }),
+            type: 'player' as const,
+            actualEpisodeNumber: episodeNumber,
+          }
+          return res.json([videoSource])
+        }
+        const mapping = (
+          await import('../repositories/local-show-mapping.repository')
+        ).LocalShowMappingRepository.getById(req.db, showId)
+        if (mapping?.anilistId) {
+          showId = String(mapping.anilistId)
+        } else if (mapping?.malId) {
+          showId = `mal-${mapping.malId}`
+        } else {
+          return res.json([])
+        }
+      }
+
       const videoMalId = parseMalId(showId)
       if (videoMalId) {
         try {
@@ -326,10 +405,36 @@ export class DataController {
   }
 
   getEpisodes = async (req: Request, res: Response) => {
-    const showIdRaw = req.query.showId as string
+    let showIdRaw = req.query.showId as string
 
     if (!showIdRaw) {
       return res.json({ episodes: [] })
+    }
+
+    if (showIdRaw.startsWith('local_')) {
+      const wantedProvider = String(req.query.provider || '').toLowerCase()
+      if (!wantedProvider || wantedProvider === 'local') {
+        const { LocalEpisodesRepository } =
+          await import('../repositories/local-episodes.repository')
+        const { formatLocalEpisodeNumber } = await import('../lib/local-scan')
+        const episodes = LocalEpisodesRepository.getByLocalId(req.db, showIdRaw)
+        const multiSeason = new Set(episodes.map((e) => e.season ?? 1)).size > 1
+        const episodeNumbers = episodes.map((e) =>
+          formatLocalEpisodeNumber(e.season ?? 1, e.episodeNumber, multiSeason)
+        )
+        res.set('Cache-Control', 'public, max-age=60')
+        return res.json({ episodes: episodeNumbers })
+      }
+      const mapping = (
+        await import('../repositories/local-show-mapping.repository')
+      ).LocalShowMappingRepository.getById(req.db, showIdRaw)
+      if (mapping?.anilistId) {
+        showIdRaw = String(mapping.anilistId)
+      } else if (mapping?.malId) {
+        showIdRaw = `mal-${mapping.malId}`
+      } else {
+        return res.json({ episodes: [] })
+      }
     }
 
     let showId = await getMigratedId(req.db, showIdRaw)
@@ -699,6 +804,75 @@ export class DataController {
 
   getShowMeta = async (req: Request, res: Response) => {
     const showIdRaw = req.params.id as string
+
+    if (showIdRaw.startsWith('local_')) {
+      const mapping = (
+        await import('../repositories/local-show-mapping.repository')
+      ).LocalShowMappingRepository.getById(req.db, showIdRaw)
+      if (!mapping) {
+        res.json({})
+        return
+      }
+      let full: Show | null = null
+      try {
+        if (mapping.anilistId) {
+          full = await getShowMetaById(String(mapping.anilistId))
+        } else if (mapping.malId) {
+          full = await getShowMetaById(`mal-${mapping.malId}`)
+        }
+      } catch {
+        full = null
+      }
+      const episodes = (
+        await import('../repositories/local-episodes.repository')
+      ).LocalEpisodesRepository.getByLocalId(req.db, showIdRaw)
+      if (full) {
+        try {
+          ShowsMetaRepository.upsert(req.db, {
+            id: showIdRaw,
+            name: full.name,
+            thumbnail: full.thumbnail || undefined,
+            nativeName: full.nativeName,
+            englishName: full.englishName,
+            anilistId: full.anilistId ?? mapping.anilistId ?? undefined,
+          })
+        } catch {
+          // ignore
+        }
+        this.setDataCache(res, 3600, full)
+        res.json({
+          ...full,
+          _id: showIdRaw,
+          id: showIdRaw,
+          localId: showIdRaw,
+          anilistId: mapping.anilistId,
+          malId: mapping.malId,
+          localEpisodeCount: episodes.length,
+        })
+        return
+      }
+      const meta = (await ShowsMetaRepository.getById(req.db, showIdRaw)) as Record<
+        string,
+        unknown
+      > | null
+      res.json({
+        _id: showIdRaw,
+        id: showIdRaw,
+        name: meta?.name || mapping.detectedTitle,
+        englishName: meta?.name || mapping.detectedTitle,
+        thumbnail: meta?.thumbnail || '',
+        type: 'TV',
+        isAdult: false,
+        status: 'FINISHED',
+        episodeCount: episodes.length,
+        localId: showIdRaw,
+        anilistId: mapping.anilistId,
+        malId: mapping.malId,
+        localEpisodeCount: episodes.length,
+      })
+      return
+    }
+
     const id = await getMigratedId(req.db, showIdRaw)
 
     if (isTempShowId(id)) {

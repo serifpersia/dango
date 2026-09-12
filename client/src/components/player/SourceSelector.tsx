@@ -3,9 +3,20 @@ import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
 
 type ProviderId =
-  'anilight' | 'kaa' | 'megaplay' | 'animepahe' | 'animeya' | '123anime' | 'wh' | 'hn' | 'ht' | 'op'
+  | 'local'
+  | 'anilight'
+  | 'kaa'
+  | 'megaplay'
+  | 'animepahe'
+  | 'animeya'
+  | '123anime'
+  | 'wh'
+  | 'hn'
+  | 'ht'
+  | 'op'
 
 const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
+  { value: 'local', label: 'Local', mature: false },
   { value: 'megaplay', label: 'MegaPlay', mature: false },
   { value: 'kaa', label: 'KAA', mature: false },
   { value: 'anilight', label: 'Anilight', mature: false },
@@ -22,17 +33,22 @@ interface ProviderSelectorProps {
   selectedProvider: ProviderId
   onProviderChange: (provider: ProviderId) => void
   isAdult?: boolean
+  showLocal?: boolean
 }
 
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   selectedProvider,
   onProviderChange,
   isAdult,
+  showLocal,
 }) => {
+  const eligibleProviders = PROVIDER_OPTIONS.filter((option) =>
+    option.value === 'local' ? !!showLocal : true
+  )
   const visibleProviders =
     isAdult === undefined
-      ? PROVIDER_OPTIONS
-      : PROVIDER_OPTIONS.filter((option) => option.mature === isAdult)
+      ? eligibleProviders
+      : eligibleProviders.filter((option) => option.mature === isAdult)
 
   return (
     <div className={styles.providerSelectContainer}>

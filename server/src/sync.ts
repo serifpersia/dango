@@ -53,14 +53,28 @@ async function exportSyncPayload(db: DatabaseWrapper): Promise<SyncPayload> {
 }
 
 function importSyncPayload(db: DatabaseWrapper, payload: SyncPayload) {
+  const columnCache = new Map<string, Set<string>>()
+  const localColumns = (table: string): Set<string> => {
+    let cols = columnCache.get(table)
+    if (!cols) {
+      cols = new Set(
+        db
+          .all<{ name: string }>(`PRAGMA table_info("${table.replace(/"/g, '""')}")`)
+          .map((c) => c.name)
+      )
+      columnCache.set(table, cols)
+    }
+    return cols
+  }
   db.serialize(() => {
     for (const table of SYNC_TABLES) {
       db.run(`DELETE FROM "${table}"`)
     }
     for (const table of SYNC_TABLES) {
+      const known = localColumns(table)
       for (const row of payload.tables[table] || []) {
         if (isTempSyncRow(row)) continue
-        const columns = Object.keys(row)
+        const columns = Object.keys(row).filter((c) => known.has(c))
         if (columns.length === 0) continue
         const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
         const placeholders = columns.map(() => '?').join(', ')
@@ -472,6 +486,82 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_temp_show_ids_provider_native ON temp_show_ids(provider, nativeId)`
     )
 
+    db.run(
+      `CREATE TABLE IF NOT EXISTS local_show_mapping (
+        localId TEXT PRIMARY KEY,
+        anilistId INTEGER,
+        malId INTEGER,
+        folderPath TEXT NOT NULL,
+        folderName TEXT NOT NULL,
+        detectedTitle TEXT NOT NULL,
+        detectedSeason INTEGER DEFAULT 1,
+        scanTime TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS local_episodes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        localId TEXT NOT NULL,
+        episodeNumber REAL NOT NULL,
+        season INTEGER DEFAULT 1,
+        filePath TEXT NOT NULL UNIQUE,
+        fileName TEXT NOT NULL,
+        fileSize INTEGER,
+        durationSeconds REAL,
+        scanTime TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (localId) REFERENCES local_show_mapping(localId) ON DELETE CASCADE
+      )`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS local_subtitles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        episodeId INTEGER NOT NULL,
+        filePath TEXT NOT NULL UNIQUE,
+        language TEXT NOT NULL DEFAULT 'und',
+        format TEXT NOT NULL,
+        FOREIGN KEY (episodeId) REFERENCES local_episodes(id) ON DELETE CASCADE
+      )`
+    )
+    db.run(`CREATE INDEX IF NOT EXISTS idx_local_episodes_localId ON local_episodes(localId)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_local_subtitles_episodeId ON local_subtitles(episodeId)`)
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_local_show_mapping_anilistId ON local_show_mapping(anilistId)`
+    )
+    db.run(`CREATE INDEX IF NOT EXISTS idx_local_show_mapping_malId ON local_show_mapping(malId)`)
+
+    const mappingDef = db.get<{ sql: string }>(
+      `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'local_show_mapping'`
+    )
+    if (mappingDef?.sql && mappingDef.sql.includes('folderPath TEXT NOT NULL UNIQUE')) {
+      db.serialize(() => {
+        db.run(
+          `CREATE TABLE local_show_mapping_new (
+            localId TEXT PRIMARY KEY,
+            anilistId INTEGER,
+            malId INTEGER,
+            folderPath TEXT NOT NULL,
+            folderName TEXT NOT NULL,
+            detectedTitle TEXT NOT NULL,
+            detectedSeason INTEGER DEFAULT 1,
+            scanTime TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )`
+        )
+        db.run(
+          `INSERT INTO local_show_mapping_new (localId, anilistId, malId, folderPath, folderName, detectedTitle, detectedSeason, scanTime)
+           SELECT localId, anilistId, malId, folderPath, folderName, detectedTitle, detectedSeason, scanTime FROM local_show_mapping`
+        )
+        db.run(`DROP TABLE local_show_mapping`)
+        db.run(`ALTER TABLE local_show_mapping_new RENAME TO local_show_mapping`)
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_local_show_mapping_anilistId ON local_show_mapping(anilistId)`
+        )
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_local_show_mapping_malId ON local_show_mapping(malId)`
+        )
+      })
+      log.info('Migrated local_show_mapping: folderPath no longer unique')
+    }
+
     try {
       const purged = TempShowIdsRepository.purge(db)
       if (purged > 0) logger.info({ purged }, 'Purged stale temp show ids on boot')
@@ -530,6 +620,12 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'type', 'TEXT')
     addCol('shows_meta', 'anilistId', 'INTEGER')
     addCol('shows_meta', 'isAdult', 'INTEGER')
+    addCol('watched_episodes', 'source', "TEXT DEFAULT 'stream'")
+    addCol('local_episodes', 'season', 'INTEGER DEFAULT 1')
+
+    db.run(
+      'UPDATE watched_episodes SET duration = currentTime WHERE currentTime > 0 AND (duration IS NULL OR duration <= 0)'
+    )
 
     await db.saveNow()
     return db

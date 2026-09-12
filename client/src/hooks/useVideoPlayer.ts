@@ -9,6 +9,8 @@ interface VideoPlayerProps {
   episodeNumber?: string
   episodeCount?: number
   sourceType?: string
+  provider?: string
+  resumeDuration?: number
   showMeta?: {
     name?: string
     thumbnail?: string
@@ -26,6 +28,8 @@ const useVideoPlayer = ({
   episodeNumber,
   episodeCount,
   sourceType,
+  provider,
+  resumeDuration,
   showMeta,
 }: VideoPlayerProps) => {
   const queryClient = useQueryClient()
@@ -104,12 +108,23 @@ const useVideoPlayer = ({
     const video = videoRef.current
     if (!showId || !episodeNumber || !showMeta?.name) return null
 
+    const rawTime = video ? video.currentTime : 0
+    const rawDuration = video ? video.duration : 0
+    const safeTime = Number.isFinite(rawTime) && rawTime > 0 ? rawTime : 0
+    const safeDuration =
+      Number.isFinite(rawDuration) && rawDuration > 0
+        ? rawDuration
+        : Number.isFinite(resumeDuration) && (resumeDuration as number) > 0
+          ? (resumeDuration as number)
+          : 0
+
     return {
       showId,
       episodeNumber,
       episodeCount,
-      currentTime: video ? video.currentTime : 0,
-      duration: video ? video.duration : 0,
+      currentTime: safeTime,
+      duration: safeDuration,
+      source: provider === 'local' ? 'local' : 'stream',
       showName: showMeta.name,
       showThumbnail: showMeta.thumbnail,
       nativeName: showMeta.names?.native,
@@ -123,7 +138,7 @@ const useVideoPlayer = ({
       sessionId: sessionIdRef.current,
       isAdult: showMeta.isAdult,
     }
-  }, [showId, episodeNumber, episodeCount, showMeta])
+  }, [showId, episodeNumber, episodeCount, provider, resumeDuration, showMeta])
 
   const sendProgressUpdate = useCallback(
     (isFinalUpdate = false, force = false) => {

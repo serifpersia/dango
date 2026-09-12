@@ -129,7 +129,9 @@ async function fetchVideoSources(
       selectedLink,
       resumeTime,
       resumeDuration,
-      showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+      showResumeModal:
+        (resumeTime > 5 || (resumeDuration > 0 && resumeTime * 5 >= resumeDuration)) &&
+        sourceToSelect?.type !== 'iframe',
       skipIntervals,
       fetchedEpisodeNumber: episodeNumber,
     }
@@ -180,6 +182,7 @@ export const usePlayerData = (
   const queryClient = useQueryClient()
   const hasForcedProvider = useRef<string | null>(null)
   const hasForcedAdultProvider = useRef<string | null>(null)
+  const hasForcedLocalProvider = useRef<string | null>(null)
 
   const currentEpisode = episodeNumber || uiState.initialEpisode
 
@@ -206,6 +209,49 @@ export const usePlayerData = (
   }, [showId, uiState.selectedProvider])
 
   const { data: showMeta, isLoading: loadingShowData, error: showDataError } = useShowMeta(showId)
+
+  useEffect(() => {
+    if (!showId || !showId.startsWith('local_')) return
+    let stored: string | null = null
+    try {
+      stored = localStorage.getItem(`localProvider_${showId}`)
+    } catch {
+      stored = null
+    }
+    const valid = [
+      'local',
+      'megaplay',
+      'kaa',
+      'anilight',
+      'animepahe',
+      'animeya',
+      '123anime',
+      'wh',
+      'hn',
+      'ht',
+      'op',
+    ]
+    if (stored && !valid.includes(stored)) stored = null
+    if (stored === uiState.selectedProvider) {
+      hasForcedLocalProvider.current = showId
+      return
+    }
+    if (hasForcedLocalProvider.current === showId) return
+    if (stored && stored !== 'local' && !showMeta) return
+    hasForcedLocalProvider.current = showId
+    if (!stored || stored === 'local') {
+      if (uiState.selectedProvider !== 'local') {
+        dispatch({ type: 'SET_PROVIDER', payload: 'local' })
+      }
+    } else if (showMeta?.anilistId || showMeta?.malId) {
+      dispatch({
+        type: 'SET_PROVIDER',
+        payload: stored as PlayerState['selectedProvider'],
+      })
+    } else if (uiState.selectedProvider !== 'local') {
+      dispatch({ type: 'SET_PROVIDER', payload: 'local' })
+    }
+  }, [showId, uiState.selectedProvider, showMeta])
 
   const { data: playerData } = useQuery({
     queryKey: ['player-data', showId, uiState.currentMode, uiState.selectedProvider],
@@ -418,6 +464,7 @@ export const usePlayerData = (
           episodeNumber,
           currentTime: duration,
           duration: duration,
+          source: uiState.selectedProvider === 'local' ? 'local' : 'stream',
           showName: showMeta.name,
           showThumbnail: showMeta.thumbnail,
           nativeName: showMeta.names?.native,

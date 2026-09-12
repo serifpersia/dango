@@ -239,6 +239,7 @@ class DiscordGatewayService {
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
       radio: { details: 'Radio', state: 'Browsing radio stations' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },
+      local: { details: 'Local Library', state: 'Browsing local files' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }

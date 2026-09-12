@@ -6,6 +6,7 @@ export type Action =
   | {
       type: 'SET_PROVIDER'
       payload:
+        | 'local'
         | 'animepahe'
         | '123anime'
         | 'animeya'

@@ -60,6 +60,7 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/asmr')) page = 'asmr'
     else if (path.startsWith('/radio')) page = 'radio'
     else if (path.startsWith('/tv')) page = 'tv'
+    else if (path.startsWith('/local')) page = 'local'
 
     fetch('/api/discord/status', {
       method: 'POST',

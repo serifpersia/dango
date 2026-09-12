@@ -81,6 +81,7 @@ export interface SubtitleTrack {
   src?: string
   url?: string
   lang: string
+  language?: string
   label: string
   mode?: 'showing' | 'hidden' | 'disabled'
 }
@@ -119,6 +120,7 @@ export interface PlayerState {
   resumeDuration: number
   skipIntervals: SkipInterval[]
   selectedProvider:
+    | 'local'
     | 'animepahe'
     | '123anime'
     | 'animeya'
