@@ -19,6 +19,7 @@ const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
 const Mature = lazy(() => import('./pages/Mature'))
 const Asmr = lazy(() => import('./pages/Asmr'))
+const Manga = lazy(() => import('./pages/Manga'))
 const Radio = lazy(() => import('./pages/Radio'))
 const Tv = lazy(() => import('./pages/Tv'))
 const Trackers = lazy(() => import('./pages/Trackers'))
@@ -163,6 +164,7 @@ function App() {
               <Route path="/mature" element={<Mature />} />
               <Route path="/asmr" element={<Asmr />} />
               <Route path="/asmr/:rj" element={<Asmr />} />
+              <Route path="/manga" element={<Manga />} />
               <Route path="/radio" element={<Radio />} />
               <Route path="/tv" element={<Tv />} />
               <Route path="/tv/:id" element={<Tv />} />

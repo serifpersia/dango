@@ -58,6 +58,7 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/map')) page = 'map'
     else if (path.startsWith('/trackers')) page = 'trackers'
     else if (path.startsWith('/asmr')) page = 'asmr'
+    else if (path.startsWith('/manga')) page = 'manga'
     else if (path.startsWith('/radio')) page = 'radio'
     else if (path.startsWith('/tv')) page = 'tv'
 

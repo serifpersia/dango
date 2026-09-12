@@ -2,8 +2,59 @@ import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
+import { pickBestMatch } from '../providers/title-matching'
 
 const dlsitePosterCache = new Map<string, { url: string; ts: number }>()
+const mangadexCoverCache = new Map<string, { url: string | null; ts: number }>()
+
+async function getMangadexCover(title: string): Promise<string | null> {
+  const key = title.trim().toLowerCase()
+  if (!key) return null
+  const cached = mangadexCoverCache.get(key)
+  if (cached && Date.now() - cached.ts < 3600_000) return cached.url
+  try {
+    const params = new URLSearchParams({
+      title: title.trim(),
+      limit: '5',
+      'includes[]': 'cover_art',
+      'order[relevance]': 'desc',
+    })
+    for (const r of ['safe', 'suggestive', 'erotica', 'pornographic']) {
+      params.append('contentRating[]', r)
+    }
+    const res = await fetch(`https://api.mangadex.org/manga?${params.toString()}`, {
+      headers: { 'User-Agent': 'Dango/3.0', Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      data?: Array<{
+        id: string
+        attributes?: { title?: Record<string, string>; altTitles?: Record<string, string>[] }
+        relationships?: Array<{ type: string; attributes?: { fileName?: string } }>
+      }>
+    }
+    const candidates: Array<{ title: string; cover: string }> = []
+    for (const m of data.data || []) {
+      const fileName = m.relationships?.find((r) => r.type === 'cover_art')?.attributes?.fileName
+      if (!fileName) continue
+      const cover = `https://uploads.mangadex.org/covers/${m.id}/${fileName}.256.jpg`
+      const main = m.attributes?.title
+      const mainTitle = main?.en || main?.['ja-ro'] || Object.values(main || {})[0]
+      if (mainTitle) candidates.push({ title: mainTitle, cover })
+      for (const alt of m.attributes?.altTitles || []) {
+        const t = Object.values(alt)[0]
+        if (t) candidates.push({ title: t, cover })
+      }
+    }
+    const match = pickBestMatch(candidates, [title])
+    const url = match ? match.item.cover : null
+    mangadexCoverCache.set(key, { url, ts: Date.now() })
+    return url
+  } catch {
+    return null
+  }
+}
 
 async function getDlsitePoster(rjCode: string): Promise<string | null> {
   const key = String(rjCode).trim().toUpperCase()
@@ -177,6 +228,56 @@ export function createWatchlistRouter(getDb: () => DatabaseWrapper): {
       providerName: 'Radio',
       sessionId: typeof sessionId === 'string' ? sessionId : undefined,
       isAdult: false,
+    })
+    res.json({ success: true })
+  })
+
+  router.post('/discord/manga', async (req, res) => {
+    const { title, chapterLabel, isPlaying, thumbnail, thumbnails, sessionId, isAdult } =
+      req.body ?? {}
+    if (!discordRPCService.isServiceEnabled) return res.json({ success: true })
+    if (typeof sessionId === 'string') discordRPCService.heartbeat(sessionId)
+    const cleanThumb = (value: unknown): string => {
+      let thumb = String(value || '')
+      if (thumb.includes('/api/proxy') || thumb.includes('/api/image-proxy')) {
+        const match = thumb.match(/url=([^&]+)/)
+        if (match) {
+          try {
+            thumb = decodeURIComponent(match[1])
+          } catch {
+            return ''
+          }
+        }
+      }
+      if (!thumb.startsWith('https://')) return ''
+      if (thumb.includes('localhost') || thumb.includes('127.0.0.1')) return ''
+      if (thumb.includes('readdetectiveconan.com')) return ''
+      return thumb
+    }
+    let thumb = cleanThumb(thumbnail)
+    let thumbs = Array.isArray(thumbnails)
+      ? (thumbnails.map(cleanThumb).filter(Boolean) as string[])
+      : undefined
+    if (!thumb && title) {
+      const fallback = await getMangadexCover(String(title))
+      if (fallback) {
+        thumb = fallback
+        thumbs = [fallback, ...(thumbs || [])]
+      }
+    }
+    discordRPCService.updatePresence({
+      title: String(title || 'Manga').slice(0, 128),
+      episode: String(chapterLabel || '').slice(0, 64),
+      totalEpisodes: '',
+      stateLine: (chapterLabel ? `Reading ${chapterLabel}` : 'Reading').slice(0, 64),
+      currentTime: 0,
+      duration: 0,
+      thumbnail: thumb,
+      thumbnails: thumbs,
+      isPlaying: isPlaying !== false,
+      providerName: 'Manga',
+      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+      isAdult: isAdult === true,
     })
     res.json({ success: true })
   })

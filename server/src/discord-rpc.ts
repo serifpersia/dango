@@ -435,6 +435,7 @@ class DiscordRPCService {
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
       radio: { details: 'Radio', state: 'Browsing radio stations' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },
+      manga: { details: 'Manga', state: 'Browsing manga' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }

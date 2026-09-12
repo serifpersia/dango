@@ -6,7 +6,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-897cff?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
-[![App version](https://img.shields.io/badge/dango-3.0.2-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-3.0.3-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -28,7 +28,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 - **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
 - **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
 - **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
-- **Expanded Media Hub:** Dedicated interfaces for ASMR, Internet Radio, and TV/Movies.
+- **Expanded Media Hub:** Dedicated interfaces for ASMR, Manga, Internet Radio, and TV/Movies.
 - **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
 
 ---

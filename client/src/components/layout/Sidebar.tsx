@@ -13,6 +13,7 @@ import {
   FaHeadphones,
   FaTv,
   FaBroadcastTower,
+  FaBook,
 } from 'react-icons/fa'
 import Logo from '../common/Logo'
 import packageJson from '../../../package.json'
@@ -44,6 +45,7 @@ const Sidebar: React.FC = () => {
     { to: '/insights', icon: <FaChartPie />, label: 'Insights' },
     { to: '/trackers', icon: <FaSyncAlt />, label: 'Trackers' },
     { to: '/asmr', icon: <FaHeadphones />, label: 'ASMR' },
+    { to: '/manga', icon: <FaBook />, label: 'Manga' },
     { to: '/radio', icon: <FaBroadcastTower />, label: 'Radio' },
     { to: '/tv', icon: <FaTv />, label: 'TV & Movies' },
     ...(hasMatureConsent ? [{ to: '/mature', icon: <FaPepperHot />, label: 'Mature' }] : []),
