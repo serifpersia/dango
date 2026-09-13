@@ -51,11 +51,35 @@
 
 .footer {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-3);
   margin-top: var(--space-6);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-primary);
+}
+
+.footer > * {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: var(--space-4);
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .footer > * {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 
 @keyframes fadeIn {

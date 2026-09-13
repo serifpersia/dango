@@ -1,6 +1,7 @@
 import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 import { execFileSync } from 'node:child_process'
+import { gotScraping } from 'got-scraping'
 import { BaseProvider } from './base-provider'
 
 const ANILIGHT_API = 'https://api.anilight.live/api'
@@ -176,6 +177,8 @@ interface SourcesResponse {
 
 const slugByAnilistId = new Map<number, string>()
 
+const BLACKLISTED_PROVIDERS = new Set(['raye', 'near', 'vid'])
+
 function parseShowId(id: string): { anilistId: number | null; slug: string | null } {
   if (id.startsWith('al:')) {
     const rest = id.slice(3)
@@ -259,6 +262,65 @@ export class AnilightProvider extends BaseProvider {
     return data
   }
 
+  private async isStreamLinkReachable(link: string): Promise<boolean> {
+    try {
+      let target = link
+      let referer = 'https://anilight.live/'
+      if (link.startsWith('/api/proxy?')) {
+        const params = new URL(link, 'http://localhost').searchParams
+        const raw = params.get('url')
+        if (!raw) return false
+        target = raw
+        referer = params.get('referer') || referer
+      }
+      const looksMediaFile = /\.(mp4|mkv|avi|mov|webm)(\?|#|$)/i.test(target)
+      const extraHeaders: Record<string, string> = {}
+      if (
+        /krussdomi\.com|advancedairesearchlab\.xyz|habibikun\.xyz|babybayw\.xyz|narutokun\.xyz/i.test(
+          target
+        )
+      ) {
+        extraHeaders.Origin = 'https://krussdomi.com'
+      }
+      if (looksMediaFile) {
+        const res = await fetch(target, {
+          headers: {
+            'User-Agent': BROWSER_UA,
+            Referer: referer,
+            Range: 'bytes=0-1023',
+            ...extraHeaders,
+          },
+          signal: AbortSignal.timeout(10000),
+        })
+        if (res.status !== 200 && res.status !== 206) return false
+        const contentType = res.headers.get('content-type') || ''
+        if (contentType.includes('text/html')) return false
+        const buf = await res.arrayBuffer().catch(() => null)
+        return !!buf && buf.byteLength > 0
+      }
+      const res = await gotScraping({
+        url: target,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+          Referer: referer,
+          ...extraHeaders,
+        },
+        responseType: 'text',
+        timeout: { request: 10000 },
+        followRedirect: true,
+        throwHttpErrors: false,
+      })
+      if (res.statusCode !== 200 && res.statusCode !== 206) return false
+      const body = String(res.body ?? '')
+      if (body.includes('#EXTM3U')) return true
+      if (/<html[\s>]|{"error"|"code":/i.test(body.slice(0, 500))) return false
+      return body.length > 0
+    } catch {
+      return false
+    }
+  }
+
   async search(options: SearchOptions): Promise<Show[]> {
     try {
       const query = (options.query || '').trim()
@@ -315,12 +377,14 @@ export class AnilightProvider extends BaseProvider {
       const sources: VideoSource[] = []
 
       for (const provider of providers) {
+        if (BLACKLISTED_PROVIDERS.has(provider.id)) continue
         const data = await curlGetJSON<SourcesResponse>(
           `${ANILIGHT_API}/sources?id=${watch.id}\u0026epNum=${episodeNumber}\u0026type=${mode}\u0026providerId=${provider.id}`
         )
         if (!data?.sources) continue
 
         const links: { resolutionStr: string; link: string; hls: boolean }[] = []
+        const embedLinks: { resolutionStr: string; link: string; hls: boolean }[] = []
 
         for (const source of data.sources) {
           let rawUrl = source.url || ''
@@ -331,7 +395,8 @@ export class AnilightProvider extends BaseProvider {
           if (rawUrl.includes('24stream.xyz')) {
             rawUrl = rawUrl.replace('24stream.xyz', 'aniwatchtv.site')
           }
-          const isHls = rawUrl.includes('.m3u8') || source.quality === 'auto'
+          const isHls = rawUrl.includes('.m3u8')
+          const isMp4 = !isHls && /\.(mp4|mkv|avi|mov|webm)(\?|#|$)/i.test(rawUrl)
           let proxyUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://anilight.live/')}`
           if (provider.id === 'misa') {
             proxyUrl = `${ANILIGHT_API}/lb/misa/proxy?url=${encodeURIComponent(rawUrl)}`
@@ -343,7 +408,7 @@ export class AnilightProvider extends BaseProvider {
             proxyUrl = `${ANILIGHT_API}/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://anilight.live/')}`
           }
           if (provider.id === 'ryu') {
-            proxyUrl = `${ANILIGHT_API}/proxy/ryu?url=${encodeURIComponent(rawUrl)}`
+            proxyUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://www.animegg.org/')}`
           }
 
           const qualityLabel =
@@ -353,7 +418,13 @@ export class AnilightProvider extends BaseProvider {
                 : `${source.quality}p`
               : 'Auto'
 
-          links.push({ resolutionStr: qualityLabel, link: proxyUrl, hls: isHls })
+          if (isHls || isMp4) {
+            links.push({ resolutionStr: qualityLabel, link: proxyUrl, hls: isHls })
+          }
+
+          if (!isHls && !isMp4) {
+            embedLinks.push({ resolutionStr: 'Auto', link: rawUrl, hls: false })
+          }
 
           if (isHls && rawUrl.endsWith('master.m3u8')) {
             try {
@@ -389,7 +460,17 @@ export class AnilightProvider extends BaseProvider {
           }
         }
 
-        if (links.length === 0) continue
+        if (links.length === 0 && embedLinks.length === 0) continue
+
+        const reachable = await Promise.all(
+          links.map(async (entry) =>
+            (await this.isStreamLinkReachable(entry.link)) ? entry : null
+          )
+        )
+        const liveLinks = reachable.filter(
+          (entry): entry is { resolutionStr: string; link: string; hls: boolean } => entry !== null
+        )
+        if (liveLinks.length === 0 && embedLinks.length === 0) continue
 
         const subtitles = (data.tracks || [])
           .filter((t) => t.file || t.url)
@@ -445,13 +526,29 @@ export class AnilightProvider extends BaseProvider {
           }
         }
 
-        sources.push({
-          sourceName: provider.id,
-          links,
-          subtitles: subtitles.length ? subtitles : undefined,
-          type: 'player',
-          actualEpisodeNumber: episodeNumber,
-        })
+        if (liveLinks.length > 0) {
+          sources.push({
+            sourceName: provider.id,
+            links: liveLinks,
+            subtitles: subtitles.length ? subtitles : undefined,
+            type: 'player',
+            actualEpisodeNumber: episodeNumber,
+          })
+        }
+
+        if (embedLinks.length > 0) {
+          sources.push({
+            sourceName: `${provider.id} [Embed]`,
+            links: embedLinks.map((e) => ({
+              resolutionStr: e.resolutionStr,
+              link: e.link,
+              hls: false,
+            })),
+            subtitles: undefined,
+            type: 'iframe',
+            actualEpisodeNumber: episodeNumber,
+          })
+        }
       }
 
       return sources.length ? sources : null

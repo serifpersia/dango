@@ -19,6 +19,7 @@ import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
 import { pickSubtitleIndex, subtitleKey } from '../../lib/subtitles'
+import type { FallbackChoice } from '../../lib/fallbackChoice'
 
 const PlayerSettings = lazy(() => import('./PlayerSettings'))
 
@@ -50,6 +51,8 @@ interface PlayerControlsProps {
   videoDelayMs: number
   onVideoDelayChange: (ms: number) => void
   onCalibrateAvSync: () => void
+  fallbackChoice: FallbackChoice
+  onFallbackChoiceChange: (value: FallbackChoice) => void
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -79,6 +82,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   videoDelayMs,
   onVideoDelayChange,
   onCalibrateAvSync,
+  fallbackChoice,
+  onFallbackChoiceChange,
 }) => {
   const { state, refs, actions } = player
   const { showSettings, showVolumeSlider } = state
@@ -577,6 +582,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           }}
           isAutoplayEnabled={isAutoplayEnabled}
           onAutoplayChange={onAutoplayChange}
+          fallbackChoice={fallbackChoice}
+          onFallbackChoiceChange={onFallbackChoiceChange}
         />
       </Suspense>
     </div>

@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
 import { loadHls } from '../lib/hls'
+import { fetchApi } from '../lib/fetchApi'
 import { pickSubtitleIndex } from '../lib/subtitles'
 import {
   buildCueCss,
@@ -41,6 +42,7 @@ import EpisodeListSkeleton from '../components/player/EpisodeListSkeleton'
 import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
+import { PROVIDER_OPTIONS } from '../components/player/providers'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
 import useDelayCanvas from '../hooks/useDelayCanvas'
@@ -48,11 +50,22 @@ import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import { usePlayerData } from '../hooks/usePlayerData'
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
-import type { VideoLink, SubtitleTrack } from '../types/player'
+import type { VideoLink, SubtitleTrack, VideoSource } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
 import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
 import QueueOptionsButton from '../components/anime/QueueOptionsButton'
+import {
+  getStoredFallbackAction,
+  storeFallbackAction,
+  type FallbackChoice,
+} from '../lib/fallbackChoice'
+
+const DIRECT_PROVIDER_ORDER: string[] = PROVIDER_OPTIONS.map((option) => option.value)
+
+const MATURE_PROVIDERS = new Set(
+  PROVIDER_OPTIONS.filter((option) => option.mature).map((option) => option.value)
+)
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
@@ -194,6 +207,20 @@ const Player: React.FC = () => {
   const hasDismissedShowCompletedRef = useRef(false)
   const [queueCountdown, setQueueCountdown] = useState<number | null>(null)
   const hasAutoFallbackRef = useRef(false)
+  const triedProvidersRef = useRef<string[]>([])
+  const fallbackDismissedRef = useRef(false)
+  const [fallbackPrompt, setFallbackPrompt] = useState<{ retryFailed: boolean } | null>(null)
+  const [isRetryingProvider, setIsRetryingProvider] = useState(false)
+  const [rememberFallbackChoice, setRememberFallbackChoice] = useState(false)
+  const [fallbackChoice, setFallbackChoiceState] = useState<FallbackChoice>(
+    () => getStoredFallbackAction() ?? 'ask'
+  )
+  const updateFallbackChoice = useCallback((value: FallbackChoice) => {
+    setFallbackChoiceState(value)
+    storeFallbackAction(value === 'ask' ? null : value)
+  }, [])
+  const fallbackChoiceRef = useRef(fallbackChoice)
+  fallbackChoiceRef.current = fallbackChoice
   const videoSourcesRef = useRef(state.videoSources)
   videoSourcesRef.current = state.videoSources
   const handleVideoSourceErrorRef = useRef<() => void>(() => {})
@@ -211,6 +238,14 @@ const Player: React.FC = () => {
       hasDismissedShowCompletedRef.current = false
     }
   }, [episodeNumber])
+
+  useEffect(() => {
+    hasAutoFallbackRef.current = false
+    triedProvidersRef.current = []
+    fallbackDismissedRef.current = false
+    setFallbackPrompt(null)
+    setIsRetryingProvider(false)
+  }, [showId, state.currentEpisode])
 
   useEffect(() => {
     if (!hasReachedEpisodeEnd) {
@@ -485,22 +520,140 @@ const Player: React.FC = () => {
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
 
-  const handleVideoSourceError = useCallback(() => {
-    if (hasAutoFallbackRef.current) return
-    const sources = videoSourcesRef.current
-    if (state.selectedSource?.type !== 'player') return
-    const fallbackSource = sources.find((s) => s.type === 'iframe')
-    if (!fallbackSource?.links?.length) return
+  const switchToIframeFallback = useCallback(
+    (fallbackSource: VideoSource) => {
+      if (hasAutoFallbackRef.current) return
+      hasAutoFallbackRef.current = true
+      const bestLink = fallbackSource.links[0]
+      setPreferredSource(fallbackSource.sourceName)
+      dispatch({
+        type: 'SET_STATE',
+        payload: { selectedSource: fallbackSource, selectedLink: bestLink },
+      })
+      setFallbackPrompt(null)
+    },
+    [dispatch, setPreferredSource]
+  )
 
-    hasAutoFallbackRef.current = true
-    const bestLink = fallbackSource.links[0]
-    setPreferredSource(fallbackSource.sourceName)
-    dispatch({
-      type: 'SET_STATE',
-      payload: { selectedSource: fallbackSource, selectedLink: bestLink },
+  const findIframeFallback = useCallback((): VideoSource | null => {
+    const sources = videoSourcesRef.current
+    const fallbackSource = sources.find((s) => s.type === 'iframe')
+    return fallbackSource?.links?.length ? fallbackSource : null
+  }, [])
+
+  const runProviderRetry = useCallback(async () => {
+    const isAdult = state.showMeta?.isAdult
+    const ordered = DIRECT_PROVIDER_ORDER.filter((provider) => {
+      if (triedProvidersRef.current.includes(provider)) return false
+      const mature = MATURE_PROVIDERS.has(provider)
+      if (isAdult === undefined) return true
+      return mature === isAdult
     })
-  }, [state.selectedSource, dispatch, setPreferredSource])
+    setIsRetryingProvider(true)
+    try {
+      for (const provider of ordered) {
+        triedProvidersRef.current.push(provider)
+        let sources: VideoSource[] | null = null
+        try {
+          sources = (await fetchApi(
+            `/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${provider}`
+          )) as VideoSource[] | null
+        } catch {
+          continue
+        }
+        const pool = (sources ?? []).filter((s) => {
+          const name = s.sourceName.toLowerCase()
+          if (state.currentMode === 'dub') {
+            return name.includes('eng') || name.includes('dub')
+          }
+          return (
+            name.includes('jpn') ||
+            name.includes('sub') ||
+            (!name.includes('eng') && !name.includes('dub'))
+          )
+        })
+        const withDirect = pool.length > 0 ? pool : (sources ?? [])
+        const direct = withDirect.find((s) => s.type !== 'iframe' && s.links?.length)
+        if (direct) {
+          triedProvidersRef.current = [state.selectedProvider]
+          fallbackDismissedRef.current = false
+          dispatch({
+            type: 'SET_STATE',
+            payload: {
+              selectedProvider: provider,
+              videoSources: [],
+              selectedSource: null,
+              selectedLink: null,
+              loadingVideo: true,
+            },
+          })
+          localStorage.setItem('preferredProvider', provider)
+          setFallbackPrompt(null)
+          toast.success(`Switched to ${provider} (direct stream)`)
+          return
+        }
+      }
+      setFallbackPrompt({ retryFailed: true })
+      toast.error('No working direct stream found on other providers')
+    } finally {
+      setIsRetryingProvider(false)
+    }
+  }, [
+    showId,
+    state.currentEpisode,
+    state.currentMode,
+    state.showMeta?.isAdult,
+    state.selectedProvider,
+    dispatch,
+  ])
+
+  const handleVideoSourceError = useCallback(() => {
+    if (hasAutoFallbackRef.current || fallbackDismissedRef.current) return
+    if (state.selectedSource?.type !== 'player') return
+    const fallbackSource = findIframeFallback()
+    if (!fallbackSource) return
+
+    if (!triedProvidersRef.current.includes(state.selectedProvider)) {
+      triedProvidersRef.current.push(state.selectedProvider)
+    }
+    const choice = fallbackChoiceRef.current
+    if (choice === 'iframe') {
+      switchToIframeFallback(fallbackSource)
+      return
+    }
+    if (choice === 'retry') {
+      void runProviderRetry()
+      return
+    }
+    actions.setShowControls(true)
+    setFallbackPrompt({ retryFailed: false })
+  }, [
+    state.selectedSource,
+    state.selectedProvider,
+    findIframeFallback,
+    switchToIframeFallback,
+    runProviderRetry,
+    actions,
+  ])
   handleVideoSourceErrorRef.current = handleVideoSourceError
+
+  const dismissFallbackPrompt = useCallback(() => {
+    fallbackDismissedRef.current = true
+    setFallbackPrompt(null)
+    setRememberFallbackChoice(false)
+  }, [])
+
+  const chooseIframeFallback = useCallback(() => {
+    if (rememberFallbackChoice) updateFallbackChoice('iframe')
+    const fallbackSource = findIframeFallback()
+    if (fallbackSource) switchToIframeFallback(fallbackSource)
+    else setFallbackPrompt(null)
+  }, [rememberFallbackChoice, updateFallbackChoice, findIframeFallback, switchToIframeFallback])
+
+  const chooseProviderRetry = useCallback(() => {
+    if (rememberFallbackChoice) updateFallbackChoice('retry')
+    void runProviderRetry()
+  }, [rememberFallbackChoice, updateFallbackChoice, runProviderRetry])
 
   const matchesQueueItem = (item: QueueItem, id: string | undefined, metaId: string | undefined) =>
     item.showId === id || (!!metaId && item.showId === metaId)
@@ -1453,6 +1606,50 @@ const Player: React.FC = () => {
         )}
       </Modal>
 
+      <Modal
+        isOpen={!!fallbackPrompt}
+        onClose={dismissFallbackPrompt}
+        title="Direct stream failed"
+        width="sm"
+      >
+        <Modal.Body>
+          <p>
+            <strong>{state.selectedProvider}</strong>&apos;s direct stream failed for this episode.
+          </p>
+          {fallbackPrompt?.retryFailed && (
+            <p>No working direct stream was found on the other providers either.</p>
+          )}
+          <p>
+            You can continue with the embedded (iframe) player, but embedded players may show{' '}
+            <strong>ads and pop-ups</strong>.
+          </p>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={rememberFallbackChoice}
+              onChange={(e) => setRememberFallbackChoice(e.target.checked)}
+            />
+            Remember my choice
+          </label>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="secondary" onClick={chooseIframeFallback}>
+            Continue with iframe
+          </Button>
+          <Button onClick={chooseProviderRetry} disabled={isRetryingProvider}>
+            {isRetryingProvider ? 'Searching…' : 'Try another provider'}
+          </Button>
+        </Modal.Actions>
+      </Modal>
+
       <AnimePaheCookieModal
         isOpen={!!state.showCookieModal}
         onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
@@ -1570,6 +1767,8 @@ const Player: React.FC = () => {
                     player={player}
                     isAutoplayEnabled={state.isAutoplayEnabled}
                     onAutoplayChange={handleAutoplayChange}
+                    fallbackChoice={fallbackChoice}
+                    onFallbackChoiceChange={updateFallbackChoice}
                     showNextEpisodeButton={
                       !shouldShowModal && showNextEpisodePrompt && queue.length === 0
                     }
@@ -1750,6 +1949,10 @@ const Player: React.FC = () => {
                 selectedProvider={state.selectedProvider}
                 isAdult={state.showMeta?.isAdult}
                 onProviderChange={(newProvider) => {
+                  hasAutoFallbackRef.current = false
+                  triedProvidersRef.current = []
+                  fallbackDismissedRef.current = false
+                  setFallbackPrompt(null)
                   dispatch({
                     type: 'SET_STATE',
                     payload: {
@@ -1865,6 +2068,10 @@ const Player: React.FC = () => {
                       className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${state.currentMode === 'dub' ? styles.modeToggleActive : ''}`}
                       onClick={() => {
                         const mode = state.currentMode === 'dub' ? 'sub' : 'dub'
+                        hasAutoFallbackRef.current = false
+                        triedProvidersRef.current = []
+                        fallbackDismissedRef.current = false
+                        setFallbackPrompt(null)
                         dispatch({ type: 'SET_MODE', payload: mode })
                         localStorage.setItem('preferredMode', mode)
                       }}

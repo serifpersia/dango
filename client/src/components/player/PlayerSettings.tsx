@@ -10,6 +10,7 @@ import {
   type SubtitleEdge,
 } from '../../lib/subtitleStyle'
 import { MenuSlider, SegmentedRow, SwatchRow } from './MenuControls'
+import type { FallbackChoice } from '../../lib/fallbackChoice'
 
 interface PlayerSettingsProps {
   isOpen: boolean
@@ -52,6 +53,8 @@ interface PlayerSettingsProps {
   onAutoSkipChange: (value: boolean) => void
   isAutoplayEnabled: boolean
   onAutoplayChange: (value: boolean) => void
+  fallbackChoice: FallbackChoice
+  onFallbackChoiceChange: (value: FallbackChoice) => void
 }
 
 type SettingsView =
@@ -88,6 +91,8 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onAutoSkipChange,
     isAutoplayEnabled,
     onAutoplayChange,
+    fallbackChoice,
+    onFallbackChoiceChange,
   } = props
   const [view, setView] = useState<SettingsView>('main')
   const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
@@ -375,6 +380,28 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       </button>
       <div className={styles.menuNote}>
         Automatically start the next episode when this one ends.
+      </div>
+      <button
+        type="button"
+        className={styles.menuItem}
+        onClick={() =>
+          onFallbackChoiceChange(
+            fallbackChoice === 'ask' ? 'iframe' : fallbackChoice === 'iframe' ? 'retry' : 'ask'
+          )
+        }
+      >
+        <span>Failed direct stream</span>
+        <span className={styles.currentValue}>
+          {fallbackChoice === 'iframe'
+            ? 'Use iframe'
+            : fallbackChoice === 'retry'
+              ? 'Try provider'
+              : 'Ask me'}
+        </span>
+      </button>
+      <div className={styles.menuNote}>
+        When a direct stream fails: ask each time, go straight to the embedded player (may show
+        ads), or automatically try another provider.
       </div>
     </div>
   )

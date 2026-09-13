@@ -129,6 +129,10 @@ export interface PlayerState {
     | 'kaa'
     | 'ht'
     | 'op'
+    | 'anibd'
+    | 'animedunya'
+    | 'animegg'
+    | 'anineko'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

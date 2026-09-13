@@ -1,22 +1,7 @@
 import React from 'react'
 import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
-
-type ProviderId =
-  'anilight' | 'kaa' | 'megaplay' | 'animepahe' | 'animeya' | '123anime' | 'wh' | 'hn' | 'ht' | 'op'
-
-const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
-  { value: 'megaplay', label: 'MegaPlay', mature: false },
-  { value: 'kaa', label: 'KAA', mature: false },
-  { value: 'anilight', label: 'Anilight', mature: false },
-  { value: 'animepahe', label: 'AnimePahe', mature: false },
-  { value: 'animeya', label: 'Animeya', mature: false },
-  { value: '123anime', label: '123Anime', mature: false },
-  { value: 'wh', label: 'WH', mature: true },
-  { value: 'hn', label: 'HN', mature: true },
-  { value: 'ht', label: 'HT', mature: true },
-  { value: 'op', label: 'OP', mature: true },
-]
+import { PROVIDER_OPTIONS, type ProviderId } from './providers'
 
 interface ProviderSelectorProps {
   selectedProvider: ProviderId

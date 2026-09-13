@@ -25,6 +25,10 @@ import { KaaProvider } from './providers/kaa.provider'
 import { HtProvider } from './providers/ht.provider'
 import { JasmrProvider } from './providers/jasmr.provider'
 import { OpProvider } from './providers/op.provider'
+import { AniBdProvider } from './providers/anibd.provider'
+import { AnimeDunyaProvider } from './providers/animedunya.provider'
+import { AnimeGgProvider } from './providers/animegg.provider'
+import { AniNekoProvider } from './providers/anineko.provider'
 import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
 import {
@@ -94,6 +98,10 @@ const kaaProvider = new KaaProvider(apiCache)
 const htProvider = new HtProvider(apiCache)
 const jasmrProvider = new JasmrProvider(apiCache)
 const opProvider = new OpProvider(apiCache)
+const anibdProvider = new AniBdProvider(apiCache)
+const animedunyaProvider = new AnimeDunyaProvider(apiCache)
+const animeggProvider = new AnimeGgProvider(apiCache)
+const aninekoProvider = new AniNekoProvider(apiCache)
 
 const providers = {
   '123anime': _123AnimeProvider,
@@ -107,6 +115,10 @@ const providers = {
   ht: htProvider,
   jasmr: jasmrProvider,
   op: opProvider,
+  anibd: anibdProvider,
+  animedunya: animedunyaProvider,
+  animegg: animeggProvider,
+  anineko: aninekoProvider,
 }
 
 let db: DatabaseWrapper
