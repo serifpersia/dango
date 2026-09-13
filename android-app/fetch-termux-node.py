@@ -28,6 +28,7 @@ NPM_REGISTRY = "https://registry.npmjs.org/npm/-/npm-11.19.0.tgz"
 SCRIPT_DIR = Path(__file__).resolve().parent
 PAYLOAD_DIR = SCRIPT_DIR / "payload"
 DEBS_DIR = SCRIPT_DIR / "debs"
+ALIASES_FILE = "aliases.txt"
 
 PACKAGES = [
     "nodejs",
@@ -330,6 +331,37 @@ def clean_unneeded_dirs(abi_dir: Path):
             shutil.rmtree(lib_sub)
 
 
+def dedupe_lib_aliases(payload_dir: Path):
+    print("\n[*] Deduping soname alias copies...")
+    alias_lines = []
+    saved = 0
+    removed = 0
+    for abi in SUPPORTED_ABIS:
+        lib_dir = payload_dir / abi / "lib"
+        if not lib_dir.exists():
+            continue
+        by_hash = {}
+        for f in sorted(lib_dir.iterdir()):
+            if not f.is_file() or f.is_symlink():
+                continue
+            by_hash.setdefault(hashlib.sha256(f.read_bytes()).hexdigest(), []).append(f)
+        for files in by_hash.values():
+            if len(files) < 2:
+                continue
+            files.sort(key=lambda p: (len(p.name), p.name))
+            canonical = files[-1]
+            for dup in files[:-1]:
+                alias_lines.append(f"{abi}/lib/{dup.name} {abi}/lib/{canonical.name}")
+                saved += dup.stat().st_size
+                dup.unlink()
+                removed += 1
+    manifest = payload_dir / ALIASES_FILE
+    manifest.write_text(
+        "\n".join(sorted(alias_lines)) + ("\n" if alias_lines else ""), encoding="utf-8"
+    )
+    print(f"  Removed {removed} duplicate copies, saved {saved / 1024 / 1024:.1f} MB")
+
+
 def create_manifest(payload_dir: Path):
     print("\n[*] Generating manifest.txt...")
     manifest_path = payload_dir / "manifest.txt"
@@ -464,6 +496,7 @@ def main():
     else:
         print("\n[+] Skipped npm")
 
+    dedupe_lib_aliases(PAYLOAD_DIR)
     patch_npm_sigstore(common_dir)
     create_manifest(PAYLOAD_DIR)
 
@@ -484,6 +517,12 @@ if __name__ == "__main__":
         if DEBS_DIR.exists():
             shutil.rmtree(DEBS_DIR)
             print("Cleaned debs/")
+        print("Done.")
+        sys.exit(0)
+
+    if "--dedupe-only" in sys.argv:
+        dedupe_lib_aliases(PAYLOAD_DIR)
+        create_manifest(PAYLOAD_DIR)
         print("Done.")
         sys.exit(0)
 

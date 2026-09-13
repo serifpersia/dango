@@ -34,6 +34,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var statusTitle: TextView
     private lateinit var statusSubtitle: TextView
     private lateinit var versionText: TextView
+    private lateinit var devServerUrlInput: android.widget.EditText
     private lateinit var updateBtn: Button
     private lateinit var launchBtn: Button
     private lateinit var progressBar: ProgressBar
@@ -56,6 +57,7 @@ class SetupActivity : AppCompatActivity() {
         statusTitle = findViewById(R.id.statusTitle)
         statusSubtitle = findViewById(R.id.statusSubtitle)
         versionText = findViewById(R.id.versionText)
+        devServerUrlInput = findViewById(R.id.devServerUrlInput)
         updateBtn = findViewById(R.id.updateBtn)
         launchBtn = findViewById(R.id.launchBtn)
         progressBar = findViewById(R.id.progressBar)
@@ -69,13 +71,34 @@ class SetupActivity : AppCompatActivity() {
         }
         launchBtn.setOnClickListener {
             Log.i(TAG, "Launch button clicked")
+            if (DevConfig.isEnabled(this)) {
+                DevConfig.setDevUrl(this, devServerUrlInput.text.toString())
+            }
             startActivity(Intent(this, MainActivity::class.java))
         }
 
         scope.launch {
             Log.i(TAG, "Starting checkState coroutine")
+            if (DevConfig.isEnabled(this@SetupActivity)) {
+                showDevServerMode()
+                return@launch
+            }
             checkState()
         }
+    }
+
+    private fun showDevServerMode() {
+        statusTitle.text = "dango"
+        statusSubtitle.text = "Dev server mode"
+        versionText.visibility = View.GONE
+        updateBtn.visibility = View.GONE
+        devServerUrlInput.setText(DevConfig.getDevUrl(this))
+        devServerUrlInput.visibility = View.VISIBLE
+        launchBtn.text = "Launch (dev server)"
+        launchBtn.visibility = View.VISIBLE
+        progressBar.visibility = View.GONE
+        progressText.visibility = View.GONE
+        logScroll.visibility = View.GONE
     }
 
     private suspend fun checkState() {
@@ -93,8 +116,9 @@ class SetupActivity : AppCompatActivity() {
 
             showProgress("Extracting payload...")
             val payloadDir = File(filesDir, "payload")
+            val payloadOk = File(payloadDir, ".payload_ok").exists()
             withContext(Dispatchers.IO) {
-                if (!File(payloadDir, "npm/bin/npm-cli.js").exists()) {
+                if (!File(payloadDir, "npm/bin/npm-cli.js").exists() || !payloadOk) {
                     withContext(Dispatchers.Main) { appendLog("Extracting files to device...") }
                     extractPayload(payloadDir)
                 }
@@ -276,16 +300,12 @@ class SetupActivity : AppCompatActivity() {
         for (assetPath in files) {
             try {
                 val rel = when {
-                    // Common assets (npm, etc/tls)
                     assetPath.startsWith("payload/common/") ->
                         assetPath.removePrefix("payload/common/")
-                    // ABI-specific libraries for current device
                     assetPath.startsWith("payload/$deviceAbi/lib/") ->
                         "lib/" + assetPath.removePrefix("payload/$deviceAbi/lib/")
-                    // Skip libraries for other ABIs
                     abis.any { assetPath.startsWith("payload/$it/") } ->
                         continue
-                    // Fallback for legacy single-arch flat payload
                     else ->
                         assetPath.removePrefix("payload/")
                 }
@@ -302,7 +322,45 @@ class SetupActivity : AppCompatActivity() {
                 Log.w(TAG, "extractPayload: failed to extract $assetPath: ${e.message}")
             }
         }
+        recreateLibSymlinks(targetDir, deviceAbi)
         Log.i(TAG, "extractPayload: extracted $extracted files for $deviceAbi")
+    }
+
+    private fun recreateLibSymlinks(targetDir: File, deviceAbi: String): Boolean {
+        val lines = try {
+            assets.open("payload/aliases.txt").bufferedReader().readLines()
+        } catch (_: Exception) {
+            return true
+        }
+        val prefix = "$deviceAbi/"
+        var ok = true
+        for (line in lines) {
+            val parts = line.trim().split(" ")
+            if (parts.size != 2 || parts.any { it.isEmpty() }) continue
+            if (!parts[0].startsWith(prefix) || !parts[1].startsWith(prefix)) continue
+            val linkFile = File(targetDir, parts[0].removePrefix(prefix))
+            val targetFile = File(targetDir, parts[1].removePrefix(prefix))
+            if (!targetFile.exists()) {
+                ok = false
+                continue
+            }
+            try {
+                linkFile.delete()
+                android.system.Os.symlink(targetFile.absolutePath, linkFile.absolutePath)
+            } catch (_: Exception) {
+                try {
+                    targetFile.copyTo(linkFile, overwrite = true)
+                } catch (_: Exception) {
+                    ok = false
+                }
+            }
+        }
+        if (ok) {
+            try {
+                File(targetDir, ".payload_ok").createNewFile()
+            } catch (_: Exception) {}
+        }
+        return ok
     }
 
     private fun scanAssets(path: String, out: MutableList<String>) {

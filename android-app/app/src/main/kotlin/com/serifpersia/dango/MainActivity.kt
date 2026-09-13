@@ -5,11 +5,14 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -22,7 +25,10 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,9 +47,10 @@ class MainActivity : AppCompatActivity() {
         const val TAG = "DangoMain"
         const val SERVER_URL = "http://127.0.0.1:3000"
         const val SHUTDOWN_URL = "$SERVER_URL/api/internal/shutdown"
-        private const val FILE_CHOOSER_REQUEST_CODE = 1001
-        private const val FILE_DOWNLOAD_REQUEST_CODE = 1002
     }
+
+    private var devMode = false
+    private var startUrl = SERVER_URL
 
     private lateinit var webView: WebView
     private lateinit var swipeRefreshLayout: DangoSwipeRefreshLayout
@@ -72,7 +79,9 @@ class MainActivity : AppCompatActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingDownloadUrl: String? = null
     private var pendingDownloadFileName: String = "dango-backup.db"
-    private var pendingDownloadMimeType: String = "application/octet-stream"
+
+    private var fileChooserLauncher: ActivityResultLauncher<Intent>? = null
+    private var createDocumentLauncher: ActivityResultLauncher<Intent>? = null
 
     private val edgeSwipeThresholdPx by lazy { resources.displayMetrics.density * 18f }
     private val swipeTriggerDistancePx by lazy {
@@ -84,10 +93,71 @@ class MainActivity : AppCompatActivity() {
     private val swipeMaxVerticalDriftPx by lazy { resources.displayMetrics.density * 24f }
     private val refreshTriggerDistancePx by lazy { (resources.displayMetrics.density * 160f).toInt() }
 
+    inner class DangoBridge {
+        @JavascriptInterface
+        fun isDangoApp(): Boolean = true
+
+        @JavascriptInterface
+        fun downloadFile(url: String, fileName: String) {
+            runOnUiThread {
+                val resolved = resolveUrl(url)
+                if (resolved.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Export failed.", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                startDownloadSave(
+                    resolved,
+                    fileName.ifBlank { "dango-backup.db" },
+                    guessMimeType(fileName.ifBlank { "dango-backup.db" })
+                )
+            }
+        }
+    }
+
+    private fun resolveUrl(url: String): String {
+        if (url.isBlank()) return ""
+        if (url.startsWith("http://") || url.startsWith("https://")) return url
+        val base = try {
+            val current = webView.url ?: startUrl
+            URL(current)
+        } catch (_: Exception) {
+            return startUrl.trimEnd('/') + "/" + url.trimStart('/')
+        }
+        return try {
+            URL(base, url).toString()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun guessMimeType(fileName: String): String {
+        val lower = fileName.lowercase()
+        return when {
+            lower.endsWith(".db") -> "application/octet-stream"
+            lower.endsWith(".xml") -> "application/xml"
+            lower.endsWith(".json") -> "application/json"
+            else -> "application/octet-stream"
+        }
+    }
+
+    private fun concreteCreateMimeType(mimeType: String?, fileName: String): String {
+        if (!mimeType.isNullOrBlank() && mimeType != "*/*") return mimeType
+        return guessMimeType(fileName)
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val debuggable =
+            (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debuggable) {
+            try {
+                WebView.setWebContentsDebuggingEnabled(true)
+            } catch (_: Exception) {
+            }
+        }
 
         webView = findViewById(R.id.webView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
@@ -101,6 +171,46 @@ class MainActivity : AppCompatActivity() {
         shutdownConfirmSubtext = findViewById(R.id.shutdownConfirmSubtext)
         shutdownConfirmAccept = findViewById(R.id.shutdownConfirmAccept)
         shutdownConfirmCancel = findViewById(R.id.shutdownConfirmCancel)
+
+        fileChooserLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                val callback = fileChooserCallback ?: return@registerForActivityResult
+                fileChooserCallback = null
+                if (result.resultCode != RESULT_OK || result.data == null) {
+                    callback.onReceiveValue(null)
+                    return@registerForActivityResult
+                }
+                val data = result.data!!
+                val uris = mutableListOf<Uri>()
+                val clipData = data.clipData
+                if (clipData != null) {
+                    for (i in 0 until clipData.itemCount) {
+                        clipData.getItemAt(i)?.uri?.let { uris.add(it) }
+                    }
+                } else {
+                    data.data?.let { uris.add(it) }
+                }
+                for (uri in uris) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+                callback.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
+            }
+
+        createDocumentLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                val downloadUrl = pendingDownloadUrl
+                pendingDownloadUrl = null
+                if (result.resultCode != RESULT_OK || result.data?.data == null || downloadUrl == null) {
+                    return@registerForActivityResult
+                }
+                saveDownloadToUri(downloadUrl, result.data!!.data!!)
+            }
 
         swipeRefreshLayout.setColorSchemeColors(0xFF8B5CF6.toInt())
         swipeRefreshLayout.setDistanceToTriggerSync(refreshTriggerDistancePx)
@@ -130,11 +240,14 @@ class MainActivity : AppCompatActivity() {
             javaScriptEnabled = true
             domStorageEnabled = true
             allowFileAccess = true
+            allowContentAccess = true
+            javaScriptCanOpenWindowsAutomatically = true
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
             setSupportMultipleWindows(false)
         }
+        webView.addJavascriptInterface(DangoBridge(), "DangoBridge")
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -155,31 +268,21 @@ class MainActivity : AppCompatActivity() {
 
         webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
             if (url.isNullOrBlank()) return@setDownloadListener
+            if (url.startsWith("blob:") || url.startsWith("data:")) {
+                Toast.makeText(
+                    this,
+                    "Use the in-page backup button for downloads.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@setDownloadListener
+            }
 
-            pendingDownloadUrl = url
-            pendingDownloadFileName = URLUtil.guessFileName(
+            val fileName = URLUtil.guessFileName(
                 url,
                 contentDisposition,
                 mimeType
             ).ifBlank { "dango-backup.db" }
-            pendingDownloadMimeType = if (mimeType.isNullOrBlank() || mimeType == "application/octet-stream") "*/*" else mimeType
-
-            val saveIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = pendingDownloadMimeType
-                putExtra(Intent.EXTRA_TITLE, pendingDownloadFileName)
-            }
-
-            try {
-                startActivityForResult(saveIntent, FILE_DOWNLOAD_REQUEST_CODE)
-            } catch (_: Exception) {
-                pendingDownloadUrl = null
-                android.widget.Toast.makeText(
-                    this,
-                    "No file manager is available to save this file.",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
+            startDownloadSave(url, fileName, mimeType)
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -198,37 +301,30 @@ class MainActivity : AppCompatActivity() {
                 filePathCallback: ValueCallback<Array<Uri>>?,
                 fileChooserParams: FileChooserParams?
             ): Boolean {
-                this@MainActivity.fileChooserCallback?.onReceiveValue(null)
-                this@MainActivity.fileChooserCallback = filePathCallback
+                fileChooserCallback?.onReceiveValue(null)
+                fileChooserCallback = null
 
                 if (filePathCallback == null || fileChooserParams == null) {
-                    this@MainActivity.fileChooserCallback = null
                     return false
                 }
+                fileChooserCallback = filePathCallback
 
-                val chooserIntent = try {
-                    fileChooserParams.createIntent().apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        if (type.isNullOrBlank()) {
-                            type = "*/*"
-                        }
-                        if (fileChooserParams.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
-                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                        }
-                    }
+                val intent = try {
+                    buildFileChooserIntent(fileChooserParams)
                 } catch (_: Exception) {
                     Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         type = "*/*"
                     }
                 }
 
                 return try {
-                    startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST_CODE)
+                    fileChooserLauncher?.launch(intent)
                     true
                 } catch (_: Exception) {
-                    this@MainActivity.fileChooserCallback?.onReceiveValue(null)
-                    this@MainActivity.fileChooserCallback = null
+                    fileChooserCallback?.onReceiveValue(null)
+                    fileChooserCallback = null
                     false
                 }
             }
@@ -316,12 +412,132 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        NodeService.onStatusChange = { running ->
-            if (running) retryLoad()
+        devMode = DevConfig.isEnabled(this)
+        startUrl = if (devMode) DevConfig.getDevUrl(this) else SERVER_URL
+        if (devMode) {
+            Log.i(TAG, "Dev server mode: loading $startUrl, node install skipped")
+            waitForServer(startUrl)
+        } else {
+            NodeService.onStatusChange = { running ->
+                if (running) retryLoad()
+            }
+            NodeService.start(this)
+            waitForServer(SERVER_URL)
+        }
+    }
+
+    private fun buildFileChooserIntent(params: WebChromeClient.FileChooserParams): Intent {
+        val base = try {
+            params.createIntent()
+        } catch (_: Exception) {
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+        }
+        base.addCategory(Intent.CATEGORY_OPENABLE)
+        base.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+        val acceptTypes = params.acceptTypes ?: emptyArray()
+        val extensionOnly = acceptTypes.isEmpty() || acceptTypes.any { it.startsWith(".") }
+        if (extensionOnly) {
+            base.type = "*/*"
+            val hints = mutableListOf<String>()
+            for (accept in acceptTypes) {
+                when {
+                    accept.equals(".db", ignoreCase = true) -> {
+                        hints.add("application/octet-stream")
+                        hints.add("application/x-sqlite3")
+                    }
+                    accept.equals(".xml", ignoreCase = true) -> {
+                        hints.add("text/xml")
+                        hints.add("application/xml")
+                    }
+                    accept.isNotBlank() -> hints.add(accept)
+                }
+            }
+            if (hints.isNotEmpty()) {
+                base.putExtra(Intent.EXTRA_MIME_TYPES, hints.distinct().toTypedArray())
+            }
+        } else if (base.type.isNullOrBlank()) {
+            base.type = "*/*"
         }
 
-        NodeService.start(this)
-        waitForServer()
+        if (params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+            base.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        return base
+    }
+
+    private fun startDownloadSave(url: String, fileName: String, mimeType: String?) {
+        pendingDownloadUrl = url
+        pendingDownloadFileName = fileName.ifBlank { "dango-backup.db" }
+
+        val saveIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = concreteCreateMimeType(mimeType, pendingDownloadFileName)
+            putExtra(Intent.EXTRA_TITLE, pendingDownloadFileName)
+        }
+
+        try {
+            createDocumentLauncher?.launch(saveIntent)
+        } catch (_: Exception) {
+            pendingDownloadUrl = null
+            Toast.makeText(
+                this,
+                "Export failed.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun saveDownloadToUri(downloadUrl: String, destinationUri: Uri) {
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                var conn: HttpURLConnection? = null
+                try {
+                    conn = URL(downloadUrl).openConnection() as HttpURLConnection
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 30000
+                    conn.instanceFollowRedirects = true
+                    try {
+                        val cookie = CookieManager.getInstance().getCookie(downloadUrl)
+                        if (!cookie.isNullOrBlank()) {
+                            conn.setRequestProperty("Cookie", cookie)
+                        }
+                    } catch (_: Exception) {
+                    }
+                    try {
+                        conn.setRequestProperty("User-Agent", webView.settings.userAgentString)
+                    } catch (_: Exception) {
+                    }
+                    conn.connect()
+                    if (conn.responseCode !in 200..299) {
+                        Log.w(TAG, "Download failed: HTTP ${conn.responseCode} for $downloadUrl")
+                        return@withContext false
+                    }
+                    conn.inputStream.use { input ->
+                        contentResolver.openOutputStream(destinationUri)?.use { output ->
+                            input.copyTo(output)
+                            true
+                        } ?: false
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Download failed for $downloadUrl: ${e.message}")
+                    false
+                } finally {
+                    try {
+                        conn?.disconnect()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (saved) "Exported successfully." else "Export failed.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun handleEdgeSwipe(event: MotionEvent): Boolean {
@@ -401,8 +617,8 @@ class MainActivity : AppCompatActivity() {
         swipeActive = false
     }
 
-    private fun waitForServer() {
-        statusText.text = "Starting dango..."
+    private fun waitForServer(url: String) {
+        statusText.text = if (devMode) "Connecting to dev server..." else "Starting dango..."
         statusText.visibility = View.VISIBLE
         progressBar.visibility = View.VISIBLE
 
@@ -410,7 +626,7 @@ class MainActivity : AppCompatActivity() {
             val ready = withContext(Dispatchers.IO) {
                 for (i in 1..120) {
                     try {
-                        val conn = URL(SERVER_URL).openConnection() as HttpURLConnection
+                        val conn = URL(url).openConnection() as HttpURLConnection
                         conn.connectTimeout = 2000
                         conn.readTimeout = 2000
                         conn.connect()
@@ -427,21 +643,30 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (ready) {
-                webView.loadUrl(SERVER_URL)
+                webView.loadUrl(url)
             } else {
-                statusText.text = "Server failed to start."
+                statusText.text = if (devMode) {
+                    "Dev server unreachable at $url"
+                } else {
+                    "Server failed to start."
+                }
             }
         }
     }
 
     private fun retryLoad() {
+        val url = startUrl
         scope.launch {
             delay(2000)
-            webView.loadUrl(SERVER_URL)
+            webView.loadUrl(url)
         }
     }
 
     private fun gracefulShutdown() {
+        if (devMode) {
+            finish()
+            return
+        }
         webView.visibility = View.GONE
         shutdownOverlay.visibility = View.VISIBLE
 
@@ -484,54 +709,12 @@ class MainActivity : AppCompatActivity() {
         customView = null
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == FILE_DOWNLOAD_REQUEST_CODE) {
-            val downloadUrl = pendingDownloadUrl
-            pendingDownloadUrl = null
-            if (resultCode != RESULT_OK || data?.data == null || downloadUrl == null) return
-
-            val destinationUri = data.data!!
-            scope.launch {
-                val saved = withContext(Dispatchers.IO) {
-                    try {
-                        URL(downloadUrl).openStream().use { input ->
-                            contentResolver.openOutputStream(destinationUri)?.use { output ->
-                                input.copyTo(output)
-                                true
-                            } ?: false
-                        }
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-                android.widget.Toast.makeText(
-                    this@MainActivity,
-                    if (saved) "File saved successfully." else "Could not save the file.",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
-            return
-        }
-
-        if (requestCode != FILE_CHOOSER_REQUEST_CODE) return
-
-        val callback = fileChooserCallback ?: return
-        fileChooserCallback = null
-
-        val results = if (resultCode == RESULT_OK && data != null) {
-            WebChromeClient.FileChooserParams.parseResult(resultCode, data)
-        } else {
-            null
-        }
-        callback.onReceiveValue(results)
-    }
-
     override fun onDestroy() {
         fileChooserCallback?.onReceiveValue(null)
         fileChooserCallback = null
-        NodeService.stop(this)
+        if (!devMode) {
+            NodeService.stop(this)
+        }
         scope.cancel()
         super.onDestroy()
     }

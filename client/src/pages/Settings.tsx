@@ -187,7 +187,17 @@ const Settings: React.FC = () => {
   }, [activeTab, updateIndicator])
 
   const handleBackup = () => {
-    setStatusMessage('Downloading database backup...')
+    setStatusMessage('Exporting database...')
+    const bridge = (
+      window as unknown as { DangoBridge?: { downloadFile: (url: string, name: string) => void } }
+    ).DangoBridge
+    if (bridge?.downloadFile) {
+      bridge.downloadFile('/api/backup-db', 'dango-backup.db')
+      setTimeout(() => {
+        setStatusMessage('Database exported successfully!')
+      }, 1500)
+      return
+    }
     const a = document.createElement('a')
     a.href = '/api/backup-db'
     a.download = 'dango-backup.db'
@@ -195,7 +205,7 @@ const Settings: React.FC = () => {
     a.click()
     a.remove()
     setTimeout(() => {
-      setStatusMessage('Database backup downloaded!')
+      setStatusMessage('Database exported successfully!')
     }, 1500)
   }
 
@@ -203,7 +213,7 @@ const Settings: React.FC = () => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    setStatusMessage('Restoring database...')
+    setStatusMessage('Importing database...')
     const formData = new FormData()
     formData.append('dbfile', file)
 
@@ -216,13 +226,15 @@ const Settings: React.FC = () => {
       const result = await response.json()
 
       if (response.ok) {
-        setStatusMessage(result.message || 'Database restored successfully!')
+        setStatusMessage('Database imported successfully!')
         setTimeout(() => window.location.reload(), 2000)
       } else {
-        setStatusMessage(`Restore failed: ${result.error}`)
+        setStatusMessage(`Import failed: ${result.error}`)
       }
     } catch (_error) {
-      setStatusMessage('Restore failed: An unexpected error occurred.')
+      setStatusMessage('Import failed: An unexpected error occurred.')
+    } finally {
+      event.target.value = ''
     }
   }
 
@@ -586,8 +598,14 @@ const Settings: React.FC = () => {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleRestore}
-                style={{ display: 'none' }}
-                accept=".db"
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  opacity: 0,
+                  overflow: 'hidden',
+                }}
+                accept=".db,application/octet-stream"
               />
               {statusMessage && <p className={styles.status}>{statusMessage}</p>}
             </div>

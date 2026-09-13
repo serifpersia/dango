@@ -47,6 +47,17 @@
             android:visibility="gone"
             android:layout_marginBottom="24dp" />
 
+        <EditText
+            android:id="@+id/devServerUrlInput"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:hint="Dev server URL"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:inputType="textUri"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp" />
+
         <Button
             android:id="@+id/updateBtn"
             android:layout_width="280dp"
