@@ -11,6 +11,11 @@ import fs from 'fs'
 import logger from '../logger'
 import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils'
 import { isSafeExternalUrl } from '../utils/security.utils'
+import {
+  MEGAPLAY_ORIGIN,
+  isNexabloomMasterUrl,
+  signNexabloomMasterUrl,
+} from '../utils/megaplay.utils'
 
 function firstString(value: unknown): string | undefined {
   if (typeof value === 'string') return value
@@ -180,6 +185,10 @@ export class ProxyController {
         if (!headers['Referer']) headers['Referer'] = refererStr || ProxyController.KAA_REFERER
         headers['Origin'] = ProxyController.KAA_ORIGIN
       }
+      const isMegaplay = refererStr.startsWith(MEGAPLAY_ORIGIN) || urlStr.includes('nexabloom.top')
+      if (isMegaplay && !headers['Origin']) {
+        headers['Origin'] = MEGAPLAY_ORIGIN
+      }
       if (urlStr.includes('weeabo0.xyz') || urlStr.includes('weeab0o.xyz')) {
         if (!headers['Referer']) headers['Referer'] = refererStr || 'https://japaneseasmr.com/'
         const jasmrCookieHeader = buildCfClearanceCookie(cookieStr)
@@ -199,7 +208,7 @@ export class ProxyController {
         }
 
         const resp = await gotScraping({
-          url: urlStr,
+          url: isNexabloomMasterUrl(urlStr) ? signNexabloomMasterUrl(urlStr) : urlStr,
           method: 'GET',
           headers,
           responseType: 'text',

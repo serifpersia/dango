@@ -12,6 +12,7 @@ import {
 import logger from '../logger'
 import { anilistRequest, parseMalId } from '../lib/anilist'
 import { kitsuMetaByAnilistId } from '../lib/kitsu'
+import { signNexabloomMasterUrl } from '../utils/megaplay.utils'
 
 interface AniListTitle {
   romaji?: string
@@ -521,9 +522,11 @@ export class MegaPlayProvider implements Provider {
     for (const s of sources) {
       if (s.file.includes('.m3u8')) {
         try {
-          const masterRes = await fetch(s.file, {
+          const signedMaster = signNexabloomMasterUrl(s.file)
+          const masterRes = await fetch(signedMaster, {
             headers: {
               Referer: 'https://megaplay.buzz/',
+              Origin: 'https://megaplay.buzz',
               'User-Agent': this.megaPlayHeaders['User-Agent'],
             },
             signal: AbortSignal.timeout(10000),
