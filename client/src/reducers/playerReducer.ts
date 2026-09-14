@@ -19,7 +19,6 @@ export type Action =
         | 'anibd'
         | 'animedunya'
         | 'animegg'
-        | 'anineko'
     }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
@@ -43,7 +42,6 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
     'anibd',
     'animedunya',
     'animegg',
-    'anineko',
   ]
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']

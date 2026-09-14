@@ -185,7 +185,8 @@ export class DataController {
 
       const providerKey = providerName?.toLowerCase()
       const stillMal = parseMalId(showId) !== null
-      const needsResolution = providerKey !== 'megaplay' && (/^\d+$/.test(showId) || stillMal)
+      const isNativeId = !!(providerKey && this.providers[providerKey]?.isDirectId?.(showId))
+      const needsResolution = !isNativeId && (/^\d+$/.test(showId) || stillMal)
       if (providerKey && needsResolution) {
         const meta = (await ShowsMetaRepository.getById(req.db, showId)) as {
           name?: string
@@ -404,6 +405,22 @@ export class DataController {
           }
         } catch {
           // ignore
+        }
+      }
+
+      if (episodes.length === 0) {
+        const providerName = (req.query.provider as string)?.toLowerCase()
+        const provider = providerName ? this.providers[providerName] : undefined
+        if (provider?.isDirectId?.(showId)) {
+          try {
+            const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
+            if (data?.episodes?.length) {
+              res.set('Cache-Control', 'no-store').json(data)
+              return
+            }
+          } catch {
+            // ignore
+          }
         }
       }
 

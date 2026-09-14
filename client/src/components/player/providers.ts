@@ -12,19 +12,43 @@ export type ProviderId =
   | 'anibd'
   | 'animedunya'
   | 'animegg'
-  | 'anineko'
+  | 'justanime'
 
-export const PROVIDER_OPTIONS: { value: ProviderId; label: string; mature: boolean }[] = [
-  { value: 'megaplay', label: 'MegaPlay', mature: false },
-  { value: 'kaa', label: 'KAA', mature: false },
-  { value: 'anibd', label: 'AniBD', mature: false },
-  { value: 'anilight', label: 'Anilight', mature: false },
-  { value: 'animedunya', label: 'AnimeDunya', mature: false },
-  { value: 'animegg', label: 'AnimeGG', mature: false },
-  { value: 'animepahe', label: 'AnimePahe', mature: false },
-  { value: 'animeya', label: 'Animeya', mature: false },
-  { value: '123anime', label: '123Anime', mature: false },
-  { value: 'anineko', label: 'AniNeko', mature: false },
+export type SubType = 'soft' | 'hard' | 'mixed'
+
+export type ProviderTier = 'direct' | 'embed' | 'cookie'
+
+export const SUB_LABEL: Record<SubType, string> = {
+  soft: 'Softsub',
+  hard: 'Hardsub',
+  mixed: 'Mixed',
+}
+
+export const TIER_LABEL: Record<ProviderTier, string> = {
+  direct: 'Direct',
+  embed: 'Embed',
+  cookie: 'Needs cookie',
+}
+
+export const TIER_ORDER: ProviderTier[] = ['direct', 'cookie', 'embed']
+
+export const PROVIDER_OPTIONS: {
+  value: ProviderId
+  label: string
+  mature: boolean
+  sub?: SubType
+  tier?: ProviderTier
+}[] = [
+  { value: 'megaplay', label: 'MegaPlay', mature: false, sub: 'soft', tier: 'direct' },
+  { value: 'justanime', label: 'JustAnime', mature: false, sub: 'hard', tier: 'direct' },
+  { value: 'anibd', label: 'AniBD', mature: false, sub: 'hard', tier: 'direct' },
+  { value: 'animegg', label: 'AnimeGG', mature: false, sub: 'hard', tier: 'direct' },
+  { value: 'kaa', label: 'KAA', mature: false, sub: 'soft', tier: 'direct' },
+  { value: 'anilight', label: 'Anilight', mature: false, sub: 'mixed', tier: 'direct' },
+  { value: 'animepahe', label: 'AnimePahe', mature: false, sub: 'hard', tier: 'cookie' },
+  { value: 'animeya', label: 'Animeya', mature: false, sub: 'mixed', tier: 'embed' },
+  { value: '123anime', label: '123Anime', mature: false, sub: 'hard', tier: 'embed' },
+  { value: 'animedunya', label: 'AnimeDunya', mature: false, sub: 'soft', tier: 'embed' },
   { value: 'wh', label: 'WH', mature: true },
   { value: 'hn', label: 'HN', mature: true },
   { value: 'ht', label: 'HT', mature: true },

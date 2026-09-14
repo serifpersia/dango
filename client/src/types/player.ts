@@ -132,7 +132,6 @@ export interface PlayerState {
     | 'anibd'
     | 'animedunya'
     | 'animegg'
-    | 'anineko'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

@@ -179,6 +179,10 @@ export class MegaPlayProvider implements Provider {
     return results[0]?._id || null
   }
 
+  isDirectId(showId: string): boolean {
+    return /^\d+$/.test(showId.trim())
+  }
+
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       if (!/^\d+$/.test(showId)) return null

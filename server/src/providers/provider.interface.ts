@@ -106,4 +106,5 @@ export interface Provider {
     mode?: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
   resolveShowId?(title: string, romaji?: string, mode?: 'sub' | 'dub'): Promise<string | null>
+  isDirectId?(showId: string): boolean
 }

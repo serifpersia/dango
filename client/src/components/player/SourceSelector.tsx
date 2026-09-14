@@ -1,7 +1,7 @@
 import React from 'react'
 import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
-import { PROVIDER_OPTIONS, type ProviderId } from './providers'
+import { PROVIDER_OPTIONS, SUB_LABEL, TIER_LABEL, TIER_ORDER, type ProviderId } from './providers'
 
 interface ProviderSelectorProps {
   selectedProvider: ProviderId
@@ -27,11 +27,19 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         value={selectedProvider}
         onChange={(e) => onProviderChange(e.target.value as ProviderId)}
       >
-        {visibleProviders.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+        {TIER_ORDER.map((tier) => {
+          const group = visibleProviders.filter((option) => (option.tier ?? 'direct') === tier)
+          if (group.length === 0) return null
+          return (
+            <optgroup key={tier} label={TIER_LABEL[tier]}>
+              {group.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.sub ? `${option.label} (${SUB_LABEL[option.sub]})` : option.label}
+                </option>
+              ))}
+            </optgroup>
+          )
+        })}
       </select>
     </div>
   )

@@ -131,6 +131,10 @@ export class AniBdProvider implements Provider {
     }
   }
 
+  isDirectId(showId: string): boolean {
+    return /^\d+$/.test(showId.trim())
+  }
+
   private async fetchGroups(anilistId: string): Promise<AniBdServerGroup[]> {
     const cacheKey = `anibd_groups_${anilistId}`
     const cached = this.cache.get<AniBdServerGroup[]>(cacheKey)
