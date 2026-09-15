@@ -47,12 +47,16 @@ export const deleteTelemetryData = async () => {
   }
 }
 
+let pingInProgress = false
+
 export const sendTelemetryPing = async () => {
-  if (!TELEMETRY_URL) return
+  if (!TELEMETRY_URL || pingInProgress) return
+  pingInProgress = true
+  localStorage.setItem('last_telemetry_ping', Date.now().toString())
   try {
     let installationId = localStorage.getItem('installation_id')
 
-    if (!installationId || installationId.length === 36) {
+    if (!installationId) {
       try {
         const res = await fetch('/api/installation-id')
         const data = await res.json()
@@ -81,9 +85,10 @@ export const sendTelemetryPing = async () => {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
     })
-    localStorage.setItem('last_telemetry_ping', Date.now().toString())
   } catch (err) {
     console.error('Telemetry ping failed:', err)
+  } finally {
+    pingInProgress = false
   }
 }
 
