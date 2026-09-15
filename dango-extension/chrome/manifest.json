@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Dango Pahe Helper",
+  "version": "0.1.0",
+  "description": "Supplies the AnimePahe cf_clearance cookie to Dango.",
+  "permissions": ["cookies", "webRequest"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://animepahe.pw/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

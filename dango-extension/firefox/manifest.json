@@ -1,0 +1,28 @@
+{
+  "manifest_version": 2,
+  "name": "Dango Pahe Helper",
+  "version": "0.1.0",
+  "description": "Supplies the AnimePahe cf_clearance cookie to Dango.",
+  "permissions": [
+    "cookies",
+    "webRequest",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://animepahe.pw/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://animepahe.pw/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dango-pahe-helper@dango.local"
+    }
+  }
+}
