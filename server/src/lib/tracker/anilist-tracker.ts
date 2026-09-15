@@ -1,5 +1,5 @@
-import logger from '../../logger'
-import { waitForAnilistSlot, applyRateLimitHeaders } from '../anilist'
+import logger from '../../logger.js'
+import { waitForAnilistSlot, applyRateLimitHeaders } from '../anilist.js'
 
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 

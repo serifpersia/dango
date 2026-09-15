@@ -1,8 +1,8 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import logger from '../logger'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import logger from '../logger.js'
 import { execFileSync } from 'node:child_process'
 import { gotScraping } from 'got-scraping'
-import { BaseProvider } from './base-provider'
+import { BaseProvider } from './base-provider.js'
 
 const ANILIGHT_API = 'https://api.anilight.live/api'
 const SITE_BASE = 'https://anilight.live'

@@ -1,13 +1,13 @@
-import NodeCache from 'node-cache'
-import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
-import logger from '../logger'
+import { AppCache } from '../utils/cache.utils.js'
+import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import { buildQueryVariants, pickBestMatch } from './title-matching.js'
+import logger from '../logger.js'
 
 /**
  * Shared base for every scraping provider.
  *
  * Provides:
- *   - `NodeCache` lifecycle
+ *   - Shared cache lifecycle
  *   - Shared `resolveShowId` implementation (buildQueryVariants → search → pickBestMatch)
  *
  * Subclasses implement `name`, `search`, `getEpisodes`, `getStreamUrls`,
@@ -16,9 +16,9 @@ import logger from '../logger'
 export abstract class BaseProvider implements Provider {
   abstract name: string
 
-  protected cache: NodeCache
+  protected cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

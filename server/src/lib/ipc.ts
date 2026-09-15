@@ -1,4 +1,4 @@
-import logger from '../logger'
+import logger from '../logger.js'
 
 export interface IpcMessage {
   type: 'SYNC_START' | 'SYNC_END' | 'SERVER_EXIT'

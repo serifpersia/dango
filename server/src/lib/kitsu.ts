@@ -1,5 +1,5 @@
-import type { AnilistMedia } from './anilist'
-import logger from '../logger'
+import type { AnilistMedia } from './anilist.js'
+import logger from '../logger.js'
 
 const KITSU_BASE = 'https://kitsu.app/api/edge'
 const KITSU_HEADERS = { Accept: 'application/vnd.api+json', 'User-Agent': 'dango' }

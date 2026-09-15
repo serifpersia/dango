@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { AuthController } from '../controllers/auth.controller'
-import { DatabaseWrapper } from '../db'
+import { AuthController } from '../controllers/auth.controller.js'
+import { DatabaseWrapper } from '../db.js'
 
 export function createAuthRouter(
   runSyncSequence: (

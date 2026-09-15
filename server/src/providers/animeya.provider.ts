@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio'
-import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import logger from '../logger'
-import { BaseProvider } from './base-provider'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import logger from '../logger.js'
+import { BaseProvider } from './base-provider.js'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, healthiest/537.36) Chrome/120.0.0.0 Safari/537.36'

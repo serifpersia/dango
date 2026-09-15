@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express'
-import NodeCache from 'node-cache'
-import { JasmrProvider } from '../providers/jasmr.provider'
-import logger from '../logger'
+import { AppCache } from '../utils/cache.utils.js'
+import { JasmrProvider } from '../providers/jasmr.provider.js'
+import logger from '../logger.js'
 
-function makeCacheMiddleware(cache: NodeCache, keyFn: (req: Request) => string, ttl?: number) {
+function makeCacheMiddleware(cache: AppCache, keyFn: (req: Request) => string, ttl?: number) {
   return (req: Request, res: Response, next: () => void) => {
     const cacheKey = keyFn(req)
     const cached = cache.get(cacheKey)
@@ -21,7 +21,7 @@ function makeCacheMiddleware(cache: NodeCache, keyFn: (req: Request) => string, 
   }
 }
 
-export function createAsmrRouter(apiCache: NodeCache, provider: JasmrProvider): Router {
+export function createAsmrRouter(apiCache: AppCache, provider: JasmrProvider): Router {
   const router = Router()
 
   router.get(

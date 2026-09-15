@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { CONFIG } from '../config'
+import { CONFIG } from '../config.js'
 
 export function isSafeExternalUrl(rawUrl: unknown): { safe: boolean; url?: URL; error?: string } {
   if (typeof rawUrl !== 'string' || !rawUrl.trim()) {

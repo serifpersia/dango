@@ -7,11 +7,11 @@ import {
   EpisodeDetails,
   EpisodeDetail,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { requestContext } from '../utils/request-context'
-import { sanitizeCfClearance } from '../utils/cookie.utils'
-import { BaseProvider } from './base-provider'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { requestContext } from '../utils/request-context.js'
+import { sanitizeCfClearance } from '../utils/cookie.utils.js'
+import { BaseProvider } from './base-provider.js'
 
 interface AnimePaheSearchResult {
   session: string

@@ -1,8 +1,14 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions, VideoLink } from './provider.interface'
-import logger from '../logger'
-import { requestContext } from '../utils/request-context'
-import { buildCfClearanceCookie } from '../utils/cookie.utils'
-import { BaseProvider } from './base-provider'
+import {
+  Show,
+  VideoSource,
+  EpisodeDetails,
+  SearchOptions,
+  VideoLink,
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { requestContext } from '../utils/request-context.js'
+import { buildCfClearanceCookie } from '../utils/cookie.utils.js'
+import { BaseProvider } from './base-provider.js'
 
 const BASE_URL = 'https://japaneseasmr.com'
 const UA =

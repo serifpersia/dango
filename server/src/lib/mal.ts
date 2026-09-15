@@ -1,5 +1,5 @@
-import type { AnilistMedia, AnilistSearchOptions } from './anilist'
-import { kitsuTitlesByMalIds, KitsuTitles } from './kitsu'
+import type { AnilistMedia, AnilistSearchOptions } from './anilist.js'
+import { kitsuTitlesByMalIds, KitsuTitles } from './kitsu.js'
 
 export interface MalCacheStore {
   get(key: string): { payload: string; fresh: boolean } | null

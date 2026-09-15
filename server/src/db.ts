@@ -1,7 +1,7 @@
 import { DatabaseSync, StatementSync } from 'node:sqlite'
 import fs from 'fs'
 import path from 'path'
-import logger from './logger'
+import logger from './logger.js'
 
 type BindableValue = string | number | bigint | null | Uint8Array
 

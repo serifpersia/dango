@@ -1,4 +1,4 @@
-import { DatabaseWrapper } from '../db'
+import { DatabaseWrapper } from '../db.js'
 
 export const dbAll = <T = unknown>(
   db: DatabaseWrapper,

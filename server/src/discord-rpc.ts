@@ -1,7 +1,7 @@
 import { Client, StatusDisplayType } from '@xhayper/discord-rpc'
-import logger from './logger'
-import { CONFIG } from './config'
-import { discordGatewayService } from './discord-gateway'
+import logger from './logger.js'
+import { CONFIG } from './config.js'
+import { discordGatewayService } from './discord-gateway.js'
 
 const log = logger.child({ module: 'DiscordRPC' })
 

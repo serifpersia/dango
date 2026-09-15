@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import type { Request, Response, NextFunction } from 'express'
-import { CONFIG } from './config'
+import { CONFIG } from './config.js'
 
 export const LAN_AUTH_COOKIE = 'dango_lan_auth'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -71,7 +71,7 @@ export function verifyAppPassword(password: string): boolean {
 }
 
 export async function setAppPassword(password: string): Promise<void> {
-  const { updateEnvFile } = await import('./utils/env.utils')
+  const { updateEnvFile } = await import('./utils/env.utils.js')
   if (!password) {
     await updateEnvFile({ APP_PASSWORD_HASH: '' })
     ;(CONFIG as { APP_PASSWORD_HASH: string }).APP_PASSWORD_HASH = ''

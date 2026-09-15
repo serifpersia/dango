@@ -1,8 +1,8 @@
 import WebSocket from 'ws'
 import fs from 'fs'
 import path from 'path'
-import logger from './logger'
-import { CONFIG } from './config'
+import logger from './logger.js'
+import { CONFIG } from './config.js'
 import dotenv from 'dotenv'
 
 const log = logger.child({ module: 'DiscordGateway' })

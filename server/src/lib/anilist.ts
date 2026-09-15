@@ -1,11 +1,11 @@
-import { Show } from '../providers/provider.interface'
-import logger from '../logger'
-import { findTmdbDefaultBackdrop } from './tmdb'
+import { Show } from '../providers/provider.interface.js'
+import logger from '../logger.js'
+import { findTmdbDefaultBackdrop } from './tmdb.js'
 import {
   getScheduleFromAniSchedule,
   getAiredEpisodesFromAniScheduleFeed,
   withScheduleFields,
-} from './anischedule'
+} from './anischedule.js'
 import {
   kitsuSearchAnime,
   kitsuTrending,
@@ -15,7 +15,7 @@ import {
   kitsuMetaByAnilistId,
   kitsuMetaByMalId,
   kitsuEpisodes,
-} from './kitsu'
+} from './kitsu.js'
 import {
   malSearchMedia,
   malSeasonal,
@@ -27,8 +27,8 @@ import {
   EN_TITLE_CACHE_PREFIX,
   toAnilistSearchMedia,
   toAnilistDetailMedia,
-} from './mal'
-import { malCacheStore } from '../repositories/mal-cache.repository'
+} from './mal.js'
+import { malCacheStore } from '../repositories/mal-cache.repository.js'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
@@ -1209,7 +1209,7 @@ export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, s
   const missing = ids.filter((id) => !result.has(id))
   if (missing.length > 0) {
     try {
-      const { kitsuBatchGetStatuses } = await import('./kitsu')
+      const { kitsuBatchGetStatuses } = await import('./kitsu.js')
       const kitsuStatuses = await kitsuBatchGetStatuses(missing)
       for (const [id, status] of kitsuStatuses) {
         result.set(id, status)

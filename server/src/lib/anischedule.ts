@@ -1,5 +1,5 @@
-import { Show } from '../providers/provider.interface'
-import logger from '../logger'
+import { Show } from '../providers/provider.interface.js'
+import logger from '../logger.js'
 
 const SUB_SCHEDULE_URL =
   'https://raw.githubusercontent.com/RockinChaos/AniSchedule/master/raw/sub-schedule.json'

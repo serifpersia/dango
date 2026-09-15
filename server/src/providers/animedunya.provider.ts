@@ -1,4 +1,4 @@
-import NodeCache from 'node-cache'
+import { AppCache } from '../utils/cache.utils.js'
 import { gotScraping } from 'got-scraping'
 import {
   Provider,
@@ -8,10 +8,10 @@ import {
   SubtitleTrack,
   EpisodeDetails,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { anilistRequest, parseMalId, searchAnilistByTitle } from '../lib/anilist'
-import { kitsuMetaByAnilistId } from '../lib/kitsu'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { anilistRequest, parseMalId, searchAnilistByTitle } from '../lib/anilist.js'
+import { kitsuMetaByAnilistId } from '../lib/kitsu.js'
 
 interface AniListTitle {
   romaji?: string
@@ -38,9 +38,9 @@ const UA =
 export class AnimeDunyaProvider implements Provider {
   name = 'AnimeDunya'
   private base = 'https://anime-dunya.com'
-  private cache: NodeCache
+  private cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

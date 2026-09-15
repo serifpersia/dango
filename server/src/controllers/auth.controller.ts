@@ -1,11 +1,11 @@
 import { Request, Response } from 'express'
-import logger from '../logger'
-import { googleDriveService } from '../google'
-import { githubSyncService } from '../github-sync'
-import { DatabaseWrapper } from '../db'
-import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
-import { CONFIG } from '../config'
-import { rcloneService } from '../rclone'
+import logger from '../logger.js'
+import { googleDriveService } from '../google.js'
+import { githubSyncService } from '../github-sync.js'
+import { DatabaseWrapper } from '../db.js'
+import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync.js'
+import { CONFIG } from '../config.js'
+import { rcloneService } from '../rclone.js'
 import path from 'path'
 
 export class AuthController {
@@ -42,7 +42,7 @@ export class AuthController {
 
   updateGoogleAuthSettings = async (req: Request, res: Response) => {
     const { clientId, clientSecret, workerUrl } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
 
     const updates: Record<string, string> = {}
 
@@ -79,7 +79,7 @@ export class AuthController {
 
   updateGitHubAuthSettings = async (req: Request, res: Response) => {
     const { clientId } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
     if (typeof clientId !== 'string') {
       return res.status(400).json({ error: 'clientId required' })
     }
@@ -97,7 +97,7 @@ export class AuthController {
   }
 
   getSyncSettings = async (_req: Request, res: Response) => {
-    const { getActiveProvider } = await import('../sync')
+    const { getActiveProvider } = await import('../sync.js')
     res.json({
       activeProvider: process.env.SYNC_PROVIDER || 'default',
       actualActiveProvider: getActiveProvider(),
@@ -111,7 +111,7 @@ export class AuthController {
 
   updateSyncProvider = async (req: Request, res: Response) => {
     const { provider } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
 
     const value = provider === 'default' ? '' : provider
     await updateEnvFile({ SYNC_PROVIDER: value })
@@ -150,7 +150,7 @@ export class AuthController {
 
   logoutGitHub = async (_req: Request, res: Response) => {
     await githubSyncService.logout()
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     res.json({ success: true })
@@ -158,7 +158,7 @@ export class AuthController {
 
   updateRcloneSettings = async (req: Request, res: Response) => {
     const { remote } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
 
     await updateEnvFile({
       RCLONE_REMOTE: remote,
@@ -177,7 +177,7 @@ export class AuthController {
     if (googleDriveService.isAuthenticated()) {
       const user = await googleDriveService.getUserProfile()
       if (user) {
-        const { updateEnvFile } = await import('../utils/env.utils')
+        const { updateEnvFile } = await import('../utils/env.utils.js')
         await updateEnvFile({ SYNC_PROVIDER: 'google' })
         await this.runSyncSequence(req.db, 'google')
         return res.json({ url: null, authenticated: true })
@@ -199,7 +199,7 @@ export class AuthController {
     await googleDriveService.handleCallback(code)
     const user = await googleDriveService.getUserProfile()
 
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: 'google' })
 
     logger.info('User logged in. Syncing database (please wait)...')
@@ -235,7 +235,7 @@ export class AuthController {
 
   logout = async (_req: Request, res: Response) => {
     await googleDriveService.logout()
-    const { updateEnvFile } = await import('../utils/env.utils')
+    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     res.json({ success: true })

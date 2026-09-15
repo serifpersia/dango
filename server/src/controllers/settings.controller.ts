@@ -1,21 +1,21 @@
 import { Request, Response } from 'express'
-import { performWriteTransaction } from '../sync'
-import { searchAnilistByTitle, isAnilistRateLimited, getShowMetaById } from '../lib/anilist'
-import { kitsuSearchAnime } from '../lib/kitsu'
-import { parseStringPromise } from 'xml2js'
-import logger from '../logger'
+import { performWriteTransaction } from '../sync.js'
+import { searchAnilistByTitle, isAnilistRateLimited, getShowMetaById } from '../lib/anilist.js'
+import { kitsuSearchAnime } from '../lib/kitsu.js'
+import { XMLParser } from 'fast-xml-parser'
+import logger from '../logger.js'
 import path from 'path'
 import fs from 'fs'
-import { CONFIG } from '../config'
-import { DatabaseWrapper } from '../db'
-import { SettingsRepository } from '../repositories/settings.repository'
-import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
-import { getMachineId } from '../utils/machine-id'
-import { discordRPCService } from '../discord-rpc'
+import { CONFIG } from '../config.js'
+import { DatabaseWrapper } from '../db.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
+import { getMachineId } from '../utils/machine-id.js'
+import { discordRPCService } from '../discord-rpc.js'
 
 interface MalAnimeItem {
-  series_title: string[]
-  my_status: string[]
+  series_title: string
+  my_status: string
 }
 
 interface ShowToInsert {
@@ -35,6 +35,12 @@ function mapMalStatus(malStatus: string): string {
       return malStatus
   }
 }
+
+const malXmlParser = new XMLParser({
+  isArray: (name) => name === 'anime',
+  parseTagValue: false,
+  trimValues: true,
+})
 
 async function searchByTitleForMal(title: string): Promise<{
   id: number
@@ -182,15 +188,16 @@ export class SettingsController {
     if (!req.file) return res.status(400).json({ error: 'No file' })
     const { erase } = req.body
 
-    let result: Record<string, unknown>
+    let result: { myanimelist?: { anime?: MalAnimeItem[] } }
     try {
-      result = await parseStringPromise(req.file.buffer.toString())
+      result = malXmlParser.parse(req.file.buffer.toString()) as {
+        myanimelist?: { anime?: MalAnimeItem[] }
+      }
     } catch {
       return res.status(400).json({ error: 'Invalid XML' })
     }
 
-    const animeList: MalAnimeItem[] =
-      ((result?.myanimelist as Record<string, unknown>)?.anime as MalAnimeItem[]) || []
+    const animeList: MalAnimeItem[] = result?.myanimelist?.anime || []
 
     if (animeList.length === 0) {
       return res.status(400).json({ error: 'No anime found in XML' })
@@ -222,13 +229,13 @@ export class SettingsController {
       const metaPromises: Promise<void>[] = []
 
       batchResults.forEach((r, idx) => {
-        const malTitle = batch[idx].series_title[0]
+        const malTitle = batch[idx].series_title
         const currentIdx = i + idx + 1
 
         if (r.status === 'fulfilled' && r.value) {
           const show = r.value
           const title = show.title?.english || show.title?.romaji || malTitle
-          const status = mapMalStatus(batch[idx].my_status[0])
+          const status = mapMalStatus(batch[idx].my_status)
           showsToInsert.push({
             id: String(show.id),
             name: title,
@@ -265,7 +272,7 @@ export class SettingsController {
             total,
             title: malTitle,
             matchedTitle: null,
-            status: mapMalStatus(batch[idx].my_status[0]),
+            status: mapMalStatus(batch[idx].my_status),
             source: null,
             found: false,
           })

@@ -1,7 +1,13 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions, VideoLink } from './provider.interface'
-import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
-import { BaseProvider } from './base-provider'
+import {
+  Show,
+  VideoSource,
+  EpisodeDetails,
+  SearchOptions,
+  VideoLink,
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { buildQueryVariants, pickBestMatch } from './title-matching.js'
+import { BaseProvider } from './base-provider.js'
 
 const BASE_URL = 'https://watchhentai.net'
 const UA =

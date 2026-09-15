@@ -1,13 +1,13 @@
-import NodeCache from 'node-cache'
+import { AppCache } from '../../utils/cache.utils.js'
 import * as cheerio from 'cheerio'
-import logger from '../../logger'
+import logger from '../../logger.js'
 import type {
   MangaCard,
   MangaChapter,
   MangaDetail,
   MangaProvider,
   MangaSearchOptions,
-} from './manga.types'
+} from './manga.types.js'
 
 const BASE = 'https://www.mangapill.com'
 const UA =
@@ -33,9 +33,9 @@ function mangaIdFromHref(href: string): string {
 
 export class MangaPillProvider implements MangaProvider {
   name = 'mangapill' as const
-  private cache: NodeCache
+  private cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

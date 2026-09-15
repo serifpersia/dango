@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express'
-import NodeCache from 'node-cache'
+import { AppCache } from '../utils/cache.utils.js'
 
-const cache = new NodeCache({ stdTTL: 7 * 24 * 60 * 60, checkperiod: 3600 })
+const cache = new AppCache({
+  ttlSeconds: 7 * 24 * 60 * 60,
+  maxKeys: 5000,
+})
 
 function toTitleCase(s: string): string {
   return s

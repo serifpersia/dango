@@ -1,6 +1,6 @@
-import { DatabaseWrapper } from '../db'
-import { dbGet, dbRun } from '../utils/db-utils'
-import { TEMP_SHOW_ID_PREFIX } from '../lib/temp-ids'
+import { DatabaseWrapper } from '../db.js'
+import { dbGet, dbRun } from '../utils/db-utils.js'
+import { TEMP_SHOW_ID_PREFIX } from '../lib/temp-ids.js'
 
 export interface TempShowRow {
   id: string

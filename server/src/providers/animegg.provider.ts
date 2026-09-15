@@ -1,4 +1,4 @@
-import NodeCache from 'node-cache'
+import { AppCache } from '../utils/cache.utils.js'
 import {
   Provider,
   Show,
@@ -6,9 +6,9 @@ import {
   VideoLink,
   EpisodeDetails,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { anilistRequest } from '../lib/anilist'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { anilistRequest } from '../lib/anilist.js'
 
 interface AniListTitle {
   romaji?: string
@@ -43,9 +43,9 @@ const UA =
 export class AnimeGgProvider implements Provider {
   name = 'AnimeGG'
   private base = 'https://www.animegg.org'
-  private cache: NodeCache
+  private cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

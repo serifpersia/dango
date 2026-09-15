@@ -5,7 +5,35 @@ const http = require('http')
 const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
-const axios = require('axios')
+
+async function fetchJson(url, timeoutMs) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'dango-cli' },
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function detectGlobalInstall() {
+  const normalized = __dirname.split(path.sep).join('/')
+  if (normalized.includes('node_modules/@serifpersia/dango')) return true
+  try {
+    const npmGlobalPrefix = execSync(`${npmCmd} config get prefix`, {
+      encoding: 'utf8',
+      timeout: 10000,
+    }).trim()
+    return path.resolve(__dirname).includes(path.resolve(npmGlobalPrefix))
+  } catch {
+    return false
+  }
+}
 
 const shutdownToken = crypto.randomBytes(32).toString('hex')
 const mode = process.argv[2] || 'prod'
@@ -35,27 +63,60 @@ if (mode === '--help' || mode === '-h') {
   process.exit(0)
 }
 
+function satisfiesEngines(current, engines) {
+  const range = String((engines && engines.node) || '').trim()
+  const match = range.match(/^>=\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
+  if (!match) return true
+  const wanted = [match[1], match[2], match[3]].map((n) => parseInt(n || '0', 10))
+  const currentParts = parseVersionParts(current)
+  for (let i = 0; i < 3; i++) {
+    const have = currentParts[i] || 0
+    if (have !== wanted[i]) return have > wanted[i]
+  }
+  return true
+}
+
+if (!satisfiesEngines(process.versions.node, require('./package.json').engines)) {
+  const wanted = require('./package.json').engines.node
+  console.error(
+    `${colors.system}[System]${colors.reset} Node.js ${wanted} or newer is required (found v${process.versions.node}).`
+  )
+  console.error(
+    `${colors.system}[System]${colors.reset} Download it from ${colors.client}https://nodejs.org/${colors.reset} then restart dango.`
+  )
+  process.exit(1)
+}
+
+function parseVersionParts(v) {
+  return String(v || '')
+    .replace(/^v/, '')
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
+}
+
+const isNewerVersion = (remote, current) => {
+  const r = parseVersionParts(remote)
+  const c = parseVersionParts(current)
+  for (let i = 0; i < 3; i++) {
+    if ((r[i] || 0) !== (c[i] || 0)) return (r[i] || 0) > (c[i] || 0)
+  }
+  return false
+}
+
 async function checkForUpdates() {
   if (process.argv.includes('--no-update') || mode === 'dev') return
 
   try {
-    const npmGlobalPrefix = execSync(`${npmCmd} config get prefix`, {
-      encoding: 'utf8',
-    }).trim()
-    const scriptPath = path.resolve(__dirname)
-    const isGlobalInstall = scriptPath.includes(npmGlobalPrefix)
+    const isGlobalInstall = detectGlobalInstall()
 
     const pkg = require('./package.json')
     const current = pkg.version
 
     if (isGlobalInstall) {
-      const { data } = await axios.get('https://registry.npmjs.org/@serifpersia/dango/latest', {
-        timeout: 3000,
-        headers: { 'User-Agent': 'dango-cli' },
-      })
+      const data = await fetchJson('https://registry.npmjs.org/@serifpersia/dango/latest', 3000)
       const latest = data.version
 
-      if (current !== latest) {
+      if (isNewerVersion(latest, current)) {
         console.log(
           `\n${colors.system}[Update]${colors.reset} ` +
             `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
@@ -76,6 +137,8 @@ async function checkForUpdates() {
           if (answer === 'y' || answer === 'yes') {
             console.log(`${colors.system}[Update]${colors.reset} Updating dango...`)
             try {
+              terminateProcess(serverProcess)
+              terminateProcess(clientProcess)
               execSync(`${npmCmd} install -g @serifpersia/dango@latest`, {
                 stdio: 'inherit',
               })
@@ -112,13 +175,13 @@ async function checkForUpdates() {
         }
       }
     } else {
-      const { data } = await axios.get(
+      const data = await fetchJson(
         'https://api.github.com/repos/serifpersia/dango/releases/latest',
-        { timeout: 3000, headers: { 'User-Agent': 'dango-cli' } }
+        3000
       )
       const remoteVersion = (data.name && data.name.match(/v(\d+\.\d+\.\d+)/)?.[1]) || null
       if (remoteVersion) {
-        if (remoteVersion !== current) {
+        if (isNewerVersion(remoteVersion, current)) {
           console.log(`\n${colors.system}====================================================`)
           console.log(
             `${colors.system}[Update Available]${colors.reset} New version ${remoteVersion} found (current: ${current})!`
@@ -183,39 +246,85 @@ const stopSpinner = () => {
   }
 }
 
+const levelNames = { 10: 'TRACE', 20: 'DEBUG', 30: 'INFO', 40: 'WARN', 50: 'ERROR', 60: 'FATAL' }
+const levelColors = {
+  10: '\x1b[90m',
+  20: '\x1b[34m',
+  30: '\x1b[32m',
+  40: '\x1b[33m',
+  50: '\x1b[31m',
+  60: '\x1b[41m',
+}
+const messageColor = '\x1b[36m'
+const propertyColor = '\x1b[35m'
+
+const formatChildLine = (line) => {
+  let obj
+  try {
+    obj = JSON.parse(line)
+  } catch {
+    return { text: line }
+  }
+  if (!obj || typeof obj !== 'object' || typeof obj.msg !== 'string') {
+    return { text: line }
+  }
+  const time = obj.time ? new Date(obj.time).toLocaleTimeString('en-GB', { hour12: false }) : ''
+  const levelName = levelNames[obj.level] || 'INFO'
+  const levelColor = levelColors[obj.level] || colors.reset
+  const extras = []
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === 'level' || key === 'time' || key === 'pid' || key === 'hostname' || key === 'msg') {
+      continue
+    }
+    extras.push(`${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`)
+  }
+  const text =
+    `${time ? `[${time}] ` : ''}${levelColor}${levelName}${colors.reset} ${messageColor}${obj.msg}${colors.reset}` +
+    (extras.length ? ` (${propertyColor}${extras.join(' ')}${colors.reset})` : '')
+  return { text, msg: obj.msg }
+}
+
 const log = (prefix, color, data) => {
-  const str = data.toString()
-
-  if (str.includes('[SYNC_START]')) {
-    const parts = str.split('[SYNC_START]')
-    if (parts[1]) startSpinner(parts[1].split('\n')[0].trim())
-  }
-  if (str.includes('[SYNC_END]')) {
-    stopSpinner()
-  }
-
-  if (str.includes('[SERVER_EXIT]')) {
-    isShuttingDown = true
-    stopSpinner()
-    console.log(
-      `${colors.system}[System]${colors.reset} Server sync complete. Shutting down cleanly.`
-    )
-    terminateProcess(serverProcess)
-    terminateProcess(clientProcess)
-    setTimeout(() => process.exit(0), 2000)
-    return
-  }
-
-  if (str.includes('[SYNC_START]') || str.includes('[SYNC_END]')) {
-    // Fall through so remaining buffered lines are not swallowed
-  }
-
-  const lines = str.split('\n').filter((line) => line.trim() !== '')
+  const lines = data
+    .toString()
+    .split('\n')
+    .filter((line) => line.trim() !== '')
   if (lines.length === 0) return
+
+  const display = []
+  for (const line of lines) {
+    const { text, msg } = formatChildLine(line)
+    const content = msg !== undefined ? msg : text
+
+    if (content.includes('[SERVER_EXIT]')) {
+      isShuttingDown = true
+      stopSpinner()
+      console.log(
+        `${colors.system}[System]${colors.reset} Server sync complete. Shutting down cleanly.`
+      )
+      terminateProcess(serverProcess)
+      terminateProcess(clientProcess)
+      setTimeout(() => process.exit(0), 2000)
+      return
+    }
+
+    if (content.includes('[SYNC_START]')) {
+      startSpinner(content.split('[SYNC_START]')[1].trim())
+      continue
+    }
+    if (content.includes('[SYNC_END]')) {
+      stopSpinner()
+    }
+
+    const withoutTags = content.replace('[SYNC_END]', '').trim()
+    if (withoutTags) display.push(text)
+  }
+
+  if (display.length === 0) return
 
   if (syncSpinner) {
     process.stdout.write('\r\x1b[K')
-    for (const line of lines) {
+    for (const line of display) {
       console.log(`${color}[${prefix}]${colors.reset} ${line}`)
     }
 
@@ -223,7 +332,7 @@ const log = (prefix, color, data) => {
       `${colors.system}[System]${colors.reset} ${syncMessage}${'.'.repeat(syncDots)}${' '.repeat(3 - syncDots)}`
     )
   } else {
-    for (const line of lines) {
+    for (const line of display) {
       console.log(`${color}[${prefix}]${colors.reset} ${line}`)
     }
   }
@@ -411,6 +520,6 @@ process.on('SIGHUP', () => {
 })
 process.on('exit', restoreTerminal)
 ;(async () => {
-  await checkForUpdates().catch(() => {})
   main()
+  checkForUpdates().catch(() => {})
 })()

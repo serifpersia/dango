@@ -1,7 +1,7 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
-import { BaseProvider } from './base-provider'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import logger from '../logger.js'
+import { buildQueryVariants, pickBestMatch } from './title-matching.js'
+import { BaseProvider } from './base-provider.js'
 
 interface ApiAnime {
   id?: string

@@ -1,5 +1,5 @@
-import { DatabaseWrapper } from '../db'
-import { dbGet, dbRun } from '../utils/db-utils'
+import { DatabaseWrapper } from '../db.js'
+import { dbGet, dbRun } from '../utils/db-utils.js'
 
 export const SettingsRepository = {
   getByKey: (db: DatabaseWrapper, key: string) =>

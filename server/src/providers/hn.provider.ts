@@ -1,4 +1,4 @@
-import NodeCache from 'node-cache'
+import { AppCache } from '../utils/cache.utils.js'
 import {
   Provider,
   Show,
@@ -6,9 +6,9 @@ import {
   EpisodeDetails,
   SearchOptions,
   VideoLink,
-} from './provider.interface'
-import logger from '../logger'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { buildQueryVariants, pickBestMatch } from './title-matching.js'
 
 const BASE_URL = 'https://hentaini.com'
 const API_URL = 'https://admin.hentaini.com/api'
@@ -267,7 +267,7 @@ export class HnProvider implements Provider {
   name = 'HN'
 
   private posterCache: Map<string, string> = new Map()
-  private landingCache = new NodeCache({ stdTTL: 1800 })
+  private landingCache = new AppCache({ ttlSeconds: 1800, maxKeys: 500 })
 
   private bestMatch(
     results: { title: string; slug: string; poster: string }[],

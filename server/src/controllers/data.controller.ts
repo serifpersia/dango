@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import { Provider, Show } from '../providers/provider.interface'
-import { pickBestMatch } from '../providers/title-matching'
+import { Provider, Show } from '../providers/provider.interface.js'
+import { pickBestMatch } from '../providers/title-matching.js'
 import {
   getTrending,
   getLatestReleases,
@@ -19,17 +19,17 @@ import {
   wasAnilistDownAtBoot,
   checkAnilistStatus,
   fromAnilistMedia,
-} from '../lib/anilist'
-import type { AnilistMedia } from '../lib/anilist'
-import { malSearchMedia, malSearchTitle, malAnimeDetail, toAnilistDetailMedia } from '../lib/mal'
-import { malCacheStore } from '../repositories/mal-cache.repository'
-import { getMigratedId } from '../lib/migration'
-import { isTempShowId, isTempMatureProvider } from '../lib/temp-ids'
-import { TempShowIdsRepository } from '../repositories/temp-show-ids.repository'
-import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
-import { WatchlistRepository } from '../repositories/watchlist.repository'
-import { dbRun } from '../utils/db-utils'
-import logger from '../logger'
+} from '../lib/anilist.js'
+import type { AnilistMedia } from '../lib/anilist.js'
+import { malSearchMedia, malSearchTitle, malAnimeDetail, toAnilistDetailMedia } from '../lib/mal.js'
+import { malCacheStore } from '../repositories/mal-cache.repository.js'
+import { getMigratedId } from '../lib/migration.js'
+import { isTempShowId, isTempMatureProvider } from '../lib/temp-ids.js'
+import { TempShowIdsRepository } from '../repositories/temp-show-ids.repository.js'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
+import { WatchlistRepository } from '../repositories/watchlist.repository.js'
+import { dbRun } from '../utils/db-utils.js'
+import logger from '../logger.js'
 
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
@@ -671,9 +671,9 @@ export class DataController {
 
   getMatureFilters = async (_req: Request, res: Response) => {
     try {
-      const { WH_GENRES } = await import('../providers/wh.provider')
-      const { OP_TAGS, OP_ORDERS } = await import('../providers/op.provider')
-      const { HT_GENRES } = await import('../providers/ht.provider')
+      const { WH_GENRES } = await import('../providers/wh.provider.js')
+      const { OP_TAGS, OP_ORDERS } = await import('../providers/op.provider.js')
+      const { HT_GENRES } = await import('../providers/ht.provider.js')
       return res.json({
         whGenres: WH_GENRES,
         opTags: OP_TAGS,

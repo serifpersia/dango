@@ -1,6 +1,6 @@
 import { spawn, execFile } from 'child_process'
-import logger from './logger'
-import { CONFIG } from './config'
+import logger from './logger.js'
+import { CONFIG } from './config.js'
 
 class RcloneService {
   private activeRemote: string | null = null

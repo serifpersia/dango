@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
-import NodeCache from 'node-cache'
-import logger from '../logger'
+import { AppCache } from '../utils/cache.utils.js'
+import logger from '../logger.js'
 
 export interface RadioStation {
   id: string
@@ -123,7 +123,7 @@ function toStation(s: RbStation): RadioStation | null {
   }
 }
 
-export function createRadioRouter(apiCache: NodeCache): Router {
+export function createRadioRouter(apiCache: AppCache): Router {
   const router = Router()
 
   router.get('/radio/stations', async (_req, res) => {

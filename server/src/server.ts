@@ -5,32 +5,32 @@ import express from 'express'
 import path from 'path'
 import cors from 'cors'
 import compression from 'compression'
-import NodeCache from 'node-cache'
+import { AppCache } from './utils/cache.utils.js'
 import fs from 'fs'
 import crypto from 'crypto'
-import { DatabaseWrapper } from './db'
-import chokidar from 'chokidar'
-import logger from './logger'
-import { notifyServerExit } from './lib/ipc'
-import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils'
+import { DatabaseWrapper } from './db.js'
+import logger from './logger.js'
+import { notifyServerExit } from './lib/ipc.js'
+import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils.js'
+import { requestLogger } from './request-logger.js'
 
-import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
-import { AnimeyaProvider } from './providers/animeya.provider'
-import { MegaPlayProvider } from './providers/megaplay.provider'
-import { AnimePaheProvider } from './providers/animepahe.provider'
-import { WhProvider } from './providers/wh.provider'
-import { HnProvider } from './providers/hn.provider'
-import { AnilightProvider } from './providers/anilight.provider'
-import { KaaProvider } from './providers/kaa.provider'
-import { HtProvider } from './providers/ht.provider'
-import { JasmrProvider } from './providers/jasmr.provider'
-import { JustAnimeProvider } from './providers/justanime.provider'
-import { OpProvider } from './providers/op.provider'
-import { AniBdProvider } from './providers/anibd.provider'
-import { AnimeDunyaProvider } from './providers/animedunya.provider'
-import { AnimeGgProvider } from './providers/animegg.provider'
-import { githubSyncService } from './github-sync'
-import { CONFIG } from './config'
+import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider.js'
+import { AnimeyaProvider } from './providers/animeya.provider.js'
+import { MegaPlayProvider } from './providers/megaplay.provider.js'
+import { AnimePaheProvider } from './providers/animepahe.provider.js'
+import { WhProvider } from './providers/wh.provider.js'
+import { HnProvider } from './providers/hn.provider.js'
+import { AnilightProvider } from './providers/anilight.provider.js'
+import { KaaProvider } from './providers/kaa.provider.js'
+import { HtProvider } from './providers/ht.provider.js'
+import { JasmrProvider } from './providers/jasmr.provider.js'
+import { JustAnimeProvider } from './providers/justanime.provider.js'
+import { OpProvider } from './providers/op.provider.js'
+import { AniBdProvider } from './providers/anibd.provider.js'
+import { AnimeDunyaProvider } from './providers/animedunya.provider.js'
+import { AnimeGgProvider } from './providers/animegg.provider.js'
+import { githubSyncService } from './github-sync.js'
+import { CONFIG } from './config.js'
 import {
   initializeDatabase,
   syncDownOnBoot,
@@ -38,27 +38,27 @@ import {
   initSyncProvider,
   waitForSync,
   getActiveProvider,
-} from './sync'
-import { createAuthRouter } from './routes/auth.routes'
-import { createLanAuthRouter } from './routes/lan-auth.routes'
-import { lanAuthMiddleware } from './app-auth'
-import { createWatchlistRouter } from './routes/watchlist.routes'
-import { createDataRouter } from './routes/data.routes'
-import { createAsmrRouter } from './routes/asmr.routes'
-import { createMangaRouter } from './routes/manga.routes'
-import { createRadioRouter } from './routes/radio.routes'
-import { createTvRouter } from './routes/tv.routes'
-import { createProxyRouter } from './routes/proxy.routes'
-import { createSettingsRouter } from './routes/settings.routes'
-import { createInsightsRouter } from './routes/insights.routes'
-import { createTranslateRouter } from './routes/translate.routes'
-import { createDiscordGatewayRouter } from './routes/discord-gateway.routes'
-import { createTrackerRouter } from './routes/tracker.routes'
-import { discordRPCService } from './discord-rpc'
-import { discordGatewayService } from './discord-gateway'
-import { SettingsRepository } from './repositories/settings.repository'
-import { requestContext } from './utils/request-context'
-import { checkAnilistStatus } from './lib/anilist'
+} from './sync.js'
+import { createAuthRouter } from './routes/auth.routes.js'
+import { createLanAuthRouter } from './routes/lan-auth.routes.js'
+import { lanAuthMiddleware } from './app-auth.js'
+import { createWatchlistRouter } from './routes/watchlist.routes.js'
+import { createDataRouter } from './routes/data.routes.js'
+import { createAsmrRouter } from './routes/asmr.routes.js'
+import { createMangaRouter } from './routes/manga.routes.js'
+import { createRadioRouter } from './routes/radio.routes.js'
+import { createTvRouter } from './routes/tv.routes.js'
+import { createProxyRouter } from './routes/proxy.routes.js'
+import { createSettingsRouter } from './routes/settings.routes.js'
+import { createInsightsRouter } from './routes/insights.routes.js'
+import { createTranslateRouter } from './routes/translate.routes.js'
+import { createDiscordGatewayRouter } from './routes/discord-gateway.routes.js'
+import { createTrackerRouter } from './routes/tracker.routes.js'
+import { discordRPCService } from './discord-rpc.js'
+import { discordGatewayService } from './discord-gateway.js'
+import { SettingsRepository } from './repositories/settings.repository.js'
+import { requestContext } from './utils/request-context.js'
+import { checkAnilistStatus } from './lib/anilist.js'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -67,6 +67,8 @@ declare module 'express-serve-static-core' {
 }
 
 const app = express()
+
+app.use(requestLogger)
 
 app.use((req, res, next) => {
   const store = new Map<string, string>()
@@ -85,7 +87,7 @@ app.use((req, res, next) => {
   requestContext.run(store, next)
 })
 
-const apiCache = new NodeCache({ stdTTL: 3600 })
+const apiCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
 
 const _123AnimeProvider = new Anime123Provider(apiCache)
 const animeyaProvider = new AnimeyaProvider(apiCache)
@@ -303,17 +305,14 @@ async function main() {
 
   let hasUnsyncedChanges = false
 
-  const watcher = chokidar.watch(CONFIG.LOCAL_MANIFEST_PATH, {
-    persistent: true,
-    ignoreInitial: true,
+  const watcher = fs.watch(CONFIG.LOCAL_MANIFEST_PATH, (eventType) => {
+    if (eventType === 'change' || eventType === 'rename') {
+      hasUnsyncedChanges = true
+    }
   })
 
   const expressServer = app.listen(CONFIG.PORT, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
-  })
-
-  watcher.on('change', () => {
-    hasUnsyncedChanges = true
   })
 
   const syncInterval = setInterval(async () => {

@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express'
-import NodeCache from 'node-cache'
-import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb'
+import { AppCache } from '../utils/cache.utils.js'
+import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import https from 'https'
 import http from 'http'
 import { URL } from 'url'
-import { isSafeExternalUrl } from '../utils/security.utils'
+import { isSafeExternalUrl } from '../utils/security.utils.js'
 
 const MOVY_API = 'https://api.wecollege.net'
 const MOVY_SERVERS = [
@@ -361,7 +361,7 @@ interface MovySource {
   quality?: string
 }
 
-export function createTvRouter(apiCache: NodeCache): Router {
+export function createTvRouter(apiCache: AppCache): Router {
   const router = Router()
 
   router.get('/tv/search', async (req, res) => {

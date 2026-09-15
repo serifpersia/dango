@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import logger from '../logger'
-import { InsightsRepository } from '../repositories/insights.repository'
+import logger from '../logger.js'
+import { InsightsRepository } from '../repositories/insights.repository.js'
 
 interface CoreStats {
   totalSeconds?: number

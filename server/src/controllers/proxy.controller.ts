@@ -1,46 +1,22 @@
 import { Request, Response } from 'express'
-import axios from 'axios'
-import axiosRetry from 'axios-retry'
 import { gotScraping } from 'got-scraping'
 import path from 'path'
-import http from 'http'
-import https from 'https'
-import NodeCache from 'node-cache'
-import { CONFIG } from '../config'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
+import { AppCache } from '../utils/cache.utils.js'
+import { CONFIG } from '../config.js'
 import fs from 'fs'
-import logger from '../logger'
-import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils'
-import { isSafeExternalUrl } from '../utils/security.utils'
+import logger from '../logger.js'
+import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils.js'
+import { isSafeExternalUrl } from '../utils/security.utils.js'
+import { fetchWithRetry } from '../utils/http.utils.js'
 import {
   MEGAPLAY_ORIGIN,
   isNexabloomMasterUrl,
   signNexabloomMasterUrl,
-} from '../utils/megaplay.utils'
+} from '../utils/megaplay.utils.js'
 
-function firstString(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) {
-    const first = value[0]
-    if (typeof first === 'string') return first
-  }
-  return undefined
-}
-
-const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
-
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 })
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 })
-
-httpAgent.setMaxListeners(100)
-httpsAgent.setMaxListeners(100)
-
-export const axiosInstance = axios.create({
-  httpAgent,
-  httpsAgent,
-  timeout: 30000,
-})
-
-axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
+const proxyCache = new AppCache({ ttlSeconds: 30, maxKeys: 500 })
 
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
@@ -297,39 +273,57 @@ export class ProxyController {
           res.set('Access-Control-Allow-Origin', '*')
           res.send(resp.body)
         } else {
-          // Plain media streams (yt-mp4, etc.)
-          // Proxy using axios streaming (got-scraping does not support stream/buffer for these hosts)
-          const axiosResp = await axiosInstance({
-            url: urlStr,
-            method: 'get',
-            headers,
-            responseType: 'stream',
-            timeout: 30000,
-            signal: abortController.signal,
-          })
-          const status = axiosResp.status
+          const upstream = await fetchWithRetry(
+            urlStr,
+            { method: 'GET', headers },
+            { retries: 3, timeoutMs: 30000, signal: abortController.signal }
+          )
+          const status = upstream.status
           if (status !== 200 && status !== 206) {
-            return res.status(status ?? 502).send('Upstream error')
+            try {
+              await upstream.body?.cancel()
+            } catch {
+              // ignore
+            }
+            return res.status(status).send('Upstream error')
           }
           res.status(status)
           const isVtt = urlStr.endsWith('.vtt') || urlStr.includes('.vtt?')
-          const ct = firstString(axiosResp.headers['content-type'])
+          const ct = upstream.headers.get('content-type')
           res.set(
             'Content-Type',
             isVtt ? 'text/vtt; charset=utf-8' : ct || 'application/octet-stream'
           )
-          const cl = firstString(axiosResp.headers['content-length'])
+          const cl = upstream.headers.get('content-length')
           if (cl) res.set('Content-Length', cl)
-          const cr = axiosResp.headers['content-range']
+          const cr = upstream.headers.get('content-range')
           if (cr) res.set('Content-Range', cr)
-          const ar = axiosResp.headers['accept-ranges']
+          const ar = upstream.headers.get('accept-ranges')
           if (ar) res.set('Accept-Ranges', ar)
           res.set('Access-Control-Allow-Origin', '*')
-          axiosResp.data.pipe(res)
+          if (!upstream.body) {
+            return res.status(502).send('Upstream error')
+          }
+          try {
+            await pipeline(
+              Readable.from(upstream.body as unknown as AsyncIterable<Uint8Array>),
+              res
+            )
+          } catch (e) {
+            if (!res.headersSent) {
+              logger.error(
+                { url: urlStr, error: (e as Error)?.message },
+                '[proxy] upstream stream failed'
+              )
+              res.status(500).send('Proxy error')
+            } else {
+              res.destroy()
+            }
+          }
         }
       }
     } catch (e) {
-      if (axios.isCancel(e)) return
+      if (abortController.signal.aborted) return
       if (!res.headersSent) {
         logger.error(
           { url: urlStr, error: (e as Error)?.message },
@@ -380,7 +374,6 @@ export class ProxyController {
         .set('Cache-Control', 'private, max-age=120')
         .send(patched)
     } catch (e) {
-      if (axios.isCancel(e)) return
       if (abortController.signal.aborted) return
       if (!res.headersSent) res.status(502).send('Gateway proxy error')
     }
@@ -491,12 +484,15 @@ export class ProxyController {
         headers['Origin'] = ProxyController.KAA_ORIGIN
       }
 
-      const response = await axiosInstance.get(url as string, {
-        headers,
-        responseType: 'text',
-        signal: abortController.signal,
-      })
-      const body = String(response.data ?? '').replace(/^\uFEFF/, '')
+      const upstream = await fetchWithRetry(
+        url as string,
+        { method: 'GET', headers },
+        { retries: 3, timeoutMs: 30000, signal: abortController.signal }
+      )
+      if (!upstream.ok) {
+        throw new Error(`Subtitle upstream failed with status ${upstream.status}`)
+      }
+      const body = (await upstream.text()).replace(/^\uFEFF/, '')
       if (/#EXTM3U/i.test(body.slice(0, 1000))) {
         const segUrls = body
           .split('\n')
@@ -514,12 +510,13 @@ export class ProxyController {
         const parts: string[] = []
         for (const seg of segUrls) {
           try {
-            const segRes = await axiosInstance.get(seg, {
-              headers,
-              responseType: 'text',
-              signal: abortController.signal,
-            })
-            let segBody = String(segRes.data ?? '').replace(/^\uFEFF/, '')
+            const segRes = await fetchWithRetry(
+              seg,
+              { method: 'GET', headers },
+              { retries: 3, timeoutMs: 30000, signal: abortController.signal }
+            )
+            if (!segRes.ok) continue
+            let segBody = (await segRes.text()).replace(/^\uFEFF/, '')
             if (/#EXTM3U/i.test(segBody.slice(0, 200))) continue
             segBody = segBody
               .replace(/\r\n/g, '\n')
@@ -531,7 +528,7 @@ export class ProxyController {
             if (segBody) parts.push(segBody)
             if (parts.join('\n').length > 2_000_000) break
           } catch (e) {
-            if (axios.isCancel(e)) return
+            if (abortController.signal.aborted) return
           }
         }
         if (parts.length === 0) {
@@ -546,7 +543,7 @@ export class ProxyController {
         `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`
       )
     } catch (e) {
-      if (axios.isCancel(e)) return
+      if (abortController.signal.aborted) return
       res.status(500).send('Proxy error')
     }
   }
@@ -603,7 +600,7 @@ export class ProxyController {
       headers['Referer'] = refererValue
 
       // Use got-scraping for a browser-like TLS fingerprint (needed for hosts
-      // like i.animepahe.pw that reject axios's fingerprint with 403). Retry a
+      // like i.animepahe.pw that reject stock clients with 403). Retry a
       // couple times since Cloudflare can intermittently challenge.
       let lastStatus = 0
       let body: Buffer | null = null

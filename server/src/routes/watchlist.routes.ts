@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { WatchlistController } from '../controllers/watchlist.controller'
-import { discordRPCService } from '../discord-rpc'
-import { DatabaseWrapper } from '../db'
-import { pickBestMatch } from '../providers/title-matching'
+import { WatchlistController } from '../controllers/watchlist.controller.js'
+import { discordRPCService } from '../discord-rpc.js'
+import { DatabaseWrapper } from '../db.js'
+import { pickBestMatch } from '../providers/title-matching.js'
 
 const dlsitePosterCache = new Map<string, { url: string; ts: number }>()
 const mangadexCoverCache = new Map<string, { url: string | null; ts: number }>()

@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { AniListTracker } from '../lib/tracker/anilist-tracker'
-import { syncAniList, importFromUsername } from '../lib/tracker/sync.service'
-import { SettingsRepository } from '../repositories/settings.repository'
-import { performWriteTransaction } from '../sync'
+import { AniListTracker } from '../lib/tracker/anilist-tracker.js'
+import { syncAniList, importFromUsername } from '../lib/tracker/sync.service.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
+import { performWriteTransaction } from '../sync.js'
 
 const TOKEN_KEY = 'tracker_anilist_token'
 const USER_KEY = 'tracker_anilist_user'

@@ -1,7 +1,7 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
-import logger from '../logger'
-import { BaseProvider } from './base-provider'
-import { buildQueryVariants, pickBestMatch } from './title-matching'
+import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import logger from '../logger.js'
+import { BaseProvider } from './base-provider.js'
+import { buildQueryVariants, pickBestMatch } from './title-matching.js'
 
 const BASE_URL = 'https://hentai.tv'
 const API_URL = 'https://hentai.tv/api/search'

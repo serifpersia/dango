@@ -1,5 +1,5 @@
-import NodeCache from 'node-cache'
-import logger from '../../logger'
+import { AppCache } from '../../utils/cache.utils.js'
+import logger from '../../logger.js'
 import type {
   MangaCard,
   MangaChapter,
@@ -7,7 +7,7 @@ import type {
   MangaDetail,
   MangaProvider,
   MangaSearchOptions,
-} from './manga.types'
+} from './manga.types.js'
 
 const API = 'https://api.mangadex.org'
 const UA = 'Dango/3.0 (+https://github.com/serifpersia/dango)'
@@ -115,9 +115,9 @@ function toCard(m: MdListResponse['data'][number]): MangaCard {
 
 export class MangaDexProvider implements MangaProvider {
   name = 'mangadex' as const
-  private cache: NodeCache
+  private cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

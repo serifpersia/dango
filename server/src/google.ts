@@ -1,14 +1,13 @@
 import fs from 'fs'
 import path from 'path'
-import http from 'http'
-import https from 'https'
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
-import logger from './logger'
-import { CONFIG } from './config'
-import { DatabaseWrapper } from './db'
-import { dbAll } from './utils/db-utils'
-import { isTempSyncRow } from './lib/temp-ids'
+import logger from './logger.js'
+import { CONFIG } from './config.js'
+import { DatabaseWrapper } from './db.js'
+import { dbAll } from './utils/db-utils.js'
+import { isTempSyncRow } from './lib/temp-ids.js'
+import { fetchWithRetry, HttpError } from './utils/http.utils.js'
 
 type GoogleTokenSet = {
   access_token?: string
@@ -24,16 +23,22 @@ type GoogleDriveFile = {
   name: string
 }
 
-const httpAgent = new http.Agent({ keepAlive: false })
-const httpsAgent = new https.Agent({ keepAlive: false })
-httpsAgent.setMaxListeners(100)
-httpAgent.setMaxListeners(100)
+const GOOGLE_REQUEST_TIMEOUT_MS = 30000
 
-const googleAxios = axios.create({
-  httpAgent,
-  httpsAgent,
-  timeout: 30000,
-})
+interface GoogleRequestConfig {
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  url: string
+  params?: Record<string, string | number | boolean | undefined>
+  data?: unknown
+  headers?: Record<string, string>
+  responseType?: 'json' | 'text' | 'stream'
+}
+
+interface GoogleRequestResult<T> {
+  data: T
+  status: number
+  headers: Headers
+}
 
 export class GoogleDriveService {
   private tokens: GoogleTokenSet = {}
@@ -84,21 +89,44 @@ export class GoogleDriveService {
     }
   }
 
+  private async postJson<T>(url: string, payload: unknown): Promise<T> {
+    const response = await fetchWithRetry(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS }
+    )
+    if (!response.ok) throw new HttpError(response.status)
+    return (await response.json()) as T
+  }
+
+  private async postForm<T>(url: string, params: URLSearchParams): Promise<T> {
+    const response = await fetchWithRetry(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      },
+      { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS }
+    )
+    if (!response.ok) throw new HttpError(response.status)
+    return (await response.json()) as T
+  }
+
   private async refreshViaWorker(): Promise<boolean> {
     if (!this.tokens.refresh_token) return false
     try {
-      const { data } = await googleAxios.post<GoogleTokenSet>(
-        `${CONFIG.GOOGLE_AUTH_WORKER_URL}/refresh`,
-        { refresh_token: this.tokens.refresh_token },
-        { headers: { 'Content-Type': 'application/json' } }
-      )
+      const data = await this.postJson<GoogleTokenSet>(`${CONFIG.GOOGLE_AUTH_WORKER_URL}/refresh`, {
+        refresh_token: this.tokens.refresh_token,
+      })
       this.saveTokens(data)
       return true
     } catch (error) {
-      if (
-        axios.isAxiosError(error) &&
-        (error.response?.status === 400 || error.response?.status === 401)
-      ) {
+      if (error instanceof HttpError && (error.status === 400 || error.status === 401)) {
         logger.warn('Worker refresh failed. Token may be revoked. Logging out.')
         await this.logout()
       }
@@ -129,20 +157,14 @@ export class GoogleDriveService {
     })
 
     try {
-      const { data } = await googleAxios.post<GoogleTokenSet>(
+      const data = await this.postForm<GoogleTokenSet>(
         'https://oauth2.googleapis.com/token',
-        params.toString(),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        }
+        params
       )
 
       this.saveTokens(data)
     } catch (error) {
-      if (
-        axios.isAxiosError(error) &&
-        (error.response?.status === 400 || error.response?.status === 401)
-      ) {
+      if (error instanceof HttpError && (error.status === 400 || error.status === 401)) {
         logger.warn('Failed to refresh Google access token. Token may be revoked. Logging out.')
         await this.logout()
       }
@@ -157,22 +179,76 @@ export class GoogleDriveService {
     }
   }
 
-  private async googleRequest<T>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  private withParams(url: string, params?: GoogleRequestConfig['params']): string {
+    if (!params) return url
+    const parsed = new URL(url)
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null) continue
+      parsed.searchParams.set(key, String(value))
+    }
+    return parsed.toString()
+  }
+
+  private serializeBody(data: unknown): { body?: BodyInit; duplex?: 'half' } {
+    if (data === undefined || data === null) return {}
+    if (typeof data === 'string') return { body: data }
+    if (data instanceof Uint8Array || data instanceof Readable) {
+      return { body: data as unknown as BodyInit, duplex: 'half' }
+    }
+    return { body: JSON.stringify(data) }
+  }
+
+  private async googleRequest<T>(config: GoogleRequestConfig): Promise<GoogleRequestResult<T>> {
     await this.ensureAccessToken()
 
     try {
-      return await googleAxios.request<T>({
-        ...config,
-        headers: {
-          Authorization: `Bearer ${this.tokens.access_token}`,
-          ...(config.headers ?? {}),
+      const { body, duplex } = this.serializeBody(config.data)
+      const response = await fetchWithRetry(
+        this.withParams(config.url, config.params),
+        {
+          method: config.method,
+          headers: {
+            Authorization: `Bearer ${this.tokens.access_token}`,
+            ...(config.headers ?? {}),
+          },
+          ...(body !== undefined ? { body } : {}),
+          ...(duplex ? { duplex } : {}),
         },
-      })
+        { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS }
+      )
+      if (!response.ok) {
+        try {
+          await response.body?.cancel()
+        } catch {
+          // ignore
+        }
+        throw new HttpError(response.status)
+      }
+      if (config.responseType === 'stream') {
+        if (!response.body) throw new HttpError(response.status, 'Empty upstream body')
+        return {
+          data: Readable.from(
+            response.body as unknown as AsyncIterable<Uint8Array>
+          ) as unknown as T,
+          status: response.status,
+          headers: response.headers,
+        }
+      }
+      if (config.responseType === 'text') {
+        return {
+          data: (await response.text()) as unknown as T,
+          status: response.status,
+          headers: response.headers,
+        }
+      }
+      const text = await response.text()
+      return {
+        data: (text ? JSON.parse(text) : undefined) as T,
+        status: response.status,
+        headers: response.headers,
+      }
     } catch (error) {
-      if (
-        axios.isAxiosError(error) &&
-        (error.response?.status === 401 || error.response?.status === 403)
-      ) {
+      if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
         logger.warn('Google API request failed with auth error. Logging out.')
         await this.logout()
       }
@@ -188,10 +264,11 @@ export class GoogleDriveService {
     // Preferred: Worker builds URL with bundled client_id, no secret needed here
     if (this.useWorker()) {
       try {
-        const { data } = await googleAxios.get<{ url: string }>(
-          `${CONFIG.GOOGLE_AUTH_WORKER_URL}/auth-url`,
-          { params: { redirect_uri: CONFIG.GOOGLE_REDIRECT_URI } }
-        )
+        const url = new URL(`${CONFIG.GOOGLE_AUTH_WORKER_URL}/auth-url`)
+        url.searchParams.set('redirect_uri', CONFIG.GOOGLE_REDIRECT_URI)
+        const response = await fetchWithRetry(url, {}, { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS })
+        if (!response.ok) throw new HttpError(response.status)
+        const data = (await response.json()) as { url?: string }
         if (data?.url) return data.url
       } catch (error) {
         logger.error({ err: error }, 'Worker /auth-url failed, falling back to local')
@@ -214,10 +291,9 @@ export class GoogleDriveService {
     // Preferred: Worker exchanges code with secret, dango never sees secret
     if (this.useWorker()) {
       try {
-        const { data } = await googleAxios.post<GoogleTokenSet>(
+        const data = await this.postJson<GoogleTokenSet>(
           `${CONFIG.GOOGLE_AUTH_WORKER_URL}/exchange`,
-          { code, redirect_uri: CONFIG.GOOGLE_REDIRECT_URI },
-          { headers: { 'Content-Type': 'application/json' } }
+          { code, redirect_uri: CONFIG.GOOGLE_REDIRECT_URI }
         )
         this.saveTokens(data)
         return this.tokens
@@ -237,13 +313,7 @@ export class GoogleDriveService {
       grant_type: 'authorization_code',
     })
 
-    const { data } = await googleAxios.post<GoogleTokenSet>(
-      'https://oauth2.googleapis.com/token',
-      params.toString(),
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }
-    )
+    const data = await this.postForm<GoogleTokenSet>('https://oauth2.googleapis.com/token', params)
 
     this.saveTokens(data)
     return this.tokens
@@ -260,10 +330,7 @@ export class GoogleDriveService {
       return res.data
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch user profile')
-      if (
-        axios.isAxiosError(error) &&
-        (error.response?.status === 401 || error.response?.status === 403)
-      ) {
+      if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
         logger.warn('Google authentication token is invalid or expired. Logging out.')
         await this.logout()
       }

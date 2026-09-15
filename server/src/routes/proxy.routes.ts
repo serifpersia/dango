@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { ProxyController } from '../controllers/proxy.controller'
+import { ProxyController } from '../controllers/proxy.controller.js'
 
 export function createProxyRouter(): Router {
   const router = Router()

@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express'
-import NodeCache from 'node-cache'
-import logger from '../logger'
-import { MangaDexProvider } from '../providers/manga/mangadex.provider'
-import { MangaPillProvider } from '../providers/manga/mangapill.provider'
-import type { MangaContentRating, MangaProviderName } from '../providers/manga/manga.types'
+import { AppCache } from '../utils/cache.utils.js'
+import logger from '../logger.js'
+import { MangaDexProvider } from '../providers/manga/mangadex.provider.js'
+import { MangaPillProvider } from '../providers/manga/mangapill.provider.js'
+import type { MangaContentRating, MangaProviderName } from '../providers/manga/manga.types.js'
 
-function makeCacheMiddleware(cache: NodeCache, keyFn: (req: Request) => string, ttl?: number) {
+function makeCacheMiddleware(cache: AppCache, keyFn: (req: Request) => string, ttl?: number) {
   return (req: Request, res: Response, next: () => void) => {
     const cacheKey = keyFn(req)
     const cached = cache.get(cacheKey)
@@ -38,7 +38,7 @@ function parseRatings(req: Request): MangaContentRating[] {
   return exact.length > 0 ? exact : SAFE
 }
 
-export function createMangaRouter(apiCache: NodeCache): Router {
+export function createMangaRouter(apiCache: AppCache): Router {
   const router = Router()
   const dex = new MangaDexProvider(apiCache)
   const pill = new MangaPillProvider(apiCache)

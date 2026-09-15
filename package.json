@@ -15,7 +15,7 @@
     "dango": "orchestrator.js"
   },
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "npm run build --workspaces",
@@ -27,13 +27,14 @@
     "test": "npm run test --workspace=client",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "node sync-deps.js && npm run build",
     "update-version": "node update-version.js"
   },
   "files": [
     "orchestrator.js",
     "client/dist",
     "server/dist",
+    "server/package.json",
     "LICENSE",
     "README.md",
     "package.json"
@@ -56,34 +57,28 @@
     "@octokit/auth-oauth-device": "^8.0.3",
     "@octokit/rest": "^22.0.1",
     "@xhayper/discord-rpc": "^1.3.4",
-    "axios": "^1.15.1",
-    "axios-retry": "^4.5.0",
     "cheerio": "^1.2.0",
-    "chokidar": "^5.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
-    "freekeys": "^0.0.4",
+    "fast-xml-parser": "^5.11.1",
     "got-scraping": "^3.2.9",
+    "lru-cache": "^11.5.2",
     "multer": "^2.0.2",
-    "node-cache": "^5.1.2",
     "pino": "^10.3.1",
-    "pino-pretty": "^13.1.1",
-    "ws": "^8.18.0",
-    "xml2js": "^0.6.2"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",
     "prettier": "^3.8.3",
-    "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "versionDate": "2026-09-15T09:34:33.446Z"
+  "versionDate": "2026-09-15T09:48:55.550Z"
 }

@@ -1,11 +1,11 @@
-import { DatabaseWrapper } from '../db'
-import { performWriteTransaction } from '../sync'
-import { searchAnilistByTitle, getShowMetaById } from './anilist'
-import { isTempShowId } from './temp-ids'
-import { WatchlistRepository } from '../repositories/watchlist.repository'
-import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
-import { dbGet, dbRun } from '../utils/db-utils'
-import logger from '../logger'
+import { DatabaseWrapper } from '../db.js'
+import { performWriteTransaction } from '../sync.js'
+import { searchAnilistByTitle, getShowMetaById } from './anilist.js'
+import { isTempShowId } from './temp-ids.js'
+import { WatchlistRepository } from '../repositories/watchlist.repository.js'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
+import { dbGet, dbRun } from '../utils/db-utils.js'
+import logger from '../logger.js'
 
 const inFlightMigrations = new Map<string, Promise<string>>()
 

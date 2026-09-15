@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import logger from '../logger'
-import { discordGatewayService } from '../discord-gateway'
-import { updateEnvFile } from '../utils/env.utils'
+import logger from '../logger.js'
+import { discordGatewayService } from '../discord-gateway.js'
+import { updateEnvFile } from '../utils/env.utils.js'
 
 const log = logger.child({ module: 'DiscordGatewayRoutes' })
 

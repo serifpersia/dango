@@ -1,10 +1,10 @@
-import logger from './logger'
-import { DatabaseWrapper } from './db'
-import { dbAll } from './utils/db-utils'
-import { isTempSyncRow } from './lib/temp-ids'
-import { updateEnvFile } from './utils/env.utils'
-import { CONFIG } from './config'
-import { SHIPPED_DEFAULTS } from './shipped-defaults'
+import logger from './logger.js'
+import { DatabaseWrapper } from './db.js'
+import { dbAll } from './utils/db-utils.js'
+import { isTempSyncRow } from './lib/temp-ids.js'
+import { updateEnvFile } from './utils/env.utils.js'
+import { CONFIG } from './config.js'
+import { SHIPPED_DEFAULTS } from './shipped-defaults.js'
 
 const log = logger.child({ module: 'GitHubSync' })
 
@@ -246,7 +246,7 @@ class GitHubSyncService {
           status: 'success',
           user: user,
         }
-        const { updateEnvFile } = await import('./utils/env.utils')
+        const { updateEnvFile } = await import('./utils/env.utils.js')
         await updateEnvFile({ SYNC_PROVIDER: 'github' })
         await runSyncSequence(db, 'github')
         return this.deviceState

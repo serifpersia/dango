@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express'
-import { DataController } from '../controllers/data.controller'
-import { Provider } from '../providers/provider.interface'
-import NodeCache from 'node-cache'
+import { DataController } from '../controllers/data.controller.js'
+import { Provider } from '../providers/provider.interface.js'
+import { AppCache } from '../utils/cache.utils.js'
 
 function makeCacheMiddleware(
-  cache: NodeCache,
+  cache: AppCache,
   keyFn: (req: Request) => string,
   ttl?: number,
   validate: (data: unknown) => boolean = (d) => Array.isArray(d) && d.length > 0
@@ -30,7 +30,7 @@ function makeCacheMiddleware(
 }
 
 export function createDataRouter(
-  apiCache: NodeCache,
+  apiCache: AppCache,
   providers: { [key: string]: Provider }
 ): Router {
   const router = Router()

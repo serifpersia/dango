@@ -1,20 +1,20 @@
 import { Request, Response } from 'express'
-import logger from '../logger'
-import { DatabaseWrapper } from '../db'
-import { performWriteTransaction } from '../sync'
-import { WatchlistRepository } from '../repositories/watchlist.repository'
+import logger from '../logger.js'
+import { DatabaseWrapper } from '../db.js'
+import { performWriteTransaction } from '../sync.js'
+import { WatchlistRepository } from '../repositories/watchlist.repository.js'
 import {
   WatchedEpisodesRepository,
   ContinueWatchingResult,
   WatchedEpisode,
-} from '../repositories/watched-episodes.repository'
-import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
-import { NotificationsRepository } from '../repositories/notifications.repository'
-import { QueueRepository } from '../repositories/queue.repository'
-import { SettingsRepository } from '../repositories/settings.repository'
-import { discordRPCService } from '../discord-rpc'
-import { requestContext } from '../utils/request-context'
-import { dbAll, dbGet } from '../utils/db-utils'
+} from '../repositories/watched-episodes.repository.js'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
+import { NotificationsRepository } from '../repositories/notifications.repository.js'
+import { QueueRepository } from '../repositories/queue.repository.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
+import { discordRPCService } from '../discord-rpc.js'
+import { requestContext } from '../utils/request-context.js'
+import { dbAll, dbGet } from '../utils/db-utils.js'
 import {
   searchAnilist,
   searchAnilistByTitle,
@@ -23,9 +23,9 @@ import {
   getShowMetaById,
   isAnilistRateLimited,
   batchGetShowStatuses,
-} from '../lib/anilist'
-import { kitsuSearchAnime } from '../lib/kitsu'
-import { getMigratedId } from '../lib/migration'
+} from '../lib/anilist.js'
+import { kitsuSearchAnime } from '../lib/kitsu.js'
+import { getMigratedId } from '../lib/migration.js'
 
 interface CombinedContinueWatchingShow {
   _id: string

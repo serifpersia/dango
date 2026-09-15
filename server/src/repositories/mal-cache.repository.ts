@@ -1,10 +1,10 @@
 import { DatabaseSync } from 'node:sqlite'
 import fs from 'fs'
 import path from 'path'
-import { CONFIG } from '../config'
-import { DatabaseWrapper } from '../db'
-import { dbGet, dbRun } from '../utils/db-utils'
-import type { MalCacheStore } from '../lib/mal'
+import { CONFIG } from '../config.js'
+import { DatabaseWrapper } from '../db.js'
+import { dbGet, dbRun } from '../utils/db-utils.js'
+import type { MalCacheStore } from '../lib/mal.js'
 
 export const MAL_CACHE_MAX_ROWS = 5000
 const DEFAULT_TTL_SECONDS = 6 * 3600

@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { SettingsController } from '../controllers/settings.controller'
+import { SettingsController } from '../controllers/settings.controller.js'
 import multer from 'multer'
-import { CONFIG } from '../config'
-import { DatabaseWrapper } from '../db'
+import { CONFIG } from '../config.js'
+import { DatabaseWrapper } from '../db.js'
 
 export function createSettingsRouter(
   getDb: () => DatabaseWrapper,

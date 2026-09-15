@@ -1,5 +1,5 @@
 import fs from 'fs'
-import { CONFIG } from '../config'
+import { CONFIG } from '../config.js'
 
 const lockPath = `${CONFIG.ENV_PATH}.lock`
 

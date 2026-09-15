@@ -2,9 +2,9 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import dotenv from 'dotenv'
-import { SHIPPED_DEFAULTS } from './shipped-defaults'
+import { SHIPPED_DEFAULTS } from './shipped-defaults.js'
 
-export const SERVER_ROOT = path.resolve(__dirname, '..')
+export const SERVER_ROOT = path.resolve(import.meta.dirname, '..')
 const PACKAGE_ROOT = path.resolve(SERVER_ROOT, '..')
 
 function resolveDataRoot() {

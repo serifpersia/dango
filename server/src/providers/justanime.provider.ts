@@ -4,9 +4,9 @@ import {
   EpisodeDetails,
   EpisodeDetail,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { BaseProvider } from './base-provider'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { BaseProvider } from './base-provider.js'
 
 interface JustAnimeTitle {
   english?: string | null

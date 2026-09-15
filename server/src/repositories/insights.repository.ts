@@ -1,5 +1,5 @@
-import { DatabaseWrapper } from '../db'
-import { dbAll, dbGet } from '../utils/db-utils'
+import { DatabaseWrapper } from '../db.js'
+import { dbAll, dbGet } from '../utils/db-utils.js'
 
 export const InsightsRepository = {
   getCoreStats: (db: DatabaseWrapper) =>

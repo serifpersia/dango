@@ -5,9 +5,9 @@ import {
   SubtitleTrack,
   EpisodeDetails,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { BaseProvider } from './base-provider'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { BaseProvider } from './base-provider.js'
 
 const KAA_BASE = 'https://kaa.lt'
 const KAA_HLS_BASE = 'https://hls.krussdomi.com/manifest'

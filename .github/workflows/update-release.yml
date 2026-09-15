@@ -43,8 +43,9 @@ jobs:
           echo "" >> release_notes.md
           echo "### Manual Setup" >> release_notes.md
           echo "1. Download and extract 'dango.zip'" >> release_notes.md
-          echo "2. Run 'npm install --omit=dev --workspaces=false' inside the folder (minimal prod deps, client is prebuilt)" >> release_notes.md
-          echo "3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
+          echo "2. Install Node.js 22.12 or newer ('node --version' to check)" >> release_notes.md
+          echo "3. Run 'npm install --omit=dev --workspaces=false' inside the folder (minimal prod deps, client is prebuilt)" >> release_notes.md
+          echo "4. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android APK" >> release_notes.md
           echo "Universal APK is included in this release if available." >> release_notes.md

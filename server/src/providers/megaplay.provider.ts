@@ -1,4 +1,4 @@
-import NodeCache from 'node-cache'
+import { AppCache } from '../utils/cache.utils.js'
 import { createDecipheriv } from 'node:crypto'
 import {
   Provider,
@@ -8,11 +8,11 @@ import {
   SubtitleTrack,
   EpisodeDetails,
   SearchOptions,
-} from './provider.interface'
-import logger from '../logger'
-import { anilistRequest, parseMalId } from '../lib/anilist'
-import { kitsuMetaByAnilistId } from '../lib/kitsu'
-import { signNexabloomMasterUrl } from '../utils/megaplay.utils'
+} from './provider.interface.js'
+import logger from '../logger.js'
+import { anilistRequest, parseMalId } from '../lib/anilist.js'
+import { kitsuMetaByAnilistId } from '../lib/kitsu.js'
+import { signNexabloomMasterUrl } from '../utils/megaplay.utils.js'
 
 interface AniListTitle {
   romaji?: string
@@ -37,9 +37,9 @@ interface AniListMedia {
 export class MegaPlayProvider implements Provider {
   name = 'MegaPlay'
   private megaPlayBase = 'https://megaplay.buzz/stream/ani'
-  private cache: NodeCache
+  private cache: AppCache
 
-  constructor(cache: NodeCache) {
+  constructor(cache: AppCache) {
     this.cache = cache
   }
 

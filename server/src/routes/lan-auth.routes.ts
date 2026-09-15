@@ -11,7 +11,7 @@ import {
   buildLanCookie,
   clearLanCookie,
   getRequestToken,
-} from '../app-auth'
+} from '../app-auth.js'
 
 export function createLanAuthRouter(): Router {
   const router = Router()
