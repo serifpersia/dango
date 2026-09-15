@@ -3,10 +3,6 @@
   "version": "3.0.6",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
-  "workspaces": [
-    "client",
-    "server"
-  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/serifpersia/dango.git"
@@ -18,16 +14,20 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "npm run build --workspaces",
+    "preinstall": "node -e \"if(require('fs').existsSync('pnpm-workspace.yaml')&&!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm install');process.exit(1)}\"",
+    "prebuild": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run build');process.exit(1)}\"",
+    "prelint": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run lint');process.exit(1)}\"",
+    "preformat": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run format');process.exit(1)}\"",
+    "build": "pnpm -r run build",
     "start": "node orchestrator.js prod",
     "dev": "node orchestrator.js dev",
-    "client": "npm run start --workspace=client",
-    "server": "npm run start --workspace=server",
+    "client": "pnpm --filter dango-client run start",
+    "server": "pnpm --filter dango-server run start",
     "preview": "node orchestrator.js prod",
-    "test": "npm run test --workspace=client",
-    "lint": "npm run lint --workspaces --if-present",
+    "test": "pnpm --filter dango-client run test",
+    "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write .",
-    "prepublishOnly": "node sync-deps.js && npm run build",
+    "prepublishOnly": "node sync-deps.js && pnpm run build",
     "update-version": "node update-version.js"
   },
   "files": [
@@ -53,6 +53,7 @@
     "access": "public"
   },
   "type": "commonjs",
+  "packageManager": "pnpm@11.27.0",
   "dependencies": {
     "@octokit/auth-oauth-device": "^8.0.3",
     "@octokit/rest": "^22.0.1",

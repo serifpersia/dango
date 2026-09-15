@@ -37,10 +37,11 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 ### Prerequisites
 
-| Requirement | Supported Version | Notes                                              |
-| :---------- | :---------------- | :------------------------------------------------- |
-| **Node.js** | `>= 22.5.0`       | Required runtime ([Download](https://nodejs.org/)) |
-| **npm**     | Latest with Node  | Global binary installation                         |
+| Requirement | Supported Version      | Notes                                                       |
+| :---------- | :--------------------- | :---------------------------------------------------------- |
+| **Node.js** | `>= 22.12.0`           | Required runtime ([Download](https://nodejs.org/))          |
+| **npm**     | Bundled with Node      | Global install (`npm install -g @serifpersia/dango`) + zips |
+| **pnpm**    | `11` (`npm i -g pnpm`) | Only needed for source development (`run.bat` / `run.sh`)   |
 
 ---
 
@@ -125,18 +126,18 @@ _Build requirements: Python 3, JDK 17+, Android SDK (Platform 36, Build-Tools 36
 
 ## Manual Setup (Development)
 
-The project is structured as an **npm workspace** (`client` and `server`) managed by a unified root lockfile.
+The project is structured as a **pnpm workspace** (`client` and `server`) managed by a unified lockfile. You need Node.js 22.12+ and pnpm 11 (`npm install -g pnpm`).
 
 ```bash
 # Clone the repository
 git clone https://github.com/serifpersia/dango.git
 cd dango
 
-# Install dependencies (root + workspaces hoisted)
-npm install
+# Install dependencies (root + workspaces)
+pnpm install
 
 # Compile workspaces (Vite frontend + tsc backend)
-npm run build
+pnpm run build
 ```
 
 Run via interactive environment scripts:
@@ -151,14 +152,14 @@ run.bat
 
 ### Command Reference
 
-| Command                                | Action                                     |
-| :------------------------------------- | :----------------------------------------- |
-| `dango`                                | Start the installed client daemon          |
-| `dango --version`                      | Display current installed version          |
-| `npm run dev`                          | Start full dev stack via `orchestrator.js` |
-| `npm run --workspace=dango-client dev` | Run Vite frontend independently            |
-| `npm run --workspace=dango-server dev` | Run backend via `nodemon` + `ts-node`      |
-| `npm run lint --workspaces`            | Run ESLint passes across all packages      |
+| Command                              | Action                                     |
+| :----------------------------------- | :----------------------------------------- |
+| `dango`                              | Start the installed client daemon          |
+| `dango --version`                    | Display current installed version          |
+| `pnpm run dev`                       | Start full dev stack via `orchestrator.js` |
+| `pnpm --filter dango-client run dev` | Run Vite frontend independently            |
+| `pnpm --filter dango-server run dev` | Run backend via `tsx watch`                |
+| `pnpm -r run lint`                   | Run ESLint passes across all packages      |
 
 ---
 

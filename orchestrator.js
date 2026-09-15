@@ -340,8 +340,8 @@ const log = (prefix, color, data) => {
 
 const spawnOpts = (cwd, extraEnv, withIpc = false) => ({
   // 'ipc' gives the child a structured message channel (see server/src/lib/ipc.ts).
-  // It only works for directly spawned node processes (prod); under `npm run`
-  // (dev) there is no IPC forwarding, so stdout tags remain the fallback signal.
+  // It only works for directly spawned node processes (prod); under a
+  // package-manager runner (dev) there is no IPC forwarding, so stdout tags remain the fallback signal.
   stdio: withIpc ? ['pipe', 'pipe', 'pipe', 'ipc'] : 'pipe',
   shell: false,
   cwd,
@@ -350,11 +350,20 @@ const spawnOpts = (cwd, extraEnv, withIpc = false) => ({
   env: { ...process.env, ...(extraEnv || {}) },
 })
 
-const spawnNpm = (args, cwd, env) => {
+const rootPkg = require('./package.json')
+const usePnpm =
+  typeof rootPkg.packageManager === 'string' && rootPkg.packageManager.startsWith('pnpm')
+const pmShellCmd = isWin ? `${usePnpm ? 'pnpm' : 'npm'}.cmd` : usePnpm ? 'pnpm' : 'npm'
+
+const pmRun = (script, filter) =>
+  usePnpm ? ['--filter', filter, 'run', script] : ['run', script, `--workspace=${filter}`]
+
+const spawnPm = (script, filter, cwd, env) => {
+  const args = pmRun(script, filter)
   if (isWin) {
-    return spawn('cmd.exe', ['/c', npmCmd, ...args], spawnOpts(cwd, env))
+    return spawn('cmd.exe', ['/c', pmShellCmd, ...args], spawnOpts(cwd, env))
   }
-  return spawn(npmCmd, args, spawnOpts(cwd, env))
+  return spawn(pmShellCmd, args, spawnOpts(cwd, env))
 }
 
 const terminateProcess = (proc, signal = 'SIGTERM') => {
@@ -395,11 +404,11 @@ async function main() {
   )
 
   if (mode === 'dev') {
-    serverProcess = spawnNpm(['run', 'dev', '--workspace=dango-server'], __dirname, {
+    serverProcess = spawnPm('dev', 'dango-server', __dirname, {
       NODE_ENV: 'development',
       INTERNAL_SHUTDOWN_TOKEN: shutdownToken,
     })
-    clientProcess = spawnNpm(['run', 'dev', '--workspace=dango-client'], __dirname, {
+    clientProcess = spawnPm('dev', 'dango-client', __dirname, {
       NODE_ENV: 'development',
     })
   } else {

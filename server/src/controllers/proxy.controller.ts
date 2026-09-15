@@ -50,6 +50,18 @@ export class ProxyController {
   ])
   private static readonly KAA_REFERER = 'https://krussdomi.com/'
   private static readonly KAA_ORIGIN = 'https://krussdomi.com'
+  private static readonly ANILIGHT_REFERER = 'https://anilight.live/'
+  private static readonly ANILIGHT_ORIGIN = 'https://anilight.live'
+  private static readonly ANILIGHT_HOSTS = [
+    'anilight.live',
+    'api.anilight.live',
+    'lostproject.club',
+    'streamzone1.site',
+    'nukitashi.top',
+    'vivibebe.site',
+    'vibeplayer.site',
+    'aniwatchtv.site',
+  ]
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
@@ -470,29 +482,110 @@ export class ProxyController {
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
-    try {
+    const subUrl = url as string
+    const refererStr = (referer as string) || ''
+    const isAnilight =
+      refererStr.includes('anilight.live') ||
+      ProxyController.ANILIGHT_HOSTS.some((host) => subUrl.includes(host))
+    const innerRawUrl = (() => {
+      try {
+        const parsed = new URL(subUrl)
+        if (
+          parsed.hostname.toLowerCase().endsWith('anilight.live') &&
+          parsed.pathname.includes('/proxy/captions')
+        ) {
+          const inner = parsed.searchParams.get('url')
+          if (inner && (inner.startsWith('http://') || inner.startsWith('https://'))) {
+            return inner
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return null
+    })()
+
+    const buildHeaders = (): Record<string, string> => {
       const headers: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/vtt,text/plain,*/*;q=0.8',
       }
-      if (referer) headers['Referer'] = referer as string
-      const subUrl = url as string
+      if (refererStr) {
+        headers['Referer'] = refererStr
+      } else if (isAnilight) {
+        headers['Referer'] = ProxyController.ANILIGHT_REFERER
+      }
       if (
-        (referer as string)?.startsWith(ProxyController.KAA_ORIGIN) ||
+        refererStr.startsWith(ProxyController.KAA_ORIGIN) ||
         Array.from(ProxyController.KAA_HOSTS).some((host) => subUrl.includes(host))
       ) {
         headers['Origin'] = ProxyController.KAA_ORIGIN
+      } else if (isAnilight) {
+        headers['Origin'] = ProxyController.ANILIGHT_ORIGIN
       }
+      return headers
+    }
 
-      const upstream = await fetchWithRetry(
-        url as string,
-        { method: 'GET', headers },
-        { retries: 3, timeoutMs: 30000, signal: abortController.signal }
-      )
-      if (!upstream.ok) {
-        throw new Error(`Subtitle upstream failed with status ${upstream.status}`)
+    const fetchText = async (
+      target: string,
+      retries = 1
+    ): Promise<{ status: number; body: string } | null> => {
+      const headers = buildHeaders()
+      if (innerRawUrl && target === innerRawUrl) {
+        headers['Referer'] = ProxyController.ANILIGHT_REFERER
+        headers['Origin'] = ProxyController.ANILIGHT_ORIGIN
       }
-      const body = (await upstream.text()).replace(/^\uFEFF/, '')
+      try {
+        const upstream = await fetchWithRetry(
+          target,
+          { method: 'GET', headers },
+          { retries, timeoutMs: 15000, signal: abortController.signal }
+        )
+        if (!upstream.ok) {
+          logger.warn(
+            { target, status: upstream.status },
+            '[subtitle-proxy] upstream returned error status'
+          )
+          try {
+            await upstream.body?.cancel()
+          } catch {
+            // ignore
+          }
+          return { status: upstream.status, body: '' }
+        }
+        const body = (await upstream.text()).replace(/^\uFEFF/, '')
+        if (/^\s*\{[\s\S]*"error"[\s\S]*\}\s*$/.test(body.slice(0, 500))) {
+          logger.warn({ target, body: body.slice(0, 200) }, '[subtitle-proxy] upstream JSON error')
+          return { status: 502, body: '' }
+        }
+        return { status: upstream.status, body }
+      } catch (e) {
+        if (abortController.signal.aborted) return null
+        logger.warn(
+          { target, error: (e as Error)?.message },
+          '[subtitle-proxy] upstream fetch failed'
+        )
+        return { status: 502, body: '' }
+      }
+    }
+
+    try {
+      const headers = buildHeaders()
+
+      let result = await fetchText(subUrl, 1)
+      if (abortController.signal.aborted) return
+      if ((!result || !result.body) && innerRawUrl) {
+        result = await fetchText(innerRawUrl, 0)
+        if (abortController.signal.aborted) return
+      }
+      if (!result || !result.body) {
+        res.set('Access-Control-Allow-Origin', '*')
+        res.set('Cache-Control', 'no-store')
+        return res.status(502).send('Subtitle upstream error')
+      }
+      const body = result.body
+      const baseForSegments = innerRawUrl || subUrl
       if (/#EXTM3U/i.test(body.slice(0, 1000))) {
         const segUrls = body
           .split('\n')
@@ -501,7 +594,7 @@ export class ProxyController {
           .slice(0, 200)
           .map((u) => {
             try {
-              return new URL(u, subUrl).href
+              return new URL(u, baseForSegments).href
             } catch {
               return null
             }
@@ -513,7 +606,7 @@ export class ProxyController {
             const segRes = await fetchWithRetry(
               seg,
               { method: 'GET', headers },
-              { retries: 3, timeoutMs: 30000, signal: abortController.signal }
+              { retries: 1, timeoutMs: 15000, signal: abortController.signal }
             )
             if (!segRes.ok) continue
             let segBody = (await segRes.text()).replace(/^\uFEFF/, '')
@@ -532,19 +625,30 @@ export class ProxyController {
           }
         }
         if (parts.length === 0) {
+          res.set('Access-Control-Allow-Origin', '*')
+          res.set('Cache-Control', 'no-store')
           return res.status(502).send('Subtitle playlist empty')
         }
         res.set('Content-Type', 'text/vtt; charset=utf-8')
+        res.set('Access-Control-Allow-Origin', '*')
+        res.set('Cache-Control', 'public, max-age=86400')
         return res.send(`WEBVTT\n\n${parts.join('\n\n')}\n`)
       }
       res.set('Content-Type', 'text/vtt; charset=utf-8')
+      res.set('Access-Control-Allow-Origin', '*')
+      res.set('Cache-Control', 'public, max-age=86400')
       if (/^\s*WEBVTT/i.test(body)) return res.send(body)
       return res.send(
         `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`
       )
     } catch (e) {
       if (abortController.signal.aborted) return
-      res.status(500).send('Proxy error')
+      logger.warn({ url: subUrl, error: (e as Error)?.message }, '[subtitle-proxy] failed')
+      if (!res.headersSent) {
+        res.set('Access-Control-Allow-Origin', '*')
+        res.set('Cache-Control', 'no-store')
+        res.status(502).send('Subtitle upstream error')
+      }
     }
   }
 

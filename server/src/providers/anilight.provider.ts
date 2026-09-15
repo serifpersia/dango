@@ -1,4 +1,10 @@
-import { Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface.js'
+import {
+  Show,
+  VideoSource,
+  EpisodeDetails,
+  SearchOptions,
+  SubtitleTrack,
+} from './provider.interface.js'
 import logger from '../logger.js'
 import { execFileSync } from 'node:child_process'
 import { gotScraping } from 'got-scraping'
@@ -262,6 +268,50 @@ export class AnilightProvider extends BaseProvider {
     return data
   }
 
+  private subtitleCheckHeaders(url: string): Record<string, string> {
+    const headers: Record<string, string> = { 'User-Agent': BROWSER_UA }
+    if (
+      /krussdomi\.com|advancedairesearchlab\.xyz|habibikun\.xyz|babybayw\.xyz|narutokun\.xyz/i.test(
+        url
+      )
+    ) {
+      headers['Referer'] = 'https://krussdomi.com/'
+      headers['Origin'] = 'https://krussdomi.com'
+    } else if (
+      /anilight\.live|lostproject\.club|streamzone1\.site|nukitashi\.top|vivibebe\.site|vibeplayer\.site|aniwatchtv\.site/i.test(
+        url
+      )
+    ) {
+      headers['Referer'] = 'https://anilight.live/'
+      headers['Origin'] = 'https://anilight.live'
+    }
+    headers['Range'] = 'bytes=0-1023'
+    return headers
+  }
+
+  private async dropDeadSubtitles(tracks: SubtitleTrack[]): Promise<SubtitleTrack[]> {
+    if (!tracks.length) return tracks
+    const checks = await Promise.all(
+      tracks.map(async (t) => {
+        try {
+          const res = await fetch(t.url, {
+            headers: this.subtitleCheckHeaders(t.url),
+            signal: AbortSignal.timeout(8000),
+          })
+          try {
+            await res.body?.cancel()
+          } catch {
+            // ignore
+          }
+          return res.status === 200 || res.status === 206
+        } catch {
+          return false
+        }
+      })
+    )
+    return tracks.filter((_, i) => checks[i])
+  }
+
   private async isStreamLinkReachable(link: string): Promise<boolean> {
     try {
       let target = link
@@ -472,7 +522,7 @@ export class AnilightProvider extends BaseProvider {
         )
         if (liveLinks.length === 0 && embedLinks.length === 0) continue
 
-        const subtitles = (data.tracks || [])
+        let subtitles: SubtitleTrack[] = (data.tracks || [])
           .filter((t) => t.file || t.url)
           .map((t) => {
             const raw = t.file || t.url || ''
@@ -526,6 +576,10 @@ export class AnilightProvider extends BaseProvider {
           }
         }
 
+        if (provider.id === 'misa' || provider.id === 'misora') {
+          subtitles = await this.dropDeadSubtitles(subtitles)
+        }
+
         if (liveLinks.length > 0) {
           sources.push({
             sourceName: provider.id,
@@ -548,6 +602,24 @@ export class AnilightProvider extends BaseProvider {
             type: 'iframe',
             actualEpisodeNumber: episodeNumber,
           })
+        }
+      }
+
+      const fallbackSubs: SubtitleTrack[] = []
+      for (const name of ['rem', 'l']) {
+        const src = sources.find((s) => s.sourceName === name && s.subtitles?.length)
+        for (const t of src?.subtitles ?? []) {
+          if (!fallbackSubs.some((f) => f.label.toLowerCase() === t.label.toLowerCase())) {
+            fallbackSubs.push(t)
+          }
+        }
+      }
+      if (fallbackSubs.length) {
+        for (const src of sources) {
+          if (src.sourceName !== 'misa' || src.type !== 'player') continue
+          const seen = new Set((src.subtitles ?? []).map((t) => t.label.toLowerCase()))
+          const extra = fallbackSubs.filter((t) => !seen.has(t.label.toLowerCase()))
+          if (extra.length) src.subtitles = [...(src.subtitles ?? []), ...extra]
         }
       }
 

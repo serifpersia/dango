@@ -1,6 +1,11 @@
 #!/bin/bash
 clear
 
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm is required but was not found. Install it with: npm install -g pnpm"
+    exit 1
+fi
+
 if [ -n "$1" ]; then
     choice="$1"
 else
@@ -34,7 +39,7 @@ if [ "$choice" == "1" ]; then
     echo -e "\033[1;36mRunning in DEVELOPMENT mode... \033[0m"
     echo
     echo "--> Installing all dependencies..."
-    npm install
+    pnpm install
     echo
     echo "--> Starting Development Server..."
     node orchestrator.js dev
@@ -45,19 +50,19 @@ elif [ "$choice" == "2" ]; then
 
     if [ "$2" = "rebuild" ] || [ "$2" = "--rebuild" ]; then
         echo "--> Rebuild requested. Installing and Building..."
-        npm install
-        npm run build
+        pnpm install
+        pnpm run build
     elif [ -f "server/dist/server.js" ] && [ -d "client/dist" ]; then
         echo "--> Pre-built files found. Skipping build... (use '$0 2 rebuild' to force rebuild after git pull)"
     else
         echo "--> Build missing. Installing and Building..."
-        npm install
+        pnpm install
         if [ $? -ne 0 ]; then
             echo -e "\033[1;31mError: Install failed!\033[0m"
             read -p "Press Enter to exit..."
             exit 1
         fi
-        npm run build
+        pnpm run build
         if [ $? -ne 0 ]; then
             echo -e "\033[1;31mError: Build failed!\033[0m"
             read -p "Press Enter to exit..."

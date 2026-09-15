@@ -3,6 +3,14 @@ setlocal EnableDelayedExpansion
 
 cls
 
+where pnpm >nul 2>nul
+if %errorlevel% neq 0 (
+    echo pnpm is required but was not found.
+    echo Install it with: npm install -g pnpm
+    pause
+    exit /b 1
+)
+
 if not "%~1"=="" (
     set "choice=%~1"
     goto process_choice
@@ -37,7 +45,7 @@ goto menu
 echo Running in DEVELOPMENT mode...
 echo.
 echo --^> Installing all dependencies...
-call npm install
+call pnpm install
 echo.
 echo --^> Starting Development Server...
 node orchestrator.js dev
@@ -55,13 +63,13 @@ if exist "server\dist\server.js" if exist "client\dist" (
 )
 :do_build
 echo --^> Build missing. Installing and Building...
-call npm install
+call pnpm install
 if !errorlevel! neq 0 (
     echo Error: Install failed!
     pause
     exit /b 1
 )
-call npm run build
+call pnpm run build
 if !errorlevel! neq 0 (
     echo Error: Build failed!
     pause
@@ -70,8 +78,8 @@ if !errorlevel! neq 0 (
 goto after_build
 :force_build
 echo --^> Rebuild requested. Installing and Building...
-call npm install
-call npm run build
+call pnpm install
+call pnpm run build
 :after_build
 
 echo.

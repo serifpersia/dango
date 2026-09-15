@@ -87,8 +87,13 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Install Dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Generate Shipped Defaults
         run: node server/scripts/generate-shipped-defaults.cjs
@@ -98,10 +103,15 @@ jobs:
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
 
       - name: Build Application
-        run: npm run build
+        run: pnpm run build
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
+
+      - name: Generate package-lock for zip installs
+        # --ignore-scripts bypasses the source-only pnpm guard (preinstall) since
+        # this step intentionally uses npm to emit a lockfile for the zip channel.
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Create Release Archive
         run: |
