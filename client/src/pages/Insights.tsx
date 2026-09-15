@@ -447,6 +447,8 @@ const Insights: React.FC = () => {
                       alt={getShowTitle(show)}
                       className={styles.miniPoster}
                       title={getShowTitle(show)}
+                      loading="lazy"
+                      decoding="async"
                     />
                   ))}
                 </div>

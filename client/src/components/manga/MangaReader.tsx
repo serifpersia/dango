@@ -306,6 +306,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
                   src={withNonce(src)}
                   alt={`Page ${i + 1}`}
                   loading={i < 3 ? 'eager' : 'lazy'}
+                  decoding="async"
                   draggable={false}
                   onError={() => handleImgError(i)}
                 />
@@ -337,6 +338,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
                 className={styles.pageImage}
                 src={withNonce(proxied[pageIndex])}
                 alt={`Page ${pageIndex + 1} of ${pages.length}`}
+                decoding="async"
                 draggable={false}
                 onError={() => handleImgError(pageIndex)}
               />

@@ -132,7 +132,7 @@
 .filterToggleBtn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   box-shadow: 0 4px 15px var(--accent-glow);
 }
 
@@ -243,15 +243,15 @@
 }
 
 .genreButton.include {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: #10b981;
-  color: #10b981;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .genreButton.exclude {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
-  color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
   text-decoration: line-through;
 }
 

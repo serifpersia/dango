@@ -256,7 +256,7 @@
   align-items: center;
   justify-content: center;
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   font-size: 0.78rem;
   font-weight: 800;
 }

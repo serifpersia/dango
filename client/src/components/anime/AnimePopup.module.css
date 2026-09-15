@@ -162,7 +162,7 @@
   width: 100%;
   height: 48px;
   background-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   border: none;
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-bold);
@@ -216,7 +216,7 @@
 .watchlistBtn.active {
   background-color: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
 }
 
 .watchlistBtn.active:hover {

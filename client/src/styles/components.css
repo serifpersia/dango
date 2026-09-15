@@ -144,7 +144,7 @@
 
 .badge-primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
 }
 
 .badge-secondary {
@@ -155,17 +155,17 @@
 
 .badge-danger {
   background: var(--color-danger);
-  color: white;
+  color: var(--color-danger-text);
 }
 
 .badge-success {
   background: var(--color-success);
-  color: white;
+  color: var(--color-success-text);
 }
 
 .badge-warning {
   background: var(--color-warning);
-  color: #000;
+  color: var(--color-warning-text);
 }
 
 /* ===== PROGRESS ===== */

@@ -77,7 +77,7 @@
 .clearBtn:hover {
   background: var(--bg-elevated);
   color: var(--color-danger);
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
 }
 
 .nextBtn {
@@ -223,8 +223,8 @@
 
 .iconBtn:hover {
   color: var(--color-danger);
-  border-color: rgba(239, 68, 68, 0.4);
-  background: rgba(239, 68, 68, 0.1);
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 }
 
 @media (max-width: 768px) {

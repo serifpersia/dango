@@ -20,6 +20,7 @@ const Logo: React.FC<LogoProps> = ({ className }) => {
       src={src}
       alt="dango"
       className={className}
+      decoding="async"
       style={{
         height: 'var(--logo-height, 75px)',
         width: 'auto',

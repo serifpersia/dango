@@ -365,6 +365,8 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
               <img
                 src={effectiveCover}
                 alt={headline}
+                loading="lazy"
+                decoding="async"
                 draggable={false}
                 className={radioStyles.cover}
                 onError={() => setArtFailed(true)}

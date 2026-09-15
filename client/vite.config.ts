@@ -60,15 +60,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (
-              id.includes('preact') ||
-              id.includes('react-router') ||
-              id.includes('@tanstack/react-query')
-            ) {
-              return 'vendor'
-            }
-          }
+          if (!id.includes('node_modules')) return
+          if (id.includes('preact') || id.includes('react-router')) return 'vendor-core'
+          if (id.includes('@tanstack/react-query')) return 'vendor-query'
+          if (id.includes('react-icons')) return 'vendor-icons'
+          if (id.includes('@floating-ui') || id.includes('embla-carousel')) return 'vendor-ui'
         },
       },
     },

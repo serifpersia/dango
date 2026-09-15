@@ -25,7 +25,13 @@ const Footer: React.FC = () => {
       <div className={styles.footerInner}>
         <div className={styles.brandSection}>
           <div className={styles.logoRow}>
-            <img src={logoSrc} className={styles.logoText} alt="dango" />
+            <img
+              src={logoSrc}
+              className={styles.logoText}
+              alt="dango"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
           <div className={styles.brandMeta}>
             <div className={styles.statusPill}>

@@ -297,15 +297,15 @@
 }
 
 .genreButton.include {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: #10b981;
-  color: #10b981;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .genreButton.exclude {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
-  color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
   text-decoration: line-through;
 }
 
@@ -566,9 +566,9 @@
 }
 
 .removeBtn {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
   width: 36px;
   height: 36px;
   display: flex;
@@ -581,9 +581,9 @@
 }
 
 .removeBtn:hover {
-  background: #ef4444;
-  color: #ffffff;
-  border-color: #ef4444;
+  background: var(--color-danger);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger);
   transform: scale(1.05);
 }
 
@@ -592,7 +592,11 @@
   padding: var(--space-16) var(--space-4);
   color: var(--text-tertiary);
   background: var(--glass-bg);
-  background-image: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+    transparent 70%
+  );
   border: 1px dashed var(--border-primary);
   border-radius: var(--radius-xl);
   font-size: var(--font-size-base);
@@ -772,9 +776,9 @@
   gap: var(--space-2);
   height: 38px;
   padding: 0 var(--space-4);
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: var(--font-size-sm);
@@ -783,8 +787,8 @@
 }
 
 .manageRemoveBtn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border-color: var(--color-danger);
 }
 
 .manageRemoveBtn:disabled {

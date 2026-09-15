@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import styles from './LanAuthModal.module.css'
 import { Button } from '../common/Button'
 import toast from 'react-hot-toast'
@@ -53,7 +53,7 @@ const LanAuthModal: React.FC<LanAuthModalProps> = ({ isOpen, onClose, onSuccess 
   }
 
   return (
-    <GenericModal isOpen={isOpen} onClose={onClose} title="LAN Authentication Required">
+    <Modal isOpen={isOpen} onClose={onClose} title="LAN Authentication Required">
       <div className={styles.container}>
         <p>This instance is protected. Enter the password to access from this device.</p>
         <div className={styles.field}>
@@ -77,7 +77,7 @@ const LanAuthModal: React.FC<LanAuthModalProps> = ({ isOpen, onClose, onSuccess 
           </Button>
         </div>
       </div>
-    </GenericModal>
+    </Modal>
   )
 }
 

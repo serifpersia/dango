@@ -20,9 +20,9 @@
 }
 
 .status {
-  background: rgba(139, 92, 246, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-light);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   padding: 0.35rem 0.85rem;
   border-radius: var(--radius-full);
   font-weight: 700;
@@ -63,13 +63,13 @@
 }
 
 .watchlistBtn.inList {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.4);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
   color: var(--color-success);
 }
 
 .watchlistBtn.inList:hover {
-  background: rgba(16, 185, 129, 0.15);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
   border-color: var(--color-success);
 }
 
@@ -170,7 +170,7 @@
 .sourceButton.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
 }
 
 .detailsBox {
@@ -261,7 +261,7 @@
 
 .animeStatus {
   display: inline-block;
-  background: rgba(16, 185, 129, 0.1);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
   color: var(--color-success);
   padding: 0.25rem 0.75rem;
   border-radius: var(--radius-sm);
@@ -269,7 +269,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent);
 }
 
 .genresList {

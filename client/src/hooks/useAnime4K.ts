@@ -157,7 +157,9 @@ export default function useAnime4K({
       inFlightRef.current = false
 
       try {
-        const { ModeA, ModeB, ModeC, ModeAA } = await import('anime4k-webgpu-async')
+        const { ModeA, ModeB, ModeC, ModeAA } = await import(
+          /* @vitePreload: false */ 'anime4k-webgpu-async'
+        )
         if (!navigator.gpu) throw new Error('WebGPU not available')
         const adapter = await navigator.gpu.requestAdapter()
         if (!adapter) throw new Error('No GPU adapter found')

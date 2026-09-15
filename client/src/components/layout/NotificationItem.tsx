@@ -69,6 +69,8 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         src={fixThumbnailUrl(notification.thumbnail, 48, 64)}
         alt={notification.name}
         className={styles.thumbnail}
+        loading="lazy"
+        decoding="async"
       />
       <div className={styles.itemInfo}>
         <span className={styles.itemTitle}>{displayTitle}</span>

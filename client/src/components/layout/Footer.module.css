@@ -99,8 +99,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: var(--color-success);
+  box-shadow: 0 0 8px var(--color-success);
 }
 
 .linksGrid {
@@ -168,7 +168,7 @@
 }
 
 .heartIcon {
-  color: #ef4444;
+  color: var(--color-danger);
   margin: 0 2px;
 }
 

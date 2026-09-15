@@ -21,9 +21,9 @@
 }
 
 .status {
-  background: rgba(139, 92, 246, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-light);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   padding: 0.35rem 0.85rem;
   border-radius: var(--radius-full);
   font-weight: 700;
@@ -70,32 +70,32 @@
 }
 
 .watchlistBtn.inList {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.35);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
   color: var(--color-success);
 }
 
 .watchlistBtn.inList:hover {
-  background: rgba(16, 185, 129, 0.18);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
   border-color: var(--color-success);
 }
 
 .queueBtn {
-  background: rgba(139, 92, 246, 0.08);
-  border-color: rgba(139, 92, 246, 0.25);
-  color: #d8b4fe;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-light);
 }
 
 .queueBtn:hover {
-  background: rgba(139, 92, 246, 0.14);
-  border-color: rgba(167, 139, 250, 0.45);
-  color: #f3e8ff;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent-lighter);
 }
 
 .queueActive {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(167, 139, 250, 0.6);
-  color: #f5d0fe;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--accent-lighter);
 }
 
 .modeToggleBtn {
@@ -106,14 +106,14 @@
 }
 
 .modeToggleActive {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(96, 165, 250, 0.45);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 45%, transparent);
   color: #dbeafe;
 }
 
 .modeToggleActive:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(96, 165, 250, 0.65);
+  background: color-mix(in srgb, var(--color-info) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 65%, transparent);
 }
 
 .nativeToggleBtn {
@@ -130,14 +130,14 @@
 }
 
 .nativeToggleActive {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.4);
-  color: #fde68a;
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  color: var(--color-warning);
 }
 
 .nativeToggleActive:hover {
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.6);
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 60%, transparent);
 }
 
 .watchlistBtn:disabled {
@@ -151,41 +151,41 @@
 }
 
 .markWatchedBtn {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 25%, transparent);
   color: #93c5fd;
   flex: 0 1 auto;
   justify-content: center;
 }
 
 .markWatchedBtn:hover {
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(96, 165, 250, 0.45);
+  background: color-mix(in srgb, var(--color-info) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 45%, transparent);
   color: #dbeafe;
 }
 
 .markWatchedDone {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.35);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
   color: var(--color-success);
 }
 
 .markWatchedDone:hover {
-  background: rgba(16, 185, 129, 0.18);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
   border-color: var(--color-success);
 }
 
 .completeSeriesBtn {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
   color: #d1fae5;
   flex: 0 1 auto;
   justify-content: center;
 }
 
 .completeSeriesBtn:hover {
-  background: rgba(16, 185, 129, 0.16);
-  border-color: rgba(52, 211, 153, 0.45);
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
   color: #ecfdf5;
 }
 
@@ -287,7 +287,7 @@
   align-items: center;
   gap: 0.7rem;
   padding: 0.65rem 1rem;
-  border: 1px solid rgba(167, 139, 250, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: var(--radius-md);
   background: rgba(18, 18, 22, 0.92);
   color: #f5f3ff;
@@ -529,6 +529,7 @@
 
 .centerPlayPause:hover {
   background: var(--accent);
+  color: var(--accent-text);
   transform: translate(-50%, -50%) scale(1.1);
   border-color: var(--accent);
   box-shadow: 0 0 40px var(--accent-glow);
@@ -908,7 +909,7 @@
 .qualityItemInMenu.active,
 .ccItem.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -1178,7 +1179,7 @@
 .sourceButton.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   box-shadow: 0 8px 20px var(--accent-glow);
 }
 
@@ -1253,15 +1254,15 @@
 
 .animeStatus {
   display: inline-block;
-  background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
   padding: 0.25rem 0.75rem;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent);
 }
 
 .genresList {
@@ -1392,7 +1393,7 @@
 
 .epJumpInputGroup button {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   border: none;
   padding: 0.4rem 1rem;
   border-radius: 4px;
@@ -1507,7 +1508,7 @@
 
 .retryButton {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   border: none;
   padding: 0.6rem 2rem;
   border-radius: var(--radius-md);
@@ -1515,7 +1516,7 @@
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 0.5rem;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .retryButton:hover {

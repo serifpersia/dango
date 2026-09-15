@@ -18,6 +18,7 @@ import {
   FaListOl,
 } from 'react-icons/fa'
 import type { AsmrChapter, AsmrTrack } from '../../hooks/useAsmr'
+import { formatTime } from '../../lib/utils'
 import { loadHls } from '../../lib/hls'
 import type Hls from 'hls.js'
 import styles from './Asmr.module.css'
@@ -35,16 +36,6 @@ interface AsmrPlayerProps {
   onTrackChange: (index: number) => void
   onExpandedChange: (expanded: boolean) => void
   onClose: () => void
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds)) return '0:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-  return h > 0
-    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    : `${m}:${String(s).padStart(2, '0')}`
 }
 
 const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
@@ -535,6 +526,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
                         ref={(el) => attachImgRef(el, src)}
                         src={src}
                         alt={`${t ? t(title) : title} — work image`}
+                        loading="lazy"
+                        decoding="async"
                         draggable={false}
                         onLoad={() => handleImgLoad(src)}
                         onError={() => handleImgLoad(src)}

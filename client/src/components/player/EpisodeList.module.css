@@ -68,7 +68,7 @@
 
 .rangeButton.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 
@@ -147,14 +147,14 @@
 }
 
 .episodeItem.active {
-  background: rgba(139, 92, 246, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-light);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .episodeItem.active:hover {
   transform: none;
-  background: rgba(139, 92, 246, 0.15);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .episodeItem span {

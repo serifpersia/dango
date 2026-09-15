@@ -8,7 +8,6 @@ import { useTelemetry } from './hooks/useTelemetry'
 import TelemetryNoticeModal from './components/modals/TelemetryNoticeModal'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
-import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { useAnimePaheCookie } from './hooks/useAnimePaheCookie'
 import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
@@ -27,6 +26,7 @@ const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 const PlayerRedirect = lazy(() => import('./pages/PlayerRedirect'))
+const VirtualKeyboard = lazy(() => import('./components/common/VirtualKeyboard'))
 
 import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
@@ -183,11 +183,15 @@ function App() {
         </ErrorBoundary>
       </main>
       <Footer />
-      <VirtualKeyboard
-        activeInputRef={virtualKeyboard.activeInputRef}
-        isVisible={virtualKeyboard.isVisible}
-        onClose={virtualKeyboard.hide}
-      />
+      {virtualKeyboard.isVisible && (
+        <Suspense fallback={null}>
+          <VirtualKeyboard
+            activeInputRef={virtualKeyboard.activeInputRef}
+            isVisible={virtualKeyboard.isVisible}
+            onClose={virtualKeyboard.hide}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

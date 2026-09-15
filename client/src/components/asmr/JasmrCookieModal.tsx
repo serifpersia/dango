@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import styles from '../anime/AnimePaheCookieModal.module.css'
 import toast from 'react-hot-toast'
 
@@ -51,7 +51,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
   }
 
   return (
-    <GenericModal isOpen={isOpen} onClose={onClose} title="JapaneseASMR Verification Required">
+    <Modal isOpen={isOpen} onClose={onClose} title="JapaneseASMR Verification Required">
       <div className={styles.container}>
         {step === 1 ? (
           <>
@@ -134,7 +134,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
           </>
         )}
       </div>
-    </GenericModal>
+    </Modal>
   )
 }
 

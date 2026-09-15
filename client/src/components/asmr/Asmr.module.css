@@ -61,7 +61,7 @@
   border: none;
   border-left: var(--space-px) solid var(--border-primary);
   background: var(--accent);
-  color: var(--text-primary);
+  color: var(--accent-text);
   cursor: pointer;
 }
 
@@ -713,7 +713,7 @@
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent);
-  color: var(--text-primary);
+  color: var(--accent-text);
   font-size: var(--font-size-base);
   cursor: pointer;
 }
@@ -817,12 +817,12 @@
 
   .seekBtn:hover .seekBtnLabel {
     background: var(--accent);
-    color: var(--text-primary);
+    color: var(--accent-text);
   }
 
   .playBtn:hover:not(:disabled) {
     background: var(--accent-light);
-    color: var(--text-primary);
+    color: var(--accent-text);
     box-shadow: 0 0 12px var(--accent-glow);
   }
 }
@@ -836,7 +836,7 @@
 
 .playBtn {
   background: var(--accent);
-  color: var(--text-primary);
+  color: var(--accent-text);
   width: var(--size-42);
   height: var(--size-42);
 }

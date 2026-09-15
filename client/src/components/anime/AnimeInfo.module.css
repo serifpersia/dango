@@ -130,7 +130,7 @@
   color: var(--accent);
 }
 .iconType {
-  color: #10b981;
+  color: var(--color-success);
 }
 .iconClock {
   color: #60a5fa;
@@ -157,7 +157,7 @@
 .genre:hover {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   transform: translateY(-2px);
 }
 
@@ -194,7 +194,7 @@
   align-items: center;
   gap: var(--space-3);
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-  color: white;
+  color: var(--accent-text);
   padding: 0.8rem 1.8rem;
   border-radius: var(--radius-md);
   font-weight: 600;
@@ -232,9 +232,9 @@
 }
 
 .watchlistBtn.active {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: #10b981;
-  color: #10b981;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 /* Details Section */

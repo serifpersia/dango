@@ -199,22 +199,22 @@
 }
 
 .typeBadge.tv {
-  background: rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
   color: #60a5fa;
 }
 
 .typeBadge.movie {
-  background: rgba(16, 185, 129, 0.2);
+  background: color-mix(in srgb, var(--color-success) 20%, transparent);
   color: #34d399;
 }
 
 .typeBadge.tvSeries {
-  background: rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
   color: #60a5fa;
 }
 
 .typeBadge.tvMiniSeries {
-  background: rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
   color: #60a5fa;
 }
 

@@ -129,23 +129,23 @@
 }
 
 .typeBadge.tv {
-  background: rgba(59, 130, 246, 0.85);
-  color: white;
+  background: color-mix(in srgb, var(--color-info) 85%, transparent);
+  color: var(--color-info-text);
 }
 
 .typeBadge.movie {
-  background: rgba(16, 185, 129, 0.85);
-  color: white;
+  background: color-mix(in srgb, var(--color-success) 85%, transparent);
+  color: var(--color-success-text);
 }
 
 .typeBadge.tvSeries {
-  background: rgba(59, 130, 246, 0.85);
-  color: white;
+  background: color-mix(in srgb, var(--color-info) 85%, transparent);
+  color: var(--color-info-text);
 }
 
 .typeBadge.tvMiniSeries {
-  background: rgba(59, 130, 246, 0.85);
-  color: white;
+  background: color-mix(in srgb, var(--color-info) 85%, transparent);
+  color: var(--color-info-text);
 }
 
 .ratingBadge {

@@ -36,13 +36,13 @@
 .btn-primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
   color: var(--accent-text);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.35);
+  box-shadow: 0 6px 16px var(--accent-glow);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -72,11 +72,11 @@
 
 .btn-danger {
   background: var(--color-danger);
-  color: white;
+  color: var(--color-danger-text);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #dc2626;
+  background: var(--color-danger-dark);
 }
 
 /* ===== SIZES ===== */

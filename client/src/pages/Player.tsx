@@ -27,7 +27,6 @@ import {
   type SubtitleStyleSettings,
 } from '../lib/subtitleStyle'
 import type Hls from 'hls.js'
-import GenericModal from '../components/common/GenericModal'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
@@ -1540,7 +1539,7 @@ const Player: React.FC = () => {
   if (matureBlocked) {
     return (
       <div className={layoutStyles.playerPageLayout}>
-        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/home')}>
+        <Modal isOpen title="Content Warning" onClose={() => navigate('/home')}>
           <div style={{ padding: '1rem', textAlign: 'center' }}>
             <p>This title contains mature content intended for adult audiences.</p>
             <p>
@@ -1561,7 +1560,7 @@ const Player: React.FC = () => {
               <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       </div>
     )
   }
@@ -2016,6 +2015,8 @@ const Player: React.FC = () => {
                   <img
                     src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
                     alt={displayTitle}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       ;(e.target as HTMLImageElement).src = '/placeholder.svg'
                     }}

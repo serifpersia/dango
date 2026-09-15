@@ -31,6 +31,7 @@ const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter
             className={styles.detailCover}
             src={mangaCoverSrc(detail.provider, detail.cover)}
             alt={detail.title}
+            decoding="async"
             draggable={false}
           />
         )}

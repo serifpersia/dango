@@ -234,7 +234,13 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <img key={safeIndex} src={bannerSrc} alt={getTitle(anime)} className={styles.posterImage} />
+        <img
+          key={safeIndex}
+          src={bannerSrc}
+          alt={getTitle(anime)}
+          className={styles.posterImage}
+          decoding="async"
+        />
 
         {top6.length > 1 && (
           <>

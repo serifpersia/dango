@@ -26,7 +26,7 @@ export function CardImage({
 }) {
   return (
     <div className={`card-image ${className}`}>
-      <img src={src} alt={alt} loading="lazy" />
+      <img src={src} alt={alt} loading="lazy" decoding="async" />
     </div>
   )
 }

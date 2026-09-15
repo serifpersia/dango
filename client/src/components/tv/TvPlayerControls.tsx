@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fa'
 import styles from './TvPlayerControls.module.css'
 import CenterControls from '../player/CenterControls'
+import { formatTime } from '../../lib/utils'
 import { pickSubtitleIndex } from '../../lib/subtitles'
 import { MenuSlider, SegmentedRow, SwatchRow } from '../player/MenuControls'
 import {
@@ -448,15 +449,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       document.exitFullscreen().catch(() => {})
       setIsFullscreen(false)
     }
-  }
-
-  const formatTime = (time: number) => {
-    if (!time || isNaN(time)) return '0:00'
-    const h = Math.floor(time / 3600)
-    const m = Math.floor((time % 3600) / 60)
-    const s = Math.floor(time % 60)
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    return `${m}:${s.toString().padStart(2, '0')}`
   }
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0

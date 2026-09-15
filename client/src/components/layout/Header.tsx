@@ -232,6 +232,7 @@ const Header: React.FC = () => {
                   alt={user.name}
                   className={styles.profileImg}
                   referrerPolicy="no-referrer"
+                  decoding="async"
                 />
               ) : user?.provider === 'github' ? (
                 <FaGithub />

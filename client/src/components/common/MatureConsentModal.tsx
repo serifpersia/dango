@@ -1,5 +1,5 @@
 import React from 'react'
-import GenericModal from './GenericModal'
+import { Modal } from './Modal'
 import { Button } from './Button'
 
 interface MatureConsentModalProps {
@@ -9,7 +9,7 @@ interface MatureConsentModalProps {
 }
 
 const MatureConsentModal: React.FC<MatureConsentModalProps> = ({ isOpen, onClose, onGrant }) => (
-  <GenericModal isOpen={isOpen} title="Content Warning" onClose={onClose}>
+  <Modal isOpen={isOpen} title="Content Warning" onClose={onClose}>
     <div style={{ padding: '1rem', textAlign: 'center' }}>
       <p>This title contains mature content intended for adult audiences.</p>
       <p>
@@ -30,7 +30,7 @@ const MatureConsentModal: React.FC<MatureConsentModalProps> = ({ isOpen, onClose
         <Button onClick={onGrant}>I&apos;m 18+, Continue</Button>
       </div>
     </div>
-  </GenericModal>
+  </Modal>
 )
 
 export default MatureConsentModal

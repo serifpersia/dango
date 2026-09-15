@@ -34,6 +34,11 @@ import {
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import {
+  selectionKey,
+  addPageToSelection,
+  removePageFromSelection,
+} from '../lib/watchlistSelection'
 import styles from './Watchlist.module.css'
 
 const FILTERS = [
@@ -113,6 +118,7 @@ const Watchlist: React.FC = () => {
 
   const [manageMode, setManageMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const filterKeyRef = useRef<string | null>(null)
 
   const isCW = filterBy === 'Continue Watching'
   const watchlistQueryString = useMemo(() => {
@@ -156,8 +162,12 @@ const Watchlist: React.FC = () => {
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setGenreStates(states)
     setPage(parseInt(searchParams.get('page') || '1'))
-    setSelectedIds(new Set())
-  }, [searchParams])
+    const nextFilterKey = selectionKey(filterBy, searchParams)
+    if (filterKeyRef.current !== null && filterKeyRef.current !== nextFilterKey) {
+      setSelectedIds(new Set())
+    }
+    filterKeyRef.current = nextFilterKey
+  }, [searchParams, filterBy])
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -349,9 +359,9 @@ const Watchlist: React.FC = () => {
 
   const handleSelectAll = () => {
     if (allSelected) {
-      setSelectedIds(new Set())
+      setSelectedIds((prev) => removePageFromSelection(prev, pageIds))
     } else {
-      setSelectedIds(new Set(pageIds))
+      setSelectedIds((prev) => addPageToSelection(prev, pageIds))
     }
   }
 

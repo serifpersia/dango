@@ -4,7 +4,7 @@ let loadPromise: Promise<typeof import('hls.js').default | null> | null = null
 export async function loadHls(): Promise<typeof import('hls.js').default | null> {
   if (cachedHls) return cachedHls
   if (!loadPromise) {
-    loadPromise = import('hls.js')
+    loadPromise = import(/* @vitePreload: false */ 'hls.js')
       .then((mod) => {
         cachedHls = mod.default
         return cachedHls

@@ -1,0 +1,40 @@
+.top-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
+}
+
+.top-progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent-light), transparent);
+  animation: top-progress-slide 1.1s infinite ease-in-out;
+}
+
+@keyframes top-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-progress-bar::after {
+    animation: none;
+    width: 100%;
+    border-radius: 0;
+  }
+}

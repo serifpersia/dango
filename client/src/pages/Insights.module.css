@@ -487,13 +487,13 @@
 }
 
 .warningSection {
-  background: rgba(239, 68, 68, 0.03);
+  background: color-mix(in srgb, var(--color-danger) 3%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
   border-radius: var(--radius-xl);
   padding: var(--space-10);
-  box-shadow: 0 20px 50px -20px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 20px 50px -20px color-mix(in srgb, var(--color-danger) 15%, transparent);
   animation: slideUpIn 0.8s var(--ease-smooth) 0.3s both;
 }
 
@@ -502,7 +502,7 @@
   align-items: center;
   gap: var(--space-4);
   margin-bottom: var(--space-8);
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .warningHeader h3 {

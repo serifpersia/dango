@@ -14,8 +14,16 @@
   /* ===== COLOR: SEMANTIC ===== */
   --color-danger: #ef4444;
   --color-error: var(--color-danger);
+  --color-danger-dark: #dc2626;
+  --color-danger-text: #ffffff;
   --color-success: #10b981;
+  --color-success-text: #ffffff;
   --color-warning: #f59e0b;
+  --color-warning-text: #17171c;
+  --color-info: #3b82f6;
+  --color-info-text: #ffffff;
+  --badge-info-bg: var(--accent);
+  --badge-info-text: var(--accent-text);
 
   /* ===== COLOR: BLUE ===== */
   --secondary-h: 180;
@@ -230,6 +238,9 @@ html[data-theme='mochi'] {
 
   --glass-bg: rgba(27, 27, 31, 0.96);
 
+  --badge-info-bg: var(--accent);
+  --badge-info-text: var(--accent-text);
+
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
@@ -269,6 +280,9 @@ html[data-theme='sakura'] {
   --border-secondary: #403640;
 
   --glass-bg: rgba(28, 23, 30, 0.96);
+
+  --badge-info-bg: var(--accent-dark);
+  --badge-info-text: #ffffff;
 
   --shadow-sm: none;
   --shadow-md: none;

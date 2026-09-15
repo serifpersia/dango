@@ -1,19 +1,14 @@
-import { useEffect } from 'react'
-import NProgress from 'nprogress'
-import 'nprogress/nprogress.css'
+import { useEffect, useState } from 'react'
+import './TopProgressBar.css'
 
-NProgress.configure({ showSpinner: false })
+export default function TopProgressBar() {
+  const [visible, setVisible] = useState(false)
 
-const TopProgressBar: React.FC = () => {
   useEffect(() => {
-    NProgress.start()
-
-    return () => {
-      NProgress.done()
-    }
+    const timer = window.setTimeout(() => setVisible(true), 120)
+    return () => window.clearTimeout(timer)
   }, [])
 
-  return null
+  if (!visible) return null
+  return <div className="top-progress-bar" role="progressbar" aria-label="Loading" />
 }
-
-export default TopProgressBar

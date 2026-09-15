@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import styles from './AnimePaheCookieModal.module.css'
 import toast from 'react-hot-toast'
 
@@ -123,7 +123,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
   }
 
   return (
-    <GenericModal isOpen={isOpen} onClose={onClose} title="AnimePahe Verification Required">
+    <Modal isOpen={isOpen} onClose={onClose} title="AnimePahe Verification Required">
       <div className={styles.container}>
         {step === 1 ? (
           <>
@@ -237,7 +237,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
           </>
         )}
       </div>
-    </GenericModal>
+    </Modal>
   )
 }
 

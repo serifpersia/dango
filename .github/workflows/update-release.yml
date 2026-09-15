@@ -89,8 +89,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -111,7 +109,15 @@ jobs:
       - name: Generate package-lock for zip installs
         # --ignore-scripts bypasses the source-only pnpm guard (preinstall) since
         # this step intentionally uses npm to emit a lockfile for the zip channel.
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        # node_modules is pnpm's symlinked layout here, which crashes npm's
+        # arborist ("Cannot read properties of null (reading 'matches')"), so
+        # move it aside while npm resolves purely from the registry.
+        # --omit=dev matches the shipped install command and shrinks the tree.
+        run: |
+          mv node_modules node_modules.pnpm
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --omit=dev
+          rm -rf node_modules
+          mv node_modules.pnpm node_modules
 
       - name: Create Release Archive
         run: |
@@ -136,6 +142,11 @@ jobs:
           cd release-package
           zip -r ../dango.zip .
 
+      - name: Zip Companion Extension
+        run: |
+          cd dango-extension
+          zip -r ../dango-extension.zip firefox chrome
+
       - name: Create New Latest Release
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -146,6 +157,7 @@ jobs:
           fi
           gh release create "latest" \
             "dango.zip" \
+            "dango-extension.zip" \
             $APK_ARG \
             --title "latest (v$VERSION)" \
             --notes-file release_notes.md \

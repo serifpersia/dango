@@ -282,13 +282,6 @@ footer a:hover {
   text-shadow: 0 0 8px var(--accent-glow);
 }
 
-/* ===== NPROGRESS ===== */
-#nprogress .bar {
-  background: var(--accent) !important;
-  height: 3px !important;
-  box-shadow: 0 0 15px var(--accent) !important;
-}
-
 /* ===== SELECT GLOBAL ===== */
 select {
   appearance: none;

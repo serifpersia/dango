@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 import { MenuSlider } from './MenuControls'
 import useDelayCanvas from '../../hooks/useDelayCanvas'
@@ -72,7 +72,7 @@ const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
   const clamp = (v: number) => Math.max(0, Math.min(MAX_MS, Math.round(v)))
 
   return (
-    <GenericModal isOpen={isOpen} onClose={onClose} title="Calibrate A/V sync">
+    <Modal isOpen={isOpen} onClose={onClose} title="Calibrate A/V sync">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         {!videoFailed ? (
           <button
@@ -160,7 +160,7 @@ const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
           <Button onClick={() => onApply(tempMs)}>Use {tempMs}ms</Button>
         </div>
       </div>
-    </GenericModal>
+    </Modal>
   )
 }
 

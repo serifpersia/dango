@@ -35,8 +35,8 @@
 
 .userInfo {
   padding: var(--space-4) var(--space-5);
-  background: rgba(16, 185, 129, 0.05);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: color-mix(in srgb, var(--color-success) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success) 20%, transparent);
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-6);
   display: flex;
@@ -52,11 +52,11 @@
 }
 
 .userInfo strong {
-  color: #10b981;
+  color: var(--color-success);
 }
 
 .warning {
-  color: #f59e0b;
+  color: var(--color-warning);
   font-size: var(--font-size-xs);
   margin: var(--space-3) 0 0;
   font-weight: 500;

@@ -57,7 +57,7 @@
   border: none;
   border-left: var(--space-px) solid var(--border-primary);
   background: var(--accent);
-  color: var(--text-primary);
+  color: var(--accent-text);
   cursor: pointer;
 }
 

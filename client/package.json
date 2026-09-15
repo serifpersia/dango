@@ -22,18 +22,14 @@
     "anime4k-webgpu-async": "^2.0.0",
     "embla-carousel-react": "^8.6.0",
     "hls.js": "^1.5.13",
-    "nprogress": "^0.2.0",
     "preact": "^10.29.1",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.6.0",
     "react-router": "^8.3.0",
-    "react-simple-maps": "^5.0.3",
-    "uuid": "^14.0.0"
+    "react-simple-maps": "^5.0.3"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.5",
-    "@types/nprogress": "^0.2.3",
-    "@types/uuid": "^10.0.0",
     "@webgpu/types": "^0.1.72",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

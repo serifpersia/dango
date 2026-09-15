@@ -63,6 +63,8 @@ const Radio: React.FC = () => {
             src={station.favicon}
             alt=""
             className={styles.stationThumb}
+            loading="lazy"
+            decoding="async"
             onError={(e) => {
               ;(e.target as HTMLImageElement).style.display = 'none'
             }}

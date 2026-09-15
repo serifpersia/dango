@@ -17,6 +17,7 @@ const AsmrCard: React.FC<AsmrCardProps> = ({ work, onSelect }) => {
             src={work.thumbnail}
             alt={work.name}
             loading="lazy"
+            decoding="async"
             draggable={false}
           />
         ) : (

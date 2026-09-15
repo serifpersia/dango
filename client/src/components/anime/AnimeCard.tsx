@@ -9,7 +9,7 @@ import {
   FaInfoCircle,
 } from 'react-icons/fa'
 import AnimePopup from './AnimePopup'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
@@ -395,11 +395,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
         </Link>
 
         {showModal && (
-          <GenericModal
-            isOpen={showModal}
-            title="Content Warning"
-            onClose={() => setShowModal(false)}
-          >
+          <Modal isOpen={showModal} title="Content Warning" onClose={() => setShowModal(false)}>
             <div style={{ padding: '1rem', textAlign: 'center' }}>
               <p>This title contains mature content intended for adult audiences.</p>
               <p>
@@ -423,7 +419,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
                 <Button onClick={handleConfirmViewMature}>I'm 18+, Continue</Button>
               </div>
             </div>
-          </GenericModal>
+          </Modal>
         )}
 
         {showRemoveBtn && (

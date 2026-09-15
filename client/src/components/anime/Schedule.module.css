@@ -113,7 +113,7 @@
 .dayBtn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   box-shadow: 0 8px 20px var(--accent-glow);
   transform: translateY(-4px);
 }

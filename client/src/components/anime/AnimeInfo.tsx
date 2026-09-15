@@ -14,7 +14,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 import { useMatureConsent } from '../../hooks/useMatureConsent'
 import styles from './AnimeInfo.module.css'
@@ -104,6 +104,7 @@ export default function AnimeInfo() {
               src={fixThumbnailUrl(showMeta.thumbnail || '', 320, 480)}
               alt={showMeta.name}
               className={styles.poster}
+              decoding="async"
             />
           </div>
 
@@ -203,7 +204,7 @@ export default function AnimeInfo() {
       </div>
 
       {matureBlocked && (
-        <GenericModal isOpen title="Content Warning" onClose={() => navigate('/')}>
+        <Modal isOpen title="Content Warning" onClose={() => navigate('/')}>
           <div style={{ padding: '1rem', textAlign: 'center' }}>
             <p>This title contains mature content intended for adult audiences.</p>
             <p>
@@ -224,7 +225,7 @@ export default function AnimeInfo() {
               <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       )}
     </div>
   )

@@ -302,7 +302,7 @@
   border-radius: var(--radius-2xl) !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow:
-    0 20px 60px rgba(139, 92, 246, 0.15),
+    0 20px 60px color-mix(in srgb, var(--accent) 15%, transparent),
     0 0 100px rgba(0, 0, 0, 0.9) !important;
   overflow: hidden !important;
   position: relative !important;

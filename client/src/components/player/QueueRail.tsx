@@ -78,6 +78,8 @@ const QueueRailItem = ({
         className={styles.thumbnail}
         src={fixThumbnailUrl(item.thumbnail || '', 72, 96)}
         alt={displayTitle}
+        loading="lazy"
+        decoding="async"
         onError={(event) => {
           event.currentTarget.src = '/placeholder.svg'
         }}

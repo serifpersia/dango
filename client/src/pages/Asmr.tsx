@@ -3,7 +3,7 @@ import { FaHeadphones, FaSearch } from 'react-icons/fa'
 import { useParams, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import ToggleSwitch from '../components/common/ToggleSwitch'
-import GenericModal from '../components/common/GenericModal'
+import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import AsmrCard from '../components/asmr/AsmrCard'
 import AsmrDetail from '../components/asmr/AsmrDetail'
@@ -388,11 +388,7 @@ const Asmr: React.FC = () => {
       )}
 
       {showMatureModal && (
-        <GenericModal
-          isOpen={showMatureModal}
-          title="Content Warning"
-          onClose={handleDeclineMature}
-        >
+        <Modal isOpen={showMatureModal} title="Content Warning" onClose={handleDeclineMature}>
           <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
             <p>This section contains mature content intended for adult audiences.</p>
             <p>
@@ -422,7 +418,7 @@ const Asmr: React.FC = () => {
               <Button onClick={handleAcceptMature}>I'm 18+, Continue</Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       )}
 
       {player && (

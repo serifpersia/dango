@@ -24,6 +24,7 @@ const MangaCard: React.FC<MangaCardProps> = ({ item, onSelect }) => {
             src={mangaCoverSrc(item.provider, item.cover)}
             alt={item.title}
             loading="lazy"
+            decoding="async"
             draggable={false}
           />
         ) : (

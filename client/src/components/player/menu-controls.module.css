@@ -161,7 +161,7 @@
 }
 
 .segmented button[aria-pressed='true'] {
-  background: rgba(139, 92, 246, 0.25);
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent-light);
 }
 

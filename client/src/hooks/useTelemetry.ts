@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
-import { v4 as uuidv4 } from 'uuid'
 import packageJson from '../../package.json'
+
+const newInstallationId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36)
 
 const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL
 
@@ -62,7 +66,7 @@ export const sendTelemetryPing = async () => {
     }
 
     if (!installationId) {
-      installationId = uuidv4()
+      installationId = newInstallationId()
       localStorage.setItem('installation_id', installationId)
     }
 

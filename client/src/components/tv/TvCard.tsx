@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 import { useMatureConsent } from '../../hooks/useMatureConsent'
 import styles from './TvCard.module.css'
@@ -84,7 +84,7 @@ const TvCard: React.FC<TvCardProps> = ({ item }) => {
       </Link>
 
       {showMatureModal && (
-        <GenericModal
+        <Modal
           isOpen={showMatureModal}
           title="Content Warning"
           onClose={() => setShowMatureModal(false)}
@@ -116,7 +116,7 @@ const TvCard: React.FC<TvCardProps> = ({ item }) => {
               </Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       )}
     </>
   )

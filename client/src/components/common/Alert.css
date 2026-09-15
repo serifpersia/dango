@@ -9,25 +9,25 @@
 }
 
 .alert-info {
-  background: rgba(139, 92, 246, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-color: var(--accent);
   color: var(--text-primary);
 }
 
 .alert-success {
-  background: rgba(16, 185, 129, 0.1);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
   border-color: var(--color-success);
   color: var(--color-success);
 }
 
 .alert-warning {
-  background: rgba(245, 158, 11, 0.1);
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
   border-color: var(--color-warning);
   color: var(--color-warning);
 }
 
 .alert-error {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   border-color: var(--color-danger);
   color: var(--color-danger);
 }

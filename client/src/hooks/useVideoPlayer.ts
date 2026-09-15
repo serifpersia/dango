@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
+import { formatTime } from '../lib/utils'
 import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
 
 interface VideoPlayerProps {
@@ -215,12 +216,6 @@ const useVideoPlayer = ({
     }
   }, [sendProgressUpdate])
 
-  const formatTime = (timeInSeconds: number): string => {
-    if (isNaN(timeInSeconds) || timeInSeconds <= 0) return '00:00'
-    const result = new Date(timeInSeconds * 1000).toISOString().slice(11, 19)
-    const hours = parseInt(result.slice(0, 2), 10)
-    return hours > 0 ? result : result.slice(3)
-  }
   const toggleFullscreen = useCallback(() => {
     if (!playerContainerRef.current) return
     if (!document.fullscreenElement) {

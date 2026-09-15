@@ -257,8 +257,8 @@
   composes: badge;
   top: var(--space-2);
   right: var(--space-2);
-  background-color: #0369a1;
-  color: white;
+  background-color: var(--badge-info-bg);
+  color: var(--badge-info-text);
   border: none;
   font-size: 11px;
   font-weight: 800;
@@ -341,14 +341,16 @@
 }
 
 .cardWrapper .removeBtn:hover {
-  background-color: rgba(239, 68, 68, 0.9);
-  border-color: rgba(239, 68, 68, 0.9);
+  background-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
+  color: var(--color-danger-text);
   transform: scale(1.08);
 }
 
 .infoBtn:hover {
   background-color: var(--accent);
   border-color: var(--accent);
+  color: var(--accent-text);
   transform: scale(1.08);
 }
 

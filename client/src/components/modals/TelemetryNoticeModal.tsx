@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import GenericModal from '../common/GenericModal'
+import { Modal } from '../common/Modal'
 import ToggleSwitch from '../common/ToggleSwitch'
 import styles from './TelemetryNoticeModal.module.css'
 import { FaChevronDown } from 'react-icons/fa'
@@ -46,7 +46,7 @@ const TelemetryNoticeModal: React.FC<TelemetryNoticeModalProps> = ({ isOpen, onC
   }
 
   return (
-    <GenericModal isOpen={isOpen} onClose={() => {}} title="Telemetry">
+    <Modal isOpen={isOpen} onClose={() => {}} title="Telemetry">
       <div className={styles.container}>
         <p className={styles.description}>
           Dango collects anonymous usage data to help track how many people use the app. This
@@ -106,7 +106,7 @@ const TelemetryNoticeModal: React.FC<TelemetryNoticeModalProps> = ({ isOpen, onC
           </button>
         </div>
       </div>
-    </GenericModal>
+    </Modal>
   )
 }
 

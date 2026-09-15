@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { FaBook, FaSearch } from 'react-icons/fa'
 import ToggleSwitch from '../components/common/ToggleSwitch'
-import GenericModal from '../components/common/GenericModal'
+import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import MangaCard from '../components/manga/MangaCard'
@@ -427,11 +427,7 @@ export default function Manga() {
       )}
 
       {showMatureModal && (
-        <GenericModal
-          isOpen={showMatureModal}
-          title="Content Warning"
-          onClose={handleDeclineMature}
-        >
+        <Modal isOpen={showMatureModal} title="Content Warning" onClose={handleDeclineMature}>
           <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
             <p>This section contains mature content intended for adult audiences.</p>
             <p>
@@ -461,7 +457,7 @@ export default function Manga() {
               <Button onClick={handleAcceptMature}>I'm 18+, Continue</Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       )}
     </div>
   )

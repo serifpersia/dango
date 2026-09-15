@@ -340,7 +340,13 @@ const Trackers: React.FC = () => {
         {anilistConnected && anilistUser ? (
           <div className={styles.connectedProfile}>
             {anilistUser.avatar && (
-              <img src={anilistUser.avatar} alt="Avatar" className={styles.avatar} />
+              <img
+                src={anilistUser.avatar}
+                alt="Avatar"
+                className={styles.avatar}
+                loading="lazy"
+                decoding="async"
+              />
             )}
             <div className={styles.connectedInfo}>
               <span className={styles.connectedName}>{anilistUser.name}</span>

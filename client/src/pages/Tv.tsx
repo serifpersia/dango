@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { FaSearch, FaTv, FaArrowLeft, FaSpinner } from 'react-icons/fa'
 import TvCard from '../components/tv/TvCard'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
-import GenericModal from '../components/common/GenericModal'
+import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
@@ -1319,7 +1319,7 @@ const Tv: React.FC = () => {
       )}
 
       {details?.adult && !hasMatureConsent && (
-        <GenericModal isOpen title="Content Warning" onClose={handleBack}>
+        <Modal isOpen title="Content Warning" onClose={handleBack}>
           <div style={{ padding: '1rem', textAlign: 'center' }}>
             <p>This title contains mature content intended for adult audiences.</p>
             <p>
@@ -1340,7 +1340,7 @@ const Tv: React.FC = () => {
               <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
             </div>
           </div>
-        </GenericModal>
+        </Modal>
       )}
 
       {!details && (

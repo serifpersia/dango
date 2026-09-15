@@ -26,7 +26,7 @@
 
 .form-input-error:focus {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
 .form-select {

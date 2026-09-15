@@ -36,7 +36,12 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
 
         <div className={styles.detailHeader}>
           {work.thumbnail ? (
-            <img className={styles.detailCover} src={work.thumbnail} alt={work.name} />
+            <img
+              className={styles.detailCover}
+              src={work.thumbnail}
+              alt={work.name}
+              decoding="async"
+            />
           ) : (
             <div className={`${styles.detailCover} ${styles.thumbPlaceholder}`} />
           )}
