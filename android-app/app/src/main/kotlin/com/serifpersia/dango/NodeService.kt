@@ -59,17 +59,20 @@ class NodeService : Service() {
                 scope.launch { startDango() }
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         stopNode()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         scope.cancel()
         super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         stopNode()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 

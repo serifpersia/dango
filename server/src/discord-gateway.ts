@@ -289,6 +289,12 @@ class DiscordGatewayService {
     this.lastActivity = null
   }
 
+  public shutdown() {
+    this.isEnabled = false
+    this.token = null
+    this.disconnect()
+  }
+
   public disconnect() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout)

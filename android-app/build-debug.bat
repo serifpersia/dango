@@ -40,9 +40,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
+for /f "delims=" %%V in ('node "%~dp0app-version.js"') do set APP_VERSION=%%V
+set APK_NAME=com.serifpersia.dango-v%APP_VERSION%-universal-debug.apk
+set APK_PATH=app\build\outputs\apk\debug\%APK_NAME%
+
+if not exist "%APK_PATH%" (
+    echo.
+    echo [!] Expected APK not found: %APK_PATH%
+    dir /b app\build\outputs\apk\debug\
+    exit /b 1
+)
+
 echo.
 echo [2/2] Done!
-echo APK: android-app\app\build\outputs\apk\debug\com.serifpersia.dango-universal-debug.apk
+echo APK: android-app\%APK_PATH%
+echo Version: %APP_VERSION%
 echo.
-echo Install: adb install -r android-app\app\build\outputs\apk\debug\com.serifpersia.dango-universal-debug.apk
+echo Install: adb install -r android-app\%APK_PATH%
 echo.

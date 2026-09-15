@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Standalone app version, independent from the dango node project version.
+val dangoVersionName = "1.0.4"
+val dangoVersionCode = 4
+
 android {
     namespace = "com.serifpersia.dango"
     compileSdk = 35
@@ -11,8 +15,8 @@ android {
         applicationId = "com.serifpersia.dango"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = dangoVersionCode
+        versionName = dangoVersionName
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
@@ -58,9 +62,9 @@ android {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
             if (buildType.name == "release") {
-                output?.outputFileName = "com.serifpersia.dango-universal.apk"
+                output?.outputFileName = "com.serifpersia.dango-v${dangoVersionName}-universal.apk"
             } else if (buildType.name == "debug") {
-                output?.outputFileName = "com.serifpersia.dango-universal-debug.apk"
+                output?.outputFileName = "com.serifpersia.dango-v${dangoVersionName}-universal-debug.apk"
             }
         }
     }

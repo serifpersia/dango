@@ -57,6 +57,15 @@ const GoogleAuthSettings: React.FC = () => {
     const fetchInitialData = async () => {
       setLoading(true)
       await Promise.all([fetchUser(), fetchStatus()])
+      try {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('google_auth') === 'success') {
+          await fetchUser()
+          window.history.replaceState(null, '', window.location.pathname)
+        }
+      } catch {
+        // ignore
+      }
       setLoading(false)
     }
 
@@ -89,6 +98,13 @@ const GoogleAuthSettings: React.FC = () => {
       }
 
       if (data.url) {
+        const inDangoApp =
+          typeof (window as unknown as { DangoBridge?: { isDangoApp?: () => boolean } })
+            .DangoBridge !== 'undefined'
+        if (inDangoApp) {
+          window.location.href = data.url
+          return
+        }
         const width = 600
         const height = 700
         const left = window.innerWidth / 2 - width / 2

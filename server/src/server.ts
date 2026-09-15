@@ -70,6 +70,16 @@ const app = express()
 
 app.use(requestLogger)
 
+app.get('/api/health', (_req, res) => {
+  if (isShuttingDown) {
+    return res.status(503).json({ status: 'shutting-down', ready: false })
+  }
+  if (!db) {
+    return res.status(503).json({ status: 'starting', ready: false })
+  }
+  res.json({ status: 'ok', ready: true })
+})
+
 app.use((req, res, next) => {
   const store = new Map<string, string>()
   if (req.headers['x-animepahe-ua']) {
@@ -334,11 +344,11 @@ async function main() {
     stopDiscovery()
     clearInterval(syncInterval)
     discordRPCService.disconnect()
-    discordGatewayService.disconnect()
+    discordGatewayService.shutdown()
     await watcher.close()
 
     if (expressServer) {
-      expressServer.close()
+      await new Promise<void>((resolve) => expressServer.close(() => resolve()))
     }
 
     if (hasUnsyncedChanges) {
@@ -357,6 +367,8 @@ async function main() {
       notifyServerExit()
       if (signal === 'SIGUSR2') {
         process.kill(process.pid, 'SIGUSR2')
+      } else {
+        setTimeout(() => process.exit(0), 100).unref()
       }
     })
   }

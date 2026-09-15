@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "3.0.6",
+  "version": "3.0.8",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
@@ -14,7 +14,6 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "preinstall": "node -e \"if(require('fs').existsSync('pnpm-workspace.yaml')&&!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm install');process.exit(1)}\"",
     "prebuild": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run build');process.exit(1)}\"",
     "prelint": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run lint');process.exit(1)}\"",
     "preformat": "node -e \"if(!String(process.env.npm_config_user_agent||'').startsWith('pnpm/')){console.error('[dango] Use pnpm, not npm. Run: pnpm run format');process.exit(1)}\"",
@@ -81,5 +80,5 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "versionDate": "2026-09-15T09:48:55.550Z"
+  "versionDate": "2026-09-15T14:44:02.005Z"
 }

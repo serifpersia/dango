@@ -37,6 +37,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var devServerUrlInput: android.widget.EditText
     private lateinit var updateBtn: Button
     private lateinit var launchBtn: Button
+    private lateinit var swipeHintText: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var progressText: TextView
     private lateinit var logContainer: LinearLayout
@@ -60,6 +61,7 @@ class SetupActivity : AppCompatActivity() {
         devServerUrlInput = findViewById(R.id.devServerUrlInput)
         updateBtn = findViewById(R.id.updateBtn)
         launchBtn = findViewById(R.id.launchBtn)
+        swipeHintText = findViewById(R.id.swipeHintText)
         progressBar = findViewById(R.id.progressBar)
         progressText = findViewById(R.id.progressText)
         logContainer = findViewById(R.id.logContainer)
@@ -91,6 +93,7 @@ class SetupActivity : AppCompatActivity() {
         statusTitle.text = "dango"
         statusSubtitle.text = "Dev server mode"
         versionText.visibility = View.GONE
+        swipeHintText.visibility = View.GONE
         updateBtn.visibility = View.GONE
         devServerUrlInput.setText(DevConfig.getDevUrl(this))
         devServerUrlInput.visibility = View.VISIBLE
@@ -185,9 +188,9 @@ class SetupActivity : AppCompatActivity() {
             File(prefixDir, "bin").mkdirs()
 
             val cmd = if (isUpdate) {
-                arrayOf("install", "-g", "$DANGO_PACKAGE@latest")
+                arrayOf("install", "-g", "--ignore-scripts", "$DANGO_PACKAGE@latest")
             } else {
-                arrayOf("install", "-g", DANGO_PACKAGE)
+                arrayOf("install", "-g", "--ignore-scripts", DANGO_PACKAGE)
             }
 
             appendLog("Running: node npm-cli.js ${cmd.joinToString(" ")}")
@@ -413,6 +416,7 @@ class SetupActivity : AppCompatActivity() {
         statusTitle.text = text
         statusSubtitle.text = ""
         versionText.visibility = View.GONE
+        swipeHintText.visibility = View.GONE
         updateBtn.visibility = View.GONE
         launchBtn.visibility = View.GONE
         progressBar.visibility = View.VISIBLE
@@ -428,6 +432,7 @@ class SetupActivity : AppCompatActivity() {
         versionText.text = "v$version"
         versionText.visibility = View.VISIBLE
         updateBtn.visibility = View.GONE
+        swipeHintText.visibility = View.VISIBLE
         launchBtn.text = "Launch"
         launchBtn.visibility = View.VISIBLE
         progressBar.visibility = View.GONE
@@ -440,6 +445,7 @@ class SetupActivity : AppCompatActivity() {
         statusTitle.text = "Update Available"
         statusSubtitle.text = "v$current -> v$latest"
         versionText.visibility = View.GONE
+        swipeHintText.visibility = View.VISIBLE
         updateBtn.text = "Update to v$latest"
         updateBtn.visibility = View.VISIBLE
         launchBtn.text = "Continue with v$current"
@@ -454,6 +460,7 @@ class SetupActivity : AppCompatActivity() {
         statusTitle.text = "dango"
         statusSubtitle.text = ""
         versionText.visibility = View.GONE
+        swipeHintText.visibility = View.GONE
         updateBtn.visibility = View.GONE
         launchBtn.visibility = View.GONE
         progressBar.visibility = View.VISIBLE

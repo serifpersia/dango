@@ -37,6 +37,7 @@
         <service
             android:name=".NodeService"
             android:foregroundServiceType="specialUse"
+            android:stopWithTask="true"
             android:exported="false" />
 
     </application>

@@ -22,8 +22,20 @@ echo ""
 echo "[1/2] Building debug APK..."
 ./gradlew app:clean app:assembleDebug --no-daemon
 
+APP_VERSION=$(node "$(dirname "$0")/app-version.js")
+APK_NAME="com.serifpersia.dango-v${APP_VERSION}-universal-debug.apk"
+APK_PATH="app/build/outputs/apk/debug/${APK_NAME}"
+
+if [ ! -f "$APK_PATH" ]; then
+    echo ""
+    echo "[!] Expected APK not found: $APK_PATH"
+    ls "app/build/outputs/apk/debug/"
+    exit 1
+fi
+
 echo ""
 echo "[2/2] Done!"
-echo "APK: app/build/outputs/apk/debug/com.serifpersia.dango-universal-debug.apk"
+echo "APK: $APK_PATH"
+echo "Version: $APP_VERSION"
 echo ""
-echo "Install: adb install -r app/build/outputs/apk/debug/com.serifpersia.dango-universal-debug.apk"
+echo "Install: adb install -r $APK_PATH"

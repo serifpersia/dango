@@ -211,16 +211,32 @@ export class AuthController {
 
     const responseHtml = `
             <html>
+            <head><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
             <body>
             <h1>Authentication Successful</h1>
-            <p>Database synced. Closing window...</p>
+            <p>Database synced. Returning to dango...</p>
+            <p><a href="/?google_auth=success">Tap here if you are not redirected</a></p>
             <script>
-            if (window.opener) {
-                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, window.location.origin);
-                window.close();
-            } else {
-                window.location.href = '/';
-            }
+            (function () {
+              var payload = { type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} };
+              try {
+                if (window.opener && !window.opener.closed) {
+                  window.opener.postMessage(payload, window.location.origin);
+                  try {
+                    window.opener.postMessage(payload, 'http://localhost:${CONFIG.PORT}');
+                  } catch (e) {}
+                  try {
+                    window.opener.postMessage(payload, 'http://127.0.0.1:${CONFIG.PORT}');
+                  } catch (e) {}
+                  setTimeout(function () { window.close(); }, 300);
+                  setTimeout(function () { window.location.href = '/?google_auth=success'; }, 1500);
+                } else {
+                  window.location.href = '/?google_auth=success';
+                }
+              } catch (e) {
+                window.location.href = '/?google_auth=success';
+              }
+            })();
             </script>
             </body>
             </html>

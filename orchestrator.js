@@ -529,6 +529,6 @@ process.on('SIGHUP', () => {
 })
 process.on('exit', restoreTerminal)
 ;(async () => {
-  main()
-  checkForUpdates().catch(() => {})
+  await checkForUpdates().catch(() => {})
+  await main()
 })()

@@ -45,7 +45,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val TAG = "DangoMain"
-        const val SERVER_URL = "http://127.0.0.1:3000"
+        const val SERVER_URL = "http://localhost:3000"
+        const val HEALTH_URL = "$SERVER_URL/api/health"
         const val SHUTDOWN_URL = "$SERVER_URL/api/internal/shutdown"
     }
 
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefreshLayout: DangoSwipeRefreshLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
+    private lateinit var bootOverlay: View
     private lateinit var fullscreenContainer: FrameLayout
     private lateinit var shutdownOverlay: View
     private lateinit var shutdownConfirmOverlay: View
@@ -76,6 +78,8 @@ class MainActivity : AppCompatActivity() {
     private var swipeActive = false
     private var swipeFromLeftEdge = true
     private var shutdownConfirmVisible = false
+    private var serverReady = false
+    private var shuttingDown = false
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingDownloadUrl: String? = null
     private var pendingDownloadFileName: String = "dango-backup.db"
@@ -163,6 +167,7 @@ class MainActivity : AppCompatActivity() {
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
         progressBar = findViewById(R.id.progressBar)
         statusText = findViewById(R.id.statusText)
+        bootOverlay = findViewById(R.id.bootOverlay)
         fullscreenContainer = findViewById(R.id.fullscreenContainer)
         shutdownOverlay = findViewById(R.id.shutdownOverlay)
         shutdownConfirmOverlay = findViewById(R.id.shutdownConfirmOverlay)
@@ -250,8 +255,29 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(DangoBridge(), "DangoBridge")
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url?.toString().orEmpty()
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    return false
+                }
+                if (url.isNotBlank()) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    } catch (_: Exception) {
+                    }
+                    return true
+                }
+                return false
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 swipeRefreshLayout.isRefreshing = false
+                if (serverReady) {
+                    bootOverlay.visibility = View.GONE
+                    progressBar.visibility = View.GONE
+                    statusText.visibility = View.GONE
+                    webView.visibility = View.VISIBLE
+                }
             }
 
             override fun onReceivedError(
@@ -261,7 +287,19 @@ class MainActivity : AppCompatActivity() {
             ) {
                 if (request?.isForMainFrame == true) {
                     swipeRefreshLayout.isRefreshing = false
-                    retryLoad()
+                    if (!serverReady) {
+                        scope.launch {
+                            delay(2000)
+                            if (!serverReady && !shuttingDown) pollHealthOnce()
+                        }
+                    } else if (!shuttingDown) {
+                        progressBar.visibility = View.GONE
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Failed to load page. Pull down to retry.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         }
@@ -287,12 +325,14 @@ class MainActivity : AppCompatActivity() {
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                if (!serverReady) {
+                    return
+                }
                 if (newProgress >= 100) {
                     progressBar.visibility = View.GONE
-                    statusText.visibility = View.GONE
                 } else {
+                    statusText.visibility = View.GONE
                     progressBar.visibility = View.VISIBLE
-                    statusText.visibility = View.VISIBLE
                 }
             }
 
@@ -414,15 +454,14 @@ class MainActivity : AppCompatActivity() {
 
         devMode = DevConfig.isEnabled(this)
         startUrl = if (devMode) DevConfig.getDevUrl(this) else SERVER_URL
+        webView.visibility = View.INVISIBLE
         if (devMode) {
             Log.i(TAG, "Dev server mode: loading $startUrl, node install skipped")
-            waitForServer(startUrl)
+            waitForServer(startUrl, "$startUrl/api/health")
         } else {
-            NodeService.onStatusChange = { running ->
-                if (running) retryLoad()
-            }
+            NodeService.onStatusChange = null
             NodeService.start(this)
-            waitForServer(SERVER_URL)
+            waitForServer(SERVER_URL, HEALTH_URL)
         }
     }
 
@@ -617,25 +656,18 @@ class MainActivity : AppCompatActivity() {
         swipeActive = false
     }
 
-    private fun waitForServer(url: String) {
+    private fun waitForServer(pageUrl: String, healthUrl: String) {
         statusText.text = if (devMode) "Connecting to dev server..." else "Starting dango..."
+        bootOverlay.visibility = View.VISIBLE
         statusText.visibility = View.VISIBLE
         progressBar.visibility = View.VISIBLE
+        webView.visibility = View.INVISIBLE
 
         scope.launch {
             val ready = withContext(Dispatchers.IO) {
                 for (i in 1..120) {
-                    try {
-                        val conn = URL(url).openConnection() as HttpURLConnection
-                        conn.connectTimeout = 2000
-                        conn.readTimeout = 2000
-                        conn.connect()
-                        if (conn.responseCode == 200) {
-                            conn.disconnect()
-                            return@withContext true
-                        }
-                        conn.disconnect()
-                    } catch (_: Exception) {
+                    if (isHealthReady(healthUrl)) {
+                        return@withContext true
                     }
                     delay(1000)
                 }
@@ -643,10 +675,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (ready) {
-                webView.loadUrl(url)
+                onServerReady(pageUrl)
             } else {
                 statusText.text = if (devMode) {
-                    "Dev server unreachable at $url"
+                    "Dev server unreachable at $pageUrl"
                 } else {
                     "Server failed to start."
                 }
@@ -654,20 +686,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun retryLoad() {
-        val url = startUrl
+    private fun pollHealthOnce() {
         scope.launch {
-            delay(2000)
-            webView.loadUrl(url)
+            val ready = withContext(Dispatchers.IO) { isHealthReady(HEALTH_URL) }
+            if (ready) {
+                onServerReady(startUrl)
+            }
         }
+    }
+
+    private fun isHealthReady(healthUrl: String): Boolean {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = URL(healthUrl).openConnection() as HttpURLConnection
+            conn.connectTimeout = 2000
+            conn.readTimeout = 2000
+            conn.connect()
+            if (conn.responseCode != 200) {
+                return false
+            }
+            val body = try {
+                conn.inputStream.bufferedReader().readText()
+            } catch (_: Exception) {
+                ""
+            }
+            body.contains("\"ready\":true") || body.contains("\"ready\": true")
+        } catch (_: Exception) {
+            false
+        } finally {
+            try {
+                conn?.disconnect()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun onServerReady(pageUrl: String) {
+        if (serverReady || shuttingDown) return
+        serverReady = true
+        bootOverlay.visibility = View.GONE
+        statusText.visibility = View.GONE
+        progressBar.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+        webView.loadUrl(pageUrl)
     }
 
     private fun gracefulShutdown() {
         if (devMode) {
-            finish()
+            finishAndRemoveTask()
             return
         }
+        if (shuttingDown) return
+        shuttingDown = true
+        webView.stopLoading()
         webView.visibility = View.GONE
+        bootOverlay.visibility = View.GONE
         shutdownOverlay.visibility = View.VISIBLE
 
         scope.launch {
@@ -678,14 +751,65 @@ class MainActivity : AppCompatActivity() {
                     conn.connectTimeout = 3000
                     conn.readTimeout = 3000
                     conn.connect()
+                    try {
+                        conn.inputStream.use { it.readBytes() }
+                    } catch (_: Exception) {
+                    }
                     conn.disconnect()
                 } catch (_: Exception) {
                 }
             }
-            delay(1500)
+            val serverDown = withContext(Dispatchers.IO) {
+                for (i in 1..20) {
+                    var conn: HttpURLConnection? = null
+                    try {
+                        conn = URL(HEALTH_URL).openConnection() as HttpURLConnection
+                        conn.connectTimeout = 1500
+                        conn.readTimeout = 1500
+                        conn.connect()
+                        val code = conn.responseCode
+                        if (code == 503) {
+                            return@withContext waitForPortClosed(15000)
+                        }
+                    } catch (_: Exception) {
+                        return@withContext true
+                    } finally {
+                        try {
+                            conn?.disconnect()
+                        } catch (_: Exception) {
+                        }
+                    }
+                    delay(1000)
+                }
+                waitForPortClosed(5000)
+            }
+            Log.i(TAG, "Shutdown requested, server down: $serverDown")
             NodeService.stop(this@MainActivity)
-            finish()
+            finishAndRemoveTask()
         }
+    }
+
+    private fun waitForPortClosed(timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = URL(HEALTH_URL).openConnection() as HttpURLConnection
+                conn.connectTimeout = 1000
+                conn.readTimeout = 1000
+                conn.connect()
+                conn.responseCode
+            } catch (_: Exception) {
+                return true
+            } finally {
+                try {
+                    conn?.disconnect()
+                } catch (_: Exception) {
+                }
+            }
+            Thread.sleep(500)
+        }
+        return false
     }
 
     private fun hideFullscreen() {
@@ -712,8 +836,15 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         fileChooserCallback?.onReceiveValue(null)
         fileChooserCallback = null
+        NodeService.onStatusChange = null
         if (!devMode) {
             NodeService.stop(this)
+        }
+        try {
+            webView.stopLoading()
+            (webView.parent as? ViewGroup)?.removeView(webView)
+            webView.destroy()
+        } catch (_: Exception) {
         }
         scope.cancel()
         super.onDestroy()
