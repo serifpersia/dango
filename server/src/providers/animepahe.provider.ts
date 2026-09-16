@@ -258,7 +258,7 @@ export class AnimePaheProvider extends BaseProvider {
       if (!epSession) return null
 
       const sources = await this.getSources(showId, epSession)
-      const results: VideoSource[] = []
+      const modeTag = mode.toUpperCase()
 
       const isDubSource = (audio: string) => audio.includes('eng') || audio.includes('dub')
 
@@ -266,59 +266,74 @@ export class AnimePaheProvider extends BaseProvider {
       const rawCookie = store?.get('cookie') || ''
       const cookieValue = sanitizeCfClearance(rawCookie)
 
-      for (const src of sources) {
+      const matched = sources.filter((src) => {
         const audio = (src.audio || '').toLowerCase()
-        const sourceMode = isDubSource(audio) ? 'dub' : 'sub'
+        return (isDubSource(audio) ? 'dub' : 'sub') === mode
+      })
+      if (matched.length === 0) return null
 
-        if (sourceMode !== mode) continue
+      const variantLabel = (src: AnimePaheVideoSource): string => {
+        const quality = src.quality || 'Auto'
+        return src.fansub ? `${quality} · ${src.fansub}` : quality
+      }
 
-        const label = src.fansub
-          ? `${src.quality || 'Auto'} - ${src.fansub} (${sourceMode.toUpperCase()})`
-          : `${src.quality || 'Auto'} (${sourceMode.toUpperCase()})`
-
-        const embedLink = cookieValue
+      const embedLinkFor = (src: AnimePaheVideoSource): string =>
+        cookieValue
           ? `/api/embed-proxy?url=${encodeURIComponent(src.url)}&cookie=${encodeURIComponent(cookieValue)}`
           : `/api/embed-proxy?url=${encodeURIComponent(src.url)}`
 
-        let directLink: string | null = null
-        try {
-          const resolved = await this.resolveKwik(src.url, store?.get('ua'), rawCookie)
-          if (resolved.m3u8) {
-            directLink = cookieValue
-              ? `/api/proxy?url=${encodeURIComponent(resolved.m3u8)}&referer=${encodeURIComponent(resolved.referer)}&cookie=${encodeURIComponent(cookieValue)}`
-              : `/api/proxy?url=${encodeURIComponent(resolved.m3u8)}&referer=${encodeURIComponent(resolved.referer)}`
+      const resolved = await Promise.all(
+        matched.map(async (src) => {
+          try {
+            const r = await this.resolveKwik(src.url, store?.get('ua'), rawCookie)
+            if (!r.m3u8) return null
+            const directLink = cookieValue
+              ? `/api/proxy?url=${encodeURIComponent(r.m3u8)}&referer=${encodeURIComponent(r.referer)}&cookie=${encodeURIComponent(cookieValue)}`
+              : `/api/proxy?url=${encodeURIComponent(r.m3u8)}&referer=${encodeURIComponent(r.referer)}`
+            return { src, directLink }
+          } catch (e) {
+            logger.error(
+              { url: src.url, error: (e as Error).message },
+              '[AnimePahe] direct resolve failed'
+            )
+            return null
           }
-        } catch (e) {
-          logger.error(
-            { url: src.url, error: (e as Error).message },
-            '[AnimePahe] direct resolve failed'
-          )
-        }
+        })
+      )
 
-        if (directLink) {
-          results.push({
-            sourceName: `${label} (Direct)`,
-            links: [
-              {
-                resolutionStr: src.quality || 'Auto',
-                link: directLink,
-                hls: true,
-              },
-            ],
-            type: 'player',
-            actualEpisodeNumber: episodeNumber,
-          })
-        }
+      const byQualityDesc = (a: { resolutionStr: string }, b: { resolutionStr: string }) =>
+        (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
 
+      const directLinks = resolved
+        .filter((r): r is { src: AnimePaheVideoSource; directLink: string } => r !== null)
+        .map(({ src, directLink }) => ({
+          resolutionStr: variantLabel(src),
+          link: directLink,
+          hls: true,
+        }))
+        .sort(byQualityDesc)
+
+      const iframeLinks = matched
+        .map((src) => ({
+          resolutionStr: variantLabel(src),
+          link: embedLinkFor(src),
+          hls: false,
+        }))
+        .sort(byQualityDesc)
+
+      const results: VideoSource[] = []
+      if (directLinks.length > 0) {
         results.push({
-          sourceName: `${label}`,
-          links: [
-            {
-              resolutionStr: src.quality || 'Auto',
-              link: embedLink,
-              hls: false,
-            },
-          ],
+          sourceName: `Direct (${modeTag})`,
+          links: directLinks,
+          type: 'player',
+          actualEpisodeNumber: episodeNumber,
+        })
+      }
+      if (iframeLinks.length > 0) {
+        results.push({
+          sourceName: `Fallback (${modeTag})`,
+          links: iframeLinks,
           type: 'iframe',
           actualEpisodeNumber: episodeNumber,
         })

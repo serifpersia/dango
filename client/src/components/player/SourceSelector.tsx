@@ -1,6 +1,6 @@
 import React from 'react'
 import styles from './Player.module.css'
-import type { VideoSource } from '../../pages/Player'
+import type { VideoLink, VideoSource } from '../../types/player'
 import { PROVIDER_OPTIONS, SUB_LABEL, TIER_LABEL, TIER_ORDER, type ProviderId } from './providers'
 
 interface ProviderSelectorProps {
@@ -48,17 +48,24 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 interface SourceSelectorProps {
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
+  selectedLink: VideoLink | null
   onSourceChange: (source: VideoSource) => void
+  onLinkChange: (link: VideoLink) => void
 }
 
 const SourceSelector: React.FC<SourceSelectorProps> = ({
   videoSources,
   selectedSource,
+  selectedLink,
   onSourceChange,
+  onLinkChange,
 }) => {
   const sources = Array.isArray(videoSources) ? videoSources : []
 
   if (sources.length === 0) return null
+
+  const showVariantPicker =
+    selectedSource?.type === 'iframe' && (selectedSource.links?.length ?? 0) > 1
 
   return (
     <div className={styles.sourceSelectionContainer}>
@@ -74,6 +81,23 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
           </button>
         ))}
       </div>
+      {showVariantPicker && (
+        <select
+          className={styles.sourceSelect}
+          aria-label="Fallback embed quality"
+          value={selectedLink?.link ?? selectedSource.links[0]?.link ?? ''}
+          onChange={(e) => {
+            const link = selectedSource.links.find((l) => l.link === e.target.value)
+            if (link) onLinkChange(link)
+          }}
+        >
+          {selectedSource.links.map((link) => (
+            <option key={link.link} value={link.link}>
+              {link.resolutionStr}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   )
 }
@@ -81,6 +105,7 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
 export default React.memo(SourceSelector, (prevProps, nextProps) => {
   return (
     prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
+    prevProps.selectedLink?.link === nextProps.selectedLink?.link &&
     prevProps.videoSources === nextProps.videoSources
   )
 })

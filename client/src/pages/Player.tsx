@@ -1977,6 +1977,7 @@ const Player: React.FC = () => {
                 <SourceSelector
                   videoSources={state.videoSources}
                   selectedSource={state.selectedSource}
+                  selectedLink={state.selectedLink}
                   onSourceChange={(source) => {
                     if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                       seekToTimeRef.current = refs.videoRef.current.currentTime
@@ -1997,6 +1998,14 @@ const Player: React.FC = () => {
                         selectedLink: bestLink,
                         showResumeModal: state.showResumeModal && source.type !== 'iframe',
                       },
+                    })
+                  }}
+                  onLinkChange={(link) => {
+                    if (!state.selectedSource) return
+                    setPreferredSource(state.selectedSource.sourceName)
+                    dispatch({
+                      type: 'SET_STATE',
+                      payload: { selectedLink: link },
                     })
                   }}
                 />
