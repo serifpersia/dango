@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { createPortal } from 'preact/compat'
-import { FaTimes } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import EpisodeList from './EpisodeList'
 import styles from './EpisodeDrawer.module.css'
 
@@ -59,7 +59,7 @@ export default function EpisodeDrawer({
           </div>
 
           <button className={styles.closeBtn} type="button" onClick={onClose} aria-label="Close">
-            <FaTimes />
+            <Icon name="times" />
           </button>
         </div>
 

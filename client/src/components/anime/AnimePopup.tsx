@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
 import { useFloating, flip, shift, autoUpdate } from '@floating-ui/react'
-import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { Link } from 'react-router'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { sanitizeText } from '../../lib/utils'
@@ -106,13 +106,13 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                 <div className={styles.metaRow}>
                   {showMeta.score && (
                     <div className={styles.metaItem}>
-                      <FaStar className={styles.scoreIcon} size={14} />
+                      <Icon name="star" className={styles.scoreIcon} size={14} />
                       <span>{showMeta.score}</span>
                     </div>
                   )}
                   {showMeta.status && (
                     <div className={styles.metaItem}>
-                      <FaTv size={14} />
+                      <Icon name="tv" size={14} />
                       <span>{showMeta.status}</span>
                     </div>
                   )}
@@ -151,7 +151,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
               <div className={styles.footer}>
                 <div className={styles.primaryAction}>
                   <Link to={`/watch/${showMeta?.id || showId}`} className={styles.watchBtn}>
-                    <FaPlay size={14} />
+                    <Icon name="play" size={14} />
                     Watch now
                   </Link>
                 </div>
@@ -164,7 +164,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                       toggleWatchlist()
                     }}
                   >
-                    {inWatchlist ? <FaCheck size={12} /> : <FaPlus size={12} />}
+                    {inWatchlist ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}
                     <span>{inWatchlist ? 'Remove' : 'Watchlist'}</span>
                   </button>
                   <QueueOptionsButton

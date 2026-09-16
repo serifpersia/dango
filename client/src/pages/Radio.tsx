@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { FaBroadcastTower, FaSearch } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import RadioPlayer from '../components/radio/RadioPlayer'
 import {
   useRadioStations,
@@ -71,7 +71,7 @@ const Radio: React.FC = () => {
           />
         ) : (
           <span className={styles.stationThumbPlaceholder}>
-            <FaBroadcastTower />
+            <Icon name="broadcast-tower" />
           </span>
         )}
         <span className={styles.stationMeta}>
@@ -87,7 +87,7 @@ const Radio: React.FC = () => {
     <div className={`${asmrStyles.page} ${selected ? asmrStyles.pageWithPlayer : ''}`}>
       <div className={asmrStyles.header}>
         <h1 className={asmrStyles.pageTitle}>
-          <FaBroadcastTower /> Radio
+          <Icon name="broadcast-tower" /> Radio
         </h1>
         <form
           className={asmrStyles.searchForm}
@@ -104,7 +104,7 @@ const Radio: React.FC = () => {
             aria-label="Search radio stations"
           />
           <button className={asmrStyles.searchBtn} type="submit" aria-label="Search">
-            <FaSearch />
+            <Icon name="search" />
           </button>
         </form>
       </div>

@@ -1,22 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
-import {
-  FaPlay,
-  FaPause,
-  FaStepForward,
-  FaStepBackward,
-  FaUndo,
-  FaRedo,
-  FaVolumeUp,
-  FaTimes,
-  FaImage,
-  FaEyeSlash,
-  FaChevronDown,
-  FaChevronUp,
-  FaChevronLeft,
-  FaChevronRight,
-  FaListOl,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import type { AsmrChapter, AsmrTrack } from '../../hooks/useAsmr'
 import { formatTime } from '../../lib/utils'
 import { loadHls } from '../../lib/hls'
@@ -343,7 +327,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           disabled={trackIndex === 0}
           aria-label="Previous track"
         >
-          <FaStepBackward />
+          <Icon name="step-backward" />
         </button>
         <button
           className={`${styles.playerBtn} ${styles.seekBtn}`}
@@ -351,7 +335,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           aria-label="Seek back 10 seconds"
           title="Back 10s"
         >
-          <FaUndo />
+          <Icon name="undo" />
           <span className={styles.seekBtnLabel}>10</span>
         </button>
         <button
@@ -359,7 +343,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           onClick={togglePlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <FaPause /> : <FaPlay />}
+          {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
         </button>
         <button
           className={`${styles.playerBtn} ${styles.seekBtn}`}
@@ -367,7 +351,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           aria-label="Seek forward 10 seconds"
           title="Forward 10s"
         >
-          <FaRedo />
+          <Icon name="redo" />
           <span className={styles.seekBtnLabel}>10</span>
         </button>
         <button
@@ -376,7 +360,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           disabled={trackIndex >= tracks.length - 1}
           aria-label="Next track"
         >
-          <FaStepForward />
+          <Icon name="step-forward" />
         </button>
       </div>
 
@@ -411,7 +395,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         aria-label={expanded ? 'Minimize player' : 'Expand player'}
         title={expanded ? 'Minimize to browse' : 'Expand'}
       >
-        {expanded ? <FaChevronDown /> : <FaChevronUp />}
+        {expanded ? <Icon name="chevron-down" /> : <Icon name="chevron-up" />}
       </button>
 
       <div className={styles.playerInfo}>
@@ -427,7 +411,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       <div className={styles.playerControls}>{transportRow}</div>
 
       <div className={styles.playerRight}>
-        <FaVolumeUp className={styles.volumeIcon} />
+        <Icon name="volume-up" className={styles.volumeIcon} />
         <input
           className={styles.volumeBar}
           type="range"
@@ -453,7 +437,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
             aria-label={showArt ? 'Hide images' : 'Show images'}
             title={showArt ? 'Hide images' : 'Show images'}
           >
-            {showArt ? <FaEyeSlash /> : <FaImage />}
+            {showArt ? <Icon name="eye-slash" /> : <Icon name="image" />}
           </button>
         )}
 
@@ -464,12 +448,12 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
             aria-label={showChapterPanel ? 'Hide bookmarks' : 'Show bookmarks'}
             title="Timestamps"
           >
-            <FaListOl />
+            <Icon name="list-ol" />
           </button>
         )}
 
         <button className={styles.playerBtn} onClick={onClose} aria-label="Close player">
-          <FaTimes />
+          <Icon name="times" />
         </button>
       </div>
     </>
@@ -555,7 +539,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
                     disabled={safeIndex === 0}
                     aria-label="Previous image"
                   >
-                    <FaChevronLeft />
+                    <Icon name="chevron-left" />
                   </button>
                   <button
                     className={`${styles.npArrow} ${styles.npArrowRight}`}
@@ -567,7 +551,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
                     disabled={safeIndex === images.length - 1}
                     aria-label="Next image"
                   >
-                    <FaChevronRight />
+                    <Icon name="chevron-right" />
                   </button>
                   <span className={styles.npImageCount} onClick={(e) => e.stopPropagation()}>
                     {safeIndex + 1} / {images.length}

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Skeleton } from '../common/Skeleton'
 import styles from './QueueRail.module.css'
-import { FaChevronDown } from 'react-icons/fa'
+import Icon from '../common/Icon'
 
 interface QueueRailSkeletonProps {
   count?: number
@@ -15,7 +15,7 @@ const QueueRailSkeleton: React.FC<QueueRailSkeletonProps> = ({ count = 3 }) => {
           <span className={styles.title}>
             <Skeleton width="60px" height="1.2rem" variant="text" />
           </span>
-          <FaChevronDown style={{ opacity: 0.3 }} />
+          <Icon name="chevron-down" style={{ opacity: 0.3 }} />
         </button>
       </div>
       <div className={styles.list}>

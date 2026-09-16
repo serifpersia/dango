@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState, useLayoutEffect } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import { FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
@@ -234,7 +234,7 @@ const Home: React.FC = () => {
                     style={{ opacity: page === 1 ? 0.3 : 1 }}
                     aria-label="Previous page"
                   >
-                    <FaChevronLeft size={14} />
+                    <Icon name="chevron-left" size={14} />
                   </button>
                   <span className={styles['page-info']}>{page}</span>
                   <button
@@ -251,7 +251,7 @@ const Home: React.FC = () => {
                     style={{ opacity: canGoNext ? 1 : 0.3 }}
                     aria-label="Next page"
                   >
-                    <FaChevronRight size={14} />
+                    <Icon name="chevron-right" size={14} />
                   </button>
                 </div>
               </div>
@@ -311,7 +311,7 @@ const Home: React.FC = () => {
         isFetchingNextPage={fetchingMoreContinueWatching}
         emptyState={
           <div className={styles.emptyState}>
-            <FaHistory size={48} className={styles.emptyStateIcon} />
+            <Icon name="history" size={48} className={styles.emptyStateIcon} />
             <div>
               <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
               <p className={styles.emptyStateText}>

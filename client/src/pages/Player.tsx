@@ -4,17 +4,7 @@ import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
-import {
-  FaCheck,
-  FaPlus,
-  FaChevronDown,
-  FaChevronUp,
-  FaBackward,
-  FaForward,
-  FaChevronLeft,
-  FaChevronRight,
-  FaListUl,
-} from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import { fixThumbnailUrl } from '../lib/utils'
 import { loadHls } from '../lib/hls'
 import { fetchApi } from '../lib/fetchApi'
@@ -1365,7 +1355,7 @@ const Player: React.FC = () => {
         disabled={!previousEpisode}
         type="button"
       >
-        <FaChevronLeft size={12} />
+        <Icon name="chevron-left" size={12} />
         Prev EP
       </button>
       <button
@@ -1375,7 +1365,7 @@ const Player: React.FC = () => {
         type="button"
       >
         Next EP
-        <FaChevronRight size={12} />
+        <Icon name="chevron-right" size={12} />
       </button>
       {variant === 'mobile' && isMobile && (
         <button
@@ -1383,7 +1373,7 @@ const Player: React.FC = () => {
           onClick={() => setIsEpisodeDrawerOpen(true)}
           type="button"
         >
-          <FaListUl size={12} />
+          <Icon name="list-ul" size={12} />
           Episodes
         </button>
       )}
@@ -1698,7 +1688,11 @@ const Player: React.FC = () => {
             >
               <div className={styles.skipBubble}>
                 <div className={styles.skipIcon}>
-                  {skipIndicator.side === 'left' ? <FaBackward /> : <FaForward />}
+                  {skipIndicator.side === 'left' ? (
+                    <Icon name="backward" />
+                  ) : (
+                    <Icon name="forward" />
+                  )}
                 </div>
                 <div className={styles.skipText}>15s</div>
               </div>
@@ -1708,7 +1702,7 @@ const Player: React.FC = () => {
           {player.state.isSpeedBoostActive && (
             <div className={styles.speedBoostBadge} aria-hidden="true">
               <span>2x</span>
-              <FaForward size={12} />
+              <Icon name="forward" size={12} />
             </div>
           )}
 
@@ -2041,7 +2035,11 @@ const Player: React.FC = () => {
                       className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`}
                       onClick={toggleWatchlist}
                     >
-                      {state.inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                      {state.inWatchlist ? (
+                        <Icon name="check" size={14} />
+                      ) : (
+                        <Icon name="plus" size={14} />
+                      )}
                       {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                     </button>
                     <QueueOptionsButton
@@ -2060,7 +2058,7 @@ const Player: React.FC = () => {
                         onClick={handleMarkEpisodeWatched}
                         disabled={isMarkingWatched || !state.currentEpisode}
                       >
-                        <FaCheck size={14} />
+                        <Icon name="check" size={14} />
                         {isMarkingWatched
                           ? 'Saving...'
                           : isCurrentEpisodeWatched
@@ -2116,7 +2114,11 @@ const Player: React.FC = () => {
               </div>
 
               <button className={styles.detailsToggleBtn} onClick={handleToggleDetails}>
-                {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
+                {state.showCombinedDetails ? (
+                  <Icon name="chevron-up" />
+                ) : (
+                  <Icon name="chevron-down" />
+                )}
                 {state.showCombinedDetails ? 'Hide Details' : 'Show Details'}
               </button>
 

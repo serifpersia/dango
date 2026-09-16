@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router'
-import { FaCheck, FaPlus, FaTimes } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { fixThumbnailUrl } from '../../lib/utils'
 import type { Notification } from '../../hooks/useAnimeData'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -81,14 +81,14 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         onClick={handleQueue}
         aria-label="Add notification to queue"
       >
-        {justQueued ? <FaCheck /> : <FaPlus />}
+        {justQueued ? <Icon name="check" /> : <Icon name="plus" />}
       </button>
       <button
         className={styles.removeItem}
         onClick={handleDismiss}
         aria-label="Remove notification"
       >
-        <FaTimes />
+        <Icon name="times" />
       </button>
     </Link>
   )

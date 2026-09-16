@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { FaHeadphones, FaSearch } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import { useParams, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -228,7 +228,7 @@ const Asmr: React.FC = () => {
         <>
           <header className={styles.header}>
             <h1 className={styles.pageTitle}>
-              <FaHeadphones /> ASMR
+              <Icon name="headphones" /> ASMR
             </h1>
 
             <form className={styles.searchForm} onSubmit={handleSearch}>
@@ -241,7 +241,7 @@ const Asmr: React.FC = () => {
                 aria-label="Search ASMR works"
               />
               <button className={styles.searchBtn} type="submit" aria-label="Search">
-                <FaSearch />
+                <Icon name="search" />
               </button>
             </form>
           </header>

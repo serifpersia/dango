@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FaBell } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useQueryClient } from '@tanstack/react-query'
 import NotificationDropdown from './NotificationDropdown'
 import {
@@ -55,7 +55,7 @@ const NotificationBell: React.FC = () => {
   return (
     <div className={styles.container} ref={bellRef}>
       <button className={styles.bellBtn} onClick={handleToggle} aria-label="Notifications">
-        <FaBell />
+        <Icon name="bell" />
         {count > 0 && <span className={styles.badge}>{displayCount}</span>}
       </button>
 

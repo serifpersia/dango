@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useQuery } from '@tanstack/react-query'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
@@ -125,14 +125,14 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
                 onClick={() => stepBy('left')}
                 aria-label="Scroll left"
               >
-                <FaChevronLeft />
+                <Icon name="chevron-left" />
               </button>
               <button
                 className={styles.navButton}
                 onClick={() => stepBy('right')}
                 aria-label="Scroll right"
               >
-                <FaChevronRight />
+                <Icon name="chevron-right" />
               </button>
             </div>
           )}

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Modal } from '../common/Modal'
 import ToggleSwitch from '../common/ToggleSwitch'
 import styles from './TelemetryNoticeModal.module.css'
-import { FaChevronDown } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import packageJson from '../../../../package.json'
 import { deleteTelemetryData } from '../../hooks/useTelemetry'
 
@@ -65,7 +65,10 @@ const TelemetryNoticeModal: React.FC<TelemetryNoticeModalProps> = ({ isOpen, onC
 
         <button className={styles.previewToggle} onClick={() => setShowPreview(!showPreview)}>
           <span>See exactly what data is sent</span>
-          <FaChevronDown className={`${styles.chevron} ${showPreview ? styles.chevronOpen : ''}`} />
+          <Icon
+            name="chevron-down"
+            className={`${styles.chevron} ${showPreview ? styles.chevronOpen : ''}`}
+          />
         </button>
 
         {showPreview && (

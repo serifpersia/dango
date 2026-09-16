@@ -1,6 +1,6 @@
 import React from 'react'
-import { FaPlay, FaPause } from 'react-icons/fa'
-import { MdReplay10, MdForward10 } from 'react-icons/md'
+import Icon from '../common/Icon'
+
 import styles from './CenterControls.module.css'
 
 interface CenterControlsProps {
@@ -26,7 +26,7 @@ const CenterControls: React.FC<CenterControlsProps> = ({
         title={`Skip back ${skipSeconds}s`}
         aria-label={`Skip back ${skipSeconds} seconds`}
       >
-        <MdReplay10 />
+        <Icon name="replay-10" />
       </button>
       <button
         className={styles.centerPlayPause}
@@ -34,7 +34,7 @@ const CenterControls: React.FC<CenterControlsProps> = ({
         onClick={onTogglePlay}
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
+        {isPlaying ? <Icon name="pause" /> : <Icon name="play" className={styles.playIconOffset} />}
       </button>
       <button
         className={styles.centerSkipBtn}
@@ -42,7 +42,7 @@ const CenterControls: React.FC<CenterControlsProps> = ({
         title={`Skip forward ${skipSeconds}s`}
         aria-label={`Skip forward ${skipSeconds} seconds`}
       >
-        <MdForward10 />
+        <Icon name="forward-10" />
       </button>
     </div>
   )

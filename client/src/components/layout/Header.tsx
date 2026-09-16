@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { FaBars, FaCloud, FaGithub, FaSearch } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
@@ -161,7 +161,7 @@ const Header: React.FC = () => {
         <div className={styles.headerInner}>
           <div className={styles.leftSection}>
             <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
-              <FaBars />
+              <Icon name="bars" />
             </button>
             <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
               <Logo />
@@ -219,7 +219,7 @@ const Header: React.FC = () => {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleSearchButtonClick}
               >
-                <FaSearch className={styles.searchIcon} />
+                <Icon name="search" className={styles.searchIcon} />
               </button>
             </div>
 
@@ -235,9 +235,9 @@ const Header: React.FC = () => {
                   decoding="async"
                 />
               ) : user?.provider === 'github' ? (
-                <FaGithub />
+                <Icon name="github" />
               ) : (
-                <FaCloud />
+                <Icon name="cloud" />
               )}
             </Link>
           </div>
@@ -250,7 +250,7 @@ const Header: React.FC = () => {
           onBlur={handleMobileSearchBlur}
         >
           <div className={styles.mobileSearchInner}>
-            <FaSearch className={styles.mobileSearchIcon} />
+            <Icon name="search" className={styles.mobileSearchIcon} />
             <input
               ref={mobileInputRef}
               type="text"

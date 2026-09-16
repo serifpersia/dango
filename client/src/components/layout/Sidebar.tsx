@@ -2,19 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
-import {
-  FaHome,
-  FaSearch,
-  FaPepperHot,
-  FaClock,
-  FaSyncAlt,
-  FaCog,
-  FaChartPie,
-  FaHeadphones,
-  FaTv,
-  FaBroadcastTower,
-  FaBook,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import Logo from '../common/Logo'
 import packageJson from '../../../package.json'
 
@@ -39,17 +27,19 @@ const Sidebar: React.FC = () => {
   }
 
   const navItems = [
-    { to: '/', icon: <FaHome />, label: 'Home' },
-    { to: '/search', icon: <FaSearch />, label: 'Search' },
-    { to: '/watchlist', icon: <FaClock />, label: 'Watchlist' },
-    { to: '/insights', icon: <FaChartPie />, label: 'Insights' },
-    { to: '/trackers', icon: <FaSyncAlt />, label: 'Trackers' },
-    { to: '/asmr', icon: <FaHeadphones />, label: 'ASMR' },
-    { to: '/manga', icon: <FaBook />, label: 'Manga' },
-    { to: '/radio', icon: <FaBroadcastTower />, label: 'Radio' },
-    { to: '/tv', icon: <FaTv />, label: 'TV & Movies' },
-    ...(hasMatureConsent ? [{ to: '/mature', icon: <FaPepperHot />, label: 'Mature' }] : []),
-    { to: '/settings', icon: <FaCog />, label: 'Settings' },
+    { to: '/', icon: <Icon name="home" />, label: 'Home' },
+    { to: '/search', icon: <Icon name="search" />, label: 'Search' },
+    { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
+    { to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' },
+    { to: '/trackers', icon: <Icon name="sync-alt" />, label: 'Trackers' },
+    { to: '/asmr', icon: <Icon name="headphones" />, label: 'ASMR' },
+    { to: '/manga', icon: <Icon name="book" />, label: 'Manga' },
+    { to: '/radio', icon: <Icon name="broadcast-tower" />, label: 'Radio' },
+    { to: '/tv', icon: <Icon name="tv" />, label: 'TV & Movies' },
+    ...(hasMatureConsent
+      ? [{ to: '/mature', icon: <Icon name="pepper-hot" />, label: 'Mature' }]
+      : []),
+    { to: '/settings', icon: <Icon name="cog" />, label: 'Settings' },
   ]
 
   return (

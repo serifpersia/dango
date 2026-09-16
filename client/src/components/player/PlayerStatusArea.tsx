@@ -1,14 +1,6 @@
 import React, { useState } from 'react'
 import styles from './PlayerStatusArea.module.css'
-import {
-  FaArrowUp,
-  FaArrowDown,
-  FaArrowLeft,
-  FaArrowRight,
-  FaKeyboard,
-  FaChevronUp,
-  FaChevronDown,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 
 const PlayerStatusArea: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -22,30 +14,22 @@ const PlayerStatusArea: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls="player-shortcuts"
       >
-        <FaKeyboard size={14} />
+        <Icon name="keyboard" size={14} />
         <span>Keyboard Shortcuts</span>
-        {isOpen ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+        {isOpen ? <Icon name="chevron-up" size={12} /> : <Icon name="chevron-down" size={12} />}
       </button>
 
       {isOpen && (
         <div id="player-shortcuts" className={styles.shortcuts}>
           <div className={styles.shortcutGroup}>
             <div className={styles.shortcut}>
-              <span className={styles.key}>
-                <FaArrowUp size={10} />
-              </span>
-              <span className={styles.key}>
-                <FaArrowDown size={10} />
-              </span>
+              <span className={styles.key}>↑</span>
+              <span className={styles.key}>↓</span>
               <span className={styles.label}>Volume</span>
             </div>
             <div className={styles.shortcut}>
-              <span className={styles.key}>
-                <FaArrowLeft size={10} />
-              </span>
-              <span className={styles.key}>
-                <FaArrowRight size={10} />
-              </span>
+              <span className={styles.key}>←</span>
+              <span className={styles.key}>→</span>
               <span className={styles.label}>Seek</span>
             </div>
           </div>

@@ -1,19 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
-import {
-  FaPlay,
-  FaPause,
-  FaStepForward,
-  FaStepBackward,
-  FaVolumeUp,
-  FaTimes,
-  FaImage,
-  FaEyeSlash,
-  FaChevronDown,
-  FaChevronUp,
-  FaListOl,
-  FaBroadcastTower,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import type { RadioStation, ListenMoeNowPlaying } from '../../hooks/useRadio'
 import { songArt, songArtist } from '../../hooks/useRadio'
 import styles from '../asmr/Asmr.module.css'
@@ -231,27 +218,27 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
           onClick={() => onStationStep(-1)}
           aria-label="Previous station"
         >
-          <FaStepBackward />
+          <Icon name="step-backward" />
         </button>
         <button
           className={`${styles.playerBtn} ${styles.playBtn}`}
           onClick={togglePlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <FaPause /> : <FaPlay />}
+          {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
         </button>
         <button
           className={styles.playerBtn}
           onClick={() => onStationStep(1)}
           aria-label="Next station"
         >
-          <FaStepForward />
+          <Icon name="step-forward" />
         </button>
       </div>
 
       <div className={styles.seekRow}>
         <span className={radioStyles.liveBadge}>
-          <FaBroadcastTower size={10} /> LIVE
+          <Icon name="broadcast-tower" size={10} /> LIVE
         </span>
         {elapsed && <span className={styles.timeLabel}>{elapsed}</span>}
         {connected && nowPlaying.listeners > 0 && (
@@ -272,7 +259,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
         aria-label={expanded ? 'Minimize player' : 'Expand player'}
         title={expanded ? 'Minimize to browse' : 'Expand'}
       >
-        {expanded ? <FaChevronDown /> : <FaChevronUp />}
+        {expanded ? <Icon name="chevron-down" /> : <Icon name="chevron-up" />}
       </button>
 
       <div className={styles.playerInfo}>
@@ -285,7 +272,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
       <div className={styles.playerControls}>{transportRow}</div>
 
       <div className={styles.playerRight}>
-        <FaVolumeUp className={styles.volumeIcon} />
+        <Icon name="volume-up" className={styles.volumeIcon} />
         <input
           className={styles.volumeBar}
           type="range"
@@ -311,7 +298,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
             aria-label={showArt ? 'Hide art' : 'Show art'}
             title={showArt ? 'Hide art' : 'Show art'}
           >
-            {showArt ? <FaEyeSlash /> : <FaImage />}
+            {showArt ? <Icon name="eye-slash" /> : <Icon name="image" />}
           </button>
         )}
 
@@ -322,12 +309,12 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
             aria-label={showHistoryPanel ? 'Hide history' : 'Show history'}
             title="Recently played"
           >
-            <FaListOl />
+            <Icon name="list-ol" />
           </button>
         )}
 
         <button className={styles.playerBtn} onClick={onClose} aria-label="Close player">
-          <FaTimes />
+          <Icon name="times" />
         </button>
       </div>
     </>

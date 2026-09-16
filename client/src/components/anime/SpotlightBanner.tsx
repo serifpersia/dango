@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, Link } from 'react-router'
-import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
@@ -252,7 +252,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               }}
               aria-label="Previous slide"
             >
-              <FaChevronLeft size={20} />
+              <Icon name="chevron-left" size={20} />
             </button>
             <button
               className={`${styles.navArrow} ${styles.nextArrow}`}
@@ -262,7 +262,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               }}
               aria-label="Next slide"
             >
-              <FaChevronRight size={20} />
+              <Icon name="chevron-right" size={20} />
             </button>
           </>
         )}
@@ -285,7 +285,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               )}
               {anime.score && (
                 <div className={styles.scoreChip}>
-                  <FaStar size={12} />
+                  <Icon name="star" size={12} />
                   <span>{anime.score}</span>
                 </div>
               )}
@@ -327,11 +327,11 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
             <div className={styles.actions}>
               <button className={styles.watchBtn} onClick={handleWatch}>
-                <FaPlay size={14} />
+                <Icon name="play" size={14} />
                 <span>Watch Now</span>
               </button>
               <button className={styles.detailsBtn} onClick={() => navigate(`/anime/${anime._id}`)}>
-                <FaInfoCircle size={15} />
+                <Icon name="info-circle" size={15} />
                 <span>Details</span>
               </button>
             </div>

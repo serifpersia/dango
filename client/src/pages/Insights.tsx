@@ -1,15 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  FaClock,
-  FaCheckCircle,
-  FaLayerGroup,
-  FaFire,
-  FaUserAstronaut,
-  FaHistory,
-  FaExclamationTriangle,
-  FaBookmark,
-} from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
@@ -150,7 +141,7 @@ const Insights: React.FC = () => {
       <div className={styles.header}>
         <h2 className="section-title">Watch Insights</h2>
         <div className={styles.personaBadge}>
-          <FaUserAstronaut />
+          <Icon name="user-astronaut" />
           <div className={styles.personaInfo}>
             <span className={styles.personaLabel}>Your Persona</span>
             <span className={styles.personaValue}>{data.persona}</span>
@@ -164,7 +155,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(138, 79, 255, 0.2)', color: 'var(--accent)' }}
           >
-            <FaClock />
+            <Icon name="clock" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.totalHours}h</span>
@@ -177,7 +168,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa' }}
           >
-            <FaBookmark />
+            <Icon name="bookmark" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.totalAnime}</span>
@@ -190,7 +181,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e' }}
           >
-            <FaCheckCircle />
+            <Icon name="check-circle" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.totalEpisodes}</span>
@@ -203,7 +194,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e' }}
           >
-            <FaCheckCircle />
+            <Icon name="check-circle" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.completionRate}%</span>
@@ -216,7 +207,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
           >
-            <FaFire />
+            <Icon name="fire" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.bingeFactor}</span>
@@ -229,7 +220,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}
           >
-            <FaHistory />
+            <Icon name="history" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.avgSessionMinutes}m</span>
@@ -242,7 +233,7 @@ const Insights: React.FC = () => {
             className={styles.statIcon}
             style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}
           >
-            <FaLayerGroup />
+            <Icon name="layer-group" />
           </div>
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.avgCompletionDays}d</span>
@@ -459,7 +450,7 @@ const Insights: React.FC = () => {
       {data.droppedShows?.length > 0 && (
         <div className={styles.warningSection}>
           <div className={styles.warningHeader}>
-            <FaExclamationTriangle />
+            <Icon name="exclamation-triangle" />
             <h3>Dusty Watchlist (Inactive 90+ days)</h3>
           </div>
           <div className={styles.droppedGrid}>

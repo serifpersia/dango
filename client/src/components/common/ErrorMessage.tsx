@@ -1,6 +1,6 @@
 import React from 'react'
 import styles from './ErrorMessage.module.css'
-import { FaExclamationTriangle } from 'react-icons/fa'
+import Icon from './Icon'
 
 interface ErrorMessageProps {
   message: string
@@ -9,7 +9,7 @@ interface ErrorMessageProps {
 const ErrorMessage: React.FC<ErrorMessageProps> = ({ message }) => {
   return (
     <div className={styles.errorBox}>
-      <FaExclamationTriangle className={styles.icon} />
+      <Icon name="exclamation-triangle" className={styles.icon} />
       <span>{message}</span>
     </div>
   )

@@ -1,5 +1,5 @@
 import React from 'react'
-import { FaChevronLeft } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import {
   mangaCoverSrc,
   type MangaChapter,
@@ -23,7 +23,7 @@ const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter
   return (
     <div>
       <button className={styles.backBtn} onClick={onBack}>
-        <FaChevronLeft size={12} /> Back to browse
+        <Icon name="chevron-left" size={12} /> Back to browse
       </button>
       <div className={styles.detail}>
         {detail.cover && (

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { FaChevronLeft, FaChevronRight, FaSyncAlt } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useQueryClient } from '@tanstack/react-query'
 import type { MangaChapter } from '../../hooks/useManga'
 import { mangaPageSrc, useMangaPages } from '../../hooks/useManga'
@@ -188,7 +188,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
     <div className={styles.deadPage} role="alert">
       <span>Page {i + 1} failed to load</span>
       <button className={styles.pageBtn} onClick={() => handleRetryPage(i)}>
-        <FaSyncAlt size={12} /> Retry
+        <Icon name="sync-alt" size={12} /> Retry
       </button>
     </div>
   )
@@ -199,7 +199,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
     <div className={styles.readerShell}>
       <div className={styles.readerBar}>
         <button className={styles.readerIconBtn} onClick={onBack} aria-label="Back to chapters">
-          <FaChevronLeft size={14} />
+          <Icon name="chevron-left" size={14} />
         </button>
         <span className={styles.readerTitle}>
           {mangaTitle} — Ch. {chapter.number}
@@ -254,7 +254,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
           onClick={() => openChapter(prev)}
           aria-label="Previous chapter"
         >
-          <FaChevronLeft size={14} />
+          <Icon name="chevron-left" size={14} />
         </button>
         <button
           className={styles.readerIconBtn}
@@ -262,7 +262,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
           onClick={() => openChapter(next)}
           aria-label="Next chapter"
         >
-          <FaChevronRight size={14} />
+          <Icon name="chevron-right" size={14} />
         </button>
       </div>
 
@@ -284,7 +284,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
         <div className={styles.failedBox}>
           <p className={styles.statusMsg}>Page images failed to load (expired or blocked links).</p>
           <button className={styles.pageBtn} onClick={handleRetryPages}>
-            <FaSyncAlt size={12} /> Reload pages
+            <Icon name="sync-alt" size={12} /> Reload pages
           </button>
         </div>
       ) : mode === 'strip' ? (
@@ -327,7 +327,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               aria-label="Previous page"
             >
               <span className={styles.tapChevron}>
-                <FaChevronLeft size={16} />
+                <Icon name="chevron-left" size={16} />
               </span>
             </button>
             {deadPages.has(pageIndex) ? (
@@ -349,7 +349,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               aria-label="Next page"
             >
               <span className={styles.tapChevron}>
-                <FaChevronRight size={16} />
+                <Icon name="chevron-right" size={16} />
               </span>
             </button>
           </div>

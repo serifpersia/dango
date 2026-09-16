@@ -1,18 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import {
-  FaPlay,
-  FaPause,
-  FaVolumeUp,
-  FaVolumeMute,
-  FaVolumeDown,
-  FaExpand,
-  FaCompress,
-  FaCog,
-  FaChevronLeft,
-  FaCheck,
-  FaClosedCaptioning,
-  FaServer,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import styles from './TvPlayerControls.module.css'
 import CenterControls from '../player/CenterControls'
 import { formatTime } from '../../lib/utils'
@@ -489,7 +476,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       {isMovySource && movyServers.length > 0 && (
         <button className={styles.menuItem} onClick={() => setSettingsView('server')}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FaServer size={12} /> Movy Server
+            <Icon name="server" size={12} /> Movy Server
           </span>
           <span className={styles.currentValue} style={{ textTransform: 'capitalize' }}>
             {selectedMovyServer}
@@ -539,7 +526,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         onClick={() => onQualityChange(i)}
       >
         <span>{s.quality}</span>
-        {i === qualityIdx && <FaCheck size={12} />}
+        {i === qualityIdx && <Icon name="check" size={12} />}
       </button>
     ))
 
@@ -550,7 +537,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         onClick={() => onSubtitleChange(-1)}
       >
         <span>Off</span>
-        {!isSubtitleActive && <FaCheck size={12} />}
+        {!isSubtitleActive && <Icon name="check" size={12} />}
       </button>
       {subtitles.map((track, i) => (
         <button
@@ -559,7 +546,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           onClick={() => onSubtitleChange(i)}
         >
           <span>{track.label || track.language}</span>
-          {i === selectedSubtitle && <FaCheck size={12} />}
+          {i === selectedSubtitle && <Icon name="check" size={12} />}
         </button>
       ))}
     </>
@@ -648,7 +635,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         }}
       >
         <span>Bold Text</span>
-        {subtitleBold && <FaCheck size={12} />}
+        {subtitleBold && <Icon name="check" size={12} />}
       </button>
       <button
         className={styles.menuItem}
@@ -682,7 +669,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         onClick={() => onAudioTrackChange(i)}
       >
         <span>{track.label || track.language}</span>
-        {i === selectedAudioTrack && <FaCheck size={12} />}
+        {i === selectedAudioTrack && <Icon name="check" size={12} />}
       </button>
     ))
 
@@ -695,7 +682,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           onClick={() => onMovyServerSelect?.(city)}
         >
           <span style={{ textTransform: 'capitalize' }}>{city}</span>
-          {selectedMovyServer === city && <FaCheck size={12} />}
+          {selectedMovyServer === city && <Icon name="check" size={12} />}
         </button>
       ))}
     </>
@@ -708,7 +695,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         onClick={() => onVideoDelayToggle?.(!videoDelayEnabled)}
       >
         <span>Video delay</span>
-        {videoDelayEnabled && <FaCheck size={12} />}
+        {videoDelayEnabled && <Icon name="check" size={12} />}
       </button>
       <MenuSlider
         label="Video delay"
@@ -741,7 +728,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       >
         <div className={styles.topControls}>
           <button className={styles.backBtn} onClick={onBack} title="Back" aria-label="Back">
-            <FaChevronLeft />
+            <Icon name="chevron-left" />
           </button>
           <div className={styles.videoTitleInfo}>
             <span className={styles.animeTitle}>{title}</span>
@@ -794,7 +781,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                 onClick={togglePlay}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
-                {isPlaying ? <FaPause /> : <FaPlay />}
+                {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
               </button>
               <div className={styles.volumeContainer}>
                 <button
@@ -802,7 +789,13 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                   onClick={toggleMute}
                   aria-label={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  {isMuted ? <FaVolumeMute /> : volume < 0.5 ? <FaVolumeDown /> : <FaVolumeUp />}
+                  {isMuted ? (
+                    <Icon name="volume-mute" />
+                  ) : volume < 0.5 ? (
+                    <Icon name="volume-down" />
+                  ) : (
+                    <Icon name="volume-up" />
+                  )}
                 </button>
                 <input
                   type="range"
@@ -831,7 +824,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                   onClick={toggleSubtitles}
                   aria-label={isSubtitleActive ? 'Turn subtitles off' : 'Turn subtitles on'}
                 >
-                  <FaClosedCaptioning />
+                  <Icon name="closed-captioning" />
                 </button>
               )}
               <button
@@ -839,14 +832,14 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                 onClick={() => (settingsView ? closeSettings() : openSettings())}
                 aria-label="Settings"
               >
-                <FaCog />
+                <Icon name="cog" />
               </button>
               <button
                 className={styles.controlBtn}
                 onClick={toggleFullscreen}
                 aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
               >
-                {isFullscreen ? <FaCompress /> : <FaExpand />}
+                {isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
               </button>
             </div>
           </div>
@@ -860,7 +853,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
               className={styles.settingsBackBtn}
               onClick={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
             >
-              <FaChevronLeft />
+              <Icon name="chevron-left" />
             </button>
             <span className={styles.settingsTitle}>
               {settingsView === 'main'

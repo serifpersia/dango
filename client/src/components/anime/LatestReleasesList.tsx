@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react'
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import AnimeCard from './AnimeCard'
 import ErrorMessage from '../common/ErrorMessage'
 import { useInfiniteLatestReleases } from '../../hooks/useAnimeData'
@@ -56,7 +56,7 @@ export default function LatestReleasesList({ eyebrow }: { eyebrow?: string }) {
               }}
               aria-label="Scroll left"
             >
-              <FaChevronLeft />
+              <Icon name="chevron-left" />
             </button>
             <button
               className={styles['nav-button']}
@@ -67,7 +67,7 @@ export default function LatestReleasesList({ eyebrow }: { eyebrow?: string }) {
               }}
               aria-label="Scroll right"
             >
-              <FaChevronRight />
+              <Icon name="chevron-right" />
             </button>
           </div>
         </div>

@@ -1,15 +1,6 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router'
-import {
-  FaPlay,
-  FaPlus,
-  FaCheck,
-  FaChevronDown,
-  FaChevronUp,
-  FaStar,
-  FaTv,
-  FaLayerGroup,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
@@ -115,19 +106,19 @@ export default function AnimeInfo() {
               <div className={styles.quickMeta}>
                 {showMeta.score && (
                   <div className={styles.metaItem}>
-                    <FaStar className={styles.iconStar} />
+                    <Icon name="star" className={styles.iconStar} />
                     <span>{showMeta.score}</span>
                   </div>
                 )}
                 {showMeta.status && (
                   <div className={styles.metaItem}>
-                    <FaTv className={styles.iconTv} />
+                    <Icon name="tv" className={styles.iconTv} />
                     <span>{showMeta.status}</span>
                   </div>
                 )}
                 {showMeta.type && (
                   <div className={styles.metaItem}>
-                    <FaLayerGroup className={styles.iconType} />
+                    <Icon name="layer-group" className={styles.iconType} />
                     <span>{showMeta.type}</span>
                   </div>
                 )}
@@ -160,14 +151,14 @@ export default function AnimeInfo() {
 
             <div className={styles.actions}>
               <button className={styles.watchBtn} onClick={handleStartWatching}>
-                <FaPlay size={14} />
+                <Icon name="play" size={14} />
                 Start Watching
               </button>
               <button
                 className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
                 onClick={toggleWatchlist}
               >
-                {inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                {inWatchlist ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
                 {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
               </button>
               <QueueOptionsButton
@@ -192,7 +183,7 @@ export default function AnimeInfo() {
             setShowDetails(!showDetails)
           }}
         >
-          {showDetails ? <FaChevronUp /> : <FaChevronDown />}
+          {showDetails ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
           {showDetails ? 'Hide Details' : 'Show Details'}
         </button>
 

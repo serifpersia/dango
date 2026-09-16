@@ -1,5 +1,5 @@
 import React from 'react'
-import { FaCheck } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import styles from './menu-controls.module.css'
 
 interface MenuSliderProps {
@@ -110,7 +110,7 @@ export function SegmentedRow<T extends string>({
             onClick={() => onChange(option)}
           >
             <span>{option}</span>
-            {value === option && <FaCheck size={10} />}
+            {value === option && <Icon name="check" size={10} />}
           </button>
         ))}
       </div>

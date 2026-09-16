@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { FaExclamationTriangle, FaHome } from 'react-icons/fa'
+import Icon from './Icon'
 
 interface Props {
   children: ReactNode
@@ -39,7 +39,8 @@ class ErrorBoundary extends Component<Props, State> {
             padding: '2rem',
           }}
         >
-          <FaExclamationTriangle
+          <Icon
+            name="exclamation-triangle"
             style={{ fontSize: '4rem', color: '#ff4d4d', marginBottom: '1rem' }}
           />
           <h1 style={{ marginBottom: '1rem' }}>Something went wrong</h1>
@@ -67,7 +68,7 @@ class ErrorBoundary extends Component<Props, State> {
             onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#536dfe')}
             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent, #3d5afe)')}
           >
-            <FaHome />
+            <Icon name="home" />
             Go back Home
           </button>
         </div>

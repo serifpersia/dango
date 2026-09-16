@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { FaBookmark } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { Button } from '../common/Button'
 
 function buildTokenBookmarklet(): string {
@@ -126,7 +126,7 @@ const DiscordTokenBookmarklet: React.FC = () => {
             userSelect: 'none',
           }}
         >
-          <FaBookmark style={{ marginRight: '0.45rem', color: 'var(--accent)' }} />
+          <Icon name="bookmark" style={{ marginRight: '0.45rem', color: 'var(--accent)' }} />
           Dango Token Grabber
         </a>
         <a

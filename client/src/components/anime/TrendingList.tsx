@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import ErrorMessage from '../common/ErrorMessage'
 import AnimeCard from './AnimeCard'
 import { useInfiniteTrendingList } from '../../hooks/useAnimeData'
@@ -59,7 +59,7 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
               }}
               aria-label="Scroll left"
             >
-              <FaChevronLeft />
+              <Icon name="chevron-left" />
             </button>
             <button
               className={styles['nav-button']}
@@ -70,7 +70,7 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
               }}
               aria-label="Scroll right"
             >
-              <FaChevronRight />
+              <Icon name="chevron-right" />
             </button>
           </div>
         </div>

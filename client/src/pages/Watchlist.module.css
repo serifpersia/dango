@@ -738,8 +738,29 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.selectAllBtn svg {
-  color: var(--accent);
+.selectAllBox {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.selectAllBoxChecked {
+  background: var(--accent);
+}
+
+.selectAllBoxChecked::after {
+  content: '';
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-1px);
 }
 
 .manageCount {

@@ -1,19 +1,6 @@
 import React, { useEffect, Suspense, lazy } from 'react'
 import styles from './PlayerControls.module.css'
-import {
-  FaPlay,
-  FaPause,
-  FaVolumeUp,
-  FaVolumeMute,
-  FaVolumeDown,
-  FaVolumeOff,
-  FaExpand,
-  FaCompress,
-  FaCog,
-  FaTv,
-  FaChevronLeft,
-  FaClosedCaptioning,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import CenterControls from './CenterControls'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
@@ -256,10 +243,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   }
 
   const renderVolumeIcon = () => {
-    if (state.isMuted) return <FaVolumeMute />
-    if (state.volume === 0) return <FaVolumeOff />
-    if (state.volume < 0.5) return <FaVolumeDown />
-    return <FaVolumeUp />
+    if (state.isMuted || state.volume === 0) return <Icon name="volume-mute" />
+    if (state.volume < 0.5) return <Icon name="volume-down" />
+    return <Icon name="volume-up" />
   }
 
   useEffect(() => {
@@ -316,7 +302,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           title="Back"
           aria-label="Back"
         >
-          <FaChevronLeft />
+          <Icon name="chevron-left" />
         </button>
         <div className={styles.videoTitleInfo}>
           <span className={styles.animeTitle}>{animeTitle}</span>
@@ -387,7 +373,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               onClick={actions.togglePlay}
               aria-label={state.isPlaying ? 'Pause' : 'Play'}
             >
-              {state.isPlaying ? <FaPause /> : <FaPlay />}
+              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
             </button>
 
             <div
@@ -462,7 +448,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               title={isSubtitleActive ? 'Disable Subtitles' : 'Enable Subtitles'}
               aria-label="Toggle Subtitles"
             >
-              <FaClosedCaptioning size={22} />
+              <Icon name="closed-captioning" size={22} />
             </button>
 
             <button
@@ -471,7 +457,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               onClick={() => setShowSettings(!showSettings)}
               aria-label="Settings"
             >
-              <FaCog />
+              <Icon name="cog" />
             </button>
 
             <button
@@ -483,7 +469,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               title={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
               aria-label={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
             >
-              <FaTv />
+              <Icon name="tv" />
             </button>
 
             <button
@@ -491,7 +477,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               onClick={actions.toggleFullscreen}
               aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
             >
-              {state.isFullscreen ? <FaCompress /> : <FaExpand />}
+              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
             </button>
           </div>
         </div>

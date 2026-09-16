@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { FaChevronLeft, FaCheck } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -138,7 +138,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         }}
       >
         <span>Native Controls</span>
-        {useNativeControls && <FaCheck size={12} />}
+        {useNativeControls && <Icon name="check" size={12} />}
       </button>
       {anime4kSupported && (
         <button
@@ -148,7 +148,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
           }}
         >
           <span>Anime4K Upscaler</span>
-          {anime4kEnabled && <FaCheck size={12} />}
+          {anime4kEnabled && <Icon name="check" size={12} />}
         </button>
       )}
       {anime4kSupported && anime4kEnabled && (
@@ -187,7 +187,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             onClick={() => onSourceChange(currentSource!, link)}
           >
             <span>{link.resolutionStr}</span>
-            {currentLink?.resolutionStr === link.resolutionStr && <FaCheck size={12} />}
+            {currentLink?.resolutionStr === link.resolutionStr && <Icon name="check" size={12} />}
           </button>
         ))}
       </div>
@@ -201,7 +201,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         onClick={() => onSubtitleChange('off')}
       >
         <span>Off</span>
-        {activeSubtitleTrack === 'off' && <FaCheck size={12} />}
+        {activeSubtitleTrack === 'off' && <Icon name="check" size={12} />}
       </button>
       {subtitles.map((sub) => (
         <button
@@ -210,7 +210,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
           onClick={() => onSubtitleChange(sub.label || sub.lang)}
         >
           <span>{sub.label}</span>
-          {activeSubtitleTrack === (sub.label || sub.lang) && <FaCheck size={12} />}
+          {activeSubtitleTrack === (sub.label || sub.lang) && <Icon name="check" size={12} />}
         </button>
       ))}
     </div>
@@ -272,7 +272,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         onClick={() => onSubtitleSettingsChange('bold', !subtitleSettings.bold)}
       >
         <span>Bold Text</span>
-        {subtitleSettings.bold && <FaCheck size={12} />}
+        {subtitleSettings.bold && <Icon name="check" size={12} />}
       </button>
       <button
         type="button"
@@ -314,7 +314,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             Lightest, best for weaker GPUs
           </div>
         </div>
-        {anime4kProfile === 'low' && <FaCheck size={12} />}
+        {anime4kProfile === 'low' && <Icon name="check" size={12} />}
       </button>
       <button
         className={`${styles.menuItem} ${anime4kProfile === 'balanced' ? styles.selected : ''}`}
@@ -326,7 +326,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             Source + display aware
           </div>
         </div>
-        {anime4kProfile === 'balanced' && <FaCheck size={12} />}
+        {anime4kProfile === 'balanced' && <Icon name="check" size={12} />}
       </button>
       <button
         className={`${styles.menuItem} ${anime4kProfile === 'high' ? styles.selected : ''}`}
@@ -338,7 +338,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             Aggressive, needs strong GPU
           </div>
         </div>
-        {anime4kProfile === 'high' && <FaCheck size={12} />}
+        {anime4kProfile === 'high' && <Icon name="check" size={12} />}
       </button>
       <button
         className={`${styles.menuItem} ${anime4kProfile === 'denoise' ? styles.selected : ''}`}
@@ -350,7 +350,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             Denoise + upscale noisy, compressed sources
           </div>
         </div>
-        {anime4kProfile === 'denoise' && <FaCheck size={12} />}
+        {anime4kProfile === 'denoise' && <Icon name="check" size={12} />}
       </button>
     </div>
   )
@@ -413,7 +413,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         onClick={() => onVideoDelayToggle(!videoDelayEnabled)}
       >
         <span>Video delay</span>
-        {videoDelayEnabled && <FaCheck size={12} />}
+        {videoDelayEnabled && <Icon name="check" size={12} />}
       </button>
       <MenuSlider
         label="Video delay"
@@ -443,7 +443,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       <div className={styles.header}>
         {view !== 'main' && (
           <button className={styles.backBtn} onClick={() => setView('main')}>
-            <FaChevronLeft />
+            <Icon name="chevron-left" />
           </button>
         )}
         <h3>

@@ -1,13 +1,6 @@
 import React, { memo, useState, useCallback } from 'react'
 import { Link, useNavigate, type To } from 'react-router'
-import {
-  FaMicrophone,
-  FaClosedCaptioning,
-  FaTimes,
-  FaInfo,
-  FaPlay,
-  FaInfoCircle,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import AnimePopup from './AnimePopup'
 import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
@@ -337,7 +330,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
             {!isMobile && isHovered && (
               <div className={styles.hoverOverlay}>
-                {isWatchLink ? <FaPlay size={28} /> : <FaInfoCircle size={28} />}
+                {isWatchLink ? (
+                  <Icon name="play" size={28} />
+                ) : (
+                  <Icon name="info-circle" size={28} />
+                )}
               </div>
             )}
           </div>
@@ -379,13 +376,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               <div className={styles.metaRow}>
                 {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
                   <div className={styles.metaItem}>
-                    <FaClosedCaptioning size={10} />
+                    <Icon name="closed-captioning" size={10} />
                     {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
                   </div>
                 )}
                 {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
                   <div className={styles.metaItem}>
-                    <FaMicrophone size={10} />
+                    <Icon name="microphone" size={10} />
                     {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
                   </div>
                 )}
@@ -424,7 +421,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
         {showRemoveBtn && (
           <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
-            <FaTimes size={10} />
+            <Icon name="times" size={10} />
           </button>
         )}
 
@@ -435,7 +432,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             onMouseLeave={handleInfoMouseLeave}
             aria-label="Info"
           >
-            <FaInfo size={11} />
+            <Icon name="info" size={11} />
           </button>
         )}
 

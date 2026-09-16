@@ -1,14 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'preact/compat'
-import {
-  FaSpinner,
-  FaSyncAlt,
-  FaCheckCircle,
-  FaInfoCircle,
-  FaExclamationCircle,
-  FaPlus,
-  FaTimes,
-} from 'react-icons/fa'
+import Icon from '../common/Icon'
 import NotificationItem from './NotificationItem'
 import NotificationSkeleton from './NotificationSkeleton'
 import {
@@ -51,7 +43,7 @@ const NotificationDropdown: React.FC = () => {
       <div className={styles.discoveryStatusRow}>
         {status?.running ? (
           <>
-            <FaSpinner className={styles.spinIcon} />
+            <span className={`${styles.statusDot} ${styles.statusDotRunning}`} aria-hidden="true" />
             <span>
               {status.total > 0
                 ? `Checking ${Math.min(status.done, status.total)}/${status.total} shows...`
@@ -60,24 +52,24 @@ const NotificationDropdown: React.FC = () => {
           </>
         ) : status?.state === 'complete' ? (
           <>
-            <FaCheckCircle size={12} />
+            <span className={`${styles.statusDot} ${styles.statusDotOk}`} aria-hidden="true" />
             <span>
               Discovery complete — checked {status.total} {status.total === 1 ? 'show' : 'shows'}
             </span>
           </>
         ) : status?.state === 'empty' ? (
           <>
-            <FaInfoCircle size={12} />
+            <span className={`${styles.statusDot} ${styles.statusDotInfo}`} aria-hidden="true" />
             <span>No shows set to Watching — nothing to check</span>
           </>
         ) : status?.state === 'error' ? (
           <>
-            <FaExclamationCircle size={12} />
+            <span className={`${styles.statusDot} ${styles.statusDotError}`} aria-hidden="true" />
             <span>Last check failed — will retry automatically</span>
           </>
         ) : (
           <>
-            <FaSyncAlt size={11} />
+            <span className={`${styles.statusDot} ${styles.statusDotIdle}`} aria-hidden="true" />
             <span>
               {status?.lastRunAt
                 ? `Last checked ${Math.max(
@@ -107,7 +99,7 @@ const NotificationDropdown: React.FC = () => {
                     boxShadow: 'none',
                   }}
                 >
-                  <FaInfoCircle size={32} color="#6c9fff" />
+                  <Icon name="info-circle" size={32} color="#6c9fff" />
                 </div>
                 <div className={styles.itemInfo}>
                   <span className={styles.itemTitle}>{sn.title}</span>
@@ -126,7 +118,7 @@ const NotificationDropdown: React.FC = () => {
                   style={{ opacity: 0.3, cursor: 'not-allowed' }}
                   aria-hidden="true"
                 >
-                  <FaPlus />
+                  <Icon name="plus" />
                 </button>
                 <button
                   className={styles.removeItem}
@@ -134,7 +126,7 @@ const NotificationDropdown: React.FC = () => {
                   style={{ opacity: 0.3, cursor: 'not-allowed' }}
                   aria-hidden="true"
                 >
-                  <FaTimes />
+                  <Icon name="times" />
                 </button>
               </div>
             ))}
@@ -189,7 +181,7 @@ const NotificationDropdown: React.FC = () => {
                   marginBottom: '1rem',
                 }}
               >
-                <FaInfoCircle color="#6c9fff" />
+                <Icon name="info-circle" color="#6c9fff" />
                 <span style={{ color: '#fff', fontWeight: 600, fontSize: '1rem' }}>
                   {fullNotification.title}
                 </span>

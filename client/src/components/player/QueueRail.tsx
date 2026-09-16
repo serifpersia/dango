@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router'
-import { FaBars, FaChevronDown, FaChevronUp, FaTimes } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import type { QueueItem } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -72,7 +72,7 @@ const QueueRailItem = ({
       onPointerCancel={onTouchPointerCancel}
     >
       <button className={styles.dragHandle} type="button" aria-label="Drag queue item">
-        <FaBars />
+        <Icon name="bars" />
       </button>
       <img
         className={styles.thumbnail}
@@ -106,7 +106,7 @@ const QueueRailItem = ({
         }}
         aria-label={`Remove ${displayTitle} episode ${item.episodeNumber} from queue`}
       >
-        <FaTimes />
+        <Icon name="times" />
       </button>
     </div>
   )
@@ -284,7 +284,7 @@ const QueueRail = ({
             </span>
             <span className={styles.badge}>{localQueue.length}</span>
           </span>
-          {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+          {isExpanded ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
         </button>
         {showClearAll && onClear && (
           <div className={styles.headerActions}>

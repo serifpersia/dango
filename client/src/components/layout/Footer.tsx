@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router'
-import { FaGithub, FaHeart, FaChevronUp, FaDiscord } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import styles from './Footer.module.css'
 import packageJson from '../../../package.json'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -60,14 +60,14 @@ const Footer: React.FC = () => {
           <div className={styles.linkColumn}>
             <h4 className={styles.columnTitle}>Community</h4>
             <a href="https://discord.gg/2FTSPXCsvn" target="_blank" rel="noopener noreferrer">
-              <FaDiscord style={{ marginRight: '6px' }} /> Discord
+              <Icon name="discord" style={{ marginRight: '6px' }} /> Discord
             </a>
             <a
               href="https://github.com/serifpersia/dango"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <FaGithub style={{ marginRight: '6px' }} /> GitHub
+              <Icon name="github" style={{ marginRight: '6px' }} /> GitHub
             </a>
           </div>
 
@@ -94,13 +94,13 @@ const Footer: React.FC = () => {
       <div className={styles.bottomBar}>
         <p className={styles.copyright}>
           © {currentYear} <span className={styles.brand}>dango</span> • Crafted with{' '}
-          <FaHeart className={styles.heartIcon} /> by{' '}
+          <Icon name="heart" className={styles.heartIcon} /> by{' '}
           <a href="https://github.com/serifpersia" target="_blank" rel="noopener noreferrer">
             serifpersia
           </a>
         </p>
         <button className={styles.backToTop} onClick={scrollToTop} aria-label="Back to top">
-          <FaChevronUp size={14} />
+          <Icon name="chevron-up" size={14} />
           <span>Top</span>
         </button>
       </div>

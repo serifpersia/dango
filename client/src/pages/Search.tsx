@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router'
-import {
-  FaSearch,
-  FaFilter,
-  FaChevronDown,
-  FaChevronUp,
-  FaChevronLeft,
-  FaChevronRight,
-} from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
@@ -111,9 +104,17 @@ export default function Search() {
   }>(() => {
     const states: { [key: string]: 'include' | 'exclude' } = {}
     const genres =
-      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('genres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     const exclude =
-      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('excludeGenres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     return states
@@ -161,9 +162,17 @@ export default function Search() {
 
     const states: { [key: string]: 'include' | 'exclude' } = {}
     const genres =
-      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('genres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     const exclude =
-      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('excludeGenres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setAnilistGenreState(states)
@@ -255,7 +264,7 @@ export default function Search() {
       <div className={styles.filterContainer}>
         <div className={styles.searchBarWrapper}>
           <div className={styles.inputIconWrapper}>
-            <FaSearch className={styles.searchIcon} />
+            <Icon name="search" className={styles.searchIcon} />
             <input
               type="text"
               data-virtual-keyboard="true"
@@ -274,9 +283,13 @@ export default function Search() {
               className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
               onClick={() => setShowFilters(!showFilters)}
             >
-              <FaFilter size={14} />
+              <Icon name="filter" size={14} />
               <span>Filters</span>
-              {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+              {showFilters ? (
+                <Icon name="chevron-up" size={12} />
+              ) : (
+                <Icon name="chevron-down" size={12} />
+              )}
             </button>
           </div>
         </div>
@@ -550,7 +563,7 @@ export default function Search() {
               disabled={page === 1 || isLoading}
               aria-label="Previous page"
             >
-              <FaChevronLeft size={14} />
+              <Icon name="chevron-left" size={14} />
             </button>
             <span className={styles.pageInfo}>
               Page <strong>{page}</strong>
@@ -561,7 +574,7 @@ export default function Search() {
               disabled={!canGoNext || isLoading}
               aria-label="Next page"
             >
-              <FaChevronRight size={14} />
+              <Icon name="chevron-right" size={14} />
             </button>
           </div>
         )}
@@ -577,7 +590,7 @@ export default function Search() {
 
       {!isLoading && filteredResults.length === 0 && (
         <div className={styles.noResults}>
-          <FaSearch size={48} className={styles.noResultsIcon} />
+          <Icon name="search" size={48} className={styles.noResultsIcon} />
           <h3>No results found</h3>
           <p>Try adjusting your search or filters to find what you're looking for.</p>
         </div>
@@ -591,7 +604,7 @@ export default function Search() {
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1 || isLoading}
             >
-              <FaChevronLeft size={14} />
+              <Icon name="chevron-left" size={14} />
               <span>Previous</span>
             </button>
             <span className={styles.pageInfo}>
@@ -603,7 +616,7 @@ export default function Search() {
               disabled={!canGoNext || isLoading}
             >
               <span>Next</span>
-              <FaChevronRight size={14} />
+              <Icon name="chevron-right" size={14} />
             </button>
           </div>
         </div>

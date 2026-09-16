@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { FaBook, FaSearch } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
@@ -243,7 +243,7 @@ export default function Manga() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>
-          <FaBook /> Manga
+          <Icon name="book" /> Manga
         </h1>
         <form className={styles.searchForm} onSubmit={handleSearch}>
           <input
@@ -254,7 +254,7 @@ export default function Manga() {
             aria-label="Search manga"
           />
           <button className={styles.searchBtn} type="submit" aria-label="Search">
-            <FaSearch size={14} />
+            <Icon name="search" size={14} />
           </button>
         </form>
         <select

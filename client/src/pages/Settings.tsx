@@ -11,7 +11,7 @@ import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
-import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
@@ -641,7 +641,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'general' ? styles.active : ''}`}
             onClick={() => selectTab('general')}
           >
-            <FaCog /> <span>General</span>
+            <Icon name="cog" /> <span>General</span>
           </button>
           <button
             ref={(el) => {
@@ -650,7 +650,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
             onClick={() => selectTab('sync')}
           >
-            <FaCloud /> <span>Synchronization</span>
+            <Icon name="cloud" /> <span>Synchronization</span>
           </button>
           <button
             ref={(el) => {
@@ -659,7 +659,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
             onClick={() => selectTab('watchlist')}
           >
-            <FaList /> <span>Watchlist</span>
+            <Icon name="list" /> <span>Watchlist</span>
           </button>
           <button
             ref={(el) => {
@@ -668,7 +668,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'database' ? styles.active : ''}`}
             onClick={() => selectTab('database')}
           >
-            <FaDatabase /> <span>Database</span>
+            <Icon name="database" /> <span>Database</span>
           </button>
         </aside>
 

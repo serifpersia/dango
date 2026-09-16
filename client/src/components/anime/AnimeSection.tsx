@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router'
-import { FaChevronDown, FaChevronLeft, FaChevronRight, FaChevronUp } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import AnimeCard from './AnimeCard'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
 import SkeletonGrid from '../common/SkeletonGrid'
@@ -136,7 +136,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                   stepBy('left', lowEndMode)
                 }}
               >
-                <FaChevronLeft />
+                <Icon name="chevron-left" />
               </button>
               <button
                 className={styles['nav-button']}
@@ -147,7 +147,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                   stepBy('right', lowEndMode)
                 }}
               >
-                <FaChevronRight />
+                <Icon name="chevron-right" />
               </button>
             </div>
           )}
@@ -161,7 +161,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               aria-expanded={isExpanded}
               aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
             >
-              {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+              {isExpanded ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
             </button>
           )}
         </div>

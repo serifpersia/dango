@@ -2,19 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import {
-  FaChevronDown,
-  FaChevronUp,
-  FaFilter,
-  FaSearch,
-  FaTrash,
-  FaChevronLeft,
-  FaChevronRight,
-  FaCheck,
-  FaCheckCircle,
-  FaRegCircle,
-  FaPencilAlt,
-} from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
@@ -94,9 +82,17 @@ const Watchlist: React.FC = () => {
   const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() => {
     const states: { [key: string]: 'include' | 'exclude' } = {}
     const genres =
-      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('genres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     const exclude =
-      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('excludeGenres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     return states
@@ -159,9 +155,17 @@ const Watchlist: React.FC = () => {
     setYear(searchParams.get('year') || 'ALL')
     const states: { [key: string]: 'include' | 'exclude' } = {}
     const genres =
-      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('genres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     const exclude =
-      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      searchParams
+        .get('excludeGenres')
+        ?.split(',')
+        .map((g) => g.trim())
+        .filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setGenreStates(states)
@@ -429,7 +433,7 @@ const Watchlist: React.FC = () => {
       <div className={styles.filterContainer}>
         <div className={styles.searchBarWrapper}>
           <div className={styles.inputIconWrapper}>
-            <FaSearch className={styles.searchIcon} />
+            <Icon name="search" className={styles.searchIcon} />
             <input
               className={styles.searchInput}
               placeholder="Search your watchlist by title..."
@@ -446,9 +450,13 @@ const Watchlist: React.FC = () => {
               className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
               onClick={() => setShowFilters(!showFilters)}
             >
-              <FaFilter size={14} />
+              <Icon name="filter" size={14} />
               <span>Filters</span>
-              {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+              {showFilters ? (
+                <Icon name="chevron-up" size={12} />
+              ) : (
+                <Icon name="chevron-down" size={12} />
+              )}
             </button>
           </div>
         </div>
@@ -528,7 +536,7 @@ const Watchlist: React.FC = () => {
             className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
             onClick={toggleManageMode}
           >
-            <FaPencilAlt size={13} />
+            <Icon name="pencil-alt" size={13} />
             <span>Bulk Manage</span>
           </button>
           {total > 0 && (
@@ -539,7 +547,7 @@ const Watchlist: React.FC = () => {
                 disabled={page === 1 || isLoading}
                 aria-label="Previous page"
               >
-                <FaChevronLeft size={14} />
+                <Icon name="chevron-left" size={14} />
               </button>
               <span className={styles.pageInfo}>
                 Page <strong>{page}</strong>
@@ -550,7 +558,7 @@ const Watchlist: React.FC = () => {
                 disabled={!canGoNext || isLoading}
                 aria-label="Next page"
               >
-                <FaChevronRight size={14} />
+                <Icon name="chevron-right" size={14} />
               </button>
             </div>
           )}
@@ -560,7 +568,10 @@ const Watchlist: React.FC = () => {
       {manageMode && (
         <div className={styles.manageBar}>
           <button className={styles.selectAllBtn} onClick={handleSelectAll}>
-            {allSelected ? <FaCheckCircle size={16} /> : <FaRegCircle size={16} />}
+            <span
+              className={`${styles.selectAllBox} ${allSelected ? styles.selectAllBoxChecked : ''}`}
+              aria-hidden="true"
+            />
             <span>{allSelected ? 'Clear Page' : 'Select All'}</span>
           </button>
           <span className={styles.manageCount}>{selectedIds.size} selected</span>
@@ -590,7 +601,7 @@ const Watchlist: React.FC = () => {
             onClick={handleBulkRemove}
             disabled={selectedIds.size === 0}
           >
-            <FaTrash size={13} />
+            <Icon name="trash" size={13} />
             <span>Remove Selected</span>
           </button>
         </div>
@@ -767,7 +778,7 @@ const Watchlist: React.FC = () => {
                       title={selected ? 'Deselect' : 'Select'}
                     >
                       <span className={styles.selectBadge}>
-                        {selected ? <FaCheck size={12} /> : null}
+                        {selected ? <Icon name="check" size={12} /> : null}
                       </span>
                     </div>
                   )}
@@ -798,7 +809,7 @@ const Watchlist: React.FC = () => {
                         title="Remove from Watchlist"
                         aria-label="Remove from Watchlist"
                       >
-                        <FaTrash size={12} />
+                        <Icon name="trash" size={12} />
                       </button>
                     </div>
                   )}
@@ -823,7 +834,7 @@ const Watchlist: React.FC = () => {
               : "Let's find something to watch!"}
           </p>
           <button className={styles.emptyBtn} onClick={() => navigate('/search')}>
-            <FaSearch size={14} />
+            <Icon name="search" size={14} />
             <span>Browse Anime</span>
           </button>
         </div>
@@ -837,7 +848,7 @@ const Watchlist: React.FC = () => {
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1 || isLoading}
             >
-              <FaChevronLeft size={14} />
+              <Icon name="chevron-left" size={14} />
               <span>Previous</span>
             </button>
             <span className={styles.pageInfo}>
@@ -849,7 +860,7 @@ const Watchlist: React.FC = () => {
               disabled={!canGoNext || isLoading}
             >
               <span>Next</span>
-              <FaChevronRight size={14} />
+              <Icon name="chevron-right" size={14} />
             </button>
           </div>
         </div>

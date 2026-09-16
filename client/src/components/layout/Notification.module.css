@@ -164,18 +164,41 @@
   border-bottom: 1px solid var(--border-primary);
 }
 
-.spinIcon {
-  color: var(--accent);
-  animation: spin 0.9s linear infinite;
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
+.statusDotRunning {
+  background: var(--accent);
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+.statusDotOk {
+  background: var(--color-success);
+}
+
+.statusDotInfo {
+  background: var(--color-info);
+}
+
+.statusDotError {
+  background: var(--color-danger);
+}
+
+.statusDotIdle {
+  background: var(--text-muted);
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
   }
-  to {
-    transform: rotate(360deg);
+  50% {
+    opacity: 0.35;
   }
 }
 

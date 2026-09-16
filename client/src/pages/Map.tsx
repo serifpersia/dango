@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps'
-import { FaUsers, FaUserClock } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import styles from './Map.module.css'
 import { TIMEZONE_COORDS } from '../lib/timezoneGrid'
 
@@ -162,14 +162,14 @@ const Map: React.FC = () => {
 
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
-              <FaUsers />
+              <Icon name="users" />
               <div>
                 <span className={styles.statValue}>{data.total}</span>
                 <span className={styles.statLabel}>Total Users</span>
               </div>
             </div>
             <div className={styles.statCard}>
-              <FaUserClock />
+              <Icon name="user-clock" />
               <div>
                 <span className={styles.statValue}>{data.active}</span>
                 <span className={styles.statLabel}>Active (24h)</span>

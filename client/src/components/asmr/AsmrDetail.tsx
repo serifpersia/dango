@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { FaPlay, FaTimes } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useAsmrWork } from '../../hooks/useAsmr'
 import type { AsmrTrack, AsmrWork } from '../../hooks/useAsmr'
 import styles from './Asmr.module.css'
@@ -31,7 +31,7 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
     <div className={styles.detailOverlay} onClick={onClose}>
       <div className={styles.detailModal} onClick={(e) => e.stopPropagation()}>
         <button className={styles.detailClose} onClick={onClose} aria-label="Close">
-          <FaTimes />
+          <Icon name="times" />
         </button>
 
         <div className={styles.detailHeader}>
@@ -80,7 +80,7 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
                 {tracks.map((track, i) => (
                   <li key={track.link}>
                     <button className={styles.trackRow} onClick={() => onPlay(work, tracks, i)}>
-                      <FaPlay className={styles.trackIcon} />
+                      <Icon name="play" className={styles.trackIcon} />
                       <span className={styles.trackLabel}>{track.resolutionStr}</span>
                       <span className={styles.trackType}>{track.hls ? 'HLS' : 'MP3'}</span>
                     </button>
@@ -94,7 +94,7 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
 
         {!isLoading && tracks.length > 0 && (
           <button className={styles.playAllBtn} onClick={() => onPlay(work, tracks, 0)}>
-            <FaPlay /> Play from start
+            <Icon name="play" /> Play from start
           </button>
         )}
       </div>

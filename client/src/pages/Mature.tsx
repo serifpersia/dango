@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FaSearch, FaFilter, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import MatureConsentModal from '../components/common/MatureConsentModal'
@@ -389,7 +389,7 @@ export default function Mature() {
       <div className={styles.filterContainer}>
         <div className={styles.searchBarWrapper}>
           <div className={styles.inputIconWrapper}>
-            <FaSearch className={styles.searchIcon} />
+            <Icon name="search" className={styles.searchIcon} />
             <input
               type="text"
               placeholder={`Search ${providerOptions.find((p) => p.value === provider)?.label}...`}
@@ -422,7 +422,7 @@ export default function Mature() {
                 onClick={() => setShowFilters(!showFilters)}
                 className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
               >
-                <FaFilter /> Filters
+                <Icon name="filter" /> Filters
               </button>
             )}
             {provider === 'mal' && (
@@ -430,7 +430,7 @@ export default function Mature() {
                 onClick={() => setShowFilters(!showFilters)}
                 className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
               >
-                <FaFilter /> Filters
+                <Icon name="filter" /> Filters
               </button>
             )}
             {provider === 'hn' && (
@@ -620,7 +620,7 @@ export default function Mature() {
                 disabled={page <= 1}
                 onClick={() => handlePageChange(page - 1)}
               >
-                <FaChevronLeft /> <span>Prev</span>
+                <Icon name="chevron-left" /> <span>Prev</span>
               </button>
               <span className={styles.pageInfo}>
                 Page <strong>{page}</strong>
@@ -630,7 +630,7 @@ export default function Mature() {
                 disabled={!hasMore}
                 onClick={() => handlePageChange(page + 1)}
               >
-                <span>Next</span> <FaChevronRight />
+                <span>Next</span> <Icon name="chevron-right" />
               </button>
             </div>
           </div>
@@ -648,7 +648,7 @@ export default function Mature() {
                 disabled={page <= 1}
                 onClick={() => handlePageChange(page - 1)}
               >
-                <FaChevronLeft /> <span>Prev</span>
+                <Icon name="chevron-left" /> <span>Prev</span>
               </button>
               <span className={styles.pageInfo}>
                 Page <strong>{page}</strong>
@@ -658,7 +658,7 @@ export default function Mature() {
                 disabled={!hasMore}
                 onClick={() => handlePageChange(page + 1)}
               >
-                <span>Next</span> <FaChevronRight />
+                <span>Next</span> <Icon name="chevron-right" />
               </button>
             </div>
           </div>

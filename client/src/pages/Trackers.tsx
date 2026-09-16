@@ -4,15 +4,8 @@ import toast from 'react-hot-toast'
 import { useSidebar } from '../hooks/useSidebar'
 import { useAnilistAuthCallback } from '../hooks/useAnilistAuthCallback'
 import { Button } from '../components/common/Button'
-import {
-  FaFileAlt,
-  FaUpload,
-  FaSyncAlt,
-  FaSignOutAlt,
-  FaDownload,
-  FaExternalLinkAlt,
-} from 'react-icons/fa'
-import { SiAnilist, SiMyanimelist } from 'react-icons/si'
+import Icon from '../components/common/Icon'
+
 import styles from './Trackers.module.css'
 
 interface ProgressEvent {
@@ -327,7 +320,7 @@ const Trackers: React.FC = () => {
       <div className={styles.importCard}>
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleRow}>
-            <SiAnilist className={styles.anilistIcon} />
+            <Icon name="anilist" className={styles.anilistIcon} />
             <h3>AniList</h3>
             {statusLoading ? null : anilistConnected ? (
               <span className={styles.badgeOnline}>Connected</span>
@@ -357,7 +350,7 @@ const Trackers: React.FC = () => {
               onClick={() => disconnectMutation.mutate()}
               disabled={disconnectMutation.isPending}
             >
-              <FaSignOutAlt /> Disconnect
+              <Icon name="sign-out-alt" /> Disconnect
             </button>
           </div>
         ) : (
@@ -375,7 +368,7 @@ const Trackers: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                create your own app <FaExternalLinkAlt size={9} />
+                create your own app <Icon name="external-link-alt" size={9} />
               </a>
             </div>
             <div className={styles.inputGroup}>
@@ -391,7 +384,7 @@ const Trackers: React.FC = () => {
                 onClick={handleAniListLogin}
                 disabled={!(clientIdInput.trim() || hasShipped)}
               >
-                <FaExternalLinkAlt /> Connect
+                <Icon name="external-link-alt" /> Connect
               </button>
             </div>
             <p className={styles.helpText}>
@@ -465,7 +458,7 @@ const Trackers: React.FC = () => {
             onClick={() => syncMutation.mutate()}
             disabled={!anilistConnected || syncMutation.isPending}
           >
-            <FaSyncAlt className={syncMutation.isPending ? styles.spin : ''} />
+            <Icon name="sync-alt" className={syncMutation.isPending ? styles.spin : ''} />
             {syncMutation.isPending ? 'Syncing...' : 'Start Sync'}
           </button>
           {syncSummary && (
@@ -501,7 +494,7 @@ const Trackers: React.FC = () => {
               onClick={() => importMutation.mutate()}
               disabled={importMutation.isPending}
             >
-              <FaDownload /> {importMutation.isPending ? 'Importing...' : 'Import List'}
+              <Icon name="download" /> {importMutation.isPending ? 'Importing...' : 'Import List'}
             </button>
           </div>
         </div>
@@ -510,7 +503,7 @@ const Trackers: React.FC = () => {
       <div className={styles.importCard}>
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleRow}>
-            <SiMyanimelist className={styles.malIcon} />
+            <Icon name="myanimelist" className={styles.malIcon} />
             <h3>MyAnimeList</h3>
           </div>
           <p>Upload your exported MyAnimeList XML file to import your watchlist into dango.</p>
@@ -527,7 +520,7 @@ const Trackers: React.FC = () => {
               disabled={importing}
             />
             <div className={styles.fileDisplay}>
-              <FaFileAlt className={styles.fileIcon} />
+              <Icon name="file-alt" className={styles.fileIcon} />
               <span className={styles.fileName}>{selectedFileName || 'Choose XML file...'}</span>
             </div>
             <label htmlFor="malFile" className={styles.browseButton}>
@@ -568,7 +561,7 @@ const Trackers: React.FC = () => {
               className={styles.importBtn}
               disabled={!selectedFileName}
             >
-              <FaUpload /> Start Import
+              <Icon name="upload" /> Start Import
             </Button>
           )}
         </div>

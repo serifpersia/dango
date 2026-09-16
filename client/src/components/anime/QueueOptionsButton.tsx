@@ -9,7 +9,7 @@ import {
   shift,
   offset,
 } from '@floating-ui/react'
-import { FaCheck, FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa'
+import Icon from '../common/Icon'
 import { useQuery } from '@tanstack/react-query'
 import {
   useQueue,
@@ -182,9 +182,9 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
           }
         }}
       >
-        {isQueued ? <FaCheck size={14} /> : <FaPlus size={14} />}
+        {isQueued ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
         {isQueued ? 'Queued' : 'Queue'}
-        <FaChevronDown size={10} className={styles.chevron} />
+        <Icon name="chevron-down" size={10} className={styles.chevron} />
       </span>
     </div>
   )
@@ -217,7 +217,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
                 queueOne()
               }}
             >
-              <FaPlus size={11} />
+              <Icon name="plus" size={11} />
               <span>
                 {hasRemaining
                   ? `+1 \u2014 EP ${firstEpisode}`
@@ -234,7 +234,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
                 queueThree()
               }}
             >
-              <FaPlus size={11} />
+              <Icon name="plus" size={11} />
               <span>
                 {hasRemaining
                   ? `+3 \u2014 EP ${firstEpisode}${remaining.length > 1 ? `-${lastOfThree}` : ''}`
@@ -251,7 +251,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
                 queueAll()
               }}
             >
-              <FaPlus size={11} />
+              <Icon name="plus" size={11} />
               <span>
                 All Remaining{remainingLoading ? '' : ` (${Math.max(remaining.length, 0)})`}
               </span>
@@ -271,7 +271,7 @@ const QueueOptionsButton: React.FC<QueueOptionsButtonProps> = ({
                   handleRemoveAll()
                 }}
               >
-                <FaTimes size={11} />
+                <Icon name="times" size={11} />
                 <span>
                   Remove from Queue{queuedItems.length > 0 ? ` (${queuedItems.length})` : ''}
                 </span>

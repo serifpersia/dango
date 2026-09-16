@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
-import { FaSearch, FaTv, FaArrowLeft, FaSpinner } from 'react-icons/fa'
+import Icon from '../components/common/Icon'
 import TvCard from '../components/tv/TvCard'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import { Modal } from '../components/common/Modal'
@@ -1004,7 +1004,7 @@ const Tv: React.FC = () => {
       {details && (
         <div className={styles.header}>
           <button className={styles.backBtn} onClick={handleBack}>
-            <FaArrowLeft /> Back
+            <Icon name="arrow-left" /> Back
           </button>
           <h1>{details.title}</h1>
           <div className={styles.meta}>
@@ -1131,7 +1131,7 @@ const Tv: React.FC = () => {
         >
           {streamLoading && !isEmbedProvider && (
             <div className={styles.statusMsg}>
-              <FaSpinner className={styles.spinner} /> Loading stream...
+              <Icon name="spinner" className={styles.spinner} /> Loading stream...
             </div>
           )}
           {isEmbedProvider && iframeUrl ? (
@@ -1347,7 +1347,7 @@ const Tv: React.FC = () => {
         <>
           <header className={styles.header}>
             <h1 className={styles.pageTitle}>
-              <FaTv /> TV & Movies
+              <Icon name="tv" /> TV & Movies
             </h1>
             <form className={styles.searchForm} onSubmit={(e) => doSearch(e)}>
               <input
@@ -1359,7 +1359,7 @@ const Tv: React.FC = () => {
                 aria-label="Search TV and Movies"
               />
               <button className={styles.searchBtn} type="submit" aria-label="Search">
-                <FaSearch />
+                <Icon name="search" />
               </button>
             </form>
           </header>
