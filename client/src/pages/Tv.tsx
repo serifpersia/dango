@@ -7,6 +7,7 @@ import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
+import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
 import useDelayCanvas from '../hooks/useDelayCanvas'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
@@ -587,23 +588,13 @@ const Tv: React.FC = () => {
               hls.subtitleTrack = -1
             }
           }
+          bindHlsAudioTracks(hls, HlsClass.Events, {
+            getWant: () => selectedAudioTrackRef.current,
+            onResolve: (id) => setSelectedAudioTrack(id),
+          })
           hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-            const count = Array.isArray(hls.audioTracks) ? hls.audioTracks.length : 0
-            const want = selectedAudioTrackRef.current
-            const target = count > 0 ? Math.min(Math.max(0, want), count - 1) : want
-            hls.audioTrack = target
-            if (target !== want) setSelectedAudioTrack(target)
             applySubtitlePreference()
             video.play().catch(() => {})
-          })
-          hls.on(HlsClass.Events.AUDIO_TRACK_SWITCHED, (_e, data) => {
-            const want = selectedAudioTrackRef.current
-            const count = Array.isArray(hls.audioTracks) ? hls.audioTracks.length : 0
-            if (data.id !== want && want >= 0 && want < count) {
-              if (hls.audioTrack !== want) hls.audioTrack = want
-              return
-            }
-            setSelectedAudioTrack(data.id)
           })
           hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
             applySubtitlePreference()

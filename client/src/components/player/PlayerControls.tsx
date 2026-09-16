@@ -2,6 +2,8 @@ import React, { useEffect, Suspense, lazy } from 'react'
 import styles from './PlayerControls.module.css'
 import Icon from '../common/Icon'
 import CenterControls from './CenterControls'
+import SeekBar from './SeekBar'
+import VolumeControl from './VolumeControl'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -110,86 +112,38 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     }
   }, [showSettings, showVolumeSlider, setShowSettings, setShowVolumeSlider])
 
-  const watchedBarRef = React.useRef<HTMLDivElement>(null)
-  const thumbRef = React.useRef<HTMLDivElement>(null)
-  const bufferedBarRef = React.useRef<HTMLDivElement>(null)
   const timeDisplayRef = React.useRef<HTMLSpanElement>(null)
 
-  const currentTimeRef = React.useRef(0)
-
-  useEffect(() => {
-    const video = refs.videoRef.current
-    if (!video) return
-
-    const handleTimeUpdate = () => {
-      if (!state.isScrubbing) {
-        const time = video.currentTime
-        currentTimeRef.current = time
-        const percent = (time / state.duration) * 100 || 0
-        if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent}%`
-        if (thumbRef.current) thumbRef.current.style.left = `${percent}%`
-        if (timeDisplayRef.current) {
-          timeDisplayRef.current.innerText = `${actions.formatTime(time)} / ${actions.formatTime(state.duration)}`
-        }
-      }
-    }
-
-    const handleProgress = () => {
-      if (video.buffered.length > 0) {
-        const bufferedEnd = video.buffered.end(video.buffered.length - 1)
-        const percent = (bufferedEnd / state.duration) * 100 || 0
-        if (bufferedBarRef.current) bufferedBarRef.current.style.width = `${percent}%`
-      }
-    }
-
-    handleTimeUpdate()
-    handleProgress()
-
-    video.addEventListener('timeupdate', handleTimeUpdate)
-    video.addEventListener('progress', handleProgress)
-
-    return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate)
-      video.removeEventListener('progress', handleProgress)
-    }
-  }, [refs.videoRef, state.isScrubbing, state.duration, actions])
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVolumeChange = (newVolume: number) => {
     if (!refs.videoRef.current) return
-    const newVolume = parseFloat(e.target.value)
     refs.videoRef.current.volume = newVolume
     refs.videoRef.current.muted = newVolume === 0
     localStorage.setItem('playerVolume', newVolume.toString())
   }
 
-  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (
-      !refs.videoRef.current ||
-      !refs.progressBarRef.current ||
-      isNaN(state.duration) ||
-      state.duration === 0
-    )
-      return
-    const rect = refs.progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+  const handleSeek = (percent: number) => {
+    if (!refs.videoRef.current || isNaN(state.duration) || state.duration === 0) return
     refs.videoRef.current.currentTime = percent * state.duration
     actions.sendProgressUpdate(false, true)
   }
 
-  const handleProgressBarMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!refs.progressBarRef.current || !state.duration) return
-    const rect = refs.progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-    const time = percent * state.duration
-    actions.setHoverTime({ time, position: e.clientX - rect.left })
-  }
-
-  const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault()
+  const handleScrubStart = () => {
     if (!refs.videoRef.current) return
     actions.setIsScrubbing(true)
     actions.wasPlayingBeforeScrub.current = !refs.videoRef.current.paused
     refs.videoRef.current.pause()
+  }
+
+  const handleScrubMove = (percent: number) => {
+    if (!refs.videoRef.current || !state.duration) return
+    refs.videoRef.current.currentTime = percent * state.duration
+  }
+
+  const handleScrubEnd = () => {
+    actions.setIsScrubbing(false)
+    if (actions.wasPlayingBeforeScrub.current) {
+      refs.videoRef.current?.play()
+    }
   }
 
   const handleSubtitleSelection = (trackId: string | null) => {
@@ -248,44 +202,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     return <Icon name="volume-up" />
   }
 
-  useEffect(() => {
-    const handleDocumentMouseMove = (e: MouseEvent) => {
-      if (
-        !state.isScrubbing ||
-        !refs.videoRef.current ||
-        !refs.progressBarRef.current ||
-        !state.duration
-      )
-        return
-      const rect = refs.progressBarRef.current.getBoundingClientRect()
-      const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-      const scrubTime = percent * state.duration
-      refs.videoRef.current.currentTime = scrubTime
-      const percent100 = (scrubTime / state.duration) * 100 || 0
-      if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent100}%`
-      if (thumbRef.current) thumbRef.current.style.left = `${percent100}%`
-      if (timeDisplayRef.current) {
-        timeDisplayRef.current.innerText = `${actions.formatTime(scrubTime)} / ${actions.formatTime(state.duration)}`
-      }
-      actions.setHoverTime({ time: scrubTime, position: e.clientX - rect.left })
-    }
-    const handleDocumentMouseUp = () => {
-      if (state.isScrubbing) {
-        actions.setIsScrubbing(false)
-        actions.setHoverTime({ time: 0, position: null })
-        if (actions.wasPlayingBeforeScrub.current) {
-          refs.videoRef.current?.play()
-        }
-      }
-    }
-    document.addEventListener('mousemove', handleDocumentMouseMove)
-    document.addEventListener('mouseup', handleDocumentMouseUp)
-    return () => {
-      document.removeEventListener('mousemove', handleDocumentMouseMove)
-      document.removeEventListener('mouseup', handleDocumentMouseUp)
-    }
-  }, [state.isScrubbing, state.duration, refs.videoRef, refs.progressBarRef, actions])
-
   return (
     <div
       className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !showVolumeSlider && !state.isScrubbing ? styles.hidden : ''} `}
@@ -322,49 +238,48 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         data-speed-boost-ignore="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''} `}
-          ref={refs.progressBarRef}
-          onClick={handleProgressBarClick}
-          onMouseMove={handleProgressBarMouseMove}
-          onMouseLeave={() => {
-            if (!state.isScrubbing) actions.setHoverTime({ time: 0, position: null })
+        <SeekBar
+          classes={{
+            container: styles.progressBarContainer,
+            scrubbing: styles.scrubbing,
+            timeBubble: styles.timeBubble,
+            bar: styles.progressBar,
+            buffered: styles.bufferedBar,
+            watched: styles.watchedBar,
+            thumb: styles.thumb,
           }}
+          videoRef={refs.videoRef}
+          duration={state.duration}
+          formatTime={actions.formatTime}
+          isScrubbing={state.isScrubbing}
+          onSeek={handleSeek}
+          onScrubStart={handleScrubStart}
+          onScrubMove={handleScrubMove}
+          onScrubEnd={handleScrubEnd}
+          timeLabelRef={timeDisplayRef}
         >
-          {state.hoverTime.position !== null && (
-            <div className={styles.timeBubble} style={{ left: state.hoverTime.position }}>
-              {actions.formatTime(state.hoverTime.time)}
-            </div>
+          {state.duration > 0 && player.state.currentSkipInterval && (
+            <div
+              className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]} `}
+              style={{
+                left: `${(player.state.currentSkipInterval.start_time / state.duration) * 100}% `,
+                width: `${((player.state.currentSkipInterval.end_time - player.state.currentSkipInterval.start_time) / state.duration) * 100}% `,
+              }}
+            ></div>
           )}
-          <div className={styles.progressBar}>
-            {state.duration > 0 && player.state.currentSkipInterval && (
+          {skipIntervals.map((interval) => {
+            const startPercent = (interval.start_time / state.duration) * 100
+            const widthPercent = ((interval.end_time - interval.start_time) / state.duration) * 100
+            return (
               <div
-                className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]} `}
-                style={{
-                  left: `${(player.state.currentSkipInterval.start_time / state.duration) * 100}% `,
-                  width: `${((player.state.currentSkipInterval.end_time - player.state.currentSkipInterval.start_time) / state.duration) * 100}% `,
-                }}
-              ></div>
-            )}
-            <div className={styles.bufferedBar} ref={bufferedBarRef}></div>
-            <div className={styles.watchedBar} ref={watchedBarRef}></div>
-            <div className={styles.thumb} ref={thumbRef} onMouseDown={handleThumbMouseDown}></div>
-
-            {skipIntervals.map((interval) => {
-              const startPercent = (interval.start_time / state.duration) * 100
-              const widthPercent =
-                ((interval.end_time - interval.start_time) / state.duration) * 100
-              return (
-                <div
-                  key={interval.skip_id}
-                  className={`${styles.skipSegment} ${styles[interval.skip_type]} `}
-                  style={{ left: `${startPercent}% `, width: `${widthPercent}% ` }}
-                  title={interval.skip_type.toUpperCase()}
-                />
-              )
-            })}
-          </div>
-        </div>
+                key={interval.skip_id}
+                className={`${styles.skipSegment} ${styles[interval.skip_type]} `}
+                style={{ left: `${startPercent}% `, width: `${widthPercent}% ` }}
+                title={interval.skip_type.toUpperCase()}
+              />
+            )
+          })}
+        </SeekBar>
 
         <div className={styles.bottomControlsRow}>
           <div className={styles.leftControls}>
@@ -376,42 +291,31 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
             </button>
 
-            <div
-              className={`${styles.volumeContainer} ${showVolumeSlider ? styles.visible : ''}`}
-              ref={volumeRef}
-            >
-              <button
-                className={styles.controlBtn}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (window.innerWidth <= 768) {
-                    setShowVolumeSlider(!showVolumeSlider)
-                  } else {
-                    actions.toggleMute()
-                  }
-                }}
-                aria-label={state.isMuted ? 'Unmute' : 'Mute'}
-              >
-                {renderVolumeIcon()}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={state.isMuted ? 0 : state.volume}
-                onChange={handleVolumeChange}
-                className={styles.volumeSlider}
-                style={
-                  {
-                    '--volume-percent': `${(state.isMuted ? 0 : state.volume) * 100}% `,
-                  } as React.CSSProperties
+            <VolumeControl
+              classes={{
+                container: styles.volumeContainer,
+                visible: styles.visible,
+                button: styles.controlBtn,
+                slider: styles.volumeSlider,
+              }}
+              muted={state.isMuted}
+              volume={state.volume}
+              volumeIcon={renderVolumeIcon()}
+              sliderVisible={showVolumeSlider}
+              containerRef={volumeRef}
+              onToggleMute={(e) => {
+                e.stopPropagation()
+                if (window.innerWidth <= 768) {
+                  setShowVolumeSlider(!showVolumeSlider)
+                } else {
+                  actions.toggleMute()
                 }
-              />
-            </div>
+              }}
+              onVolumeChange={handleVolumeChange}
+            />
 
             <span className={styles.timeDisplay} ref={timeDisplayRef}>
-              {actions.formatTime(currentTimeRef.current)} / {actions.formatTime(state.duration)}
+              {actions.formatTime(0)} / {actions.formatTime(state.duration)}
             </span>
 
             {state.currentSkipInterval && !state.isAutoSkipEnabled && (

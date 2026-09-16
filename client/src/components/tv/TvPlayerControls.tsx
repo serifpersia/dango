@@ -4,11 +4,14 @@ import styles from './TvPlayerControls.module.css'
 import CenterControls from '../player/CenterControls'
 import { formatTime } from '../../lib/utils'
 import { pickSubtitleIndex } from '../../lib/subtitles'
-import { MenuSlider, SegmentedRow, SwatchRow } from '../player/MenuControls'
+import SeekBar from '../player/SeekBar'
+import VolumeControl from '../player/VolumeControl'
+import SettingsShell from '../player/SettingsShell'
+import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
+import AvSyncMenu from '../player/AvSyncMenu'
+import AudioTrackMenu from '../player/AudioTrackMenu'
+import OptionListMenu from '../player/OptionListMenu'
 import {
-  BG_COLOR_PRESETS,
-  DEFAULT_SUBTITLE_STYLE,
-  TEXT_COLOR_PRESETS,
   buildCueCss,
   loadSubtitleStyle,
   type SubtitleEdge,
@@ -82,11 +85,8 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   const [isMuted, setIsMuted] = useState(() => localStorage.getItem('playerMuted') === 'true')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [settingsView, setSettingsView] = useState<SettingsView>(null)
-  const [hoverTime, setHoverTime] = useState<{ time: number; position: number | null }>({
-    time: 0,
-    position: null,
-  })
   const [isScrubbing, setIsScrubbing] = useState(false)
+  const timeLabelRef = useRef<HTMLSpanElement>(null)
   const [initialSubtitleStyle] = useState(loadSubtitleStyle)
   const [subtitleFontSize, setSubtitleFontSize] = useState(initialSubtitleStyle.fontSize)
   const [subtitlePosition, setSubtitlePosition] = useState(initialSubtitleStyle.position)
@@ -102,15 +102,50 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       // ignore
     }
   }
-  const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
-  const shownDelayMs = pendingDelayMs ?? videoDelayMs
-  useEffect(() => {
-    setPendingDelayMs(null)
-  }, [videoDelayMs])
-  const commitDelay = () => {
-    if (pendingDelayMs !== null) {
-      onVideoDelayChange?.(pendingDelayMs)
-      setPendingDelayMs(null)
+  const handleSubtitleStyleChange = (key: SubtitleStyleKey, value: number | string | boolean) => {
+    switch (key) {
+      case 'fontSize':
+        if (typeof value === 'number') {
+          setSubtitleFontSize(value)
+          persistSubtitleSetting('subtitleFontSize', value)
+        }
+        break
+      case 'position':
+        if (typeof value === 'number') {
+          setSubtitlePosition(value)
+          persistSubtitleSetting('subtitlePosition', value)
+        }
+        break
+      case 'bgOpacity':
+        if (typeof value === 'number') {
+          setSubtitleBgOpacity(value)
+          persistSubtitleSetting('subtitleBgOpacity', value)
+        }
+        break
+      case 'bgColor':
+        if (typeof value === 'string') {
+          setSubtitleBgColor(value)
+          persistSubtitleSetting('subtitleBgColor', value)
+        }
+        break
+      case 'textColor':
+        if (typeof value === 'string') {
+          setSubtitleTextColor(value)
+          persistSubtitleSetting('subtitleTextColor', value)
+        }
+        break
+      case 'edge':
+        if (value === 'shadow' || value === 'outline' || value === 'none') {
+          setSubtitleEdge(value)
+          persistSubtitleSetting('subtitleEdge', value)
+        }
+        break
+      case 'bold':
+        if (typeof value === 'boolean') {
+          setSubtitleBold(value)
+          persistSubtitleSetting('subtitleBold', value)
+        }
+        break
     }
   }
   const inactivityTimer = useRef<number | null>(null)
@@ -118,7 +153,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   const rafIdRef = useRef<number | null>(null)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<number | null>(null)
-  const progressBarRef = useRef<HTMLDivElement>(null)
   const controlsRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -363,57 +397,30 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     }, 250)
   }
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSeek = (percent: number) => {
     const video = videoRef.current
-    if (!video || !progressBarRef.current || isNaN(duration) || duration === 0) return
-    const rect = progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    if (!video || isNaN(duration) || duration === 0) return
     video.currentTime = percent * duration
   }
 
-  const handleProgressMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || !duration) return
-    const rect = progressBarRef.current.getBoundingClientRect()
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-    setHoverTime({ time: percent * duration, position: e.clientX - rect.left })
-  }
-
-  const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const video = videoRef.current
-    if (!video) return
+  const handleScrubStart = () => {
     setIsScrubbing(true)
-    video.pause()
+    videoRef.current?.pause()
   }
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isScrubbing || !progressBarRef.current || !duration) return
-      const rect = progressBarRef.current.getBoundingClientRect()
-      const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-      const video = videoRef.current
-      if (video) video.currentTime = percent * duration
-      setHoverTime({ time: percent * duration, position: e.clientX - rect.left })
-    }
-    const handleMouseUp = () => {
-      if (isScrubbing) {
-        setIsScrubbing(false)
-        setHoverTime({ time: 0, position: null })
-        videoRef.current?.play().catch(() => {})
-      }
-    }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isScrubbing, duration, videoRef])
+  const handleScrubMove = (percent: number) => {
+    const video = videoRef.current
+    if (video && duration) video.currentTime = percent * duration
+  }
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleScrubEnd = () => {
+    setIsScrubbing(false)
+    videoRef.current?.play().catch(() => {})
+  }
+
+  const handleVolumeChange = (newVolume: number) => {
     const video = videoRef.current
     if (!video) return
-    const newVolume = parseFloat(e.target.value)
     video.volume = newVolume
     video.muted = newVolume === 0
     localStorage.setItem('playerVolume', newVolume.toString())
@@ -438,7 +445,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     }
   }
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
   const hasSubtitles = subtitles.length > 0
   const isSubtitleActive = selectedSubtitle >= 0
 
@@ -518,204 +524,79 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     </>
   )
 
-  const renderQualitySettings = () =>
-    streams.map((s, i) => (
-      <button
-        key={i}
-        className={`${styles.menuItem} ${i === qualityIdx ? styles.active : ''}`}
-        onClick={() => onQualityChange(i)}
-      >
-        <span>{s.quality}</span>
-        {i === qualityIdx && <Icon name="check" size={12} />}
-      </button>
-    ))
+  const renderQualitySettings = () => (
+    <OptionListMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      options={streams.map((s, i) => ({
+        key: String(i),
+        label: s.quality,
+        selected: i === qualityIdx,
+      }))}
+      onSelect={(key) => onQualityChange(Number(key))}
+    />
+  )
 
   const renderSubtitleSettings = () => (
-    <>
-      <button
-        className={`${styles.menuItem} ${!isSubtitleActive ? styles.active : ''}`}
-        onClick={() => onSubtitleChange(-1)}
-      >
-        <span>Off</span>
-        {!isSubtitleActive && <Icon name="check" size={12} />}
-      </button>
-      {subtitles.map((track, i) => (
-        <button
-          key={i}
-          className={`${styles.menuItem} ${i === selectedSubtitle ? styles.active : ''}`}
-          onClick={() => onSubtitleChange(i)}
-        >
-          <span>{track.label || track.language}</span>
-          {i === selectedSubtitle && <Icon name="check" size={12} />}
-        </button>
-      ))}
-    </>
+    <OptionListMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      options={[
+        { key: 'off', label: 'Off', selected: !isSubtitleActive },
+        ...subtitles.map((track, i) => ({
+          key: String(i),
+          label: track.label || track.language,
+          selected: i === selectedSubtitle,
+        })),
+      ]}
+      onSelect={(key) => onSubtitleChange(key === 'off' ? -1 : Number(key))}
+    />
   )
 
   const renderSubtitleStyleSettings = () => (
-    <>
-      <MenuSlider
-        label="Font Size"
-        display={subtitleFontSize.toFixed(1)}
-        min={0.5}
-        max={10}
-        step={0.5}
-        value={subtitleFontSize}
-        percent={((subtitleFontSize - 0.5) / 9.5) * 100}
-        onChange={(v) => {
-          if (Number.isFinite(v)) {
-            setSubtitleFontSize(v)
-            persistSubtitleSetting('subtitleFontSize', v)
-          }
-        }}
-      />
-      <MenuSlider
-        label="Vertical Position"
-        display={`${subtitlePosition}`}
-        min={0}
-        max={100}
-        step={1}
-        value={subtitlePosition}
-        percent={subtitlePosition}
-        onChange={(v) => {
-          if (Number.isFinite(v)) {
-            const rounded = Math.round(v)
-            setSubtitlePosition(rounded)
-            persistSubtitleSetting('subtitlePosition', rounded)
-          }
-        }}
-      />
-      <MenuSlider
-        label="Background Opacity"
-        display={`${Math.round(subtitleBgOpacity * 100)}%`}
-        min={0}
-        max={1}
-        step={0.05}
-        value={subtitleBgOpacity}
-        percent={subtitleBgOpacity * 100}
-        onChange={(v) => {
-          if (Number.isFinite(v)) {
-            setSubtitleBgOpacity(v)
-            persistSubtitleSetting('subtitleBgOpacity', v)
-          }
-        }}
-      />
-      <SwatchRow
-        label="Text Color"
-        colors={TEXT_COLOR_PRESETS}
-        value={subtitleTextColor}
-        onChange={(c) => {
-          setSubtitleTextColor(c)
-          persistSubtitleSetting('subtitleTextColor', c)
-        }}
-      />
-      <SwatchRow
-        label="Background Color"
-        colors={BG_COLOR_PRESETS}
-        value={subtitleBgColor}
-        onChange={(c) => {
-          setSubtitleBgColor(c)
-          persistSubtitleSetting('subtitleBgColor', c)
-        }}
-      />
-      <SegmentedRow
-        label="Text Edge"
-        options={['shadow', 'outline', 'none'] as const}
-        value={subtitleEdge}
-        onChange={(edge) => {
-          setSubtitleEdge(edge)
-          persistSubtitleSetting('subtitleEdge', edge)
-        }}
-      />
-      <button
-        className={`${styles.menuItem} ${subtitleBold ? styles.active : ''}`}
-        onClick={() => {
-          setSubtitleBold(!subtitleBold)
-          persistSubtitleSetting('subtitleBold', !subtitleBold)
-        }}
-      >
-        <span>Bold Text</span>
-        {subtitleBold && <Icon name="check" size={12} />}
-      </button>
-      <button
-        className={styles.menuItem}
-        onClick={() => {
-          setSubtitleFontSize(DEFAULT_SUBTITLE_STYLE.fontSize)
-          persistSubtitleSetting('subtitleFontSize', DEFAULT_SUBTITLE_STYLE.fontSize)
-          setSubtitlePosition(DEFAULT_SUBTITLE_STYLE.position)
-          persistSubtitleSetting('subtitlePosition', DEFAULT_SUBTITLE_STYLE.position)
-          setSubtitleBgOpacity(DEFAULT_SUBTITLE_STYLE.bgOpacity)
-          persistSubtitleSetting('subtitleBgOpacity', DEFAULT_SUBTITLE_STYLE.bgOpacity)
-          setSubtitleBgColor(DEFAULT_SUBTITLE_STYLE.bgColor)
-          persistSubtitleSetting('subtitleBgColor', DEFAULT_SUBTITLE_STYLE.bgColor)
-          setSubtitleTextColor(DEFAULT_SUBTITLE_STYLE.textColor)
-          persistSubtitleSetting('subtitleTextColor', DEFAULT_SUBTITLE_STYLE.textColor)
-          setSubtitleEdge(DEFAULT_SUBTITLE_STYLE.edge)
-          persistSubtitleSetting('subtitleEdge', DEFAULT_SUBTITLE_STYLE.edge)
-          setSubtitleBold(DEFAULT_SUBTITLE_STYLE.bold)
-          persistSubtitleSetting('subtitleBold', DEFAULT_SUBTITLE_STYLE.bold)
-        }}
-      >
-        <span>Reset to Defaults</span>
-      </button>
-    </>
+    <SubtitleStyleMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      values={{
+        fontSize: subtitleFontSize,
+        position: subtitlePosition,
+        bgOpacity: subtitleBgOpacity,
+        bgColor: subtitleBgColor,
+        textColor: subtitleTextColor,
+        edge: subtitleEdge,
+        bold: subtitleBold,
+      }}
+      onChange={handleSubtitleStyleChange}
+    />
   )
 
-  const renderAudioSettings = () =>
-    audioTracks.map((track, i) => (
-      <button
-        key={i}
-        className={`${styles.menuItem} ${i === selectedAudioTrack ? styles.active : ''}`}
-        onClick={() => onAudioTrackChange(i)}
-      >
-        <span>{track.label || track.language}</span>
-        {i === selectedAudioTrack && <Icon name="check" size={12} />}
-      </button>
-    ))
+  const renderAudioSettings = () => (
+    <AudioTrackMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      tracks={audioTracks}
+      selected={selectedAudioTrack}
+      onChange={onAudioTrackChange}
+    />
+  )
 
   const renderServerSettings = () => (
-    <>
-      {movyServers.map((city) => (
-        <button
-          key={city}
-          className={`${styles.menuItem} ${selectedMovyServer === city ? styles.active : ''}`}
-          onClick={() => onMovyServerSelect?.(city)}
-        >
-          <span style={{ textTransform: 'capitalize' }}>{city}</span>
-          {selectedMovyServer === city && <Icon name="check" size={12} />}
-        </button>
-      ))}
-    </>
+    <OptionListMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      options={movyServers.map((city) => ({
+        key: city,
+        label: <span style={{ textTransform: 'capitalize' }}>{city}</span>,
+        selected: selectedMovyServer === city,
+      }))}
+      onSelect={(city) => onMovyServerSelect?.(city)}
+    />
   )
 
   const renderAvSyncSettings = () => (
-    <>
-      <button
-        className={`${styles.menuItem} ${videoDelayEnabled ? styles.active : ''}`}
-        onClick={() => onVideoDelayToggle?.(!videoDelayEnabled)}
-      >
-        <span>Video delay</span>
-        {videoDelayEnabled && <Icon name="check" size={12} />}
-      </button>
-      <MenuSlider
-        label="Video delay"
-        display={`${shownDelayMs}ms`}
-        min={0}
-        max={500}
-        step={5}
-        value={shownDelayMs}
-        percent={(shownDelayMs / 500) * 100}
-        onChange={(v) => setPendingDelayMs(Math.round(v))}
-        onCommit={commitDelay}
-      />
-      <div className={styles.menuNote}>
-        For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
-        untouched.
-      </div>
-      <button className={styles.menuItem} onClick={() => onCalibrateAvSync?.()}>
-        <span>Calibrate…</span>
-      </button>
-    </>
+    <AvSyncMenu
+      classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
+      enabled={videoDelayEnabled}
+      delayMs={videoDelayMs}
+      onToggle={(v) => onVideoDelayToggle?.(v)}
+      onDelayChange={(ms) => onVideoDelayChange?.(ms)}
+      onCalibrate={onCalibrateAvSync}
+    />
   )
 
   return (
@@ -749,30 +630,27 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         />
 
         <div className={styles.bottomControls}>
-          <div
-            className={`${styles.progressBarContainer} ${isScrubbing ? styles.scrubbing : ''}`}
-            ref={progressBarRef}
-            onClick={handleProgressClick}
-            onMouseMove={handleProgressMouseMove}
-            onMouseLeave={() => {
-              if (!isScrubbing) setHoverTime({ time: 0, position: null })
+          <SeekBar
+            classes={{
+              container: styles.progressBarContainer,
+              scrubbing: styles.scrubbing,
+              timeBubble: styles.timeBubble,
+              bar: styles.progressBar,
+              buffered: styles.bufferedBar,
+              watched: styles.watchedBar,
+              thumb: styles.thumb,
             }}
-          >
-            {hoverTime.position !== null && (
-              <div className={styles.timeBubble} style={{ left: hoverTime.position }}>
-                {formatTime(hoverTime.time)}
-              </div>
-            )}
-            <div className={styles.progressBar}>
-              <div className={styles.bufferedBar} style={{ width: '100%' }} />
-              <div className={styles.watchedBar} style={{ width: `${progressPercent}%` }} />
-              <div
-                className={styles.thumb}
-                style={{ left: `${progressPercent}%` }}
-                onMouseDown={handleThumbMouseDown}
-              />
-            </div>
-          </div>
+            videoRef={videoRef}
+            duration={duration}
+            formatTime={formatTime}
+            isScrubbing={isScrubbing}
+            buffered="full"
+            onSeek={handleSeek}
+            onScrubStart={handleScrubStart}
+            onScrubMove={handleScrubMove}
+            onScrubEnd={handleScrubEnd}
+            timeLabelRef={timeLabelRef}
+          />
 
           <div className={styles.bottomControlsRow}>
             <div className={styles.leftControls}>
@@ -783,36 +661,27 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
               >
                 {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
               </button>
-              <div className={styles.volumeContainer}>
-                <button
-                  className={styles.controlBtn}
-                  onClick={toggleMute}
-                  aria-label={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  {isMuted ? (
+              <VolumeControl
+                classes={{
+                  container: styles.volumeContainer,
+                  button: styles.controlBtn,
+                  slider: styles.volumeSlider,
+                }}
+                muted={isMuted}
+                volume={volume}
+                volumeIcon={
+                  isMuted ? (
                     <Icon name="volume-mute" />
                   ) : volume < 0.5 ? (
                     <Icon name="volume-down" />
                   ) : (
                     <Icon name="volume-up" />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className={styles.volumeSlider}
-                  style={
-                    {
-                      '--volume-percent': `${(isMuted ? 0 : volume) * 100}%`,
-                    } as React.CSSProperties
-                  }
-                />
-              </div>
-              <span className={styles.timeDisplay}>
+                  )
+                }
+                onToggleMute={toggleMute}
+                onVolumeChange={handleVolumeChange}
+              />
+              <span className={styles.timeDisplay} ref={timeLabelRef}>
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
@@ -847,38 +716,37 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       </div>
 
       {settingsView && (
-        <div className={styles.settingsPanel}>
-          <div className={styles.settingsHeader}>
-            <button
-              className={styles.settingsBackBtn}
-              onClick={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
-            >
-              <Icon name="chevron-left" />
-            </button>
-            <span className={styles.settingsTitle}>
-              {settingsView === 'main'
-                ? 'Settings'
-                : settingsView === 'subtitle-style'
-                  ? 'Subtitle Style'
-                  : settingsView === 'audio'
-                    ? 'Audio Track'
-                    : settingsView === 'server'
-                      ? 'Movy Server'
-                      : settingsView === 'av-sync'
-                        ? 'A/V Sync'
-                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)}
-            </span>
-          </div>
-          <div className={styles.settingsContent}>
-            {settingsView === 'main' && renderMainSettings()}
-            {settingsView === 'quality' && renderQualitySettings()}
-            {settingsView === 'subtitles' && renderSubtitleSettings()}
-            {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
-            {settingsView === 'audio' && renderAudioSettings()}
-            {settingsView === 'server' && renderServerSettings()}
-            {settingsView === 'av-sync' && renderAvSyncSettings()}
-          </div>
-        </div>
+        <SettingsShell
+          classes={{
+            panel: styles.settingsPanel,
+            header: styles.settingsHeader,
+            backBtn: styles.settingsBackBtn,
+            title: styles.settingsTitle,
+            content: styles.settingsContent,
+          }}
+          title={
+            settingsView === 'main'
+              ? 'Settings'
+              : settingsView === 'subtitle-style'
+                ? 'Subtitle Style'
+                : settingsView === 'audio'
+                  ? 'Audio Track'
+                  : settingsView === 'server'
+                    ? 'Movy Server'
+                    : settingsView === 'av-sync'
+                      ? 'A/V Sync'
+                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
+          }
+          onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
+        >
+          {settingsView === 'main' && renderMainSettings()}
+          {settingsView === 'quality' && renderQualitySettings()}
+          {settingsView === 'subtitles' && renderSubtitleSettings()}
+          {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
+          {settingsView === 'audio' && renderAudioSettings()}
+          {settingsView === 'server' && renderServerSettings()}
+          {settingsView === 'av-sync' && renderAvSyncSettings()}
+        </SettingsShell>
       )}
     </div>
   )

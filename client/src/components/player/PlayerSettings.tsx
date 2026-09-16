@@ -3,13 +3,11 @@ import Icon from '../common/Icon'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
-import {
-  BG_COLOR_PRESETS,
-  DEFAULT_SUBTITLE_STYLE,
-  TEXT_COLOR_PRESETS,
-  type SubtitleEdge,
-} from '../../lib/subtitleStyle'
-import { MenuSlider, SegmentedRow, SwatchRow } from './MenuControls'
+import { type SubtitleEdge } from '../../lib/subtitleStyle'
+import SettingsShell from './SettingsShell'
+import SubtitleStyleMenu from './SubtitleStyleMenu'
+import AvSyncMenu from './AvSyncMenu'
+import OptionListMenu from './OptionListMenu'
 import type { FallbackChoice } from '../../lib/fallbackChoice'
 
 interface PlayerSettingsProps {
@@ -95,15 +93,6 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onFallbackChoiceChange,
   } = props
   const [view, setView] = useState<SettingsView>('main')
-  const [pendingDelayMs, setPendingDelayMs] = useState<number | null>(null)
-  const shownDelayMs = pendingDelayMs ?? videoDelayMs
-
-  const commitDelay = () => {
-    if (pendingDelayMs !== null) {
-      onVideoDelayChange(pendingDelayMs)
-      setPendingDelayMs(null)
-    }
-  }
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -111,10 +100,6 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       return () => clearTimeout(timer)
     }
   }, [isOpen])
-
-  React.useEffect(() => {
-    setPendingDelayMs(null)
-  }, [videoDelayMs])
 
   const renderMain = () => (
     <div className={styles.menuContent}>
@@ -180,115 +165,46 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       ) || []
     return (
       <div className={styles.menuContent}>
-        {links.map((link) => (
-          <button
-            key={link.resolutionStr}
-            className={`${styles.menuItem} ${currentLink?.resolutionStr === link.resolutionStr ? styles.selected : ''} `}
-            onClick={() => onSourceChange(currentSource!, link)}
-          >
-            <span>{link.resolutionStr}</span>
-            {currentLink?.resolutionStr === link.resolutionStr && <Icon name="check" size={12} />}
-          </button>
-        ))}
+        <OptionListMenu
+          classes={{ item: styles.menuItem, active: styles.selected }}
+          options={links.map((link) => ({
+            key: link.resolutionStr,
+            label: link.resolutionStr,
+            selected: currentLink?.resolutionStr === link.resolutionStr,
+          }))}
+          onSelect={(key) => {
+            const link = links.find((l) => l.resolutionStr === key)
+            if (link) onSourceChange(currentSource!, link)
+          }}
+        />
       </div>
     )
   }
 
   const renderSubtitles = () => (
     <div className={styles.menuContent}>
-      <button
-        className={`${styles.menuItem} ${activeSubtitleTrack === 'off' ? styles.selected : ''} `}
-        onClick={() => onSubtitleChange('off')}
-      >
-        <span>Off</span>
-        {activeSubtitleTrack === 'off' && <Icon name="check" size={12} />}
-      </button>
-      {subtitles.map((sub) => (
-        <button
-          key={sub.label}
-          className={`${styles.menuItem} ${activeSubtitleTrack === (sub.label || sub.lang) ? styles.selected : ''} `}
-          onClick={() => onSubtitleChange(sub.label || sub.lang)}
-        >
-          <span>{sub.label}</span>
-          {activeSubtitleTrack === (sub.label || sub.lang) && <Icon name="check" size={12} />}
-        </button>
-      ))}
+      <OptionListMenu
+        classes={{ item: styles.menuItem, active: styles.selected }}
+        options={[
+          { key: 'off', label: 'Off', selected: activeSubtitleTrack === 'off' },
+          ...subtitles.map((sub) => ({
+            key: sub.label || sub.lang,
+            label: sub.label,
+            selected: activeSubtitleTrack === (sub.label || sub.lang),
+          })),
+        ]}
+        onSelect={(key) => onSubtitleChange(key)}
+      />
     </div>
   )
 
   const renderSubtitleStyle = () => (
     <div className={styles.menuContent}>
-      <MenuSlider
-        label="Font Size"
-        display={subtitleSettings.fontSize.toFixed(1)}
-        min={0.5}
-        max={10}
-        step={0.5}
-        value={subtitleSettings.fontSize}
-        percent={((subtitleSettings.fontSize - 0.5) / 9.5) * 100}
-        onChange={(v) => onSubtitleSettingsChange('fontSize', v)}
+      <SubtitleStyleMenu
+        classes={{ item: styles.menuItem, active: styles.selected }}
+        values={subtitleSettings}
+        onChange={onSubtitleSettingsChange}
       />
-      <MenuSlider
-        label="Vertical Position"
-        display={`${subtitleSettings.position}`}
-        min={0}
-        max={100}
-        step={1}
-        value={subtitleSettings.position}
-        percent={subtitleSettings.position}
-        onChange={(v) => onSubtitleSettingsChange('position', Math.round(v))}
-      />
-      <MenuSlider
-        label="Background Opacity"
-        display={`${Math.round(subtitleSettings.bgOpacity * 100)}%`}
-        min={0}
-        max={1}
-        step={0.05}
-        value={subtitleSettings.bgOpacity}
-        percent={subtitleSettings.bgOpacity * 100}
-        onChange={(v) => onSubtitleSettingsChange('bgOpacity', v)}
-      />
-      <SwatchRow
-        label="Text Color"
-        colors={TEXT_COLOR_PRESETS}
-        value={subtitleSettings.textColor}
-        onChange={(c) => onSubtitleSettingsChange('textColor', c)}
-      />
-      <SwatchRow
-        label="Background Color"
-        colors={BG_COLOR_PRESETS}
-        value={subtitleSettings.bgColor}
-        onChange={(c) => onSubtitleSettingsChange('bgColor', c)}
-      />
-      <SegmentedRow
-        label="Text Edge"
-        options={['shadow', 'outline', 'none'] as const}
-        value={subtitleSettings.edge}
-        onChange={(edge) => onSubtitleSettingsChange('edge', edge)}
-      />
-      <button
-        type="button"
-        className={`${styles.menuItem} ${subtitleSettings.bold ? styles.selected : ''}`}
-        onClick={() => onSubtitleSettingsChange('bold', !subtitleSettings.bold)}
-      >
-        <span>Bold Text</span>
-        {subtitleSettings.bold && <Icon name="check" size={12} />}
-      </button>
-      <button
-        type="button"
-        className={styles.menuItem}
-        onClick={() => {
-          onSubtitleSettingsChange('fontSize', DEFAULT_SUBTITLE_STYLE.fontSize)
-          onSubtitleSettingsChange('position', DEFAULT_SUBTITLE_STYLE.position)
-          onSubtitleSettingsChange('bgOpacity', DEFAULT_SUBTITLE_STYLE.bgOpacity)
-          onSubtitleSettingsChange('bgColor', DEFAULT_SUBTITLE_STYLE.bgColor)
-          onSubtitleSettingsChange('textColor', DEFAULT_SUBTITLE_STYLE.textColor)
-          onSubtitleSettingsChange('edge', DEFAULT_SUBTITLE_STYLE.edge)
-          onSubtitleSettingsChange('bold', DEFAULT_SUBTITLE_STYLE.bold)
-        }}
-      >
-        <span>Reset to Defaults</span>
-      </button>
     </div>
   )
 
@@ -408,61 +324,47 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
 
   const renderAvSync = () => (
     <div className={styles.menuContent}>
-      <button
-        className={`${styles.menuItem} ${videoDelayEnabled ? styles.selected : ''}`}
-        onClick={() => onVideoDelayToggle(!videoDelayEnabled)}
-      >
-        <span>Video delay</span>
-        {videoDelayEnabled && <Icon name="check" size={12} />}
-      </button>
-      <MenuSlider
-        label="Video delay"
-        display={`${shownDelayMs}ms`}
-        min={0}
-        max={500}
-        step={5}
-        value={shownDelayMs}
-        percent={(shownDelayMs / 500) * 100}
-        onChange={(v) => setPendingDelayMs(Math.round(v))}
-        onCommit={commitDelay}
+      <AvSyncMenu
+        classes={{ item: styles.menuItem, active: styles.selected, note: styles.menuNote }}
+        enabled={videoDelayEnabled}
+        delayMs={videoDelayMs}
+        onToggle={onVideoDelayToggle}
+        onDelayChange={onVideoDelayChange}
+        onCalibrate={onCalibrateAvSync}
       />
-      <div className={styles.menuNote}>
-        For Bluetooth headsets where audio arrives late. Video is held back via canvas; audio plays
-        untouched.
-      </div>
-      <button className={styles.menuItem} onClick={onCalibrateAvSync}>
-        <span>Calibrate…</span>
-      </button>
     </div>
   )
 
   if (!isOpen) return null
 
   return (
-    <div ref={ref} className={styles.settingsPanel} onClick={(e) => e.stopPropagation()}>
-      <div className={styles.header}>
-        {view !== 'main' && (
-          <button className={styles.backBtn} onClick={() => setView('main')}>
-            <Icon name="chevron-left" />
-          </button>
-        )}
-        <h3>
-          {view === 'main'
-            ? 'Settings'
-            : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')}
-        </h3>
-      </div>
-
-      <div className={styles.contentWrapper}>
-        {view === 'main' && renderMain()}
-        {view === 'quality' && renderQuality()}
-        {view === 'subtitles' && renderSubtitles()}
-        {view === 'subtitle-style' && renderSubtitleStyle()}
-        {view === 'upscaler' && renderUpscaler()}
-        {view === 'av-sync' && renderAvSync()}
-        {view === 'playback' && renderPlayback()}
-      </div>
-    </div>
+    <SettingsShell
+      classes={{
+        panel: styles.settingsPanel,
+        header: styles.header,
+        backBtn: styles.backBtn,
+        title: '',
+        content: styles.contentWrapper,
+      }}
+      title={
+        view === 'main'
+          ? 'Settings'
+          : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')
+      }
+      titleTag="h3"
+      showBack={view !== 'main'}
+      onBack={() => setView('main')}
+      panelRef={ref}
+      onPanelClick={(e) => e.stopPropagation()}
+    >
+      {view === 'main' && renderMain()}
+      {view === 'quality' && renderQuality()}
+      {view === 'subtitles' && renderSubtitles()}
+      {view === 'subtitle-style' && renderSubtitleStyle()}
+      {view === 'upscaler' && renderUpscaler()}
+      {view === 'av-sync' && renderAvSync()}
+      {view === 'playback' && renderPlayback()}
+    </SettingsShell>
   )
 }
 
