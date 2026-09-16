@@ -4,6 +4,7 @@ import {
   EpisodeDetails,
   EpisodeDetail,
   SearchOptions,
+  SubtitleTrack,
 } from './provider.interface.js'
 import logger from '../logger.js'
 import { BaseProvider } from './base-provider.js'
@@ -34,6 +35,26 @@ interface JustAnimeSource {
   isM3U8?: boolean
   headers?: Record<string, string>
 }
+
+interface JustAnimeSubtitle {
+  file: string
+  label?: string
+  kind?: string
+}
+
+interface JustAnimeStreamTrack {
+  sources?: JustAnimeSource[]
+  subtitles?: JustAnimeSubtitle[]
+  tracks?: JustAnimeSubtitle[]
+  headers?: { Referer?: string }
+}
+
+interface JustAnimeStreamData {
+  sub?: JustAnimeStreamTrack | null
+  dub?: JustAnimeStreamTrack | null
+}
+
+const STREAM_SERVERS = ['megaplay', 'zokoanime', 'animegg']
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
@@ -169,40 +190,60 @@ export class JustAnimeProvider extends BaseProvider {
       const cached = this.cache.get<VideoSource[]>(cacheKey)
       if (cached) return cached
 
-      const data = await this.getApi<{
-        sub?: { sources?: JustAnimeSource[] } | null
-        dub?: { sources?: JustAnimeSource[] } | null
-      }>(`/watch/${encodeURIComponent(id)}/episode/${encodeURIComponent(ep)}/animegg`)
-      const sources = (mode === 'dub' ? data.dub?.sources : data.sub?.sources) || []
-      const links = sources
-        .filter((s) => s && s.url)
-        .map((s) => {
-          const q = this.qualityNum(s.quality)
-          const hls = s.isM3U8 === true || /\.m3u8(?:[?#]|$)/i.test(s.url)
-          return {
-            resolutionStr: q ? `${q}p` : 'Auto',
-            quality: q,
-            link: s.url,
+      const settled = await Promise.allSettled(
+        STREAM_SERVERS.map((server) =>
+          this.getApi<JustAnimeStreamData>(
+            `/watch/${encodeURIComponent(id)}/episode/${encodeURIComponent(ep)}/${server}`
+          ).then((data) => ({ server, data }))
+        )
+      )
+      const result: VideoSource[] = []
+      for (const entry of settled) {
+        if (entry.status !== 'fulfilled') continue
+        const { server, data } = entry.value
+        const track = mode === 'dub' ? data.dub : data.sub
+        const sources = track?.sources || []
+        const links = sources
+          .filter((s) => s && s.url)
+          .map((s) => {
+            const q = this.qualityNum(s.quality)
+            const hls = s.isM3U8 === true || /\.m3u8(?:[?#]|$)/i.test(s.url)
+            return {
+              resolutionStr: q ? `${q}p` : 'Auto',
+              quality: q,
+              link: s.url,
+              hls,
+              referer: s.headers?.Referer || track?.headers?.Referer || 'https://www.animegg.org/',
+            }
+          })
+          .sort((a, b) => b.quality - a.quality)
+          .map(({ resolutionStr, link, hls, referer }) => ({
+            resolutionStr,
+            link,
             hls,
-          }
-        })
-        .sort((a, b) => b.quality - a.quality)
-        .map(({ resolutionStr, link, hls }) => ({
-          resolutionStr,
-          link,
-          hls,
-          headers: { Referer: 'https://www.animegg.org/' },
-        }))
-      if (links.length === 0) return null
-
-      const result: VideoSource[] = [
-        {
-          sourceName: `JustAnime (${mode.toUpperCase()})`,
+            headers: { Referer: referer },
+          }))
+        if (links.length === 0) continue
+        const subtitles: SubtitleTrack[] = [...(track?.subtitles || []), ...(track?.tracks || [])]
+          .filter((s) => s && s.file)
+          .map((s) => ({
+            language: s.label && /english/i.test(s.label) ? 'en' : s.label || 'en',
+            label: s.label || 'English',
+            url: s.file,
+          }))
+        const seen = new Set<string>()
+        const uniqueSubtitles = subtitles.filter((s) =>
+          seen.has(s.url) ? false : (seen.add(s.url), true)
+        )
+        result.push({
+          sourceName: `JustAnime · ${server} (${mode.toUpperCase()})`,
           links,
+          subtitles: uniqueSubtitles.length > 0 ? uniqueSubtitles : undefined,
           type: 'player',
           actualEpisodeNumber: ep,
-        },
-      ]
+        })
+      }
+      if (result.length === 0) return null
       this.cache.set(cacheKey, result, 1800)
       return result
     } catch (e) {

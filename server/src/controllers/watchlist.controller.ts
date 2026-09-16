@@ -554,9 +554,16 @@ export class WatchlistController {
       const idToGenres = new Map(
         genreRows.map((r) => [r.id, r.genres ? (JSON.parse(r.genres) as string[]) : []])
       )
-      const includeList = filters.genres?.split(',').map((g) => g.trim()).filter(Boolean) || []
+      const includeList =
+        filters.genres
+          ?.split(',')
+          .map((g) => g.trim())
+          .filter(Boolean) || []
       const excludeList =
-        filters.excludeGenres?.split(',').map((g) => g.trim()).filter(Boolean) || []
+        filters.excludeGenres
+          ?.split(',')
+          .map((g) => g.trim())
+          .filter(Boolean) || []
 
       filtered = filtered.filter((row) => {
         const rowGenres: string[] = idToGenres.get(row.id) || []

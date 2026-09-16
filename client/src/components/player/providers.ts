@@ -40,7 +40,7 @@ export const PROVIDER_OPTIONS: {
   tier?: ProviderTier
 }[] = [
   { value: 'megaplay', label: 'MegaPlay', mature: false, sub: 'soft', tier: 'direct' },
-  { value: 'justanime', label: 'JustAnime', mature: false, sub: 'hard', tier: 'direct' },
+  { value: 'justanime', label: 'JustAnime', mature: false, sub: 'mixed', tier: 'direct' },
   { value: 'anibd', label: 'AniBD', mature: false, sub: 'hard', tier: 'direct' },
   { value: 'animegg', label: 'AnimeGG', mature: false, sub: 'hard', tier: 'direct' },
   { value: 'kaa', label: 'KAA', mature: false, sub: 'soft', tier: 'direct' },
