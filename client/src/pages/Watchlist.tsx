@@ -29,7 +29,7 @@ import {
   useBatchRemoveFromContinueWatching,
   useBatchUpdateWatchlistStatus,
   usePaginatedAllContinueWatching,
-  useGenresAndStudios,
+  useGenresAndTags,
 } from '../hooks/useAnimeData'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
@@ -93,8 +93,10 @@ const Watchlist: React.FC = () => {
   const [year, setYear] = useState(searchParams.get('year') || 'ALL')
   const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() => {
     const states: { [key: string]: 'include' | 'exclude' } = {}
-    const genres = searchParams.get('genres')?.split(',').filter(Boolean) || []
-    const exclude = searchParams.get('excludeGenres')?.split(',').filter(Boolean) || []
+    const genres =
+      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+    const exclude =
+      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     return states
@@ -104,7 +106,7 @@ const Watchlist: React.FC = () => {
   )
   const { lowEndMode } = useLowEndMode()
   const { titlePreference } = useTitlePreference()
-  const { data: metaData } = useGenresAndStudios()
+  const { data: metaData } = useGenresAndTags()
   const availableGenres = metaData?.genres || []
   const gridRef = useRef<HTMLDivElement>(null)
 
@@ -156,8 +158,10 @@ const Watchlist: React.FC = () => {
     setSeason(searchParams.get('season') || 'ALL')
     setYear(searchParams.get('year') || 'ALL')
     const states: { [key: string]: 'include' | 'exclude' } = {}
-    const genres = searchParams.get('genres')?.split(',').filter(Boolean) || []
-    const exclude = searchParams.get('excludeGenres')?.split(',').filter(Boolean) || []
+    const genres =
+      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+    const exclude =
+      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setGenreStates(states)

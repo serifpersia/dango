@@ -12,7 +12,7 @@ import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
-import { usePaginatedSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
+import { usePaginatedSearchAnime, useGenresAndTags } from '../hooks/useAnimeData'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from './Search.module.css'
@@ -100,23 +100,20 @@ export default function Search() {
     }
   }, [])
 
-  useEffect(() => {
-    if (type === 'TV_SHORT') {
-      setType('ALL')
-    }
-  }, [type])
   const { lowEndMode } = useLowEndMode()
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  const { data: metaData } = useGenresAndStudios()
+  const { data: metaData } = useGenresAndTags()
   const availableGenres = metaData?.genres || []
 
   const [anilistGenreState, setAnilistGenreState] = useState<{
     [key: string]: 'include' | 'exclude'
   }>(() => {
     const states: { [key: string]: 'include' | 'exclude' } = {}
-    const genres = searchParams.get('genres')?.split(',') || []
-    const exclude = searchParams.get('excludeGenres')?.split(',') || []
+    const genres =
+      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+    const exclude =
+      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     return states
@@ -163,36 +160,59 @@ export default function Search() {
     setPage(parseInt(searchParams.get('page') || '1'))
 
     const states: { [key: string]: 'include' | 'exclude' } = {}
-    const genres = searchParams.get('genres')?.split(',') || []
-    const exclude = searchParams.get('excludeGenres')?.split(',') || []
+    const genres =
+      searchParams.get('genres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
+    const exclude =
+      searchParams.get('excludeGenres')?.split(',').map((g) => g.trim()).filter(Boolean) || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setAnilistGenreState(states)
   }, [searchParams])
 
-  const handleSearch = (newPage = 1) => {
+  const handleSearch = (
+    newPage = 1,
+    overrides: {
+      type?: string
+      status?: string
+      season?: string
+      year?: string
+      country?: string
+      sort?: string
+      genreState?: { [key: string]: 'include' | 'exclude' }
+      showMature?: boolean
+    } = {}
+  ) => {
     hideVirtualKeyboard()
+
+    const effType = overrides.type ?? type
+    const effStatus = overrides.status ?? status
+    const effSeason = overrides.season ?? season
+    const effYear = overrides.year ?? year
+    const effCountry = overrides.country ?? country
+    const effSort = overrides.sort ?? sort
+    const effGenreState = overrides.genreState ?? anilistGenreState
+    const effShowMature = overrides.showMature ?? showMature
 
     const params = new URLSearchParams()
     if (query.trim()) params.set('query', query.trim())
 
-    if (type !== 'ALL') params.set('type', type)
-    if (status) params.set('status', status)
-    if (season !== 'ALL') params.set('season', season)
-    if (year !== 'ALL') params.set('year', year)
-    if (country !== 'ALL') params.set('country', country)
-    if (sort !== 'POPULARITY_DESC') params.set('sortBy', sort)
+    if (effType !== 'ALL') params.set('type', effType)
+    if (effStatus) params.set('status', effStatus)
+    if (effSeason !== 'ALL') params.set('season', effSeason)
+    if (effYear !== 'ALL') params.set('year', effYear)
+    if (effCountry !== 'ALL') params.set('country', effCountry)
+    if (effSort !== 'POPULARITY_DESC') params.set('sortBy', effSort)
 
-    const anilistGenres = Object.entries(anilistGenreState)
+    const anilistGenres = Object.entries(effGenreState)
       .filter(([, s]) => s === 'include')
       .map(([g]) => g)
-    const anilistExclude = Object.entries(anilistGenreState)
+    const anilistExclude = Object.entries(effGenreState)
       .filter(([, s]) => s === 'exclude')
       .map(([g]) => g)
 
     if (anilistGenres.length > 0) params.set('genres', anilistGenres.join(','))
     if (anilistExclude.length > 0) params.set('excludeGenres', anilistExclude.join(','))
-    if (type !== 'ADULT' && !showMature) params.set('adult', 'false')
+    if (effType !== 'ADULT' && !effShowMature) params.set('adult', 'false')
 
     params.set('provider', 'anilist')
 
@@ -392,6 +412,16 @@ export default function Search() {
                 setSort('POPULARITY_DESC')
                 setStatus('')
                 setShowMature(false)
+                handleSearch(1, {
+                  type: 'ALL',
+                  status: '',
+                  season: 'ALL',
+                  year: 'ALL',
+                  country: 'ALL',
+                  sort: 'POPULARITY_DESC',
+                  genreState: {},
+                  showMature: false,
+                })
               }}
             >
               Reset All
@@ -433,7 +463,7 @@ export default function Search() {
                   e.stopPropagation()
                   e.preventDefault()
                   setType('ALL')
-                  handleSearch()
+                  handleSearch(1, { type: 'ALL' })
                 }}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
               >
@@ -453,7 +483,7 @@ export default function Search() {
                   e.stopPropagation()
                   e.preventDefault()
                   setSeason('ALL')
-                  handleSearch()
+                  handleSearch(1, { season: 'ALL' })
                 }}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
               >
@@ -473,7 +503,7 @@ export default function Search() {
                   e.stopPropagation()
                   e.preventDefault()
                   setYear('ALL')
-                  handleSearch()
+                  handleSearch(1, { year: 'ALL' })
                 }}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
               >
@@ -493,12 +523,10 @@ export default function Search() {
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  setAnilistGenreState((prev) => {
-                    const copy = { ...prev }
-                    delete copy[genre]
-                    return copy
-                  })
-                  handleSearch()
+                  const copy = { ...anilistGenreState }
+                  delete copy[genre]
+                  setAnilistGenreState(copy)
+                  handleSearch(1, { genreState: copy })
                 }}
                 style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
               >

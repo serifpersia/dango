@@ -672,9 +672,9 @@ export const useThisWeekSchedule = () => {
   })
 }
 
-export const useGenresAndStudios = () => {
-  return useQuery<{ genres: string[]; tags: string[]; studios: string[] }>({
-    queryKey: ['genresAndStudios'],
+export const useGenresAndTags = () => {
+  return useQuery<{ genres: string[]; tags: string[] }>({
+    queryKey: ['genresAndTags'],
     queryFn: () => fetchApi('/api/genres-and-tags'),
     staleTime: 1000 * 60 * 60,
   })

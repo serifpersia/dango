@@ -184,7 +184,8 @@ export interface KitsuSearchOptions {
   status?: string
   season?: string
   seasonYear?: number
-  genre?: string
+  genre?: string | string[]
+  genre_in?: string[]
   genre_not_in?: string[]
   averageScore_greater?: number
   episodes_greater?: number
@@ -220,6 +221,7 @@ export async function kitsuSearchAnime(options: KitsuSearchOptions = {}): Promis
     season,
     seasonYear,
     genre,
+    genre_in,
     genre_not_in,
     averageScore_greater,
     episodes_greater,
@@ -237,7 +239,14 @@ export async function kitsuSearchAnime(options: KitsuSearchOptions = {}): Promis
   const seasonFilter = seasonToKitsu(season)
   if (seasonFilter && seasonFilter !== 'all') filters.push(`filter[season]=${seasonFilter}`)
   if (seasonYear) filters.push(`filter[seasonYear]=${seasonYear}`)
-  if (genre) filters.push(`filter[categories]=${encodeURIComponent(genre)}`)
+  const genreCombined = [
+    ...(Array.isArray(genre) ? genre : typeof genre === 'string' ? genre.split(',') : []),
+    ...(genre_in ?? []),
+  ]
+    .map((g) => g.trim())
+    .filter(Boolean)
+    .join(',')
+  if (genreCombined) filters.push(`filter[categories]=${encodeURIComponent(genreCombined)}`)
 
   const offset = (page - 1) * perPage
   const path = `/anime?${filters.join('&')}${filters.length ? '&' : ''}sort=${anilistSortToKitsu(

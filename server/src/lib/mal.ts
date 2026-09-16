@@ -703,6 +703,7 @@ export async function malSearchMedia(
     season,
     seasonYear,
     genre,
+    genre_in,
     genre_not_in,
     averageScore_greater,
     episodes_greater,
@@ -724,8 +725,15 @@ export async function malSearchMedia(
     const statusId = MAL_STATUS_IDS[status.toLowerCase()]
     if (statusId) params.set('status', statusId)
   }
-  if (genre) {
-    const ids = await resolveGenreIds(store, genre)
+  const genreCombined = [
+    ...(Array.isArray(genre) ? genre : typeof genre === 'string' ? genre.split(',') : []),
+    ...(genre_in ?? []),
+  ]
+    .map((g) => g.trim())
+    .filter(Boolean)
+    .join(',')
+  if (genreCombined) {
+    const ids = await resolveGenreIds(store, genreCombined)
     if (!ids) return []
     for (const id of ids.split(',')) params.append('genre[]', id)
   }

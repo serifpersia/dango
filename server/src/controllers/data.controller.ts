@@ -31,6 +31,15 @@ import { WatchlistRepository } from '../repositories/watchlist.repository.js'
 import { dbRun } from '../utils/db-utils.js'
 import logger from '../logger.js'
 
+function parseListParam(value: unknown): string[] | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined
+  const list = value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+  return list.length > 0 ? list : undefined
+}
+
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
 
@@ -461,12 +470,8 @@ export class DataController {
         seasonYear: req.query.year ? parseInt(req.query.year as string) : undefined,
         countryOfOrigin: req.query.country as string,
         genre: req.query.genres as string,
-        genre_not_in: req.query.excludeGenres
-          ? (req.query.excludeGenres as string).split(',')
-          : undefined,
-        tag_not_in: req.query.excludeTags
-          ? (req.query.excludeTags as string).split(',')
-          : undefined,
+        genre_not_in: parseListParam(req.query.excludeGenres),
+        tag_not_in: parseListParam(req.query.excludeTags),
         averageScore_greater: req.query.minScore
           ? parseInt(req.query.minScore as string)
           : undefined,
@@ -502,9 +507,7 @@ export class DataController {
           seasonYear: req.query.year ? parseInt(req.query.year as string) : undefined,
           countryOfOrigin: req.query.country as string,
           genre: req.query.genres as string,
-          genre_not_in: req.query.excludeGenres
-            ? (req.query.excludeGenres as string).split(',')
-            : undefined,
+          genre_not_in: parseListParam(req.query.excludeGenres),
           isAdult: true,
           sort: (req.query.sortBy as string) || undefined,
         })
@@ -617,10 +620,8 @@ export class DataController {
             perPage: malLimit,
             format: req.query.type as string,
             status: req.query.status as string,
-            genre: undefined,
-            genre_not_in: req.query.excludeGenres
-              ? (req.query.excludeGenres as string).split(',')
-              : undefined,
+            genre: (req.query.genres as string) || undefined,
+            genre_not_in: parseListParam(req.query.excludeGenres),
             isAdult: true,
             sort: (req.query.sortBy as string) || undefined,
             averageScore_greater: req.query.minScore
