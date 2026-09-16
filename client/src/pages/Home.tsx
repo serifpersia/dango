@@ -164,9 +164,10 @@ const Home: React.FC = () => {
       const barRect = bar.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
       setIndicator({
-        left: elRect.left - barRect.left,
+        left: elRect.left - barRect.left + bar.scrollLeft,
         width: elRect.width,
       })
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
   }, [displayTab, tabsWithWeek.length])
 

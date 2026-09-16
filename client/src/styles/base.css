@@ -11,6 +11,11 @@ html {
   scroll-behavior: smooth;
   color-scheme: dark;
   scrollbar-gutter: stable;
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html:has(:fullscreen) {
@@ -27,6 +32,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
   color-scheme: dark;
 }
 
@@ -45,6 +52,7 @@ body,
 
 body {
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body::before {

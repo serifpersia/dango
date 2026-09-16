@@ -117,8 +117,15 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-full);
   width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   position: relative;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
 }
 
 .tabIndicator {
@@ -147,6 +154,7 @@
   color: var(--text-muted) !important;
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 
 .tabButton:hover:not(:disabled) {
@@ -172,7 +180,7 @@
 @media (max-width: 600px) {
   .tabBar {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .tabButton {

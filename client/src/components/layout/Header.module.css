@@ -323,6 +323,7 @@
   .header {
     height: 64px;
     padding: 0 var(--space-3);
+    --logo-height: 44px;
   }
 
   .headerInner {
@@ -332,6 +333,7 @@
 
   .leftSection {
     gap: var(--space-1);
+    min-width: 0;
   }
 
   .hamburgerBtn {
@@ -342,7 +344,7 @@
 
   .logo {
     padding: 2px;
-    transform: scale(0.8);
+    min-width: 0;
   }
 
   .searchButton {
@@ -364,7 +366,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .desktopNav {
     display: none;
   }
@@ -382,7 +384,8 @@
   }
 
   .logo {
-    transform: scale(0.85);
+    padding: 2px;
+    min-width: 0;
   }
 
   .searchButton {

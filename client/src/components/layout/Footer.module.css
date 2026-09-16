@@ -1,10 +1,6 @@
 .footer {
-  width: 100vw;
+  width: 100%;
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
   padding: 0 var(--space-8) var(--space-8);
   overflow: visible;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
