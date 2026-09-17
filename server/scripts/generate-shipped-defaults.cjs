@@ -5,6 +5,9 @@ const defaults = {
   GITHUB_CLIENT_ID: process.env.G_CLIENT_ID || '',
   GOOGLE_AUTH_WORKER_URL: process.env.GOOGLE_AUTH_WORKER_URL || '',
   DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID || '',
+  PROVIDER_REPO_URL:
+    process.env.PROVIDER_REPO_URL ||
+    'https://raw.githubusercontent.com/serifpersia/dango-providers/main/registry.json',
 }
 
 const out = `export const SHIPPED_DEFAULTS = ${JSON.stringify(defaults, null, 2)} as const
