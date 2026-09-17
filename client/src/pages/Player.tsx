@@ -1007,13 +1007,7 @@ const Player: React.FC = () => {
     }
   }, [actions, player.actions.inactivityTimer, handleNShortcut, isTheaterMode])
 
-  const { setIsFullscreen, setAvailableSubtitles, setActiveSubtitleTrack } = actions
-
-  useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [setIsFullscreen])
+  const { setAvailableSubtitles, setActiveSubtitleTrack } = actions
 
   useEffect(() => {
     const videoElement = refs.videoRef.current

@@ -1409,7 +1409,8 @@
   border-radius: 0;
 }
 
-.videoContainer:fullscreen {
+.videoContainer:fullscreen,
+.videoContainer:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
 }

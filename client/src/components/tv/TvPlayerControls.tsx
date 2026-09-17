@@ -17,6 +17,11 @@ import {
   type SubtitleEdge,
   type SubtitleStyleSettings,
 } from '../../lib/subtitleStyle'
+import {
+  toggleFullscreen as toggleFullscreenCrossBrowser,
+  isFullscreenActive,
+  subscribeFullscreen,
+} from '../../lib/fullscreen'
 
 type SettingsView =
   'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
@@ -315,7 +320,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           if (isPlaying && !settingsView && !isScrubbing) {
             inactivityTimer.current = window.setTimeout(() => {
               setShowControls(false)
-              if (document.fullscreenElement) {
+              if (isFullscreenActive(videoRef.current)) {
                 container.style.cursor = 'none'
               }
             }, 3000)
@@ -324,7 +329,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         })
       }
     },
-    [isPlaying, settingsView, isScrubbing]
+    [isPlaying, settingsView, isScrubbing, videoRef]
   )
 
   useEffect(() => {
@@ -433,17 +438,22 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     localStorage.setItem('playerMuted', video.muted.toString())
   }
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     const container = containerRef.current
     if (!container) return
-    if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(() => {})
-      setIsFullscreen(true)
-    } else {
-      document.exitFullscreen().catch(() => {})
-      setIsFullscreen(false)
-    }
-  }
+    void toggleFullscreenCrossBrowser(container, videoRef.current)
+      .then(() => {
+        setIsFullscreen(isFullscreenActive(videoRef.current))
+      })
+      .catch(() => {})
+  }, [videoRef])
+
+  useEffect(() => {
+    const getVideo = () => videoRef.current
+    const cleanup = subscribeFullscreen(getVideo, setIsFullscreen)
+    setIsFullscreen(isFullscreenActive(getVideo()))
+    return cleanup
+  }, [videoRef])
 
   const hasSubtitles = subtitles.length > 0
   const isSubtitleActive = selectedSubtitle >= 0

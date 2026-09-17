@@ -3,6 +3,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 import { formatTime } from '../lib/utils'
 import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
+import {
+  toggleFullscreen as toggleFullscreenCrossBrowser,
+  isFullscreenActive,
+  subscribeFullscreen,
+} from '../lib/fullscreen'
 
 interface VideoPlayerProps {
   skipIntervals: SkipInterval[]
@@ -217,16 +222,13 @@ const useVideoPlayer = ({
   }, [sendProgressUpdate])
 
   const toggleFullscreen = useCallback(() => {
-    if (!playerContainerRef.current) return
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`)
-      })
-    } else {
-      if (document.fullscreenElement) {
-        document.exitFullscreen()
-      }
-    }
+    const container = playerContainerRef.current
+    if (!container) return
+    void toggleFullscreenCrossBrowser(container, videoRef.current).catch((err) => {
+      console.error(
+        `Error attempting to toggle full-screen mode: ${(err as Error)?.message} (${(err as Error)?.name})`
+      )
+    })
   }, [])
 
   const togglePlay = useCallback(() => {
@@ -297,16 +299,13 @@ const useVideoPlayer = ({
   }, [setShowControls])
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = document.fullscreenElement !== null
-      setIsFullscreen(isCurrentlyFullscreen)
-      if (isCurrentlyFullscreen) {
-        setShowControls(true)
-      }
-    }
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    const getVideo = () => videoRef.current
+    const cleanup = subscribeFullscreen(getVideo, (active) => {
+      setIsFullscreen(active)
+      if (active) setShowControls(true)
+    })
+    setIsFullscreen(isFullscreenActive(getVideo()))
+    return cleanup
   }, [setShowControls])
 
   useEffect(() => {

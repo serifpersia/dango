@@ -8,7 +8,8 @@
   container-type: inline-size;
 }
 
-.container:fullscreen {
+.container:fullscreen,
+.container:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
   aspect-ratio: auto;

@@ -18,7 +18,8 @@ html {
   text-size-adjust: 100%;
 }
 
-html:has(:fullscreen) {
+html:has(:fullscreen),
+html:has(:-webkit-full-screen) {
   scrollbar-gutter: auto;
 }
 
