@@ -31,7 +31,6 @@ import EpisodeListSkeleton from '../components/player/EpisodeListSkeleton'
 import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
-import { PROVIDER_OPTIONS } from '../components/player/providers'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
 import useDelayCanvas from '../hooks/useDelayCanvas'
@@ -50,11 +49,7 @@ import {
   type FallbackChoice,
 } from '../lib/fallbackChoice'
 
-const DIRECT_PROVIDER_ORDER: string[] = PROVIDER_OPTIONS.map((option) => option.value)
-
-const MATURE_PROVIDERS = new Set(
-  PROVIDER_OPTIONS.filter((option) => option.mature).map((option) => option.value)
-)
+import { useProviders } from '../hooks/useProviders'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
@@ -62,6 +57,19 @@ const Player: React.FC = () => {
   const queryClient = useQueryClient()
   const location = useLocation()
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
+  const { options: providerOptions } = useProviders()
+  const animeOptions = useMemo(
+    () => providerOptions.filter((option) => (option.kind ?? 'anime') === 'anime'),
+    [providerOptions]
+  )
+  const DIRECT_PROVIDER_ORDER: string[] = useMemo(
+    () => animeOptions.map((option) => option.value),
+    [animeOptions]
+  )
+  const MATURE_PROVIDERS = useMemo(
+    () => new Set(animeOptions.filter((option) => option.mature).map((option) => option.value)),
+    [animeOptions]
+  )
 
   const {
     state,
@@ -597,6 +605,8 @@ const Player: React.FC = () => {
     state.showMeta?.isAdult,
     state.selectedProvider,
     dispatch,
+    DIRECT_PROVIDER_ORDER,
+    MATURE_PROVIDERS,
   ])
 
   const handleVideoSourceError = useCallback(() => {
@@ -1938,6 +1948,7 @@ const Player: React.FC = () => {
               <ProviderSelector
                 selectedProvider={state.selectedProvider}
                 isAdult={state.showMeta?.isAdult}
+                options={animeOptions}
                 onProviderChange={(newProvider) => {
                   hasAutoFallbackRef.current = false
                   triedProvidersRef.current = []

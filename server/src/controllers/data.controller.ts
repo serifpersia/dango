@@ -672,9 +672,8 @@ export class DataController {
 
   getMatureFilters = async (_req: Request, res: Response) => {
     try {
-      const { WH_GENRES } = await import('../providers/wh.provider.js')
-      const { OP_TAGS, OP_ORDERS } = await import('../providers/op.provider.js')
-      const { HT_GENRES } = await import('../providers/ht.provider.js')
+      const { WH_GENRES, OP_TAGS, OP_ORDERS, HT_GENRES } =
+        await import('../providers/mature-filters.js')
       return res.json({
         whGenres: WH_GENRES,
         opTags: OP_TAGS,

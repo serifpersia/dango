@@ -5,20 +5,7 @@ export type Action =
   | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
   | {
       type: 'SET_PROVIDER'
-      payload:
-        | 'animepahe'
-        | '123anime'
-        | 'animeya'
-        | 'megaplay'
-        | 'wh'
-        | 'hn'
-        | 'anilight'
-        | 'kaa'
-        | 'ht'
-        | 'op'
-        | 'anibd'
-        | 'animedunya'
-        | 'animegg'
+      payload: string
     }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
@@ -28,23 +15,8 @@ const getPreferredMode = (): 'sub' | 'dub' => {
 
 const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const provider = localStorage.getItem('preferredProvider')
-  const validProviders: string[] = [
-    'megaplay',
-    'anilight',
-    'kaa',
-    'animeya',
-    'animepahe',
-    '123anime',
-    'wh',
-    'hn',
-    'ht',
-    'op',
-    'anibd',
-    'animedunya',
-    'animegg',
-  ]
-  if (provider && validProviders.includes(provider)) {
-    return provider as PlayerState['selectedProvider']
+  if (provider && /^[a-z0-9-]+$/i.test(provider)) {
+    return provider
   }
   return 'megaplay'
 }

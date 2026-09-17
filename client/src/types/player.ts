@@ -118,20 +118,7 @@ export interface PlayerState {
   resumeTime: number
   resumeDuration: number
   skipIntervals: SkipInterval[]
-  selectedProvider:
-    | 'animepahe'
-    | '123anime'
-    | 'animeya'
-    | 'megaplay'
-    | 'wh'
-    | 'hn'
-    | 'anilight'
-    | 'kaa'
-    | 'ht'
-    | 'op'
-    | 'anibd'
-    | 'animedunya'
-    | 'animegg'
+  selectedProvider: string
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

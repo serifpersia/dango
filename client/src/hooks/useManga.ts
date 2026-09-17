@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchApi } from '../lib/fetchApi'
 
-export type MangaProviderName = 'mangadex' | 'mangapill'
+export type MangaProviderName = string
 
 export interface MangaCard {
   id: string
@@ -46,7 +46,7 @@ export interface MangaBrowseResult {
 
 const STALE_5_MIN = 5 * 60 * 1000
 
-const PROVIDER_REFERER: Record<MangaProviderName, string> = {
+const PROVIDER_REFERER: Record<string, string> = {
   mangadex: 'https://mangadex.org/',
   mangapill: 'https://www.mangapill.com/',
 }

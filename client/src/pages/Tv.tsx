@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import Icon from '../components/common/Icon'
 import TvCard from '../components/tv/TvCard'
@@ -6,6 +6,7 @@ import TvPlayerControls from '../components/tv/TvPlayerControls'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
+import { useProviders } from '../hooks/useProviders'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
 import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
@@ -13,23 +14,6 @@ import useDelayCanvas from '../hooks/useDelayCanvas'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import type Hls from 'hls.js'
 import styles from './Tv.module.css'
-
-const MOVY_SERVERS = [
-  'miami',
-  'phoenix',
-  'dallas',
-  'seattle',
-  'denver',
-  'cancun',
-  'atlanta',
-  'houston',
-  'portland',
-  'austin',
-  'munich',
-  'berlin',
-  'paris',
-  'delhi',
-] as const
 
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
 
@@ -86,34 +70,14 @@ interface SubtitleTrack {
   url: string
 }
 
-const WATCHSERIES_PROVIDERS = {
-  embedmaster: {
-    name: 'EmbedMaster',
-    url: (id: number, type: string, s: number, e: number) =>
-      type === 'movie'
-        ? `https://embedmaster.link/movie/${id}`
-        : `https://embedmaster.link/tv/${id}/${s}/${e}`,
-  },
-  vidfast: {
-    name: 'VidFast',
-    url: (id: number, type: string, s: number, e: number) =>
-      type === 'movie'
-        ? `https://vidfast.pro/movie/${id}`
-        : `https://vidfast.pro/tv/${id}/${s}/${e}`,
-  },
-  videasy: {
-    name: 'VidEasy',
-    url: (id: number, type: string, s: number, e: number) =>
-      type === 'movie'
-        ? `https://player.videasy.to/movie/${id}?overlay=true`
-        : `https://player.videasy.to/tv/${id}/${s}/${e}?episodeSelector=true&overlay=true`,
-  },
-  vidrock: {
-    name: 'VidRock',
-    url: (id: number, type: string, s: number, e: number) =>
-      type === 'movie' ? `https://vidrock.ru/movie/${id}` : `https://vidrock.ru/tv/${id}/${s}/${e}`,
-  },
+interface TvProviderOption {
+  id: string
+  label: string
+  tier: 'direct' | 'embed'
+  servers?: string[]
 }
+
+const NO_TV_PROVIDERS: TvProviderOption[] = []
 
 const SUGGESTIONS = [
   'Stranger Things',
@@ -144,12 +108,33 @@ const Tv: React.FC = () => {
   const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
   const [source, setSource] = useState(() => {
     try {
-      return localStorage.getItem('tvProvider') || 'movybz'
+      return localStorage.getItem('tvProvider') || ''
     } catch {
-      return 'movybz'
+      return ''
     }
   })
   const [streams, setStreams] = useState<StreamSource[]>([])
+  const {
+    options: providerOptions,
+    isFallback: providersFallback,
+    isLoading: providersLoading,
+  } = useProviders()
+  const serverTvProviders: TvProviderOption[] = useMemo(
+    () =>
+      providerOptions
+        .filter((o) => (o.kind ?? 'tv') === 'tv')
+        .map((o) => ({
+          id: o.value,
+          label: o.label,
+          tier: o.tier === 'embed' ? 'embed' : 'direct',
+          servers: o.servers,
+        })),
+    [providerOptions]
+  )
+  const tvProviders =
+    providersFallback || serverTvProviders.length === 0 ? NO_TV_PROVIDERS : serverTvProviders
+  const directProviders = tvProviders.filter((p) => p.tier === 'direct')
+  const embedProviders = tvProviders.filter((p) => p.tier === 'embed')
   const [streamLoading, setStreamLoading] = useState(false)
   const [streamError, setStreamError] = useState('')
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([])
@@ -162,9 +147,9 @@ const Tv: React.FC = () => {
   const [iframeUrl, setIframeUrl] = useState('')
   const [selectedMovyServer, setSelectedMovyServer] = useState<string>(() => {
     try {
-      return localStorage.getItem('movyServer') || 'miami'
+      return localStorage.getItem('movyServer') || ''
     } catch {
-      return 'miami'
+      return ''
     }
   })
   const streamsRef = useRef<StreamSource[]>([])
@@ -269,7 +254,37 @@ const Tv: React.FC = () => {
     return pickSubtitleIndex(tracks, { lastKey: null, enabled: true })
   }, [])
 
-  const isEmbedProvider = ['embedmaster', 'vidfast', 'videasy', 'vidrock'].includes(source)
+  const activeProvider = useMemo(
+    () => tvProviders.find((p) => p.id === source),
+    [tvProviders, source]
+  )
+  const isEmbedProvider = activeProvider?.tier === 'embed'
+  const activeServers = useMemo(() => activeProvider?.servers ?? [], [activeProvider])
+
+  useEffect(() => {
+    if (tvProviders.length === 0) return
+    if (!tvProviders.some((p) => p.id === source)) {
+      const next = tvProviders.find((p) => p.tier === 'direct')?.id ?? tvProviders[0].id
+      setSource(next)
+      try {
+        localStorage.setItem('tvProvider', next)
+      } catch {
+        // ignore
+      }
+    }
+  }, [tvProviders, source])
+
+  useEffect(() => {
+    if (activeServers.length === 0) return
+    if (!activeServers.includes(selectedMovyServer)) {
+      setSelectedMovyServer(activeServers[0])
+      try {
+        localStorage.setItem('movyServer', activeServers[0])
+      } catch {
+        // ignore
+      }
+    }
+  }, [activeServers, selectedMovyServer])
 
   useEffect(() => {
     if (!id) {
@@ -351,26 +366,26 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     if (!isEmbedProvider || !details || !id) return
-    const provider = WATCHSERIES_PROVIDERS[source as keyof typeof WATCHSERIES_PROVIDERS]
-    if (!provider) return
-
     const type = isMovie ? 'movie' : 'tv'
-    const url = provider.url(details.id, type, season, episode)
-    setIframeUrl(url)
-
-    fetch(`/api/resolve?url=${encodeURIComponent(url)}`)
+    fetch(`/api/tv/embed/${source}/${type}/${id}?season=${season}&episode=${episode}`)
       .then((r) => r.json())
-      .then((data) => {
-        if (data.finalUrl) setIframeUrl(data.finalUrl)
+      .then((data: { url?: string }) => {
+        if (!data.url) return
+        setIframeUrl(data.url)
+        return fetch(`/api/resolve?url=${encodeURIComponent(data.url)}`)
+          .then((r) => r.json())
+          .then((resolved) => {
+            if (resolved.finalUrl) setIframeUrl(resolved.finalUrl)
+          })
       })
       .catch(() => {})
   }, [source, details, id, season, episode, isMovie, isEmbedProvider])
 
   const loadStreams = useCallback(async () => {
-    if (!details || !id || isEmbedProvider) return
+    if (!details || !id || !source || isEmbedProvider) return
     if (details.adult && !hasMatureConsent) return
-    const hasExistingForMovy = source === 'movybz' && streamsRef.current.length > 0
-    if (hasExistingForMovy) {
+    const hasExisting = streamsRef.current.length > 0
+    if (hasExisting) {
       setStreamError('')
     } else {
       setStreamLoading(true)
@@ -382,100 +397,65 @@ const Tv: React.FC = () => {
     }
 
     try {
-      if (source === 'movybz') {
-        const type = isMovie ? 'movie' : 'tv'
-        const baseParams = new URLSearchParams({
-          title: details.title || '',
-          year: details.year || '',
-          season: String(season),
-          episode: String(episode),
-          totalSeasons: String(details.number_of_seasons || 1),
-          imdbId: details.imdb_id || '',
-        })
-        const res = await fetch(
-          `/api/tv/movybz/${type}/${id}/probe/${selectedMovyServer}?${baseParams.toString()}`
+      const type = isMovie ? 'movie' : 'tv'
+      const params = new URLSearchParams({
+        title: details.title || '',
+        year: details.year || '',
+        season: String(season),
+        episode: String(episode),
+        totalSeasons: String(details.number_of_seasons || 1),
+        imdbId: details.imdb_id || '',
+      })
+      if (activeServers.length > 0 && selectedMovyServer) {
+        params.set('server', selectedMovyServer)
+      }
+      const res = await fetch(`/api/tv/sources/${source}/${type}/${id}?${params.toString()}`)
+      const data = await res.json()
+      setStreamLoading(false)
+      if (!data.valid || !data.sources?.length) {
+        setStreamError(
+          data.error
+            ? `${data.error}`
+            : activeServers.length > 0
+              ? `No streams from ${selectedMovyServer}. Try another server.`
+              : 'No streams available.'
         )
-        const data = await res.json()
-        setStreamLoading(false)
-        if (data.valid && data.sources?.length) {
-          setStreams(data.sources)
-          setSourceTypeFilter('all')
-          setQualityIdx(0)
-          setSubtitles([])
-          setSelectedSubtitle(-1)
-          const subType = type
-          const subId = id
-          const subSeason = season
-          const subEpisode = episode
-          fetch(`/api/tv/subtitles/${subType}/${subId}?season=${subSeason}&episode=${subEpisode}`)
-            .then((r) => r.json())
-            .then((sd: { subtitles?: SubtitleTrack[] }) => {
-              const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
-              if (osSubs.length === 0) return
-              setSubtitles(osSubs)
-              const pick = pickDefaultSubtitle(osSubs)
+        return
+      }
+      setStreams(data.sources)
+      setSourceTypeFilter('all')
+      setQualityIdx(0)
+      if (data.referer) setReferer(data.referer)
+      const tracks = data.audioTracks || []
+      setAudioTracks(tracks)
+      setSelectedAudioTrack(tracks.length > 0 ? pickDefaultAudio(tracks) : 0)
+      const subs = data.subtitles || []
+      setSubtitles(subs)
+      if (subs.length > 0) {
+        const pick = pickDefaultSubtitle(subs)
+        setSelectedSubtitle(pick)
+        persistSubtitlePick(pick)
+      } else {
+        setSelectedSubtitle(-1)
+      }
+      const subId = id
+      fetch(`/api/tv/subtitles/${type}/${subId}?season=${season}&episode=${episode}`)
+        .then((r) => r.json())
+        .then((sd: { subtitles?: SubtitleTrack[] }) => {
+          const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
+          if (osSubs.length === 0) return
+          setSubtitles((prev) => {
+            const merged = [...prev, ...osSubs.filter((s) => !prev.some((p) => p.url === s.url))]
+            if (prev.length === 0) {
+              const pick = pickDefaultSubtitle(merged)
               setSelectedSubtitle(pick)
               persistSubtitlePick(pick)
-            })
-            .catch(() => {})
-          if (data.audioTracks?.length) {
-            const tracks = data.audioTracks as AudioTrack[]
-            setAudioTracks(tracks)
-            setSelectedAudioTrack(pickDefaultAudio(tracks))
-          } else {
-            setAudioTracks([])
-          }
-          setStreamError('')
-          return
-        }
-        setStreamError(`No streams from ${selectedMovyServer}. Try another server.`)
-        return
-      } else if (source === 'vixsrc') {
-        const type = isMovie ? 'movie' : 'tv'
-        let url = `/api/tv/vixsrc/${type}/${id}`
-        if (!isMovie) url += `?season=${season}&episode=${episode}`
-        const res = await fetch(url)
-        const data = await res.json()
-        setStreamLoading(false)
-        if (!data.sources || !data.sources.length) {
-          setStreamError('No VixSrc streams available.')
-          return
-        }
-        setStreams(data.sources)
-        setReferer(data.referer || 'https://vixsrc.to/')
-        const tracks = data.audioTracks || []
-        setAudioTracks(tracks)
-        if (tracks.length > 0) {
-          setSelectedAudioTrack(pickDefaultAudio(tracks))
-        }
-        const subs = data.subtitles || []
-        setSubtitles(subs)
-        if (subs.length > 0) {
-          const pick = pickDefaultSubtitle(subs)
-          setSelectedSubtitle(pick)
-          persistSubtitlePick(pick)
-        } else {
-          setSelectedSubtitle(-1)
-        }
-        const osType = type
-        const osId = id
-        fetch(`/api/tv/subtitles/${osType}/${osId}?season=${season}&episode=${episode}`)
-          .then((r) => r.json())
-          .then((sd: { subtitles?: SubtitleTrack[] }) => {
-            const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
-            if (osSubs.length === 0) return
-            setSubtitles((prev) => {
-              const merged = [...prev, ...osSubs.filter((s) => !prev.some((p) => p.url === s.url))]
-              if (prev.length === 0) {
-                const pick = pickDefaultSubtitle(merged)
-                setSelectedSubtitle(pick)
-                persistSubtitlePick(pick)
-              }
-              return merged
-            })
+            }
+            return merged
           })
-          .catch(() => {})
-      }
+        })
+        .catch(() => {})
+      setStreamError('')
     } catch {
       setStreamLoading(false)
       setStreamError('Failed to load streams.')
@@ -489,6 +469,7 @@ const Tv: React.FC = () => {
     isMovie,
     isEmbedProvider,
     hasMatureConsent,
+    activeServers,
     selectedMovyServer,
     pickDefaultSubtitle,
     persistSubtitlePick,
@@ -541,7 +522,7 @@ const Tv: React.FC = () => {
     video.removeAttribute('src')
     video.load()
 
-    const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(source === 'movybz' ? 'https://www.movy.bz/' : referer)}`
+    const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(referer)}`
 
     if (filtered[qualityIdx]?.type === 'hls') {
       void (async () => {
@@ -668,9 +649,7 @@ const Tv: React.FC = () => {
       track.kind = 'subtitles'
       track.label = sub.label || sub.language || 'Unknown'
       track.srclang = sub.language || sub.label || 'en'
-      const subReferer =
-        source === 'movybz' ? 'https://www.movy.bz/' : referer || 'https://vixsrc.to/'
-      const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(subReferer)}`
+      const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(referer)}`
       track.src = subUrl
       track.addEventListener('load', () => {
         const idx = manualTrackElsRef.current.indexOf(track)
@@ -1067,19 +1046,34 @@ const Tv: React.FC = () => {
               value={source}
               onChange={(e) => handleSourceSelect(e.target.value)}
               className={styles.select}
+              disabled={tvProviders.length === 0}
             >
-              <optgroup label="Direct HLS">
-                <option value="movybz">Movy.bz (4K HLS)</option>
-                <option value="vixsrc">VixSrc (HLS)</option>
-              </optgroup>
-              <optgroup label="WatchSeries Embeds">
-                <option value="embedmaster">EmbedMaster</option>
-                <option value="vidfast">VidFast</option>
-                <option value="videasy">VidEasy</option>
-              </optgroup>
-              <optgroup label="Other Embeds">
-                <option value="vidrock">VidRock</option>
-              </optgroup>
+              {providersLoading ? (
+                <option value="">Loading…</option>
+              ) : tvProviders.length === 0 ? (
+                <option value="">No providers available</option>
+              ) : (
+                <>
+                  {directProviders.length > 0 && (
+                    <optgroup label="Direct HLS">
+                      {directProviders.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {embedProviders.length > 0 && (
+                    <optgroup label="Embeds">
+                      {embedProviders.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
+              )}
             </select>
           </label>
         </div>
@@ -1093,19 +1087,34 @@ const Tv: React.FC = () => {
               value={source}
               onChange={(e) => handleSourceSelect(e.target.value)}
               className={styles.select}
+              disabled={tvProviders.length === 0}
             >
-              <optgroup label="Direct HLS">
-                <option value="movybz">Movy.bz (4K HLS)</option>
-                <option value="vixsrc">VixSrc (HLS)</option>
-              </optgroup>
-              <optgroup label="WatchSeries Embeds">
-                <option value="embedmaster">EmbedMaster</option>
-                <option value="vidfast">VidFast</option>
-                <option value="videasy">VidEasy</option>
-              </optgroup>
-              <optgroup label="Other Embeds">
-                <option value="vidrock">VidRock</option>
-              </optgroup>
+              {providersLoading ? (
+                <option value="">Loading…</option>
+              ) : tvProviders.length === 0 ? (
+                <option value="">No providers available</option>
+              ) : (
+                <>
+                  {directProviders.length > 0 && (
+                    <optgroup label="Direct HLS">
+                      {directProviders.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {embedProviders.length > 0 && (
+                    <optgroup label="Embeds">
+                      {embedProviders.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
+              )}
             </select>
           </label>
         </div>
@@ -1145,7 +1154,7 @@ const Tv: React.FC = () => {
                       Retry
                     </button>
                   </div>
-                  {source === 'movybz' && (
+                  {activeServers.length > 0 && (
                     <div
                       style={{
                         display: 'flex',
@@ -1158,7 +1167,7 @@ const Tv: React.FC = () => {
                       <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
                         Servers:
                       </span>
-                      {MOVY_SERVERS.map((city) => (
+                      {activeServers.map((city) => (
                         <button
                           key={city}
                           onClick={() => handleMovyServerSelect(city)}
@@ -1191,10 +1200,10 @@ const Tv: React.FC = () => {
                 qualityIdx={qualityIdx}
                 onQualityChange={setQualityIdx}
                 onBack={handleBack}
-                movyServers={MOVY_SERVERS}
+                movyServers={activeServers}
                 selectedMovyServer={selectedMovyServer}
                 onMovyServerSelect={handleMovyServerSelect}
-                isMovySource={source === 'movybz'}
+                isMovySource={activeServers.length > 0}
                 videoDelayEnabled={videoDelayEnabled}
                 onVideoDelayToggle={(v) => {
                   setVideoDelayEnabled(v)
@@ -1273,7 +1282,7 @@ const Tv: React.FC = () => {
                   Retry
                 </button>
               </div>
-              {source === 'movybz' && (
+              {activeServers.length > 0 && (
                 <div
                   style={{
                     display: 'flex',
@@ -1286,7 +1295,7 @@ const Tv: React.FC = () => {
                   <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
                     Servers:
                   </span>
-                  {MOVY_SERVERS.map((city) => (
+                  {activeServers.map((city) => (
                     <button
                       key={city}
                       onClick={() => handleMovyServerSelect(city)}

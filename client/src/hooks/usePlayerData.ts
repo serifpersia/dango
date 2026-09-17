@@ -11,6 +11,7 @@ import type {
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
 import { fetchApi } from '../lib/fetchApi'
 import { useShowMeta } from './useShowMeta'
+import { useProviders } from './useProviders'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -180,6 +181,11 @@ export const usePlayerData = (
   const queryClient = useQueryClient()
   const hasForcedProvider = useRef<string | null>(null)
   const hasForcedAdultProvider = useRef<string | null>(null)
+  const { options: providerOptions } = useProviders()
+  const animeOptions = useMemo(
+    () => providerOptions.filter((o) => (o.kind ?? 'anime') === 'anime'),
+    [providerOptions]
+  )
 
   const currentEpisode = episodeNumber || uiState.initialEpisode
 
@@ -261,21 +267,22 @@ export const usePlayerData = (
 
   useEffect(() => {
     if (showMeta?.isAdult === undefined) return
-    const matureProvider =
-      uiState.selectedProvider === 'wh' ||
-      uiState.selectedProvider === 'hn' ||
-      uiState.selectedProvider === 'ht' ||
-      uiState.selectedProvider === 'op'
+    const matureSet = new Set(animeOptions.filter((o) => o.mature).map((o) => o.value))
+    const matureProvider = matureSet.has(uiState.selectedProvider)
     if (hasForcedAdultProvider.current === showId) return
     if (showMeta.isAdult && !matureProvider) {
       hasForcedAdultProvider.current = showId
-      dispatch({ type: 'SET_PROVIDER', payload: 'wh' })
+      const fallback =
+        animeOptions.find((o) => o.value === 'wh') ?? animeOptions.find((o) => o.mature)
+      dispatch({ type: 'SET_PROVIDER', payload: fallback?.value ?? 'wh' })
     }
     if (!showMeta.isAdult && matureProvider) {
       hasForcedAdultProvider.current = showId
-      dispatch({ type: 'SET_PROVIDER', payload: 'animepahe' })
+      const fallback =
+        animeOptions.find((o) => o.value === 'megaplay') ?? animeOptions.find((o) => !o.mature)
+      dispatch({ type: 'SET_PROVIDER', payload: fallback?.value ?? 'megaplay' })
     }
-  }, [showMeta?.isAdult, uiState.selectedProvider, showId])
+  }, [showMeta?.isAdult, uiState.selectedProvider, showId, animeOptions])
 
   useEffect(() => {
     if (!showId || !/^dango-mt-\d+$/.test(showId)) return
@@ -283,11 +290,8 @@ export const usePlayerData = (
     const origin = (showMeta as { provider?: string } | undefined)?.provider
     if (!origin) return
     hasForcedAdultProvider.current = `temp:${showId}`
-    if (
-      (origin === 'wh' || origin === 'hn' || origin === 'ht' || origin === 'op') &&
-      uiState.selectedProvider !== origin
-    ) {
-      dispatch({ type: 'SET_PROVIDER', payload: origin as PlayerState['selectedProvider'] })
+    if (origin !== uiState.selectedProvider) {
+      dispatch({ type: 'SET_PROVIDER', payload: origin })
     }
   }, [showId, showMeta, uiState.selectedProvider])
 

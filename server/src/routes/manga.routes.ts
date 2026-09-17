@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
-import { MangaDexProvider } from '../providers/manga/mangadex.provider.js'
-import { MangaPillProvider } from '../providers/manga/mangapill.provider.js'
-import type { MangaContentRating, MangaProviderName } from '../providers/manga/manga.types.js'
+import type {
+  MangaContentRating,
+  MangaProviderName,
+  MangaProvider,
+} from '../providers/manga/manga.types.js'
 
 function makeCacheMiddleware(cache: AppCache, keyFn: (req: Request) => string, ttl?: number) {
   return (req: Request, res: Response, next: () => void) => {
@@ -38,12 +40,13 @@ function parseRatings(req: Request): MangaContentRating[] {
   return exact.length > 0 ? exact : SAFE
 }
 
-export function createMangaRouter(apiCache: AppCache): Router {
+export function createMangaRouter(
+  apiCache: AppCache,
+  getProvider: (name: string) => MangaProvider | undefined
+): Router {
   const router = Router()
-  const dex = new MangaDexProvider(apiCache)
-  const pill = new MangaPillProvider(apiCache)
 
-  const pick = (name: string) => (name === 'mangapill' ? pill : dex)
+  const pick = (name: string): MangaProvider | undefined => getProvider(name.toLowerCase())
 
   router.get(
     '/manga/search',
@@ -68,8 +71,8 @@ export function createMangaRouter(apiCache: AppCache): Router {
           type,
           ratings,
         }
-        const result = await pick(provider).search(options)
-        res.json(result)
+        const result = await pick(provider)?.search(options)
+        res.json(result ?? { items: [], hasNext: false })
       } catch (err) {
         logger.error({ err }, '[Manga] search failed')
         res.json({ items: [], hasNext: false })
@@ -90,7 +93,7 @@ export function createMangaRouter(apiCache: AppCache): Router {
         const provider = req.query.provider as string as MangaProviderName
         const id = String(req.query.id || '')
         if (!id) return res.status(400).json({ error: 'Missing id' })
-        const detail = await pick(provider).getDetail(id, parseRatings(req))
+        const detail = await pick(provider)?.getDetail(id, parseRatings(req))
         if (!detail) return res.status(404).json({ error: 'Not found' })
         res.json(detail)
       } catch (err) {
@@ -113,7 +116,7 @@ export function createMangaRouter(apiCache: AppCache): Router {
         const provider = req.query.provider as string as MangaProviderName
         const id = String(req.query.id || '')
         if (!id) return res.status(400).json({ error: 'Missing id' })
-        const chapters = await pick(provider).getChapters(id, parseRatings(req))
+        const chapters = (await pick(provider)?.getChapters(id, parseRatings(req))) ?? []
         res.json({ chapters })
       } catch (err) {
         logger.error({ err }, '[Manga] chapters failed')
@@ -134,7 +137,7 @@ export function createMangaRouter(apiCache: AppCache): Router {
         const provider = req.query.provider as string as MangaProviderName
         const id = String(req.query.id || '')
         if (!id) return res.status(400).json({ error: 'Missing id' })
-        const pages = await pick(provider).getPages(id)
+        const pages = (await pick(provider)?.getPages(id)) ?? []
         res.json({ pages })
       } catch (err) {
         logger.error({ err }, '[Manga] pages failed')

@@ -1,23 +1,30 @@
 import React from 'react'
 import styles from './Player.module.css'
 import type { VideoLink, VideoSource } from '../../types/player'
-import { PROVIDER_OPTIONS, SUB_LABEL, TIER_LABEL, TIER_ORDER, type ProviderId } from './providers'
+import {
+  PROVIDER_OPTIONS,
+  SUB_LABEL,
+  TIER_LABEL,
+  TIER_ORDER,
+  type ProviderOption,
+} from './providers'
 
 interface ProviderSelectorProps {
-  selectedProvider: ProviderId
-  onProviderChange: (provider: ProviderId) => void
+  selectedProvider: string
+  onProviderChange: (provider: string) => void
   isAdult?: boolean
+  options?: ProviderOption[]
 }
 
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   selectedProvider,
   onProviderChange,
   isAdult,
+  options,
 }) => {
+  const list = options && options.length > 0 ? options : PROVIDER_OPTIONS
   const visibleProviders =
-    isAdult === undefined
-      ? PROVIDER_OPTIONS
-      : PROVIDER_OPTIONS.filter((option) => option.mature === isAdult)
+    isAdult === undefined ? list : list.filter((option) => option.mature === isAdult)
 
   return (
     <div className={styles.providerSelectContainer}>
@@ -25,7 +32,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       <select
         className={styles.providerSelect}
         value={selectedProvider}
-        onChange={(e) => onProviderChange(e.target.value as ProviderId)}
+        onChange={(e) => onProviderChange(e.target.value)}
       >
         {TIER_ORDER.map((tier) => {
           const group = visibleProviders.filter((option) => (option.tier ?? 'direct') === tier)

@@ -14,6 +14,16 @@ export type ProviderId =
   | 'animegg'
   | 'justanime'
 
+export interface ProviderOption {
+  value: string
+  label: string
+  mature: boolean
+  kind?: 'anime' | 'asmr' | 'tv'
+  sub?: SubType
+  tier?: ProviderTier
+  servers?: string[]
+}
+
 export type SubType = 'soft' | 'hard' | 'mixed'
 
 export type ProviderTier = 'direct' | 'embed' | 'cookie'
@@ -32,13 +42,7 @@ export const TIER_LABEL: Record<ProviderTier, string> = {
 
 export const TIER_ORDER: ProviderTier[] = ['direct', 'cookie', 'embed']
 
-export const PROVIDER_OPTIONS: {
-  value: ProviderId
-  label: string
-  mature: boolean
-  sub?: SubType
-  tier?: ProviderTier
-}[] = [
+export const PROVIDER_OPTIONS: ProviderOption[] = [
   { value: 'megaplay', label: 'MegaPlay', mature: false, sub: 'soft', tier: 'direct' },
   { value: 'justanime', label: 'JustAnime', mature: false, sub: 'mixed', tier: 'direct' },
   { value: 'anibd', label: 'AniBD', mature: false, sub: 'hard', tier: 'direct' },

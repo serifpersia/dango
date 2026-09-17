@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import logger from './logger.js'
 
-const SLOW_REQUEST_MS = 2000
-
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const start = process.hrtime.bigint()
   const url = req.originalUrl || req.url
@@ -11,8 +9,6 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const payload = { method: req.method, url, status: res.statusCode, ms }
     if (res.statusCode >= 500) {
       logger.warn(payload, 'request failed')
-    } else if (ms >= SLOW_REQUEST_MS) {
-      logger.warn(payload, 'slow request')
     } else if (!url.startsWith('/api/proxy')) {
       logger.trace(`${req.method} ${url} ${res.statusCode} ${ms}ms`)
     }

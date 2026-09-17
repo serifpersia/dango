@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import Icon from '../components/common/Icon'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -15,13 +15,9 @@ import {
   type MangaChapter,
   type MangaProviderName,
 } from '../hooks/useManga'
+import { useProviders } from '../hooks/useProviders'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from '../components/manga/Manga.module.css'
-
-const PROVIDERS: { value: MangaProviderName; label: string }[] = [
-  { value: 'mangadex', label: 'MangaDex' },
-  { value: 'mangapill', label: 'MangaPill' },
-]
 
 const DEX_SORTS = [
   { value: 'popular', label: 'Popular' },
@@ -72,7 +68,22 @@ export default function Manga() {
   const [showMatureModal, setShowMatureModal] = useState(false)
   const [queryInput, setQueryInput] = useState(searchParams.get('q') || '')
 
-  const provider = (searchParams.get('provider') as MangaProviderName) || 'mangadex'
+  const {
+    options: serverProviders,
+    isLoading: providersLoading,
+    refetch: refetchProviders,
+  } = useProviders()
+  const mangaProviders = useMemo(
+    () =>
+      serverProviders
+        .filter((o) => o.kind === 'manga')
+        .map((o) => ({ value: o.value, label: o.label })),
+    [serverProviders]
+  )
+  const urlProvider = (searchParams.get('provider') as MangaProviderName) || ''
+  const provider = mangaProviders.some((p) => p.value === urlProvider)
+    ? urlProvider
+    : (mangaProviders[0]?.value ?? urlProvider)
   const query = searchParams.get('q') || ''
   const page = parseInt(searchParams.get('page') || '1')
   const sort = searchParams.get('sort') || 'popular'
@@ -260,6 +271,7 @@ export default function Manga() {
         <select
           className={styles.select}
           value={provider}
+          disabled={mangaProviders.length === 0}
           onChange={(e) => {
             const next = new URLSearchParams(searchParams)
             next.set('provider', e.target.value)
@@ -272,12 +284,28 @@ export default function Manga() {
           }}
           aria-label="Manga provider"
         >
-          {PROVIDERS.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
+          {mangaProviders.length === 0 ? (
+            <option value="">
+              {providersLoading ? 'Loading providers…' : 'No providers available'}
             </option>
-          ))}
+          ) : (
+            mangaProviders.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))
+          )}
         </select>
+        {mangaProviders.length === 0 && !providersLoading && (
+          <button
+            className={styles.searchBtn}
+            type="button"
+            onClick={() => refetchProviders()}
+            aria-label="Retry loading providers"
+          >
+            <Icon name="redo" size={14} />
+          </button>
+        )}
       </div>
 
       {!mangaId && (

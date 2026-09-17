@@ -1,7 +1,14 @@
 import { Router, Request, Response } from 'express'
 import { AppCache } from '../utils/cache.utils.js'
-import { JasmrProvider } from '../providers/jasmr.provider.js'
 import logger from '../logger.js'
+
+export interface JasmrApi {
+  browse(o: { query?: string; page?: number; sort?: string; rating?: string }): Promise<unknown>
+  getEpisodes(showId: string): Promise<{ description?: string } | null>
+  getStreamUrls(showId: string, episode: string): Promise<{ links: unknown[] }[] | null>
+  getImages(showId: string): Promise<unknown>
+  getChapters(showId: string): Promise<unknown>
+}
 
 function makeCacheMiddleware(cache: AppCache, keyFn: (req: Request) => string, ttl?: number) {
   return (req: Request, res: Response, next: () => void) => {
@@ -21,7 +28,10 @@ function makeCacheMiddleware(cache: AppCache, keyFn: (req: Request) => string, t
   }
 }
 
-export function createAsmrRouter(apiCache: AppCache, provider: JasmrProvider): Router {
+export function createAsmrRouter(
+  apiCache: AppCache,
+  getProvider: () => JasmrApi | undefined
+): Router {
   const router = Router()
 
   router.get(
@@ -36,6 +46,8 @@ export function createAsmrRouter(apiCache: AppCache, provider: JasmrProvider): R
     ),
     async (req, res) => {
       try {
+        const provider = getProvider()
+        if (!provider) return res.json({ shows: [], hasNext: false })
         const result = await provider.browse({
           query: req.query.q as string,
           page: parseInt(req.query.page as string) || 1,
@@ -58,6 +70,16 @@ export function createAsmrRouter(apiCache: AppCache, provider: JasmrProvider): R
     makeCacheMiddleware(apiCache, (req) => `route-asmr-work-${req.params.rj}`, 1800),
     async (req, res) => {
       try {
+        const provider = getProvider()
+        if (!provider) {
+          return res.json({
+            rjCode: req.params.rj,
+            description: '',
+            tracks: [],
+            images: [],
+            chapters: [],
+          })
+        }
         const rjCode = String(req.params.rj).trim().toUpperCase()
         const episodes = await provider.getEpisodes(rjCode)
         const streams = await provider.getStreamUrls(rjCode, '1')

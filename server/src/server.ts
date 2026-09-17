@@ -14,21 +14,6 @@ import { notifyServerExit } from './lib/ipc.js'
 import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils.js'
 import { requestLogger } from './request-logger.js'
 
-import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider.js'
-import { AnimeyaProvider } from './providers/animeya.provider.js'
-import { MegaPlayProvider } from './providers/megaplay.provider.js'
-import { AnimePaheProvider } from './providers/animepahe.provider.js'
-import { WhProvider } from './providers/wh.provider.js'
-import { HnProvider } from './providers/hn.provider.js'
-import { AnilightProvider } from './providers/anilight.provider.js'
-import { KaaProvider } from './providers/kaa.provider.js'
-import { HtProvider } from './providers/ht.provider.js'
-import { JasmrProvider } from './providers/jasmr.provider.js'
-import { JustAnimeProvider } from './providers/justanime.provider.js'
-import { OpProvider } from './providers/op.provider.js'
-import { AniBdProvider } from './providers/anibd.provider.js'
-import { AnimeDunyaProvider } from './providers/animedunya.provider.js'
-import { AnimeGgProvider } from './providers/animegg.provider.js'
 import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import {
@@ -44,11 +29,17 @@ import { createLanAuthRouter } from './routes/lan-auth.routes.js'
 import { lanAuthMiddleware } from './app-auth.js'
 import { createWatchlistRouter } from './routes/watchlist.routes.js'
 import { createDataRouter } from './routes/data.routes.js'
-import { createAsmrRouter } from './routes/asmr.routes.js'
+import { createAsmrRouter, type JasmrApi } from './routes/asmr.routes.js'
 import { createMangaRouter } from './routes/manga.routes.js'
+import type { MangaProvider } from './providers/manga/manga.types.js'
+import type { TvProvider } from './providers/tv.types.js'
 import { createRadioRouter } from './routes/radio.routes.js'
 import { createTvRouter } from './routes/tv.routes.js'
 import { createProxyRouter } from './routes/proxy.routes.js'
+import { createProvidersRouter } from './routes/providers.routes.js'
+import { loadRemoteProviders } from './providers/remote-loader.js'
+import type { ProviderCatalogItem } from './providers/remote-types.js'
+import type { Provider } from './providers/provider.interface.js'
 import { createSettingsRouter } from './routes/settings.routes.js'
 import { createInsightsRouter } from './routes/insights.routes.js'
 import { createTranslateRouter } from './routes/translate.routes.js'
@@ -99,38 +90,60 @@ app.use((req, res, next) => {
 
 const apiCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
 
-const _123AnimeProvider = new Anime123Provider(apiCache)
-const animeyaProvider = new AnimeyaProvider(apiCache)
-const megaPlayProvider = new MegaPlayProvider(apiCache)
-const animepaheProvider = new AnimePaheProvider(apiCache)
-const whProvider = new WhProvider(apiCache)
-const hnProvider = new HnProvider()
-const anilightProvider = new AnilightProvider(apiCache)
-const kaaProvider = new KaaProvider(apiCache)
-const htProvider = new HtProvider(apiCache)
-const jasmrProvider = new JasmrProvider(apiCache)
-const justAnimeProvider = new JustAnimeProvider(apiCache)
-const opProvider = new OpProvider(apiCache)
-const anibdProvider = new AniBdProvider(apiCache)
-const animedunyaProvider = new AnimeDunyaProvider(apiCache)
-const animeggProvider = new AnimeGgProvider(apiCache)
+const providers: Record<string, Provider> = {}
+const mangaProviders: Record<string, MangaProvider> = {}
+const tvProviders: Record<string, TvProvider> = {}
 
-const providers = {
-  '123anime': _123AnimeProvider,
-  animeya: animeyaProvider,
-  megaplay: megaPlayProvider,
-  animepahe: animepaheProvider,
-  wh: whProvider,
-  hn: hnProvider,
-  anilight: anilightProvider,
-  kaa: kaaProvider,
-  ht: htProvider,
-  jasmr: jasmrProvider,
-  justanime: justAnimeProvider,
-  op: opProvider,
-  anibd: anibdProvider,
-  animedunya: animedunyaProvider,
-  animegg: animeggProvider,
+let remoteCatalog: ProviderCatalogItem[] = []
+
+function parseEnabledProviders(): string[] {
+  return CONFIG.PROVIDER_ENABLED.split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function getProviderCatalog(): ProviderCatalogItem[] {
+  return remoteCatalog
+}
+
+async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
+  const url = CONFIG.PROVIDER_REPO_URL.trim()
+  if (!url) return getProviderCatalog()
+  try {
+    const result = await loadRemoteProviders({
+      cache: apiCache,
+      registryUrl: url,
+      enabledProviders: parseEnabledProviders(),
+    })
+    if (result.catalog.length === 0) {
+      logger.warn('remote providers refresh returned nothing, keeping current set')
+      return getProviderCatalog()
+    }
+    for (const key of Object.keys(providers)) {
+      if (!(key in result.providers)) delete providers[key]
+    }
+    Object.assign(providers, result.providers)
+    for (const key of Object.keys(mangaProviders)) {
+      if (!(key in result.mangaProviders)) delete mangaProviders[key]
+    }
+    Object.assign(mangaProviders, result.mangaProviders)
+    for (const key of Object.keys(tvProviders)) {
+      if (!(key in result.tvProviders)) delete tvProviders[key]
+    }
+    Object.assign(tvProviders, result.tvProviders)
+    remoteCatalog = result.catalog
+    logger.info(
+      {
+        count: Object.keys(result.providers).length,
+        mangaCount: Object.keys(result.mangaProviders).length,
+        tvCount: Object.keys(result.tvProviders).length,
+      },
+      'remote providers refreshed'
+    )
+  } catch (err) {
+    logger.error({ err }, 'remote providers refresh failed')
+  }
+  return getProviderCatalog()
 }
 
 let db: DatabaseWrapper
@@ -225,11 +238,21 @@ app.use(
 const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(() => db)
 app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
-app.use('/api', createAsmrRouter(apiCache, jasmrProvider))
-app.use('/api', createMangaRouter(apiCache))
+app.use(
+  '/api',
+  createAsmrRouter(apiCache, () => providers['jasmr'] as unknown as JasmrApi | undefined)
+)
+app.use(
+  '/api',
+  createMangaRouter(apiCache, (name) => mangaProviders[name])
+)
 app.use('/api', createRadioRouter(apiCache))
-app.use('/api', createTvRouter(apiCache))
+app.use(
+  '/api',
+  createTvRouter(apiCache, (name) => tvProviders[name])
+)
 app.use('/api', createProxyRouter())
+app.use('/api', createProvidersRouter(getProviderCatalog, refreshRemoteProviders))
 app.use('/api', createInsightsRouter())
 app.use('/api', createTranslateRouter())
 app.use('/api', createDiscordGatewayRouter())
@@ -308,6 +331,15 @@ async function main() {
   checkAnilistStatus().catch(() => {})
 
   await runSyncSequence(db)
+
+  await refreshRemoteProviders()
+  if (CONFIG.PROVIDER_REPO_URL.trim()) {
+    setInterval(() => {
+      refreshRemoteProviders().catch((err) =>
+        logger.error({ err }, 'periodic providers refresh failed')
+      )
+    }, CONFIG.PROVIDER_REPO_REFRESH_MS).unref()
+  }
 
   if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
     fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
