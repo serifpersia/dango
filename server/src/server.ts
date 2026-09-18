@@ -237,7 +237,7 @@ app.use(
 
 const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(() => db)
 app.use('/api', watchlistRouter)
-app.use('/api', createDataRouter(apiCache, providers))
+app.use('/api', createDataRouter(apiCache, providers, getProviderCatalog))
 app.use(
   '/api',
   createAsmrRouter(apiCache, () => providers['jasmr'] as unknown as JasmrApi | undefined)

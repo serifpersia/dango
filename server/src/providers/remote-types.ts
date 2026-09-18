@@ -1,6 +1,19 @@
 export type RemoteSubType = 'soft' | 'hard' | 'mixed'
 export type RemoteTier = 'direct' | 'embed' | 'cookie'
 
+export interface BrowseCaps {
+  genre?: boolean
+  order?: boolean
+  studio?: boolean
+  sort?: boolean
+  pageSize?: number
+}
+
+export interface BrowseFacets {
+  genres?: string[]
+  orders?: string[]
+}
+
 export interface RemoteProviderEntry {
   id: string
   label: string
@@ -13,6 +26,7 @@ export interface RemoteProviderEntry {
   sub?: RemoteSubType
   tier?: RemoteTier
   modes?: ('sub' | 'dub')[]
+  browse?: BrowseCaps
   auth?: 'cookie' | 'none'
   enabledByDefault?: boolean
 }
@@ -32,6 +46,8 @@ export interface ProviderCatalogItem {
   sub?: RemoteSubType
   tier?: RemoteTier
   modes: ('sub' | 'dub')[]
+  browse?: BrowseCaps
+  facets?: BrowseFacets
   servers?: string[]
   enabledByDefault: boolean
   loaded: boolean
@@ -126,7 +142,31 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     sub: p.sub as RemoteSubType | undefined,
     tier: p.tier as RemoteTier | undefined,
     modes,
+    browse: parseBrowseCaps(p.browse, index),
     auth: p.auth === 'cookie' ? 'cookie' : undefined,
     enabledByDefault: p.enabledByDefault === false ? false : true,
   }
+}
+
+function parseBrowseCaps(raw: unknown, index: number): BrowseCaps | undefined {
+  if (raw === undefined) return undefined
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`registry.providers[${index}].browse must be an object`)
+  }
+  const b = raw as Record<string, unknown>
+  const caps: BrowseCaps = {}
+  for (const key of ['genre', 'order', 'studio', 'sort'] as const) {
+    if (b[key] === undefined) continue
+    if (typeof b[key] !== 'boolean') {
+      throw new Error(`registry.providers[${index}].browse.${key} must be boolean`)
+    }
+    caps[key] = b[key]
+  }
+  if (b.pageSize !== undefined) {
+    if (typeof b.pageSize !== 'number' || !Number.isInteger(b.pageSize) || b.pageSize < 1) {
+      throw new Error(`registry.providers[${index}].browse.pageSize must be a positive integer`)
+    }
+    caps.pageSize = b.pageSize
+  }
+  return caps
 }

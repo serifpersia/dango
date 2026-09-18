@@ -19,6 +19,7 @@ import type { TvProvider } from './tv.types.js'
 import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import {
   parseRegistry,
+  type BrowseFacets,
   type ProviderCatalogItem,
   type RemoteProviderEntry,
   type RemoteRegistry,
@@ -339,7 +340,7 @@ async function loadEntry(
   cacheDir: string,
   ctx: RemoteCtx,
   allowUnsigned: boolean
-): Promise<{ provider: unknown; error?: string }> {
+): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
   const entryUrl = resolveEntryUrl(item.entry, registryUrl)
   await fs.promises.mkdir(cacheDir, { recursive: true })
   const fileName = `${item.id}-${item.version}.mjs`
@@ -363,7 +364,7 @@ async function loadEntry(
         { provider: item.id, version: item.version },
         'remote provider reused cached instance'
       )
-      return { provider: hit.provider }
+      return { provider: hit.provider, facets: hit.facets }
     }
   } else {
     try {
@@ -387,19 +388,38 @@ async function loadEntry(
   const cacheBuster = `${item.version}-${(item.sha256 ?? 'nosha').slice(0, 12)}`
   const result = await instantiateModule(filePath, cacheBuster, ctx, item)
   if (result.provider && !result.error) {
-    instanceCache.set(instanceKey, { provider: result.provider })
+    instanceCache.set(instanceKey, { provider: result.provider, facets: result.facets })
   }
   return result
 }
 
-const instanceCache = new Map<string, { provider: unknown }>()
+const instanceCache = new Map<string, { provider: unknown; facets?: BrowseFacets }>()
+
+function extractBrowseFacets(mod: Record<string, unknown>): BrowseFacets | undefined {
+  let genres: string[] | undefined
+  let orders: string[] | undefined
+  for (const [key, value] of Object.entries(mod)) {
+    if (key === 'default' || !Array.isArray(value) || value.length === 0) continue
+    if (!value.every((v): v is string => typeof v === 'string' && v.length > 0)) continue
+    const list = (value as string[]).filter((v) => v.length <= 64).slice(0, 500)
+    if (list.length === 0) continue
+    const name = key.toUpperCase()
+    if (name.includes('GENRE') || name.includes('TAG')) {
+      genres ??= list
+    } else if (name.includes('ORDER') || name.includes('SORT')) {
+      orders ??= list
+    }
+  }
+  if (!genres && !orders) return undefined
+  return { ...(genres ? { genres } : {}), ...(orders ? { orders } : {}) }
+}
 
 async function instantiateModule(
   filePath: string,
   cacheBuster: string,
   ctx: RemoteCtx,
   item: RemoteProviderEntry
-): Promise<{ provider: unknown; error?: string }> {
+): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
   const id = item.id
   let mod: Record<string, unknown>
   try {
@@ -440,7 +460,7 @@ async function instantiateModule(
   ) {
     return { provider: null as unknown as Provider, error: 'invalid provider shape' }
   }
-  return { provider }
+  return { provider, facets: extractBrowseFacets(mod) }
 }
 
 async function loadCachedFallback(
@@ -448,7 +468,7 @@ async function loadCachedFallback(
   prev: RemoteProviderEntry,
   cacheDir: string,
   ctx: RemoteCtx
-): Promise<{ provider: unknown; error?: string }> {
+): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
   if (!prev.sha256) return { provider: null as unknown as Provider, error: 'no verified fallback' }
   const filePath = path.join(cacheDir, `${prev.id}-${prev.version}.mjs`)
   let bytes: Buffer
@@ -516,7 +536,13 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
       out.catalog.push(toCatalog(item, false, 'not in enabledProviders'))
       continue
     }
-    const { provider, error } = await loadEntry(item, registryUrl, cacheDir, ctx, allowUnsigned)
+    const { provider, facets, error } = await loadEntry(
+      item,
+      registryUrl,
+      cacheDir,
+      ctx,
+      allowUnsigned
+    )
     if (provider && !error) {
       if (item.kind === 'manga' && isValidMangaProvider(provider)) {
         out.mangaProviders[key] = provider
@@ -529,7 +555,7 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
         logger.warn({ provider: item.id }, 'remote provider kind mismatch, skipped')
         continue
       }
-      out.catalog.push(withServers(item, provider, toCatalog(item, true)))
+      out.catalog.push(withFacets(facets, withServers(item, provider, toCatalog(item, true))))
       logger.info({ provider: item.id, version: item.version }, 'remote provider loaded')
     } else {
       const prev = prevById.get(key)
@@ -552,7 +578,10 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
         }
         if (fb.provider && !fb.error) {
           out.catalog.push({
-            ...withServers(item, fb.provider, toCatalog({ ...item, version: prev.version }, true)),
+            ...withFacets(
+              fb.facets,
+              withServers(item, fb.provider, toCatalog({ ...item, version: prev.version }, true))
+            ),
             error: `serving cached ${prev.version}: ${error}`,
           })
           logger.warn(
@@ -607,6 +636,16 @@ function withServers(
   return cat
 }
 
+function withFacets(
+  facets: BrowseFacets | undefined,
+  cat: ProviderCatalogItem
+): ProviderCatalogItem {
+  const genres = (facets?.genres ?? []).length > 0 ? facets?.genres : undefined
+  const orders = (facets?.orders ?? []).length > 0 ? facets?.orders : undefined
+  if (!genres && !orders) return cat
+  return { ...cat, facets: { ...(genres ? { genres } : {}), ...(orders ? { orders } : {}) } }
+}
+
 function toCatalog(
   item: RemoteProviderEntry,
   loaded: boolean,
@@ -621,6 +660,7 @@ function toCatalog(
     sub: item.sub,
     tier: item.tier,
     modes: item.modes ?? (item.kind === 'tv' ? [] : ['sub', 'dub']),
+    browse: item.browse,
     enabledByDefault: item.enabledByDefault !== false,
     loaded,
     remote: true,

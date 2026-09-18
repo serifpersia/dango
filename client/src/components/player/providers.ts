@@ -21,7 +21,22 @@ export interface ProviderOption {
   kind?: 'anime' | 'asmr' | 'tv'
   sub?: SubType
   tier?: ProviderTier
+  browse?: BrowseCaps
+  facets?: BrowseFacets
   servers?: string[]
+}
+
+export interface BrowseCaps {
+  genre?: boolean
+  order?: boolean
+  studio?: boolean
+  sort?: boolean
+  pageSize?: number
+}
+
+export interface BrowseFacets {
+  genres?: string[]
+  orders?: string[]
 }
 
 export type SubType = 'soft' | 'hard' | 'mixed'

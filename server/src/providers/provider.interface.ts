@@ -91,9 +91,30 @@ export interface SearchOptions {
   rating?: string
 }
 
+export interface BrowseOptions {
+  query?: string
+  page?: number
+  limit?: number
+  pageSize?: number
+  genre?: string
+  genres?: string
+  order?: string
+  sort?: string
+  studio?: string
+  blacklist?: string
+}
+
+export interface BrowseResult {
+  shows: Show[]
+  hasMore: boolean
+  total?: number
+  genres?: { slug: string; name: string }[]
+}
+
 export interface Provider {
   name: string
   search(options: SearchOptions): Promise<Show[]>
+  browse?(options: BrowseOptions): Promise<BrowseResult>
   getEpisodes(
     showId: string,
     mode?: 'sub' | 'dub',

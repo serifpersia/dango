@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { DataController } from '../controllers/data.controller.js'
 import { Provider } from '../providers/provider.interface.js'
+import type { ProviderCatalogItem } from '../providers/remote-types.js'
 import { AppCache } from '../utils/cache.utils.js'
 
 function makeCacheMiddleware(
@@ -31,10 +32,11 @@ function makeCacheMiddleware(
 
 export function createDataRouter(
   apiCache: AppCache,
-  providers: { [key: string]: Provider }
+  providers: { [key: string]: Provider },
+  getCatalog?: () => ProviderCatalogItem[]
 ): Router {
   const router = Router()
-  const controller = new DataController(providers)
+  const controller = new DataController(providers, getCatalog)
 
   router.get(
     '/schedule/:date',

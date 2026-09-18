@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchApi } from '../lib/fetchApi'
 import {
   PROVIDER_OPTIONS,
+  type BrowseCaps,
+  type BrowseFacets,
   type ProviderOption,
   type SubType,
   type ProviderTier,
@@ -16,6 +18,8 @@ export interface ProviderMeta {
   kind?: 'anime' | 'asmr' | 'tv'
   sub?: SubType
   tier?: ProviderTier
+  browse?: BrowseCaps
+  facets?: BrowseFacets
   modes?: ('sub' | 'dub')[]
   servers?: string[]
   enabledByDefault?: boolean
@@ -34,6 +38,8 @@ function toOption(m: ProviderMeta): ProviderOption {
     kind: m.kind,
     sub: m.sub,
     tier: m.tier,
+    browse: m.browse,
+    facets: m.facets,
     servers: m.servers,
   }
 }

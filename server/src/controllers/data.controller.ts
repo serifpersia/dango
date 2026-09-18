@@ -1,5 +1,7 @@
 import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface.js'
+import type { BrowseCaps } from '../providers/remote-types.js'
+import type { ProviderCatalogItem } from '../providers/remote-types.js'
 import { pickBestMatch } from '../providers/title-matching.js'
 import {
   getTrending,
@@ -24,7 +26,7 @@ import type { AnilistMedia } from '../lib/anilist.js'
 import { malSearchMedia, malSearchTitle, malAnimeDetail, toAnilistDetailMedia } from '../lib/mal.js'
 import { malCacheStore } from '../repositories/mal-cache.repository.js'
 import { getMigratedId } from '../lib/migration.js'
-import { isTempShowId, isTempMatureProvider } from '../lib/temp-ids.js'
+import { isTempShowId } from '../lib/temp-ids.js'
 import { TempShowIdsRepository } from '../repositories/temp-show-ids.repository.js'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
 import { WatchlistRepository } from '../repositories/watchlist.repository.js'
@@ -41,7 +43,10 @@ function parseListParam(value: unknown): string[] | undefined {
 }
 
 export class DataController {
-  constructor(private providers: { [key: string]: Provider }) {}
+  constructor(
+    private providers: { [key: string]: Provider },
+    private getCatalog?: () => ProviderCatalogItem[]
+  ) {}
 
   private setDataCache(res: Response, maxAgeSeconds: number, body: unknown): void {
     const isEmpty = Array.isArray(body)
@@ -56,12 +61,31 @@ export class DataController {
     return this.providers[providerName] || null
   }
 
+  private matureStreamingIds(): Set<string> | null {
+    const catalog = this.getCatalog?.()
+    if (!catalog || catalog.length === 0) return null
+    return new Set(
+      catalog
+        .filter((c) => c.mature && (c.kind ?? 'anime') === 'anime' && c.loaded)
+        .map((c) => c.id.toLowerCase())
+    )
+  }
+
+  private isMatureStreamingProvider(provider: string | undefined | null): boolean {
+    const key = (provider || '').toLowerCase()
+    if (!key || !this.providers[key] || key === 'mal' || key === 'anilist') return false
+    const mature = this.matureStreamingIds()
+    return mature ? mature.has(key) : true
+  }
+
   private async resolveMatureStreamingId(
     title: string,
     wanted?: string
   ): Promise<{ provider: Provider; nativeId: string } | null> {
-    const names = [wanted, 'wh', 'op'].filter(
-      (p): p is string => !!p && p !== 'mal' && !!this.providers[p]
+    const mature = this.matureStreamingIds()
+    const pool = mature ? [...mature] : Object.keys(this.providers)
+    const names = [wanted, ...pool].filter(
+      (p): p is string => !!p && p !== 'mal' && p !== 'anilist' && !!this.providers[p]
     )
     const seen = new Set<string>()
     for (const name of names) {
@@ -164,7 +188,7 @@ export class DataController {
       if (isTempShowId(showId)) {
         try {
           const row = TempShowIdsRepository.getById(req.db, showId)
-          if (!row || !isTempMatureProvider(row.provider)) return res.json([])
+          if (!row || !this.isMatureStreamingProvider(row.provider)) return res.json([])
           const wanted = String(req.query.provider || '').toLowerCase()
           const own = this.providers[row.provider]
           if (own && (!wanted || wanted === row.provider)) {
@@ -357,7 +381,7 @@ export class DataController {
     if (isTempShowId(showId)) {
       try {
         const row = TempShowIdsRepository.getById(req.db, showId)
-        if (!row || !isTempMatureProvider(row.provider)) return res.json({ episodes: [] })
+        if (!row || !this.isMatureStreamingProvider(row.provider)) return res.json({ episodes: [] })
         const wanted = String(req.query.provider || '').toLowerCase()
         const own = this.providers[row.provider]
         if (own && (!wanted || wanted === row.provider)) {
@@ -514,99 +538,34 @@ export class DataController {
         return res.json({ data: result, hasMore: result.length >= limit })
       }
 
-      if (provider === 'wh') {
-        const p = this.providers['wh'] as unknown as {
-          browse: (o: { query?: string; page?: number; genre?: string }) => Promise<{
-            shows: Show[]
-            hasMore: boolean
-          }>
-        }
-        const result = await p.browse({
-          query,
-          page,
-          genre: (req.query.genre as string) || undefined,
-        })
-        return res.json({ data: result.shows, hasMore: result.hasMore })
-      }
-
-      if (provider === 'op') {
-        const p = this.providers['op'] as unknown as {
-          browse: (o: {
-            query?: string
-            page?: number
-            limit?: number
-            order?: string
-            genres?: string
-            blacklist?: string
-            studio?: string
-          }) => Promise<{
-            shows: Show[]
-            total: number
-            hasMore: boolean
-          }>
-        }
-        const result = await p.browse({
-          query,
-          page,
-          limit,
-          order: (req.query.order as string) || undefined,
-          genres: (req.query.genres as string) || undefined,
-          blacklist: (req.query.blacklist as string) || undefined,
-          studio: (req.query.studio as string) || undefined,
-        })
-        return res.json({ data: result.shows, hasMore: result.hasMore, total: result.total })
-      }
-
-      if (provider === 'ht') {
-        const p = this.providers['ht'] as unknown as {
-          browse: (o: {
-            query?: string
-            limit?: number
-            genre?: string
-            page?: number
-          }) => Promise<{
-            shows: Show[]
-            hasMore: boolean
-          }>
-        }
-        const result = await p.browse({
-          query,
-          limit: 40,
-          genre: (req.query.genre as string) || undefined,
-          page,
-        })
-        return res.json({ data: result.shows, hasMore: result.hasMore })
-      }
-
-      if (provider === 'hn') {
-        const p = this.providers['hn'] as unknown as {
-          browse: (o: {
-            query?: string
-            page?: number
-            pageSize?: number
-            sort?: string
-            genre?: string
-          }) => Promise<{
-            shows: Show[]
-            hasMore: boolean
-            genres: { slug: string; name: string }[]
-          }>
-        }
-        if (!p?.browse) {
-          const shows = await this.providers['hn'].search({ query })
+      if (this.isMatureStreamingProvider(provider)) {
+        const streaming = this.providers[provider]
+        if (streaming?.browse) {
+          const genre = (req.query.genre as string) || (req.query.genres as string) || undefined
+          const result = await streaming.browse({
+            query,
+            page,
+            limit,
+            pageSize: limit,
+            genre,
+            genres: (req.query.genres as string) || genre,
+            order: (req.query.order as string) || (req.query.sortBy as string) || undefined,
+            sort: (req.query.sortBy as string) || (req.query.order as string) || undefined,
+            studio: (req.query.studio as string) || undefined,
+            blacklist: (req.query.blacklist as string) || undefined,
+          })
           return res.json({
-            data: shows.map((s) => ({ ...s, isAdult: true })),
-            hasMore: false,
+            data: result.shows,
+            hasMore: result.hasMore,
+            ...(result.total !== undefined ? { total: result.total } : {}),
+            ...(result.genres ? { genres: result.genres } : {}),
           })
         }
-        const result = await p.browse({
-          query,
-          page,
-          pageSize: limit,
-          sort: (req.query.sortBy as string) || undefined,
-          genre: (req.query.genre as string) || undefined,
+        const shows = await streaming.search({ query })
+        return res.json({
+          data: shows.map((s) => ({ ...s, isAdult: true })),
+          hasMore: false,
         })
-        return res.json({ data: result.shows, hasMore: result.hasMore, genres: result.genres })
       }
 
       if (provider === 'mal') {
@@ -672,14 +631,21 @@ export class DataController {
 
   getMatureFilters = async (_req: Request, res: Response) => {
     try {
-      const { WH_GENRES, OP_TAGS, OP_ORDERS, HT_GENRES } =
-        await import('../providers/mature-filters.js')
-      return res.json({
-        whGenres: WH_GENRES,
-        opTags: OP_TAGS,
-        opOrders: OP_ORDERS,
-        htGenres: HT_GENRES,
-      })
+      const catalog = this.getCatalog?.() ?? []
+      const providers: Record<
+        string,
+        { label: string; browse?: BrowseCaps; genres?: string[]; orders?: string[] }
+      > = {}
+      for (const item of catalog) {
+        if (!item.mature || (item.kind ?? 'anime') !== 'anime' || !item.loaded) continue
+        providers[item.id] = {
+          label: item.label,
+          ...(item.browse ? { browse: item.browse } : {}),
+          ...(item.facets?.genres?.length ? { genres: item.facets.genres } : {}),
+          ...(item.facets?.orders?.length ? { orders: item.facets.orders } : {}),
+        }
+      }
+      return res.json({ providers })
     } catch (e) {
       logger.error({ err: e }, 'mature filters failed')
       res.status(500).json({ error: 'Failed to load filters' })
@@ -720,7 +686,7 @@ export class DataController {
 
     if (isTempShowId(id)) {
       const row = TempShowIdsRepository.getById(req.db, id)
-      if (!row || !isTempMatureProvider(row.provider)) {
+      if (!row || !this.isMatureStreamingProvider(row.provider)) {
         res.json({})
         return
       }
@@ -829,7 +795,7 @@ export class DataController {
       const nativeId = String(req.body?.nativeId || '').trim()
       const title = String(req.body?.title || '').trim()
       const thumbnail = String(req.body?.thumbnail || '')
-      if (!provider || !this.providers[provider] || !isTempMatureProvider(provider)) {
+      if (!provider || !this.isMatureStreamingProvider(provider)) {
         return res.status(400).json({ error: 'Unknown provider' })
       }
       if (!nativeId || !title) {

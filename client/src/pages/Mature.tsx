@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import MatureConsentModal from '../components/common/MatureConsentModal'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useMatureConsent } from '../hooks/useMatureConsent'
+import { useProviders } from '../hooks/useProviders'
 import { fetchApi } from '../lib/fetchApi'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from './Search.module.css'
@@ -33,20 +34,28 @@ interface MatureSearchResponse {
   genres?: { slug: string; name: string }[]
 }
 
-interface MatureFilters {
-  whGenres: string[]
-  opTags: string[]
-  opOrders: string[]
-  htGenres: string[]
+interface MatureProviderCaps {
+  genre?: boolean
+  order?: boolean
+  studio?: boolean
+  sort?: boolean
+  pageSize?: number
 }
 
-const providerOptions = [
+interface MatureProviderFilters {
+  label: string
+  browse?: MatureProviderCaps
+  genres?: string[]
+  orders?: string[]
+}
+
+interface MatureFiltersResponse {
+  providers: Record<string, MatureProviderFilters>
+}
+
+const META_PROVIDER_OPTIONS = [
   { value: 'anilist', label: 'AniList' },
   { value: 'mal', label: 'MAL' },
-  { value: 'wh', label: 'WH' },
-  { value: 'op', label: 'OP' },
-  { value: 'ht', label: 'HT' },
-  { value: 'hn', label: 'HN' },
 ]
 
 const sortOptions = [
@@ -64,13 +73,13 @@ const statusOptions = [
   { value: 'NOT_YET_RELEASED', label: 'Not Yet Released' },
 ]
 
-const hnSortOptions = [
+const remoteSortOptions = [
   { value: '', label: 'Relevance' },
   { value: 'visits:desc', label: 'Most Visited' },
   { value: 'title:asc', label: 'Title A-Z' },
 ]
 
-const opOrderLabels: Record<string, string> = {
+const orderLabels: Record<string, string> = {
   recent: 'Latest',
   popular: 'Popular',
   views: 'Most Viewed',
@@ -85,11 +94,6 @@ const seasonOptions = [
   { value: 'Summer', label: 'Summer' },
   { value: 'Fall', label: 'Fall' },
 ]
-
-const providerLimit = (provider: string) => {
-  if (provider === 'op') return 24
-  return 14
-}
 
 const prettyLabel = (slug: string) =>
   slug
@@ -115,34 +119,65 @@ export default function Mature() {
     if (urlSort) return urlSort
     return provider === 'mal' ? 'SCORE_DESC' : 'POPULARITY_DESC'
   })
-  const [hnSort, setHnSort] = useState(
-    (searchParams.get('provider') === 'hn' && searchParams.get('sortBy')) || ''
-  )
+  const [remoteSort, setRemoteSort] = useState(searchParams.get('sortBy') || '')
   const [status, setStatus] = useState(searchParams.get('status') || '')
   const [season, setSeason] = useState(searchParams.get('season') || 'ALL')
   const [year, setYear] = useState(searchParams.get('year') || 'ALL')
-  const [genre, setGenre] = useState(searchParams.get('genre') || '')
-  const [opOrder, setOpOrder] = useState(searchParams.get('order') || 'recent')
-  const [opStudio, setOpStudio] = useState(searchParams.get('studio') || '')
-  const [submittedOpStudio, setSubmittedOpStudio] = useState(searchParams.get('studio') || '')
-  const [hnGenres, setHnGenres] = useState<{ slug: string; name: string }[]>([])
+  const [genre, setGenre] = useState(searchParams.get('genre') || searchParams.get('genres') || '')
+  const [remoteOrder, setRemoteOrder] = useState(searchParams.get('order') || 'recent')
+  const [studio, setStudio] = useState(searchParams.get('studio') || '')
+  const [submittedStudio, setSubmittedStudio] = useState(searchParams.get('studio') || '')
+  const [dynamicGenres, setDynamicGenres] = useState<{ slug: string; name: string }[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [resolvingId, setResolvingId] = useState<string | null>(null)
 
-  const limit = providerLimit(provider)
+  const { options: allProviderOptions } = useProviders()
+  const matureStreamingOptions = useMemo(
+    () => allProviderOptions.filter((o) => o.mature && (o.kind ?? 'anime') === 'anime'),
+    [allProviderOptions]
+  )
+  const providerOptions = useMemo(
+    () => [
+      ...META_PROVIDER_OPTIONS,
+      ...matureStreamingOptions.map((o) => ({ value: o.value, label: o.label })),
+    ],
+    [matureStreamingOptions]
+  )
+
+  const { data: filters } = useQuery<MatureFiltersResponse>({
+    queryKey: ['mature-filters'],
+    queryFn: () => fetchApi('/api/mature/filters'),
+    enabled: hasConsent,
+    staleTime: Infinity,
+  })
+
+  const isMetaProvider = provider === 'anilist' || provider === 'mal'
+  const streamingFilters = isMetaProvider ? undefined : filters?.providers?.[provider]
+  const caps = streamingFilters?.browse
+  const staticGenres = streamingFilters?.genres ?? []
+  const staticOrders = streamingFilters?.orders ?? []
+  const effectiveOrder =
+    staticOrders.length > 0 && !staticOrders.includes(remoteOrder) ? staticOrders[0] : remoteOrder
+  const genreSupported =
+    !isMetaProvider && (caps?.genre === true || staticGenres.length > 0 || dynamicGenres.length > 0)
+  const orderSupported = !isMetaProvider && (caps?.order === true || staticOrders.length > 0)
+  const studioSupported = !isMetaProvider && caps?.studio === true
+  const remoteSortSupported = !isMetaProvider && caps?.sort === true
+
+  const limit = isMetaProvider ? 14 : (caps?.pageSize ?? 14)
 
   interface UrlSnapshot {
     provider: string
     query: string
     page: number
     sort: string
-    hnSort: string
+    remoteSort: string
     status: string
     season: string
     year: string
     genre: string
-    opOrder: string
-    opStudio: string
+    remoteOrder: string
+    studio: string
   }
 
   const writeParams = (s: UrlSnapshot) => {
@@ -155,19 +190,17 @@ export default function Mature() {
       if (s.status) p.set('status', s.status)
       if (s.season !== 'ALL') p.set('season', s.season)
       if (s.year !== 'ALL') p.set('year', s.year)
-    }
-    if (s.provider === 'mal') {
+    } else if (s.provider === 'mal') {
       if (s.sort !== 'SCORE_DESC') p.set('sortBy', s.sort)
       if (s.status) p.set('status', s.status)
-    }
-    if (s.provider === 'hn' && s.hnSort) p.set('sortBy', s.hnSort)
-    if (s.provider === 'wh' || s.provider === 'ht' || s.provider === 'hn') {
-      if (s.genre) p.set('genre', s.genre)
-    }
-    if (s.provider === 'op') {
-      if (s.opOrder !== 'recent') p.set('order', s.opOrder)
-      if (s.genre) p.set('genres', s.genre)
-      if (s.opStudio.trim()) p.set('studio', s.opStudio.trim())
+    } else {
+      const c = filters?.providers?.[s.provider]?.browse
+      const orders = filters?.providers?.[s.provider]?.orders ?? []
+      const order = orders.length > 0 && !orders.includes(s.remoteOrder) ? orders[0] : s.remoteOrder
+      if ((!c || c.sort) && s.remoteSort) p.set('sortBy', s.remoteSort)
+      if ((!c || c.genre) && s.genre) p.set('genre', s.genre)
+      if ((!c || c.order) && order !== (orders[0] ?? 'recent')) p.set('order', order)
+      if ((!c || c.studio) && s.studio.trim()) p.set('studio', s.studio.trim())
     }
     setSearchParams(p, { replace: true })
   }
@@ -177,21 +210,14 @@ export default function Mature() {
     query: submittedQuery,
     page,
     sort,
-    hnSort,
+    remoteSort,
     status,
     season,
     year,
     genre,
-    opOrder,
-    opStudio: submittedOpStudio,
+    remoteOrder,
+    studio: submittedStudio,
     ...over,
-  })
-
-  const { data: filters } = useQuery<MatureFilters>({
-    queryKey: ['mature-filters'],
-    queryFn: () => fetchApi('/api/mature/filters'),
-    enabled: hasConsent,
-    staleTime: Infinity,
   })
 
   const buildParams = () => {
@@ -209,15 +235,11 @@ export default function Mature() {
     if (provider === 'mal') {
       params.set('sortBy', sort)
       if (status) params.set('status', status)
-    }
-    if (provider === 'hn' && hnSort) params.set('sortBy', hnSort)
-    if (provider === 'wh' || provider === 'ht' || provider === 'hn') {
-      if (genre) params.set('genre', genre)
-    }
-    if (provider === 'op') {
-      params.set('order', opOrder)
-      if (genre) params.set('genres', genre)
-      if (submittedOpStudio.trim()) params.set('studio', submittedOpStudio.trim())
+    } else if (!isMetaProvider) {
+      if (genreSupported && genre) params.set('genre', genre)
+      if (orderSupported) params.set('order', effectiveOrder)
+      if (remoteSortSupported && remoteSort) params.set('sortBy', remoteSort)
+      if (studioSupported && submittedStudio.trim()) params.set('studio', submittedStudio.trim())
     }
     return params.toString()
   }
@@ -237,8 +259,8 @@ export default function Mature() {
 
   useEffect(() => {
     const facets = response?.genres
-    if (provider === 'hn' && facets && facets.length > 0) {
-      setHnGenres((prev) => {
+    if (!isMetaProvider && staticGenres.length === 0 && facets && facets.length > 0) {
+      setDynamicGenres((prev) => {
         const seen = new Set(prev.map((g) => g.slug))
         const next = [...prev]
         for (const g of facets) {
@@ -250,7 +272,7 @@ export default function Mature() {
         return next.length === prev.length ? prev : next
       })
     }
-  }, [response, provider])
+  }, [response, provider, isMetaProvider, staticGenres.length])
 
   const results = (response?.data || []).map((s) => ({ ...s, isAdult: true }))
   const hasMore = response?.hasMore ?? false
@@ -259,18 +281,16 @@ export default function Mature() {
     hideVirtualKeyboard()
     setPage(1)
     let nextGenre = genre
-    if (provider === 'wh' || provider === 'ht' || provider === 'hn') {
-      if (query.trim()) nextGenre = ''
-    }
+    if (!isMetaProvider && !orderSupported && query.trim()) nextGenre = ''
     setGenre(nextGenre)
-    if (provider === 'op') setSubmittedOpStudio(opStudio)
+    if (studioSupported) setSubmittedStudio(studio)
     setSubmittedQuery(query)
     writeParams(
       snapshot({
         query,
         page: 1,
         genre: nextGenre,
-        opStudio: provider === 'op' ? opStudio : submittedOpStudio,
+        studio: studioSupported ? studio : submittedStudio,
       })
     )
   }
@@ -278,15 +298,16 @@ export default function Mature() {
   const handleProviderChange = (value: string) => {
     setProvider(value)
     setPage(1)
-    setHnSort('')
+    setRemoteSort('')
     setGenre('')
+    setDynamicGenres([])
     if (value === 'mal') {
       setSort('SCORE_DESC')
     } else if (value === 'anilist') {
       setSort('POPULARITY_DESC')
     }
     setSubmittedQuery(query)
-    writeParams(snapshot({ provider: value, page: 1, hnSort: '', genre: '', query }))
+    writeParams(snapshot({ provider: value, page: 1, remoteSort: '', genre: '', query }))
   }
 
   const handleGenreChange = (value: string) => {
@@ -365,13 +386,9 @@ export default function Mature() {
   ]
 
   const genreOptions =
-    provider === 'wh'
-      ? (filters?.whGenres || []).map((g) => ({ value: g, label: prettyLabel(g) }))
-      : provider === 'ht'
-        ? (filters?.htGenres || []).map((g) => ({ value: g, label: prettyLabel(g) }))
-        : provider === 'hn'
-          ? hnGenres.map((g) => ({ value: g.slug, label: g.name }))
-          : []
+    staticGenres.length > 0
+      ? staticGenres.map((g) => ({ value: g, label: prettyLabel(g) }))
+      : dynamicGenres.map((g) => ({ value: g.slug, label: g.name }))
 
   if (!hasConsent) {
     return <MatureConsentModal isOpen onClose={() => navigate('/')} onGrant={grant} />
@@ -417,7 +434,7 @@ export default function Mature() {
             <Button onClick={handleSearch} className={styles.searchBtn}>
               Search
             </Button>
-            {provider === 'anilist' && (
+            {isMetaProvider && (
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
@@ -425,26 +442,18 @@ export default function Mature() {
                 <Icon name="filter" /> Filters
               </button>
             )}
-            {provider === 'mal' && (
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
-              >
-                <Icon name="filter" /> Filters
-              </button>
-            )}
-            {provider === 'hn' && (
+            {remoteSortSupported && (
               <select
-                value={hnSort}
+                value={remoteSort}
                 onChange={(e) => {
-                  setHnSort(e.target.value)
+                  setRemoteSort(e.target.value)
                   setPage(1)
-                  writeParams(snapshot({ hnSort: e.target.value, page: 1 }))
+                  writeParams(snapshot({ remoteSort: e.target.value, page: 1 }))
                 }}
                 className={styles.providerSelect}
                 aria-label="Sort"
               >
-                {hnSortOptions.map((opt) => (
+                {remoteSortOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -511,89 +520,82 @@ export default function Mature() {
           </div>
         )}
 
-        {(provider === 'wh' || provider === 'ht' || provider === 'hn') && (
+        {!isMetaProvider && !!filters && (genreSupported || orderSupported || studioSupported) && (
           <div className={`${styles.advancedFilters} ${styles.show}`}>
             <div className={styles.filterDivider} />
             <div className={`${styles.filterGrid} ${matureStyles.tightGrid}`}>
-              <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
-                <label>Genre</label>
-                <select value={genre} onChange={(e) => handleGenreChange(e.target.value)}>
-                  <option value="">All Genres</option>
-                  {genreOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {orderSupported && (
+                <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
+                  <label>Order</label>
+                  <select
+                    value={effectiveOrder}
+                    onChange={(e) => {
+                      setRemoteOrder(e.target.value)
+                      setPage(1)
+                      writeParams(snapshot({ remoteOrder: e.target.value, page: 1 }))
+                    }}
+                  >
+                    {(staticOrders.length > 0 ? staticOrders : ['recent']).map((o) => (
+                      <option key={o} value={o}>
+                        {orderLabels[o] || o}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {genreSupported && (
+                <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
+                  <label>Genre</label>
+                  <select
+                    value={genre}
+                    onChange={(e) => {
+                      if (orderSupported) {
+                        setGenre(e.target.value)
+                        setPage(1)
+                        writeParams(snapshot({ genre: e.target.value, page: 1 }))
+                      } else {
+                        handleGenreChange(e.target.value)
+                      }
+                    }}
+                  >
+                    <option value="">All Genres</option>
+                    {genreOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {studioSupported && (
+                <div className={styles.filterItem}>
+                  <label>Studio</label>
+                  <input
+                    type="text"
+                    placeholder="Studio name..."
+                    value={studio}
+                    onChange={(e) => setStudio(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSearch()
+                    }}
+                    className={styles.searchInput}
+                  />
+                </div>
+              )}
             </div>
-            {genre && (
+            {genre && genreSupported && !orderSupported && (
               <p className={styles.pageSubtitle}>
                 Browsing the {prettyLabel(genre)} genre — search text is ignored while a genre is
                 selected.
               </p>
             )}
-          </div>
-        )}
-
-        {provider === 'op' && (
-          <div className={`${styles.advancedFilters} ${styles.show}`}>
-            <div className={styles.filterDivider} />
-            <div className={`${styles.filterGrid} ${matureStyles.tightGrid}`}>
-              <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
-                <label>Order</label>
-                <select
-                  value={opOrder}
-                  onChange={(e) => {
-                    setOpOrder(e.target.value)
-                    setPage(1)
-                    writeParams(snapshot({ opOrder: e.target.value, page: 1 }))
-                  }}
-                >
-                  {(filters?.opOrders || ['recent']).map((o) => (
-                    <option key={o} value={o}>
-                      {opOrderLabels[o] || o}
-                    </option>
-                  ))}
-                </select>
+            {(orderSupported || studioSupported) && (
+              <div className={styles.filterActions}>
+                <Button onClick={handleSearch} className={styles.searchBtn}>
+                  Apply Filters
+                </Button>
               </div>
-              <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
-                <label>Genre</label>
-                <select
-                  value={genre}
-                  onChange={(e) => {
-                    setGenre(e.target.value)
-                    setPage(1)
-                    writeParams(snapshot({ genre: e.target.value, page: 1 }))
-                  }}
-                >
-                  <option value="">All Genres</option>
-                  {(filters?.opTags || []).map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.filterItem}>
-                <label>Studio</label>
-                <input
-                  type="text"
-                  placeholder="Studio name..."
-                  value={opStudio}
-                  onChange={(e) => setOpStudio(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSearch()
-                  }}
-                  className={styles.searchInput}
-                />
-              </div>
-            </div>
-            <div className={styles.filterActions}>
-              <Button onClick={handleSearch} className={styles.searchBtn}>
-                Apply Filters
-              </Button>
-            </div>
+            )}
           </div>
         )}
       </div>
