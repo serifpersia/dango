@@ -26,6 +26,7 @@ class SetupActivity : AppCompatActivity() {
         const val TAG = "DangoSetup"
         const val PREFS_NAME = "dango_prefs"
         const val KEY_INSTALLED_VERSION = "installed_version"
+        const val KEY_WEBVIEW_ENABLED = "webview_enabled"
         const val NPM_REGISTRY = "https://registry.npmjs.org/@serifpersia/dango/latest"
         const val DANGO_PACKAGE = "@serifpersia/dango"
     }
@@ -37,6 +38,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var devServerUrlInput: android.widget.EditText
     private lateinit var updateBtn: Button
     private lateinit var launchBtn: Button
+    private lateinit var browserSwitch: android.widget.Switch
     private lateinit var swipeHintText: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var progressText: TextView
@@ -61,6 +63,11 @@ class SetupActivity : AppCompatActivity() {
         devServerUrlInput = findViewById(R.id.devServerUrlInput)
         updateBtn = findViewById(R.id.updateBtn)
         launchBtn = findViewById(R.id.launchBtn)
+        browserSwitch = findViewById(R.id.browserSwitch)
+        browserSwitch.isChecked = prefs.getBoolean(KEY_WEBVIEW_ENABLED, true)
+        browserSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(KEY_WEBVIEW_ENABLED, checked).apply()
+        }
         swipeHintText = findViewById(R.id.swipeHintText)
         progressBar = findViewById(R.id.progressBar)
         progressText = findViewById(R.id.progressText)
@@ -97,6 +104,7 @@ class SetupActivity : AppCompatActivity() {
         updateBtn.visibility = View.GONE
         devServerUrlInput.setText(DevConfig.getDevUrl(this))
         devServerUrlInput.visibility = View.VISIBLE
+        browserSwitch.visibility = View.GONE
         launchBtn.text = "Launch (dev server)"
         launchBtn.visibility = View.VISIBLE
         progressBar.visibility = View.GONE
@@ -419,6 +427,7 @@ class SetupActivity : AppCompatActivity() {
         swipeHintText.visibility = View.GONE
         updateBtn.visibility = View.GONE
         launchBtn.visibility = View.GONE
+        browserSwitch.visibility = View.GONE
         progressBar.visibility = View.VISIBLE
         progressText.visibility = View.VISIBLE
         progressText.text = ""
@@ -435,6 +444,7 @@ class SetupActivity : AppCompatActivity() {
         swipeHintText.visibility = View.VISIBLE
         launchBtn.text = "Launch"
         launchBtn.visibility = View.VISIBLE
+        browserSwitch.visibility = View.VISIBLE
         progressBar.visibility = View.GONE
         progressText.visibility = View.GONE
         logScroll.visibility = View.GONE
@@ -450,6 +460,7 @@ class SetupActivity : AppCompatActivity() {
         updateBtn.visibility = View.VISIBLE
         launchBtn.text = "Continue with v$current"
         launchBtn.visibility = View.VISIBLE
+        browserSwitch.visibility = View.VISIBLE
         progressBar.visibility = View.GONE
         progressText.visibility = View.GONE
         logScroll.visibility = View.GONE
@@ -463,6 +474,7 @@ class SetupActivity : AppCompatActivity() {
         swipeHintText.visibility = View.GONE
         updateBtn.visibility = View.GONE
         launchBtn.visibility = View.GONE
+        browserSwitch.visibility = View.GONE
         progressBar.visibility = View.VISIBLE
         progressText.visibility = View.VISIBLE
         progressText.text = text

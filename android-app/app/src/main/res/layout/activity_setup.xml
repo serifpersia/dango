@@ -80,11 +80,22 @@
             android:visibility="gone"
             android:layout_marginBottom="12dp" />
 
+        <Switch
+            android:id="@+id/browserSwitch"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:text="Built-in browser"
+            android:textColor="#d1d5db"
+            android:textSize="14sp"
+            android:checked="true"
+            android:visibility="gone"
+            android:layout_marginBottom="24dp" />
+
         <TextView
             android:id="@+id/swipeHintText"
             android:layout_width="280dp"
             android:layout_height="wrap_content"
-            android:text="Tip: inside dango, swipe all the way in from the left or right screen edge to shut down the server."
+            android:text="Tip: inside dango, swipe all the way in from the left or right screen edge for server-only mode and shutdown. Turn off Built-in browser to use your own browser instead."
             android:textColor="#888888"
             android:textSize="12sp"
             android:gravity="center"

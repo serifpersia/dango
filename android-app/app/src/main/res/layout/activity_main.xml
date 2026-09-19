@@ -63,6 +63,16 @@
                 android:textColor="#d1d5db"
                 android:textSize="14sp" />
 
+            <Switch
+                android:id="@+id/webViewSwitchConfirm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:checked="true"
+                android:text="Built-in browser"
+                android:textColor="#d1d5db"
+                android:textSize="14sp" />
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -114,6 +124,64 @@
                 android:layout_height="36dp"
                 android:indeterminate="true"
                 android:indeterminateTint="#8b5cf6" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/serverPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="dango server running"
+                android:textColor="#f3f4f6"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/serverUrlText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="http://localhost:3000"
+                android:textColor="#8b5cf6"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="Open the address above in your browser."
+                android:textColor="#d1d5db"
+                android:textSize="14sp" />
+
+            <Switch
+                android:id="@+id/webViewSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:checked="false"
+                android:text="Built-in browser"
+                android:textColor="#d1d5db"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/stopServerBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="#8b5cf6"
+                android:text="Stop server"
+                android:textColor="#ffffff" />
 
         </LinearLayout>
 

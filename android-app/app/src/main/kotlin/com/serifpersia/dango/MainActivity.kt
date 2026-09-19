@@ -60,6 +60,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bootOverlay: View
     private lateinit var fullscreenContainer: FrameLayout
     private lateinit var shutdownOverlay: View
+    private lateinit var serverPanel: View
+    private lateinit var serverUrlText: TextView
+    private lateinit var webViewSwitch: android.widget.Switch
+    private lateinit var webViewSwitchConfirm: android.widget.Switch
+    private lateinit var stopServerBtn: Button
     private lateinit var shutdownConfirmOverlay: View
     private lateinit var shutdownConfirmArrow: TextView
     private lateinit var shutdownConfirmText: TextView
@@ -80,6 +85,8 @@ class MainActivity : AppCompatActivity() {
     private var shutdownConfirmVisible = false
     private var serverReady = false
     private var shuttingDown = false
+    private var webviewEnabled = true
+    private var webViewLoaded = false
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingDownloadUrl: String? = null
     private var pendingDownloadFileName: String = "dango-backup.db"
@@ -176,6 +183,27 @@ class MainActivity : AppCompatActivity() {
         shutdownConfirmSubtext = findViewById(R.id.shutdownConfirmSubtext)
         shutdownConfirmAccept = findViewById(R.id.shutdownConfirmAccept)
         shutdownConfirmCancel = findViewById(R.id.shutdownConfirmCancel)
+        serverPanel = findViewById(R.id.serverPanel)
+        serverUrlText = findViewById(R.id.serverUrlText)
+        webViewSwitch = findViewById(R.id.webViewSwitch)
+        webViewSwitchConfirm = findViewById(R.id.webViewSwitchConfirm)
+        stopServerBtn = findViewById(R.id.stopServerBtn)
+
+        webviewEnabled = getSharedPreferences(
+            SetupActivity.PREFS_NAME,
+            MODE_PRIVATE
+        ).getBoolean(SetupActivity.KEY_WEBVIEW_ENABLED, true)
+        webViewSwitch.isChecked = webviewEnabled
+        webViewSwitchConfirm.isChecked = webviewEnabled
+        webViewSwitch.setOnCheckedChangeListener { _, checked ->
+            setWebViewEnabled(checked)
+        }
+        webViewSwitchConfirm.setOnCheckedChangeListener { _, checked ->
+            setWebViewEnabled(checked)
+        }
+        stopServerBtn.setOnClickListener {
+            gracefulShutdown()
+        }
 
         fileChooserLauncher =
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -223,7 +251,9 @@ class MainActivity : AppCompatActivity() {
             customView != null || webView.canScrollVertically(-1)
         }
         swipeRefreshLayout.setOnRefreshListener {
-            if (customView == null) {
+            if (!webviewEnabled) {
+                swipeRefreshLayout.isRefreshing = false
+            } else if (customView == null) {
                 webView.reload()
             } else {
                 swipeRefreshLayout.isRefreshing = false
@@ -272,7 +302,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 swipeRefreshLayout.isRefreshing = false
-                if (serverReady) {
+                if (serverReady && webviewEnabled) {
                     bootOverlay.visibility = View.GONE
                     progressBar.visibility = View.GONE
                     statusText.visibility = View.GONE
@@ -446,6 +476,7 @@ class MainActivity : AppCompatActivity() {
                 when {
                     shutdownConfirmVisible -> hideShutdownConfirm()
                     customView != null -> hideFullscreen()
+                    serverPanel.visibility == View.VISIBLE -> gracefulShutdown()
                     webView.canGoBack() -> webView.goBack()
                     else -> gracefulShutdown()
                 }
@@ -456,6 +487,7 @@ class MainActivity : AppCompatActivity() {
         startUrl = if (devMode) DevConfig.getDevUrl(this) else SERVER_URL
         webView.visibility = View.INVISIBLE
         if (devMode) {
+            webViewSwitchConfirm.visibility = View.GONE
             Log.i(TAG, "Dev server mode: loading $startUrl, node install skipped")
             waitForServer(startUrl, "$startUrl/api/health")
         } else {
@@ -727,8 +759,87 @@ class MainActivity : AppCompatActivity() {
         bootOverlay.visibility = View.GONE
         statusText.visibility = View.GONE
         progressBar.visibility = View.GONE
+        if (webviewEnabled) {
+            enterWebViewMode(pageUrl)
+        } else {
+            enterServerMode()
+        }
+    }
+
+    private fun setWebViewEnabled(enabled: Boolean) {
+        if (devMode) return
+        if (enabled == webviewEnabled) {
+            syncWebViewSwitches()
+            return
+        }
+        webviewEnabled = enabled
+        getSharedPreferences(SetupActivity.PREFS_NAME, MODE_PRIVATE).edit()
+            .putBoolean(SetupActivity.KEY_WEBVIEW_ENABLED, enabled).apply()
+        syncWebViewSwitches()
+        if (shuttingDown) return
+        if (enabled) {
+            hideShutdownConfirm()
+            enterWebViewMode()
+        } else {
+            hideShutdownConfirm()
+            enterServerMode()
+        }
+    }
+
+    private fun syncWebViewSwitches() {
+        if (webViewSwitch.isChecked != webviewEnabled) {
+            webViewSwitch.isChecked = webviewEnabled
+        }
+        if (webViewSwitchConfirm.isChecked != webviewEnabled) {
+            webViewSwitchConfirm.isChecked = webviewEnabled
+        }
+    }
+
+    private fun enterWebViewMode(url: String = startUrl) {
+        serverPanel.visibility = View.GONE
         webView.visibility = View.VISIBLE
-        webView.loadUrl(pageUrl)
+        if (serverReady && !webViewLoaded) {
+            webViewLoaded = true
+            webView.loadUrl(url)
+        }
+    }
+
+    private fun enterServerMode() {
+        webView.stopLoading()
+        webView.visibility = View.GONE
+        bootOverlay.visibility = View.GONE
+        updateServerUrlText()
+        serverPanel.visibility = View.VISIBLE
+    }
+
+    private fun updateServerUrlText() {
+        val lanIp = getLanIp()
+        serverUrlText.text = if (lanIp != null) {
+            "On this device:\nhttp://localhost:3000\n\nOn your network:\nhttp://$lanIp:3000"
+        } else {
+            "On this device:\nhttp://localhost:3000"
+        }
+    }
+
+    private fun getLanIp(): String? {
+        try {
+            val interfaces = java.util.Collections.list(
+                java.net.NetworkInterface.getNetworkInterfaces()
+            )
+            for (intf in interfaces) {
+                if (!intf.isUp || intf.isLoopback) continue
+                for (addr in java.util.Collections.list(intf.inetAddresses)) {
+                    if (addr is java.net.Inet4Address &&
+                        !addr.isLoopbackAddress &&
+                        addr.isSiteLocalAddress
+                    ) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return null
     }
 
     private fun gracefulShutdown() {
@@ -741,6 +852,7 @@ class MainActivity : AppCompatActivity() {
         webView.stopLoading()
         webView.visibility = View.GONE
         bootOverlay.visibility = View.GONE
+        serverPanel.visibility = View.GONE
         shutdownOverlay.visibility = View.VISIBLE
 
         scope.launch {
