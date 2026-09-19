@@ -242,23 +242,25 @@ export class WatchlistController {
             monthEnd
           )
 
-          const latestFinishedByShow = new Map<string, { episodeKey: string; airingAt: number }>()
+          const finishedEpisodesByShow = new Map<
+            string,
+            { episodeKey: string; airingAt: number }[]
+          >()
+          const seenFinishedKeys = new Set<string>()
           for (const entry of finishedSchedules) {
             if (entry.airingAt > nowUnix) continue
             const watchlistId = reverseMap.get(entry.mediaId)
             if (!watchlistId) continue
-            const current = latestFinishedByShow.get(watchlistId)
-            if (!current || entry.airingAt > current.airingAt) {
-              latestFinishedByShow.set(watchlistId, {
-                episodeKey: String(Math.round(entry.episode)),
-                airingAt: entry.airingAt,
-              })
-            }
+            const episodeKey = String(Math.round(entry.episode))
+            const dedupeKey = `${watchlistId}:${episodeKey}`
+            if (seenFinishedKeys.has(dedupeKey)) continue
+            seenFinishedKeys.add(dedupeKey)
+            const list = finishedEpisodesByShow.get(watchlistId)
+            if (list) list.push({ episodeKey, airingAt: entry.airingAt })
+            else finishedEpisodesByShow.set(watchlistId, [{ episodeKey, airingAt: entry.airingAt }])
           }
 
-          for (const [watchlistId, { episodeKey, airingAt }] of latestFinishedByShow) {
-            if (nowUnix - airingAt > 30 * 24 * 60 * 60) continue
-
+          for (const [watchlistId, episodes] of finishedEpisodesByShow) {
             const [watchedEps, dismissedEps] = await Promise.all([
               WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, watchlistId),
               NotificationsRepository.getDismissedByShow(db, watchlistId),
@@ -267,30 +269,36 @@ export class WatchlistController {
             const watchedSet = new Set(watchedEps.map((e) => e.toString()))
             const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
 
-            if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
-              await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
-              db.scheduleSave()
+            let inserted = false
+            for (const { episodeKey, airingAt } of episodes) {
+              if (nowUnix - airingAt > 30 * 24 * 60 * 60) continue
+              if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
+                await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
+                inserted = true
+              }
             }
+            if (inserted) db.scheduleSave()
           }
         }
 
-        const latestByShow = new Map<string, { episodeKey: string; airingAt: number }>()
+        const episodesByShow = new Map<string, { episodeKey: string; airingAt: number }[]>()
+        const seenEpisodeKeys = new Set<string>()
         for (const entry of schedules) {
           if (entry.airingAt > nowUnix) continue
 
           const watchlistId = reverseMap.get(entry.mediaId)
           if (!watchlistId) continue
 
-          const current = latestByShow.get(watchlistId)
-          if (!current || entry.airingAt > current.airingAt) {
-            latestByShow.set(watchlistId, {
-              episodeKey: String(Math.round(entry.episode)),
-              airingAt: entry.airingAt,
-            })
-          }
+          const episodeKey = String(Math.round(entry.episode))
+          const dedupeKey = `${watchlistId}:${episodeKey}`
+          if (seenEpisodeKeys.has(dedupeKey)) continue
+          seenEpisodeKeys.add(dedupeKey)
+          const list = episodesByShow.get(watchlistId)
+          if (list) list.push({ episodeKey, airingAt: entry.airingAt })
+          else episodesByShow.set(watchlistId, [{ episodeKey, airingAt: entry.airingAt }])
         }
 
-        for (const [watchlistId, { episodeKey, airingAt }] of latestByShow) {
+        for (const [watchlistId, episodes] of episodesByShow) {
           const [watchedEps, dismissedEps] = await Promise.all([
             WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, watchlistId),
             NotificationsRepository.getDismissedByShow(db, watchlistId),
@@ -299,10 +307,14 @@ export class WatchlistController {
           const watchedSet = new Set(watchedEps.map((e) => e.toString()))
           const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
 
-          if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
-            await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
-            db.scheduleSave()
+          let inserted = false
+          for (const { episodeKey } of episodes) {
+            if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
+              await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
+              inserted = true
+            }
           }
+          if (inserted) db.scheduleSave()
         }
 
         await NotificationsRepository.cleanupWatchedNotifications(db)
@@ -757,6 +769,7 @@ export class WatchlistController {
       })
 
       NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+      NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber)
     })
 
     req.db.scheduleSave()
@@ -1276,22 +1289,25 @@ export class WatchlistController {
       FROM discovered_notifications dn
       JOIN watchlist w ON dn.showId = w.id
       WHERE w.status = 'Watching'
-        AND dn.episodeNumber = (
-          SELECT MAX(CAST(dn2.episodeNumber AS INTEGER))
+        AND EXISTS (
+          SELECT 1 FROM discovered_notifications dn_recent
+          WHERE dn_recent.showId = dn.showId
+            AND dn_recent.discoveredAt >= datetime('now', '-7 days')
+        )
+        AND CAST(dn.episodeNumber AS INTEGER) = (
+          SELECT MIN(CAST(dn2.episodeNumber AS INTEGER))
           FROM discovered_notifications dn2
           WHERE dn2.showId = dn.showId
-            AND dn2.discoveredAt >= datetime('now', '-7 days')
             AND NOT EXISTS (
               SELECT 1 FROM watched_episodes we2
               WHERE we2.showId = dn2.showId AND we2.episodeNumber = dn2.episodeNumber
             )
         )
-        AND dn.discoveredAt >= datetime('now', '-7 days')
         AND NOT EXISTS (
           SELECT 1 FROM watched_episodes we
           WHERE we.showId = dn.showId AND we.episodeNumber = dn.episodeNumber
         )
-      ORDER BY CAST(dn.episodeNumber AS INTEGER) DESC`
+      ORDER BY CAST(dn.episodeNumber AS INTEGER) ASC`
     )
 
     res.json(

@@ -57,6 +57,12 @@ export const NotificationsRepository = {
       episodeNumber,
     ]),
 
+  deleteDiscovered: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
+    dbRun(db, 'DELETE FROM discovered_notifications WHERE showId = ? AND episodeNumber = ?', [
+      showId,
+      episodeNumber,
+    ]),
+
   cleanupWatchedNotifications: (db: DatabaseWrapper) =>
     Promise.all([
       dbRun(
