@@ -25,168 +25,131 @@
   }
 }
 
-/* Tablet: full metadata stack kept, type stepped down one notch to fit */
-@media (max-width: 1024px) {
-  .posterWrapper {
-    height: clamp(500px, 54vh, 600px);
-    height: clamp(500px, 54svh, 600px);
-  }
-
-  .content {
-    padding: calc(var(--header-height) + 1rem) var(--space-6) var(--space-6);
-  }
-
-  .title {
-    font-size: 2rem;
-    max-width: 640px;
-  }
-
-  .summary {
-    font-size: 0.95rem;
-    max-width: 640px;
-  }
-}
-
-.posterWrapper {
+.hero {
   position: relative;
   width: 100%;
-  height: clamp(490px, 58vh, 640px);
+  height: clamp(480px, 72vh, 660px);
   overflow: hidden;
   background-color: var(--bg-main);
 }
 
-.posterImage {
-  width: 100%;
-  height: 100%;
+/* Blurred banner backdrop, crossfades between slides */
+.ambient {
+  position: absolute;
+  inset: -60px;
+  width: calc(100% + 120px);
+  height: calc(100% + 120px);
   object-fit: cover;
-  object-position: center;
-  display: block;
-  animation: bannerFade 0.6s ease;
+  object-position: center 22%;
+  filter: blur(55px) brightness(0.3) saturate(1.15);
+  opacity: 0;
+  transition: opacity 0.6s ease;
 }
 
-@keyframes bannerFade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.ambientShow {
+  opacity: 1;
 }
 
-@media (max-width: 600px) {
-  .posterWrapper {
-    height: clamp(560px, 75vh, 720px);
-    height: clamp(560px, 75svh, 720px);
-  }
-
-  .content {
-    padding: calc(64px + 1rem) var(--space-4) 3rem;
-    gap: 0.75rem;
-  }
-
-  .badgeRow {
-    gap: 0.5rem;
-  }
-
-  .featureLabel {
-    font-size: 0.7rem;
-  }
-
-  .scoreChip {
-    font-size: 0.75rem;
-  }
-
-  .metaRow {
-    font-size: 0.8rem;
-  }
-
-  .genreTag {
-    font-size: 0.72rem;
-  }
-
-  .actions {
-    margin-top: 0.25rem;
-  }
-
-  .summary {
-    display: none;
-  }
-
-  .dotRow {
-    bottom: 1rem;
-  }
-}
-
-@media (max-width: 900px) and (orientation: landscape) {
-  .posterWrapper {
-    height: clamp(560px, 100vh, 760px);
-    height: clamp(560px, 100svh, 760px);
-  }
-
-  .content {
-    padding: calc(64px + 0.75rem) var(--space-4) 3.25rem;
-    gap: 0.6rem;
-  }
-
-  .badgeRow {
-    gap: 0.5rem;
-  }
-
-  .metaRow {
-    font-size: 0.8rem;
-  }
-
-  .actions {
-    margin-top: 0.25rem;
-  }
-
-  .summary,
-  .genres {
-    display: none;
-  }
-
-  .dotRow {
-    bottom: 1rem;
-  }
-}
-
-.overlay {
+.scrim {
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(180deg, rgba(5, 5, 5, 0.85) 0%, rgba(5, 5, 5, 0.3) 25%, transparent 40%),
-    linear-gradient(
-      90deg,
-      rgba(5, 5, 5, 0.98) 0%,
-      rgba(5, 5, 5, 0.88) 38%,
-      rgba(5, 5, 5, 0.45) 65%,
-      transparent 85%
-    ),
-    linear-gradient(0deg, var(--bg-main) 0%, rgba(5, 5, 5, 0.4) 20%, transparent 50%);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  z-index: 3;
+    linear-gradient(90deg, rgba(5, 5, 8, 0.7) 0%, rgba(5, 5, 8, 0.35) 45%, rgba(5, 5, 8, 0.08) 75%),
+    linear-gradient(0deg, rgba(5, 5, 8, 0.85) 0%, transparent 42%),
+    linear-gradient(180deg, rgba(5, 5, 8, 0.5) 0%, transparent 26%);
 }
 
-.content {
-  width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: calc(var(--header-height) + 1rem) var(--space-8) var(--space-8);
+/* Story-style segment navigation, doubles as autoplay timer */
+.segments {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 1.5rem;
+  right: 1.5rem;
+  z-index: 5;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 100%;
-  gap: 1rem;
-  z-index: 4;
+  gap: 0.45rem;
+  padding: 10px 0;
 }
 
-.badgeRow {
+.segments i {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.segments .done {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.segments .live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-light);
+  transform-origin: left;
+  animation: segmentFill 8s linear forwards;
+}
+
+.paused .segments .live::after {
+  animation-play-state: paused;
+}
+
+@keyframes segmentFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Direction-aware slide track */
+.viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.slide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  padding: 4rem 5rem 3.5rem;
+}
+
+.poster {
+  width: 230px;
+  height: 330px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.info {
+  max-width: 620px;
+}
+
+.kicker {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-bottom: 0.9rem;
 }
 
 .featureLabel {
@@ -199,14 +162,6 @@
   text-transform: uppercase;
   border-radius: var(--radius-full);
   letter-spacing: 0.08em;
-}
-
-.index {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.5);
-  font-variant-numeric: tabular-nums;
 }
 
 .scoreChip {
@@ -224,6 +179,69 @@
   backdrop-filter: blur(4px);
 }
 
+/* Staggered entrance for the active slide. The hidden state lives in the
+   keyframes (not the base style) so content stays visible when animations
+   are disabled, e.g. low-end mode. */
+.slide .rise {
+  opacity: 1;
+}
+
+.slide.active .rise {
+  animation: riseIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.slide.active .rise:nth-child(1) {
+  animation-delay: 0.03s;
+}
+
+.slide.active .rise:nth-child(2) {
+  animation-delay: 0.07s;
+}
+
+.slide.active .rise:nth-child(3) {
+  animation-delay: 0.11s;
+}
+
+.slide.active .rise:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.slide.active .rise:nth-child(5) {
+  animation-delay: 0.19s;
+}
+
+.slide.active .rise:nth-child(6) {
+  animation-delay: 0.23s;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.slide.active .poster {
+  animation: posterIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes posterIn {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .metaRow {
   display: flex;
   align-items: center;
@@ -232,6 +250,7 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
   font-weight: 600;
+  margin-bottom: 0.8rem;
 }
 
 .metaItem {
@@ -248,23 +267,15 @@
 }
 
 .title {
-  font-size: 2.25rem;
-  line-height: 1.1;
+  display: block;
+  font-size: 3rem;
+  line-height: 1.04;
   cursor: pointer;
   max-width: 800px;
+  margin-bottom: 0.9rem;
   text-shadow:
-    0 2px 24px rgba(0, 0, 0, 0.8),
+    0 2px 26px rgba(0, 0, 0, 0.75),
     0 1px 3px rgba(0, 0, 0, 0.9);
-}
-
-@media (max-width: 600px) {
-  .title {
-    font-size: 1.75rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
 }
 
 .title:hover {
@@ -275,24 +286,28 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
 }
 
 .genreTag {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 0.32rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .summary {
-  font-size: 1rem;
-  line-height: 1.6;
-  margin: 0;
-  opacity: 0.9;
+  font-size: 0.96rem;
+  line-height: 1.65;
+  margin: 0 0 1.6rem;
+  color: rgba(255, 255, 255, 0.8);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 750px;
@@ -301,9 +316,8 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 0.75rem;
-  z-index: 5;
+  gap: 0.8rem;
+  flex-wrap: wrap;
 }
 
 .watchBtn {
@@ -311,27 +325,21 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: 0.8rem 2rem;
+  padding: 0.85rem 2.1rem;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
   color: var(--accent-text);
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   font-weight: 700;
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  box-shadow: 0 4px 20px var(--accent-glow);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 24px var(--accent-glow);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   letter-spacing: 0.02em;
 }
 
 .watchBtn:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 8px 28px var(--accent-glow);
-  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
-}
-
-.watchBtn:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(-2px);
 }
 
 .detailsBtn {
@@ -339,138 +347,171 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: 0.8rem 1.75rem;
-  background: rgba(255, 255, 255, 0.06);
+  padding: 0.85rem 1.8rem;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.2s ease;
 }
 
 .detailsBtn:hover {
   background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.35);
-  transform: translateY(-2px);
   color: #ffffff;
-}
-
-.detailsBtn:active {
-  transform: translateY(0);
-}
-
-@media (max-width: 600px) {
-  .actions {
-    width: 100%;
-    gap: 0.75rem;
-  }
-
-  .watchBtn,
-  .detailsBtn {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-  }
-}
-
-.dotRow {
-  position: absolute;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-  z-index: 10;
-  padding: 10px;
-}
-
-.dotRow button {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.3);
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dotRow .activeDot {
-  width: 32px;
-  background: var(--accent);
 }
 
 .navArrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 12;
-  width: 48px;
-  height: 48px;
+  z-index: 6;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: all 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.bannerContainer:hover .navArrow {
-  opacity: 0.85;
+.hero:hover .navArrow {
+  opacity: 0.9;
 }
 
 .navArrow:hover {
-  opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.7);
   border-color: var(--accent);
-  color: var(--accent);
-  transform: translateY(-50%) scale(1.08);
+  color: var(--accent-light);
 }
 
 .prevArrow {
-  left: 1.5rem;
+  left: 1.2rem;
 }
 
 .nextArrow {
-  right: 1.5rem;
+  right: 1.2rem;
 }
 
-.progressBar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light, #3b82f6) 100%);
-  box-shadow: 0 0 10px var(--accent-glow);
-  z-index: 11;
-  animation: progressTimer 10s linear forwards;
-  transition: opacity 0.3s ease;
-}
-
-.progressBarPaused {
-  animation-play-state: paused;
-  opacity: 0;
-}
-
-@keyframes progressTimer {
-  0% {
-    width: 0%;
+/* Portrait: tall centered hero */
+@media (max-width: 760px) {
+  .hero {
+    height: auto;
+    min-height: 92svh;
   }
-  100% {
+
+  .scrim {
+    background: linear-gradient(
+      0deg,
+      rgba(5, 5, 8, 0.9) 0%,
+      rgba(5, 5, 8, 0.35) 55%,
+      rgba(5, 5, 8, 0.45) 100%
+    );
+  }
+
+  .slide {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 1.3rem;
+    padding: 4.2rem 1.4rem 2.4rem;
+  }
+
+  .poster {
+    width: 172px;
+    height: 248px;
+  }
+
+  .slide.active .poster {
+    animation-name: posterUp;
+  }
+
+  @keyframes posterUp {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.97);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .kicker {
+    justify-content: center;
+  }
+
+  .title {
+    font-size: 1.6rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .metaRow {
+    justify-content: center;
+    font-size: 0.8rem;
+  }
+
+  .genres {
+    justify-content: center;
+  }
+
+  .genreTag {
+    font-size: 0.66rem;
+  }
+
+  .summary {
+    display: none;
+  }
+
+  .actions {
     width: 100%;
   }
-}
 
-@media (max-width: 768px) {
+  .watchBtn,
+  .detailsBtn {
+    flex: 1;
+    justify-content: center;
+    padding: 0.85rem 0.5rem;
+    font-size: 0.87rem;
+  }
+
   .navArrow {
     display: none;
+  }
+
+  .segments {
+    left: 1rem;
+    right: 1rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .slide {
+    gap: 2rem;
+    padding: 4rem 2.5rem 3rem;
+  }
+
+  .title {
+    font-size: 2.2rem;
+  }
+
+  .poster {
+    width: 200px;
+    height: 288px;
   }
 }

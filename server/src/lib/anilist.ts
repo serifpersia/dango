@@ -835,7 +835,7 @@ async function fetchAnilistMedia(
 
 export async function getSpotlightBanners(page: number = 1, perPage: number = 20): Promise<Show[]> {
   const media = await fetchAnilistMedia(page, perPage)
-  const source = media ?? null
+  let source = media ?? null
 
   if (!source) {
     const now = new Date()
@@ -843,44 +843,30 @@ export async function getSpotlightBanners(page: number = 1, perPage: number = 20
     const month = now.getMonth() + 1
     const currentSeason =
       month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
-    const kitsuMedia = await tryFallback<AnilistMedia>(
+    source = await tryFallback<AnilistMedia>(
       () => malTop(malCacheStore(), 'airing', 1),
       () => kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
     )
-    if (!kitsuMedia || kitsuMedia.length === 0) {
+    if (!source || source.length === 0) {
       return []
     }
-    const shuffled = kitsuMedia.sort(() => Math.random() - 0.5)
-    const results: Show[] = []
-    for (const m of shuffled) {
-      if (results.length >= 6) break
-      const artwork = await findTmdbDefaultBackdrop({
-        english: m.title?.english,
-        romaji: m.title?.romaji,
-        native: m.title?.native,
-      })
-      if (artwork) {
-        const show = fromAnilistMedia(m)
-        results.push({
-          ...show,
-          bannerImage: artwork.backdrop,
-          description: show.description || artwork.overview || '',
-        })
-      }
-    }
-    return results
+    source = [...source].sort(() => Math.random() - 0.5)
   }
 
   const results: Show[] = []
   for (const m of source) {
     if (results.length >= 6) break
+    const show = fromAnilistMedia(m)
+    if (show.bannerImage) {
+      results.push(show)
+      continue
+    }
     const artwork = await findTmdbDefaultBackdrop({
       english: m.title?.english,
       romaji: m.title?.romaji,
       native: m.title?.native,
     })
     if (artwork) {
-      const show = fromAnilistMedia(m)
       results.push({
         ...show,
         bannerImage: artwork.backdrop,
