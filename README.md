@@ -241,7 +241,7 @@ Need help configuring your setup, troubleshooting builds, discussing feature req
 
 ## Disclaimer & Legal
 
-dango is an open-source, local-first web app. It does not scrape, host or distribute unauthorized media or copyrighted video assets. Users are solely responsible for ensuring their usage aligns with relevant local laws and digital copyright regulations.
+dango is an open-source, local-first web app. It does not host or distribute unauthorized media or copyrighted video assets. Users are solely responsible for ensuring their usage aligns with relevant local laws and digital copyright regulations.
 
 ## License
 
