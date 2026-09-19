@@ -153,6 +153,27 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     requestSlide(currentIndexRef.current - 1)
   }, [requestSlide])
 
+  const segmentsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = segmentsRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
+        e.preventDefault()
+        e.stopPropagation()
+        const now = Date.now()
+        if (now - lastScrollTime.current < 300) return
+        lastScrollTime.current = now
+        resetAutoplay()
+        if (e.deltaY > 0) nextSlide()
+        else prevSlide()
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [top6.length, nextSlide, prevSlide, resetAutoplay])
+
   useEffect(() => {
     if (top6.length === 0 || isPaused) return
     const timer = setTimeout(nextSlide, AUTOPLAY_MS)
@@ -196,18 +217,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
   const handleWatch = (id: string) => {
     navigate(`/watch/${id}`)
-  }
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
-      e.stopPropagation()
-      const now = Date.now()
-      if (now - lastScrollTime.current < 300) return
-      lastScrollTime.current = now
-      resetAutoplay()
-      if (e.deltaY > 0) nextSlide()
-      else prevSlide()
-    }
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -254,7 +263,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         <div className={styles.scrim} aria-hidden="true" />
 
         {top6.length > 1 && (
-          <div className={styles.segments} onWheel={handleWheel}>
+          <div className={styles.segments} ref={segmentsRef}>
             {top6.map((_, index) => (
               <i
                 key={`${autoplayResetKey}-${index}`}
