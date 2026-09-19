@@ -25,6 +25,8 @@ const SYNC_TABLES = [
   'dismissed_notifications',
   'discovered_notifications',
 ] as const
+// anime_id_map (offline MAL<->AniList metadata) is intentionally local-only:
+// it is rebuilt weekly from the upstream JSON dump and never synced.
 
 type SyncRow = Record<string, string | number | null>
 type SyncPayload = {

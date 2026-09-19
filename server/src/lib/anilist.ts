@@ -29,6 +29,7 @@ import {
   toAnilistDetailMedia,
 } from './mal.js'
 import { malCacheStore } from '../repositories/mal-cache.repository.js'
+import { offlineDb, type OfflineEntry } from './offline-db.js'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
@@ -614,6 +615,33 @@ export function fromAnilistMedia(m: AnilistMedia): Show {
   }
 }
 
+export function showFromOfflineEntry(entry: OfflineEntry): Show {
+  const id = String(entry.anilistId)
+  const name = entry.title || 'Unknown'
+  let genres: { name: string }[] | undefined
+  if (entry.genres) {
+    try {
+      const parsed: unknown = JSON.parse(entry.genres)
+      if (Array.isArray(parsed)) {
+        const names = parsed.filter((g): g is string => typeof g === 'string')
+        if (names.length > 0) genres = names.map((g) => ({ name: g }))
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return {
+    _id: id,
+    id,
+    anilistId: entry.anilistId,
+    name,
+    names: { romaji: entry.title || undefined },
+    thumbnail: entry.thumbnail || '',
+    genres,
+    type: entry.type,
+  }
+}
+
 export async function getLatestReleases(
   format: string = 'TV',
   page: number = 1,
@@ -976,6 +1004,17 @@ async function withPosterBackfill(
     setCachedAnilist(cacheKey, show)
     return show
   }
+  if (expected && (expected.anilistId || expected.malId)) {
+    const entry =
+      (expected.anilistId ? offlineDb.getByAnilistId(expected.anilistId) : null) ??
+      (expected.malId ? offlineDb.getByMalId(expected.malId) : null)
+    const thumb = entry?.thumbnail
+    if (thumb && thumb.trim() !== '') {
+      show.thumbnail = thumb
+      setCachedAnilist(cacheKey, show)
+      return show
+    }
+  }
   const candidates = [show.names?.english, show.englishName, show.name, show.names?.romaji]
     .filter((t): t is string => !!t && t.trim().length >= 4)
     .filter((t, i, a) => a.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i)
@@ -1072,6 +1111,12 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
 
   const apiFailed = !byId?.data && !byMal?.data
   if (apiFailed && anilistUnavailable()) {
+    const offline = offlineDb.getByAnilistId(numericId) ?? offlineDb.getByMalId(numericId)
+    const offlineShow = offline ? showFromOfflineEntry(offline) : null
+    if (offlineShow && hasPoster(offlineShow)) {
+      setCachedAnilist(cacheKey, offlineShow)
+      return offlineShow
+    }
     const fb = (await kitsuMetaByAnilistId(numericId)) ?? (await kitsuMetaByMalId(numericId))
     if (fb) {
       const show = fromAnilistMedia(fb)
@@ -1083,6 +1128,10 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
         return show
       }
       return withPosterBackfill(show, cacheKey, expected)
+    }
+    if (offlineShow) {
+      setCachedAnilist(cacheKey, offlineShow)
+      return offlineShow
     }
   }
 
@@ -1124,6 +1173,13 @@ export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
     }
   }
 
+  const offline = anilistUp ? null : offlineDb.getByMalId(absMal)
+  const offlineShow = offline ? showFromOfflineEntry(offline) : null
+  if (offlineShow && hasPoster(offlineShow)) {
+    setCachedAnilist(cacheKey, offlineShow)
+    return offlineShow
+  }
+
   try {
     const fb = await kitsuMetaByMalId(absMal)
     if (fb) {
@@ -1151,6 +1207,11 @@ export async function getShowMetaByMalId(malId: number): Promise<Show | null> {
 
   if (cached && !hasPoster(cached)) {
     return withPosterBackfill(cached, cacheKey, expected)
+  }
+
+  if (offlineShow) {
+    setCachedAnilist(cacheKey, offlineShow)
+    return offlineShow
   }
 
   logger.warn({ malId: absMal }, 'MAL id unresolvable on all metadata providers')

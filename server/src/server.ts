@@ -50,6 +50,7 @@ import { discordGatewayService } from './discord-gateway.js'
 import { SettingsRepository } from './repositories/settings.repository.js'
 import { requestContext } from './utils/request-context.js'
 import { checkAnilistStatus } from './lib/anilist.js'
+import { offlineDb } from './lib/offline-db.js'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -323,6 +324,14 @@ async function main() {
   db = await initializeDatabase(dbPath)
   logger.info(`Database initialized at ${dbPath}`)
 
+  await offlineDb.init(db)
+  if (offlineDb.checkWeeklyUpdateDue(db)) {
+    logger.info('Weekly offline database update is due on startup, starting background update...')
+    offlineDb.executeScheduledUpdate(db).catch((err) => {
+      logger.warn({ err: err?.message }, 'Startup scheduled offline database update failed')
+    })
+  }
+
   const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
   const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
   await discordRPCService.setEnabled(isRpcEnabled)
@@ -370,11 +379,25 @@ async function main() {
     }
   }, 300000)
 
+  const offlineDbInterval = setInterval(
+    () => {
+      if (offlineDb.checkWeeklyUpdateDue(db)) {
+        logger.info('Weekly offline database update triggered by periodic schedule...')
+        offlineDb.executeScheduledUpdate(db).catch((err) => {
+          logger.warn({ err: err?.message }, 'Interval scheduled offline database update failed')
+        })
+      }
+    },
+    6 * 60 * 60 * 1000
+  )
+  offlineDbInterval.unref()
+
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
     stopDiscovery()
     clearInterval(syncInterval)
+    clearInterval(offlineDbInterval)
     discordRPCService.disconnect()
     discordGatewayService.shutdown()
     await watcher.close()

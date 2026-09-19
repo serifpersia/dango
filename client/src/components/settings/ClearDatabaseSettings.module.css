@@ -1,0 +1,55 @@
+.sectionCard {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  padding: var(--space-8);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-shadow);
+  margin-bottom: var(--space-6);
+}
+
+.sectionCard h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sectionCard p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-6);
+  line-height: 1.6;
+}
+
+.dangerCard {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
+
+.dangerCard h3 {
+  color: var(--color-danger);
+}
+
+.status {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.warningText {
+  margin: 0 0 var(--space-4) !important;
+}
+
+.ackLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ackLabel input {
+  margin-top: 2px;
+}

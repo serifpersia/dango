@@ -6,6 +6,8 @@ import styles from './Settings.module.css'
 import GitHubSyncSettings from '../components/settings/GitHubSyncSettings'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
+import OfflineDbSettings from '../components/settings/OfflineDbSettings'
+import ClearDatabaseSettings from '../components/settings/ClearDatabaseSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
 import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
@@ -618,6 +620,8 @@ const Settings: React.FC = () => {
               />
               {statusMessage && <p className={styles.status}>{statusMessage}</p>}
             </div>
+            <OfflineDbSettings />
+            <ClearDatabaseSettings />
           </div>
         )
       default:
