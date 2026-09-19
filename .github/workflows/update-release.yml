@@ -55,29 +55,12 @@ jobs:
           node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.versionDate = new Date().toISOString(); fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
 
       - name: Download Existing APK
+        # The APK is built elsewhere and carried over between releases.
+        # Downloaded BEFORE the build so a build failure never loses it:
+        # the old 'latest' release is only replaced after all new artifacts exist.
         run: |
           mkdir -p apk-download
           gh release download "latest" --pattern "*.apk" --dir apk-download/ 2>/dev/null || echo "No existing APK found."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete Existing Latest Release
-        run: |
-          gh release delete "latest" --yes || echo "No previous 'latest' release to delete."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete Existing Latest Tag
-        run: |
-          git tag -d "latest" || echo "No local 'latest' tag to delete."
-          git push origin --delete "latest" || echo "No remote 'latest' tag to delete."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create New Latest Tag
-        run: |
-          git tag latest
-          git push origin latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -146,6 +129,28 @@ jobs:
         run: |
           cd dango-extension
           zip -r ../dango-extension.zip firefox chrome
+
+      - name: Delete Existing Latest Release
+        # Destructive steps run ONLY after the build + packaging succeeded,
+        # so a failed build leaves the previous release (and APK) untouched.
+        run: |
+          gh release delete "latest" --yes || echo "No previous 'latest' release to delete."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Existing Latest Tag
+        run: |
+          git tag -d "latest" || echo "No local 'latest' tag to delete."
+          git push origin --delete "latest" || echo "No remote 'latest' tag to delete."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Latest Tag
+        run: |
+          git tag latest
+          git push origin latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create New Latest Release
         run: |
