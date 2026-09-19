@@ -183,7 +183,16 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const handleResize = () => updateIndicator()
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    let cancelled = false
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (!cancelled) updateIndicator()
+      })
+    }
+    return () => {
+      cancelled = true
+      window.removeEventListener('resize', handleResize)
+    }
   }, [activeTab, updateIndicator])
 
   const handleBackup = () => {

@@ -156,8 +156,7 @@ const Home: React.FC = () => {
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
 
-  useLayoutEffect(() => {
-    const activeKey = displayTab
+  const updateIndicator = useCallback((activeKey: string) => {
     const el = tabRefs.current.get(activeKey)
     const bar = tabBarRef.current
     if (el && bar) {
@@ -169,7 +168,35 @@ const Home: React.FC = () => {
       })
       el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
-  }, [displayTab, tabsWithWeek.length])
+  }, [])
+
+  useLayoutEffect(() => {
+    updateIndicator(displayTab)
+  }, [displayTab, tabsWithWeek.length, updateIndicator])
+
+  useEffect(() => {
+    updateIndicator(displayTab)
+    if (typeof ResizeObserver === 'undefined') return
+    let raf = 0
+    const bar = tabBarRef.current
+    if (!bar) return
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => updateIndicator(displayTab))
+    })
+    ro.observe(bar)
+    let cancelled = false
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (!cancelled) updateIndicator(displayTab)
+      })
+    }
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [displayTab, tabsWithWeek.length, updateIndicator])
 
   const renderTabContent = () => {
     switch (displayTab) {
