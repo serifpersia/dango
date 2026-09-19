@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useSidebar } from '../hooks/useSidebar'
@@ -14,7 +14,7 @@ interface ProgressEvent {
   title: string
   matchedTitle: string | null
   status: string
-  source: 'anilist' | 'kitsu' | null
+  source: 'offline' | 'anilist' | 'kitsu' | null
   found: boolean
 }
 
@@ -50,6 +50,7 @@ const Trackers: React.FC = () => {
   }, [])
 
   const [publicUsername, setPublicUsername] = useState<string>('')
+  const [anilistImportMode, setAnilistImportMode] = useState<'username' | 'sync'>('username')
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null)
   const [clientIdInput, setClientIdInput] = useState<string>('')
   const isExchangingToken = useAnilistAuthCallback()
@@ -81,6 +82,10 @@ const Trackers: React.FC = () => {
   }, [savedClientId])
 
   const anilistConnected = trackerStatus?.anilist?.connected ?? false
+
+  useEffect(() => {
+    if (anilistConnected) setAnilistImportMode('sync')
+  }, [anilistConnected])
   const anilistUser = trackerStatus?.anilist?.user ?? null
 
   const hasShipped = !!SHIPPED_ANILIST_CLIENT_ID
@@ -185,7 +190,7 @@ const Trackers: React.FC = () => {
       const res = await fetch('/api/tracker/anilist/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: publicUsername.trim() }),
+        body: JSON.stringify({ username: publicUsername.trim(), erase: eraseWatchlist }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Import failed')
@@ -200,7 +205,41 @@ const Trackers: React.FC = () => {
     onError: (err: Error) => toast.error(err.message),
   })
 
+  const [malUsername, setMalUsername] = useState<string>('')
+
+  const malUsernameImport = useMutation({
+    mutationFn: async (opts: {
+      erase: boolean
+      useOfflineDb: boolean
+      skipFallback: boolean
+    }): Promise<number> => {
+      if (!malUsername.trim()) throw new Error('Please enter a MAL username')
+      const res = await fetch('/api/tracker/mal/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: malUsername.trim(),
+          erase: opts.erase,
+          useOfflineDb: opts.useOfflineDb,
+          skipFallback: opts.skipFallback,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      return data.count
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      toast.success(`Imported ${count} anime entries from MAL`)
+      setMalUsername('')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   const [eraseWatchlist, setEraseWatchlist] = useState<boolean>(false)
+  const [useOfflineDb, setUseOfflineDb] = useState<boolean>(true)
+  const [skipFallback, setSkipFallback] = useState<boolean>(false)
   const [selectedFileName, setSelectedFileName] = useState<string>('')
   const [importing, setImporting] = useState<boolean>(false)
   const [progress, setProgress] = useState<ProgressEvent | null>(null)
@@ -236,6 +275,8 @@ const Trackers: React.FC = () => {
       const formData = new FormData()
       formData.append('xmlfile', file)
       formData.append('erase', String(eraseWatchlist))
+      formData.append('useOfflineDb', String(useOfflineDb))
+      formData.append('skipFallback', String(skipFallback))
 
       const response = await fetch('/api/import/mal-xml', {
         method: 'POST',
@@ -300,13 +341,16 @@ const Trackers: React.FC = () => {
       setImporting(false)
       abortRef.current = null
     }
-  }, [eraseWatchlist, queryClient])
+  }, [eraseWatchlist, useOfflineDb, skipFallback, queryClient])
 
   const handleCancel = () => {
     abortRef.current?.abort()
+    fetch('/api/import/mal-xml/cancel', { method: 'POST' }).catch(() => {})
   }
 
   const progressPercent = progress ? Math.round((progress.current / progress.total) * 100) : 0
+
+  const [malImportMode, setMalImportMode] = useState<'username' | 'xml'>('username')
 
   return (
     <div className="page-container">
@@ -430,74 +474,122 @@ const Trackers: React.FC = () => {
           </div>
         )}
 
-        <hr className={styles.divider} />
+        {anilistConnected && (
+          <>
+            <hr className={styles.divider} />
 
-        <div className={styles.actionSection}>
-          <h4>Two-way Sync</h4>
-          <p>
-            Merges progress non-destructively: pushes shows and episodes you watched on dango to
-            AniList, and pulls anything you updated on AniList into dango.
-          </p>
-          <p
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-tertiary)',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: '6px',
-              padding: '8px 10px',
-              marginBottom: '12px',
-              lineHeight: 1.5,
-            }}
-          >
-            <strong>Note:</strong> AniList <code>Rewatching (REPEATING)</code> is not tracked —
-            entries with this status are ignored and left unchanged on AniList.
-          </p>
-          <button
-            className={styles.syncBtn}
-            onClick={() => syncMutation.mutate()}
-            disabled={!anilistConnected || syncMutation.isPending}
-          >
-            <Icon name="sync-alt" className={syncMutation.isPending ? styles.spin : ''} />
-            {syncMutation.isPending ? 'Syncing...' : 'Start Sync'}
-          </button>
-          {syncSummary && (
-            <div className={styles.syncSummary}>
-              Pushed: {syncSummary.pushed} · Pulled: {syncSummary.pulled} · Merged:{' '}
-              {syncSummary.merged} · Unchanged: {syncSummary.unchanged}
-              {syncSummary.errors.length > 0 && (
-                <span className={styles.syncErrors}>
-                  {' '}
-                  · {syncSummary.errors.length} error{syncSummary.errors.length > 1 ? 's' : ''}
-                </span>
-              )}
+            <div className={styles.radioGroup}>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="anilistMode"
+                  value="username"
+                  checked={anilistImportMode === 'username'}
+                  onChange={() => setAnilistImportMode('username')}
+                />
+                <span>Quick Import</span>
+              </label>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="anilistMode"
+                  value="sync"
+                  checked={anilistImportMode === 'sync'}
+                  onChange={() => setAnilistImportMode('sync')}
+                />
+                <span>Two-way Sync</span>
+              </label>
             </div>
-          )}
-        </div>
 
-        <hr className={styles.divider} />
+            {anilistImportMode === 'username' ? (
+              <div className={styles.inputGroup}>
+                <input
+                  type="text"
+                  placeholder="Enter AniList username"
+                  value={publicUsername}
+                  onChange={(e) => setPublicUsername(e.target.value)}
+                  className={styles.input}
+                  disabled={importMutation.isPending}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && publicUsername.trim()) importMutation.mutate()
+                  }}
+                />
+              </div>
+            ) : (
+              <p className={styles.syncHint}>
+                Merges progress non-destructively: pushes shows and episodes you watched on dango to
+                AniList, and pulls anything you updated on AniList into dango.
+              </p>
+            )}
 
-        <div className={styles.actionSection}>
-          <h4>Quick Import</h4>
-          <p>Import all public anime list entries directly from any AniList username.</p>
-          <div className={styles.inputGroup}>
-            <input
-              type="text"
-              placeholder="Enter AniList username"
-              value={publicUsername}
-              onChange={(e) => setPublicUsername(e.target.value)}
-              className={styles.input}
-              disabled={importMutation.isPending}
-            />
-            <button
-              className={styles.secondaryBtn}
-              onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending}
+            {anilistImportMode === 'username' && (
+              <div className={styles.optionsArea}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={eraseWatchlist}
+                    onChange={(e) => setEraseWatchlist(e.target.checked)}
+                    className={styles.checkbox}
+                    disabled={importMutation.isPending}
+                  />
+                  <span className={styles.checkboxCustom}></span>
+                  <div className={styles.optionText}>
+                    <span className={styles.optionTitle}>Erase current watchlist</span>
+                    <span className={styles.optionDesc}>
+                      Delete existing watchlist before importing.
+                    </span>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {anilistImportMode === 'username' ? (
+              <button
+                className={styles.syncBtn}
+                onClick={() => importMutation.mutate()}
+                disabled={!publicUsername.trim() || importMutation.isPending}
+              >
+                <Icon name="download" />
+                {importMutation.isPending ? 'Importing...' : 'Start Import'}
+              </button>
+            ) : (
+              <>
+                <button
+                  className={styles.syncBtn}
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                >
+                  <Icon name="sync-alt" className={syncMutation.isPending ? styles.spin : ''} />
+                  {syncMutation.isPending ? 'Syncing...' : 'Start Sync'}
+                </button>
+                {syncSummary && (
+                  <div className={styles.syncSummary}>
+                    Pushed: {syncSummary.pushed} · Pulled: {syncSummary.pulled} · Merged:{' '}
+                    {syncSummary.merged} · Unchanged: {syncSummary.unchanged}
+                    {syncSummary.errors.length > 0 && (
+                      <span className={styles.syncErrors}>
+                        {' '}
+                        · {syncSummary.errors.length} error
+                        {syncSummary.errors.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-tertiary)',
+                marginTop: '8px',
+              }}
             >
-              <Icon name="download" /> {importMutation.isPending ? 'Importing...' : 'Import List'}
-            </button>
-          </div>
-        </div>
+              AniList <code>Rewatching (REPEATING)</code> is not tracked — entries with this status
+              are ignored.
+            </p>
+          </>
+        )}
       </div>
 
       <div className={styles.importCard}>
@@ -506,65 +598,159 @@ const Trackers: React.FC = () => {
             <Icon name="myanimelist" className={styles.malIcon} />
             <h3>MyAnimeList</h3>
           </div>
-          <p>Upload your exported MyAnimeList XML file to import your watchlist into dango.</p>
         </div>
 
-        <div className={styles.uploadArea}>
-          <div className={styles.fileInputWrapper}>
+        <div className={styles.radioGroup}>
+          <label className={styles.radioLabel}>
             <input
-              type="file"
-              id="malFile"
-              accept=".xml,application/xml"
-              className={styles.fileInput}
-              onChange={handleFileChange}
-              disabled={importing}
+              type="radio"
+              name="malMode"
+              value="username"
+              checked={malImportMode === 'username'}
+              onChange={() => setMalImportMode('username')}
             />
-            <div className={styles.fileDisplay}>
-              <Icon name="file-alt" className={styles.fileIcon} />
-              <span className={styles.fileName}>{selectedFileName || 'Choose XML file...'}</span>
-            </div>
-            <label htmlFor="malFile" className={styles.browseButton}>
-              Browse
-            </label>
-          </div>
+            <span>Username</span>
+          </label>
+          <label className={styles.radioLabel}>
+            <input
+              type="radio"
+              name="malMode"
+              value="xml"
+              checked={malImportMode === 'xml'}
+              onChange={() => setMalImportMode('xml')}
+            />
+            <span>XML File</span>
+          </label>
         </div>
+
+        {malImportMode === 'username' ? (
+          <>
+            <div className={styles.inputGroup}>
+              <input
+                type="text"
+                placeholder="Enter MAL username"
+                value={malUsername}
+                onChange={(e) => setMalUsername(e.target.value)}
+                className={styles.input}
+                disabled={malUsernameImport.isPending}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && malUsername.trim())
+                    malUsernameImport.mutate({ erase: eraseWatchlist, useOfflineDb, skipFallback })
+                }}
+              />
+            </div>
+            {malUsernameImport.isPending && (
+              <div className={styles.importLoading}>
+                <Icon name="sync-alt" className={styles.spin} />
+                <span>Importing from MAL...</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className={styles.uploadArea}>
+            <div className={styles.fileInputWrapper}>
+              <input
+                type="file"
+                id="malFile"
+                accept=".xml,application/xml"
+                className={styles.fileInput}
+                onChange={handleFileChange}
+                disabled={importing}
+              />
+              <div className={styles.fileDisplay}>
+                <Icon name="file-alt" className={styles.fileIcon} />
+                <span className={styles.fileName}>{selectedFileName || 'Choose XML file...'}</span>
+              </div>
+              <label htmlFor="malFile" className={styles.browseButton}>
+                Browse
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className={styles.optionsArea}>
           <label className={styles.checkboxLabel}>
             <input
               type="checkbox"
-              id="eraseWatchlistToggle"
               checked={eraseWatchlist}
               onChange={(e) => setEraseWatchlist(e.target.checked)}
               className={styles.checkbox}
-              disabled={importing}
+              disabled={importing || malUsernameImport.isPending}
             />
             <span className={styles.checkboxCustom}></span>
             <div className={styles.optionText}>
               <span className={styles.optionTitle}>Erase current watchlist</span>
+              <span className={styles.optionDesc}>Delete existing watchlist before importing.</span>
+            </div>
+          </label>
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={useOfflineDb}
+              onChange={(e) => setUseOfflineDb(e.target.checked)}
+              className={styles.checkbox}
+              disabled={importing || malUsernameImport.isPending}
+            />
+            <span className={styles.checkboxCustom}></span>
+            <div className={styles.optionText}>
+              <span className={styles.optionTitle}>Use offline database (fast)</span>
               <span className={styles.optionDesc}>
-                Warning: This will permanently delete your existing dango watchlist before
-                importing.
+                Match by MAL ID locally first — instant and avoids AniList rate limits.
+              </span>
+            </div>
+          </label>
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={skipFallback}
+              onChange={(e) => setSkipFallback(e.target.checked)}
+              className={styles.checkbox}
+              disabled={importing || malUsernameImport.isPending}
+            />
+            <span className={styles.checkboxCustom}></span>
+            <div className={styles.optionText}>
+              <span className={styles.optionTitle}>Skip online fallback</span>
+              <span className={styles.optionDesc}>
+                Only import offline matches. Unmatched titles are skipped without API calls.
               </span>
             </div>
           </label>
         </div>
 
-        <div className={styles.actions}>
-          {importing ? (
-            <Button onClick={handleCancel} className={styles.cancelBtn}>
-              Cancel Import
-            </Button>
-          ) : (
-            <Button
-              onClick={handleMalImport}
-              className={styles.importBtn}
-              disabled={!selectedFileName}
-            >
-              <Icon name="upload" /> Start Import
-            </Button>
-          )}
-        </div>
+        {malImportMode === 'username' ? (
+          <button
+            className={styles.syncBtn}
+            onClick={() =>
+              malUsernameImport.mutate({ erase: eraseWatchlist, useOfflineDb, skipFallback })
+            }
+            disabled={!malUsername.trim() || malUsernameImport.isPending}
+          >
+            <Icon name="download" />
+            {malUsernameImport.isPending ? 'Importing...' : 'Start Import'}
+          </button>
+        ) : (
+          <div className={styles.actions}>
+            {importing ? (
+              <Button onClick={handleCancel} className={styles.cancelBtn}>
+                Cancel Import
+              </Button>
+            ) : (
+              <Button
+                onClick={handleMalImport}
+                className={styles.importBtn}
+                disabled={!selectedFileName}
+              >
+                <Icon name="upload" /> Start Import
+              </Button>
+            )}
+          </div>
+        )}
+
+        {malImportMode === 'username' && malUsernameImport.isError && (
+          <div className={`${styles.statusMessage} ${styles.error}`}>
+            {malUsernameImport.error.message}
+          </div>
+        )}
 
         {importing && progress && (
           <div className={styles.progressSection}>
@@ -582,7 +768,11 @@ const Trackers: React.FC = () => {
                     <span
                       className={`${styles.sourceBadge} ${styles[progress.source || 'anilist']}`}
                     >
-                      {progress.source === 'kitsu' ? 'Kitsu' : 'AniList'}
+                      {progress.source === 'kitsu'
+                        ? 'Kitsu'
+                        : progress.source === 'offline'
+                          ? 'Offline DB'
+                          : 'AniList'}
                     </span>
                   </>
                 ) : (

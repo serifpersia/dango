@@ -998,6 +998,75 @@ export async function malScheduleWeek(
   return out
 }
 
+export interface MalUserListEntry {
+  malId: number
+  title: string
+  titleEnglish: string | null
+  status: number
+  score: number
+  watchedEpisodes: number
+  totalEpisodes: number
+  type: string | null
+  imageUrl: string | null
+}
+
+const MAL_USER_LIST_PAGE_SIZE = 300
+const MAL_USER_LIST_MAX_PAGES = 100
+
+export async function fetchMalUserList(username: string): Promise<MalUserListEntry[]> {
+  const user = username.trim()
+  if (!user || /[^A-Za-z0-9_-]/.test(user)) throw new Error('Invalid MAL username')
+  const entries: MalUserListEntry[] = []
+  let offset = 0
+  for (let page = 0; page < MAL_USER_LIST_MAX_PAGES; page++) {
+    const url = `https://myanimelist.net/animelist/${encodeURIComponent(user)}/load.json?status=7&offset=${offset}`
+    await politeWait()
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: 'manual',
+    })
+    if (res.status === 400 || res.status === 404) throw new Error(`MAL user "${user}" not found`)
+    if (res.status === 403 || res.status === 429) {
+      throw new Error(`MAL blocked the request (HTTP ${res.status}) — try again later`)
+    }
+    if (res.status >= 300 && res.status < 400) {
+      throw new Error(`MAL list for "${user}" is private or unavailable`)
+    }
+    if (!res.ok) throw new Error(`MAL list fetch failed (HTTP ${res.status})`)
+    const data: unknown = await res.json()
+    if (!Array.isArray(data) || data.length === 0) break
+    for (const item of data) {
+      const rec = item as Record<string, unknown>
+      const malId = Number(rec.anime_id)
+      if (!malId) continue
+      const titleRaw =
+        typeof rec.anime_title === 'string' && rec.anime_title.trim() !== ''
+          ? rec.anime_title
+          : typeof rec.anime_title_eng === 'string'
+            ? rec.anime_title_eng
+            : ''
+      entries.push({
+        malId,
+        title: decodeHtml(titleRaw),
+        titleEnglish:
+          typeof rec.anime_title_eng === 'string' && rec.anime_title_eng.trim() !== ''
+            ? decodeHtml(rec.anime_title_eng)
+            : null,
+        status: Number(rec.status) || 0,
+        score: Number(rec.score) || 0,
+        watchedEpisodes: Number(rec.num_watched_episodes) || 0,
+        totalEpisodes: Number(rec.anime_num_episodes) || 0,
+        type: typeof rec.anime_media_type_string === 'string' ? rec.anime_media_type_string : null,
+        imageUrl: typeof rec.anime_image_path === 'string' ? rec.anime_image_path : null,
+      })
+    }
+    if (data.length < MAL_USER_LIST_PAGE_SIZE) break
+    offset += MAL_USER_LIST_PAGE_SIZE
+  }
+  return entries
+}
+
 export async function malLatestReleases(
   store: MalCacheStore,
   format: string = 'TV',

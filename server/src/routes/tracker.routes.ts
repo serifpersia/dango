@@ -1,6 +1,10 @@
 import { Router } from 'express'
 import { AniListTracker } from '../lib/tracker/anilist-tracker.js'
-import { syncAniList, importFromUsername } from '../lib/tracker/sync.service.js'
+import {
+  syncAniList,
+  importFromMalUsername,
+  importFromUsername,
+} from '../lib/tracker/sync.service.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import { performWriteTransaction } from '../sync.js'
 
@@ -129,15 +133,39 @@ export function createTrackerRouter(): Router {
   })
 
   router.post('/tracker/anilist/import', async (req, res) => {
-    const { username } = req.body ?? {}
+    const { username, erase } = req.body ?? {}
     if (!username || typeof username !== 'string') {
       return res.status(400).json({ error: 'Username is required' })
     }
     try {
-      const count = await importFromUsername(req.db, username.trim())
+      const count = await importFromUsername(req.db, username.trim(), erase === true)
       res.json({ success: true, count })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed'
+      res.status(500).json({ error: message })
+    }
+  })
+
+  router.post('/tracker/mal/import', async (req, res) => {
+    const { username, erase, useOfflineDb, skipFallback } = req.body ?? {}
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'MAL username is required' })
+    }
+    try {
+      const count = await importFromMalUsername(req.db, username.trim(), {
+        erase: erase === true,
+        useOfflineDb: useOfflineDb !== false,
+        skipFallback: skipFallback === true,
+      })
+      res.json({ success: true, count })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      if (message.includes('private') || message.includes('not found')) {
+        return res.status(404).json({ error: message })
+      }
+      if (message.includes('blocked') || message.includes('HTTP 429')) {
+        return res.status(429).json({ error: message })
+      }
       res.status(500).json({ error: message })
     }
   })
