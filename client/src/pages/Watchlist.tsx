@@ -54,6 +54,7 @@ const typeOptions: Option[] = [
   { value: 'ONA', label: 'ONA' },
   { value: 'TV_SHORT', label: 'TV Short' },
   { value: 'SPECIAL', label: 'Special' },
+  { value: 'ADULT', label: 'Adult (18+)' },
 ]
 
 const seasonOptions: Option[] = [

@@ -438,8 +438,6 @@ export class WatchlistController {
       if (overlap < queryWords.size) return false
     }
 
-    if (filters.type && row.type !== filters.type) return false
-
     return true
   }
 
@@ -554,6 +552,20 @@ export class WatchlistController {
     },
   >(rows: T[], filters: WatchlistFilterOptions, db?: DatabaseWrapper): Promise<T[]> {
     let filtered = rows.filter((row) => this.matchesLocalFilters(row, filters))
+
+    if (filters.type === 'ADULT' && db && filtered.length > 0) {
+      const ids = filtered.map((r) => r.id)
+      const placeholders = ids.map(() => '?').join(',')
+      const adultRows = await dbAll<{ id: string }>(
+        db,
+        `SELECT id FROM shows_meta WHERE id IN (${placeholders}) AND isAdult = 1`,
+        ids
+      )
+      const adultSet = new Set(adultRows.map((r) => r.id))
+      filtered = filtered.filter((row) => adultSet.has(row.id))
+    } else if (filters.type && filters.type !== 'ALL' && filters.type !== 'ADULT') {
+      filtered = filtered.filter((row) => row.type === filters.type)
+    }
 
     if ((filters.genres || filters.excludeGenres) && db) {
       const ids = filtered.map((r) => r.id)
@@ -837,14 +849,29 @@ export class WatchlistController {
   }
 
   getWatchlist = async (req: Request, res: Response) => {
-    const { status, page: pageStr, limit: limitStr } = req.query
+    const { status, page: pageStr, limit: limitStr, showMature } = req.query
     const page = parseInt(pageStr as string) || 1
     const limit = parseInt(limitStr as string) || 10
     const offset = (page - 1) * limit
     const filters = this.getWatchlistFilters(req.query)
 
     const allRows = await WatchlistRepository.getAll(req.db, status as string)
-    const filteredRows = await this.filterWatchlistRows(allRows, filters, req.db)
+
+    let filteredRows = await this.filterWatchlistRows(allRows, filters, req.db)
+
+    if (showMature === 'false') {
+      const ids = filteredRows.map((r) => r.id)
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => '?').join(',')
+        const adultIds = await dbAll<{ id: string }>(
+          req.db,
+          `SELECT id FROM shows_meta WHERE id IN (${placeholders}) AND isAdult = 1`,
+          ids
+        )
+        const adultSet = new Set(adultIds.map((r) => r.id))
+        filteredRows = filteredRows.filter((row) => !adultSet.has(row.id))
+      }
+    }
     const rows = filteredRows.slice(offset, offset + limit)
 
     for (const row of rows) {
@@ -863,11 +890,24 @@ export class WatchlistController {
     }
     await this.backfillMissingPosters(req.db, rows)
 
+    const rowIds = rows.map((r) => r.id)
+    let adultIds = new Set<string>()
+    if (rowIds.length > 0) {
+      const placeholders = rowIds.map(() => '?').join(',')
+      const adultRows = await dbAll<{ id: string }>(
+        req.db,
+        `SELECT id FROM shows_meta WHERE id IN (${placeholders}) AND isAdult = 1`,
+        rowIds
+      )
+      adultIds = new Set(adultRows.map((r) => r.id))
+    }
+
     res.json({
       data: rows.map((row) => ({
         ...row,
         _id: row.id,
         thumbnail: row.thumbnail || '',
+        isAdult: adultIds.has(row.id),
       })),
       total: filteredRows.length,
       page,
