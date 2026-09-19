@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchApi } from '../lib/fetchApi'
 import {
-  PROVIDER_OPTIONS,
   type BrowseCaps,
   type BrowseFacets,
   type ProviderOption,
@@ -53,8 +52,7 @@ export const useProviders = () => {
   })
   const server = Array.isArray(query.data) ? query.data : null
   const options: ProviderOption[] = useMemo(
-    () =>
-      server && server.length > 0 ? server.filter((p) => p.loaded).map(toOption) : PROVIDER_OPTIONS,
+    () => (server && server.length > 0 ? server.filter((p) => p.loaded).map(toOption) : []),
     [server]
   )
   return { ...query, options, isFallback: !server || server.length === 0 }

@@ -272,15 +272,17 @@ export const usePlayerData = (
     if (hasForcedAdultProvider.current === showId) return
     if (showMeta.isAdult && !matureProvider) {
       hasForcedAdultProvider.current = showId
-      const fallback =
-        animeOptions.find((o) => o.value === 'wh') ?? animeOptions.find((o) => o.mature)
-      dispatch({ type: 'SET_PROVIDER', payload: fallback?.value ?? 'wh' })
+      const fallback = animeOptions.find((o) => o.mature)
+      if (!fallback) return
+      dispatch({ type: 'SET_PROVIDER', payload: fallback.value })
+      localStorage.setItem('preferredProvider', fallback.value)
     }
     if (!showMeta.isAdult && matureProvider) {
       hasForcedAdultProvider.current = showId
-      const fallback =
-        animeOptions.find((o) => o.value === 'megaplay') ?? animeOptions.find((o) => !o.mature)
-      dispatch({ type: 'SET_PROVIDER', payload: fallback?.value ?? 'megaplay' })
+      const fallback = animeOptions.find((o) => !o.mature)
+      if (!fallback) return
+      dispatch({ type: 'SET_PROVIDER', payload: fallback.value })
+      localStorage.setItem('preferredProvider', fallback.value)
     }
   }, [showMeta?.isAdult, uiState.selectedProvider, showId, animeOptions])
 
@@ -444,6 +446,7 @@ export const usePlayerData = (
         queryKey: ['video-sources', showId, variables.episodeNumber],
       })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      queryClient.invalidateQueries({ queryKey: ['thisWeekSchedule'] })
     },
     onError: () => toast.error('Failed to mark episode as watched'),
   })

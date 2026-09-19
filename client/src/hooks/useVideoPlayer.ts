@@ -173,6 +173,7 @@ const useVideoPlayer = ({
           })
           queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
           queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+          queryClient.invalidateQueries({ queryKey: ['thisWeekSchedule'] })
         } catch (err) {
           console.error('Failed to update progress:', err)
         }

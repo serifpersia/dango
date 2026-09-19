@@ -1,13 +1,7 @@
 import React from 'react'
 import styles from './Player.module.css'
 import type { VideoLink, VideoSource } from '../../types/player'
-import {
-  PROVIDER_OPTIONS,
-  SUB_LABEL,
-  TIER_LABEL,
-  TIER_ORDER,
-  type ProviderOption,
-} from './providers'
+import { SUB_LABEL, TIER_LABEL, TIER_ORDER, type ProviderOption } from './providers'
 
 interface ProviderSelectorProps {
   selectedProvider: string
@@ -22,7 +16,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   isAdult,
   options,
 }) => {
-  const list = options && options.length > 0 ? options : PROVIDER_OPTIONS
+  const list = options && options.length > 0 ? options : []
   const visibleProviders =
     isAdult === undefined ? list : list.filter((option) => option.mature === isAdult)
 
