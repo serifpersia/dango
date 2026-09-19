@@ -18,6 +18,72 @@ import {
 
 const proxyCache = new AppCache({ ttlSeconds: 30, maxKeys: 500 })
 
+function assTimeToVtt(value: string): string | null {
+  const m = value.trim().match(/^(-?\d+):(\d{2}):(\d{2})[.:](\d{2,3})$/)
+  if (!m) return null
+  const h = String(Math.max(0, parseInt(m[1], 10))).padStart(2, '0')
+  const ms = m[4].length === 2 ? `${m[4]}0` : m[4]
+  return `${h}:${m[2]}:${m[3]}.${ms}`
+}
+
+function assToVtt(body: string): string | null {
+  if (!/^\s*\[Script Info\]/im.test(body)) return null
+  const lines = body.replace(/\r\n/g, '\n').split('\n')
+  let inEvents = false
+  let format: string[] | null = null
+  const cues: string[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (/^\[Events\]/i.test(line)) {
+      inEvents = true
+      continue
+    }
+    if (/^\[/.test(line)) {
+      inEvents = false
+      continue
+    }
+    if (!inEvents) continue
+    if (/^Format\s*:/i.test(line)) {
+      format = line
+        .replace(/^Format\s*:/i, '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+      continue
+    }
+    if (!/^Dialogue\s*:/i.test(line) || !format) continue
+    const payload = line.replace(/^Dialogue\s*:/i, '')
+    const parts: string[] = []
+    let rest = payload
+    for (let i = 0; i < format.length - 1; i++) {
+      const idx = rest.indexOf(',')
+      if (idx < 0) break
+      parts.push(rest.slice(0, idx))
+      rest = rest.slice(idx + 1)
+    }
+    parts.push(rest)
+    const start = assTimeToVtt(parts[format.indexOf('start')] ?? '')
+    const end = assTimeToVtt(parts[format.indexOf('end')] ?? '')
+    if (!start || !end || format.indexOf('text') < 0) continue
+    const text = (parts[format.indexOf('text')] ?? '')
+      .replace(/\\\\/g, '\\u0000')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/\\N/gi, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\h/gi, ' ')
+      .replace(/\\[a-zA-Z]+\d*/g, '')
+      .replace(/\\u0000/g, '\\')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join('\n')
+    if (!text) continue
+    cues.push(`${start} --> ${end}\n${text}`)
+    if (cues.length > 5000) break
+  }
+  if (cues.length === 0) return null
+  return `WEBVTT\n\n${cues.join('\n\n')}\n`
+}
+
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
   private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
@@ -638,6 +704,8 @@ export class ProxyController {
       res.set('Access-Control-Allow-Origin', '*')
       res.set('Cache-Control', 'public, max-age=86400')
       if (/^\s*WEBVTT/i.test(body)) return res.send(body)
+      const vttFromAss = assToVtt(body)
+      if (vttFromAss) return res.send(vttFromAss)
       return res.send(
         `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`
       )
