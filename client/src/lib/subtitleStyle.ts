@@ -72,8 +72,10 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`
 }
 
-function edgeShadow(edge: SubtitleEdge): string {
-  if (edge === 'none') return 'none'
+function edgeShadow(edge: SubtitleEdge, bgOpacity: number): string {
+  if (edge === 'none') {
+    return bgOpacity <= 0 ? '0 1px 3px rgba(0, 0, 0, 0.9)' : 'none'
+  }
   if (edge === 'outline') {
     return [
       '-1px 0 0 black',
@@ -97,7 +99,7 @@ export function buildCueCss(s: SubtitleStyleSettings): string {
     color: ${s.textColor} !important;
     background-color: ${hexToRgba(s.bgColor, s.bgOpacity)} !important;
     font-weight: ${s.bold ? 'bold' : 'normal'} !important;
-    text-shadow: ${edgeShadow(s.edge)} !important;
+    text-shadow: ${edgeShadow(s.edge, s.bgOpacity)} !important;
   }
   `
 }
@@ -109,7 +111,7 @@ export function buildOverlayCss(s: SubtitleStyleSettings): string {
       `color: ${s.textColor}`,
       `background-color: ${hexToRgba(s.bgColor, s.bgOpacity)}`,
       `font-weight: ${s.bold ? '700' : '400'}`,
-      `text-shadow: ${edgeShadow(s.edge)}`,
+      `text-shadow: ${edgeShadow(s.edge, s.bgOpacity)}`,
       'padding: 0.2em 0.5em',
       'border-radius: 0.25em',
       'text-align: center',
