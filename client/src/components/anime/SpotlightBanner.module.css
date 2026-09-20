@@ -1,13 +1,15 @@
 .bannerContainer {
-  width: 100%;
-  max-width: 100%;
+  width: 100vw;
+  max-width: 100vw;
   position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
   margin-top: calc(-1 * var(--header-height));
   margin-bottom: 2.5rem;
   overflow: hidden;
   background-color: var(--bg-main);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
   z-index: 2;
 }
 
@@ -61,23 +63,20 @@
 /* Story-style segment navigation, doubles as autoplay timer */
 .segments {
   position: absolute;
-  bottom: 1.1rem;
+  bottom: 1.2rem;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
-  width: min(440px, calc(100% - 3rem));
+  width: min(calc(var(--max-width) - var(--space-8) * 2), calc(100% - 3rem));
   z-index: 5;
   display: flex;
-  justify-content: center;
   gap: 0.45rem;
   padding: 10px 0;
 }
 
 .segments i {
-  flex: 1 1 0;
-  min-width: 24px;
-  max-width: 64px;
-  height: 3px;
+  flex: 1;
+  height: 4px;
   border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.22);
   overflow: hidden;
@@ -130,8 +129,17 @@
   height: 100%;
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.slideInner {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 4rem var(--space-8) 3.5rem;
+  display: flex;
+  align-items: center;
   gap: 3rem;
-  padding: 4rem 5rem 3.5rem;
 }
 
 .poster {
@@ -423,12 +431,12 @@
     );
   }
 
-  .slide {
+  .slideInner {
     flex-direction: column;
     justify-content: center;
     text-align: center;
     gap: 1.3rem;
-    padding: 4.2rem 1.4rem 2.4rem;
+    padding: 4.2rem var(--space-4) 2.4rem;
   }
 
   .poster {
@@ -498,15 +506,17 @@
   }
 
   .segments {
-    width: min(320px, calc(100% - 2.5rem));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 2rem);
     bottom: 0.9rem;
   }
 }
 
 @media (max-width: 1024px) {
-  .slide {
+  .slideInner {
     gap: 2rem;
-    padding: 4rem 2.5rem 3rem;
   }
 
   .title {
@@ -526,9 +536,9 @@
     min-height: 360px;
   }
 
-  .slide {
+  .slideInner {
     gap: 1.5rem;
-    padding: 3.5rem 2rem 3rem;
+    padding: 3.5rem var(--space-8) 3rem;
   }
 
   .poster {
@@ -545,6 +555,9 @@
   }
 
   .segments {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
     width: min(300px, calc(100% - 2.5rem));
     bottom: 0.8rem;
   }

@@ -60,11 +60,11 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
       setPendingIndex(null)
       resetAutoplay()
       const src = bannerSrcFor(top6[index])
-      setAmbient((prev) => ({
-        front: src,
-        back: prev.front || src,
-        flip: !prev.flip,
-      }))
+      setAmbient((prev) =>
+        prev.flip
+          ? { front: src, back: prev.back, flip: false }
+          : { front: prev.front, back: src, flip: true }
+      )
       setCurrentIndex(index)
     },
     [resetAutoplay, top6, bannerSrcFor]
@@ -292,68 +292,70 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
                   className={`${styles.slide} ${index === safeIndex ? styles.active : ''}`}
                   aria-hidden={index !== safeIndex}
                 >
-                  <img
-                    src={fixThumbnailUrl(anime.thumbnail, 460, 650)}
-                    alt={getTitle(anime)}
-                    className={styles.poster}
-                    decoding="async"
-                  />
-                  <div className={styles.info}>
-                    <div className={`${styles.kicker} ${styles.rise}`}>
-                      <span className={styles.featureLabel}>Spotlight</span>
-                      {anime.score && (
-                        <span className={styles.scoreChip}>
-                          <Icon name="star" size={12} />
-                          <span>{anime.score}</span>
-                        </span>
-                      )}
-                    </div>
-                    <Link
-                      to={`/anime/${anime._id}`}
-                      className={`${styles.title} ${styles.rise}`}
-                      aria-label={`View details for ${getTitle(anime)}`}
-                      tabIndex={index === safeIndex ? 0 : -1}
-                    >
-                      {getTitle(anime)}
-                    </Link>
-                    <div className={`${styles.metaRow} ${styles.rise}`}>
-                      {metadata.map((item, idx) => (
-                        <React.Fragment key={idx}>
-                          <span className={styles.metaItem}>{item}</span>
-                          {idx < metadata.length - 1 && <div className={styles.metaDivider} />}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                    {genres.length > 0 && (
-                      <div className={`${styles.genres} ${styles.rise}`}>
-                        {genres.slice(0, 3).map((g) => {
-                          const genreName = typeof g === 'string' ? g : g?.name
-                          return (
-                            <span key={genreName} className={styles.genreTag}>
-                              {genreName}
-                            </span>
-                          )
-                        })}
+                  <div className={styles.slideInner}>
+                    <img
+                      src={fixThumbnailUrl(anime.thumbnail, 460, 650)}
+                      alt={getTitle(anime)}
+                      className={styles.poster}
+                      decoding="async"
+                    />
+                    <div className={styles.info}>
+                      <div className={`${styles.kicker} ${styles.rise}`}>
+                        <span className={styles.featureLabel}>Spotlight</span>
+                        {anime.score && (
+                          <span className={styles.scoreChip}>
+                            <Icon name="star" size={12} />
+                            <span>{anime.score}</span>
+                          </span>
+                        )}
                       </div>
-                    )}
-                    {synopsis && <p className={`${styles.summary} ${styles.rise}`}>{synopsis}</p>}
-                    <div className={`${styles.actions} ${styles.rise}`}>
-                      <button
-                        className={styles.watchBtn}
-                        onClick={() => handleWatch(anime._id)}
+                      <Link
+                        to={`/anime/${anime._id}`}
+                        className={`${styles.title} ${styles.rise}`}
+                        aria-label={`View details for ${getTitle(anime)}`}
                         tabIndex={index === safeIndex ? 0 : -1}
                       >
-                        <Icon name="play" size={14} />
-                        <span>Watch Now</span>
-                      </button>
-                      <button
-                        className={styles.detailsBtn}
-                        onClick={() => navigate(`/anime/${anime._id}`)}
-                        tabIndex={index === safeIndex ? 0 : -1}
-                      >
-                        <Icon name="info-circle" size={15} />
-                        <span>Details</span>
-                      </button>
+                        {getTitle(anime)}
+                      </Link>
+                      <div className={`${styles.metaRow} ${styles.rise}`}>
+                        {metadata.map((item, idx) => (
+                          <React.Fragment key={idx}>
+                            <span className={styles.metaItem}>{item}</span>
+                            {idx < metadata.length - 1 && <div className={styles.metaDivider} />}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      {genres.length > 0 && (
+                        <div className={`${styles.genres} ${styles.rise}`}>
+                          {genres.slice(0, 3).map((g) => {
+                            const genreName = typeof g === 'string' ? g : g?.name
+                            return (
+                              <span key={genreName} className={styles.genreTag}>
+                                {genreName}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {synopsis && <p className={`${styles.summary} ${styles.rise}`}>{synopsis}</p>}
+                      <div className={`${styles.actions} ${styles.rise}`}>
+                        <button
+                          className={styles.watchBtn}
+                          onClick={() => handleWatch(anime._id)}
+                          tabIndex={index === safeIndex ? 0 : -1}
+                        >
+                          <Icon name="play" size={14} />
+                          <span>Watch Now</span>
+                        </button>
+                        <button
+                          className={styles.detailsBtn}
+                          onClick={() => navigate(`/anime/${anime._id}`)}
+                          tabIndex={index === safeIndex ? 0 : -1}
+                        >
+                          <Icon name="info-circle" size={15} />
+                          <span>Details</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

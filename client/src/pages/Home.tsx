@@ -329,11 +329,16 @@ const Home: React.FC = () => {
         <div
           className="skeleton"
           style={{
-            width: '100%',
+            width: '100vw',
+            maxWidth: '100vw',
+            position: 'relative',
+            left: '50%',
+            right: '50%',
+            marginLeft: '-50vw',
+            marginRight: '-50vw',
             height: 'clamp(480px, 72vh, 660px)',
             marginTop: 'calc(-1 * var(--header-height))',
             marginBottom: '2.5rem',
-            borderRadius: 'var(--radius-lg)',
           }}
         />
       ) : (
