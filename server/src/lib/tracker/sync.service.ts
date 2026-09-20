@@ -129,7 +129,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
     episodeCount?: number
     anilistId?: number
   }[] = []
-  const watchedInserts: { showId: string; from: number; to: number }[] = []
+  const watchedInserts: { showId: string; from: number; to: number; updatedAt?: number }[] = []
   const stateUpdates: Record<string, SyncStateEntry | undefined> = {}
   const watchlistDeletes: string[] = []
   const pushUpdates: { mediaId: number; status: string | undefined; progress: number }[] = []
@@ -144,7 +144,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
 
     try {
       if (local && !remote) {
-        if (syncState[showId]) {
+        if (syncState[showId] && remoteEntries.length > 0) {
           watchlistDeletes.push(showId)
           stateUpdates[showId] = undefined
           summary.pulled++
@@ -197,7 +197,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
           anilistId: mediaId,
         })
         if (remote.progress > 0) {
-          watchedInserts.push({ showId, from: 1, to: remote.progress })
+          watchedInserts.push({ showId, from: 1, to: remote.progress, updatedAt: remote.updatedAt })
         }
         stateUpdates[showId] = { lastSyncedAt: now, remoteUpdatedAt: remote.updatedAt }
         summary.pulled++
@@ -244,7 +244,12 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
             })
           }
           if (shouldPullProgress) {
-            watchedInserts.push({ showId, from: watchedCount + 1, to: targetProgress })
+            watchedInserts.push({
+              showId,
+              from: watchedCount + 1,
+              to: targetProgress,
+              updatedAt: remoteUpdated,
+            })
           }
           stateUpdates[showId] = { lastSyncedAt: now, remoteUpdatedAt: now }
           summary.merged++
@@ -261,7 +266,12 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
             })
           }
           if (shouldPullProgress) {
-            watchedInserts.push({ showId, from: watchedCount + 1, to: targetProgress })
+            watchedInserts.push({
+              showId,
+              from: watchedCount + 1,
+              to: targetProgress,
+              updatedAt: remoteUpdated,
+            })
           }
           stateUpdates[showId] = { lastSyncedAt: now, remoteUpdatedAt: remoteUpdated }
           summary.merged++
@@ -273,6 +283,16 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
       const message = err instanceof Error ? err.message : String(err)
       logger.warn({ err, mediaId }, '[AniList Sync] Entry failed')
       summary.errors.push(`${local?.name ?? `Media ${mediaId}`}: ${message}`)
+    }
+  }
+
+  if (pushUpdates.length > 0 || remoteDeleteEntryIds.length > 0 || watchlistDeletes.length > 0) {
+    const deleteCap = Math.max(5, Math.ceil(localItems.length * 0.1))
+    const totalDeletes = watchlistDeletes.length + remoteDeleteEntryIds.length
+    if (totalDeletes > deleteCap) {
+      throw new Error(
+        `AniList sync would delete ${totalDeletes} shows but only ${remoteEntries.length} were fetched. Aborting to protect your library — if you really removed that many shows on AniList, delete them locally first and sync again.`
+      )
     }
   }
 
@@ -309,11 +329,10 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
       }
       for (const w of watchedInserts) {
         for (let ep = w.from; ep <= w.to; ep++) {
-          WatchedEpisodesRepository.upsert(tx, {
+          WatchedEpisodesRepository.insertIfMissing(tx, {
             showId: w.showId,
             episodeNumber: String(ep),
-            currentTime: 0,
-            duration: 0,
+            watchedAt: toSqliteDatetime(w.updatedAt),
           })
         }
       }
@@ -334,6 +353,11 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
   return summary
 }
 
+function toSqliteDatetime(unixSeconds?: number): string | undefined {
+  if (!unixSeconds || unixSeconds <= 0) return undefined
+  return new Date(unixSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
 function DANGO_STATUS_OR_FALLBACK(status: string): string | undefined {
   const known = ['Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned']
   return known.includes(status) ? status : undefined
@@ -344,8 +368,19 @@ export async function importFromUsername(
   username: string,
   erase = false
 ): Promise<number> {
-  const tracker = new AniListTracker()
-  const entries = await tracker.fetchUserAnimeList(username)
+  const tokenRow = await SettingsRepository.getByKey(db, TOKEN_KEY)
+  const token = tokenRow?.value
+
+  const tracker = new AniListTracker(token)
+  let entries: RemoteMediaEntry[]
+
+  if (token) {
+    const viewer = await tracker.getViewer()
+    entries = await tracker.fetchUserAnimeList(viewer.id)
+  } else {
+    entries = await tracker.fetchUserAnimeList(username)
+  }
+
   if (entries.length === 0) return 0
 
   const now = Math.floor(Date.now() / 1000)
@@ -379,11 +414,10 @@ export async function importFromUsername(
 
       if (remote.progress > 0) {
         for (let ep = 1; ep <= remote.progress; ep++) {
-          WatchedEpisodesRepository.upsert(tx, {
+          WatchedEpisodesRepository.insertIfMissing(tx, {
             showId,
             episodeNumber: String(ep),
-            currentTime: 0,
-            duration: 0,
+            watchedAt: toSqliteDatetime(remote.updatedAt),
           })
         }
       }
@@ -557,11 +591,9 @@ export async function importFromMalUsername(
       }
       for (const w of watched) {
         for (let ep = 1; ep <= w.progress; ep++) {
-          WatchedEpisodesRepository.upsert(tx, {
+          WatchedEpisodesRepository.insertIfMissing(tx, {
             showId: w.showId,
             episodeNumber: String(ep),
-            currentTime: 0,
-            duration: 0,
           })
         }
       }

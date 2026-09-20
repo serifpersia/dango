@@ -78,6 +78,20 @@ export const WatchedEpisodesRepository = {
       [data.showId, data.episodeNumber, data.currentTime, data.duration]
     ),
 
+  insertIfMissing: (
+    db: DatabaseWrapper,
+    data: {
+      showId: string
+      episodeNumber: string
+      watchedAt?: string
+    }
+  ) =>
+    dbRun(
+      db,
+      'INSERT OR IGNORE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, COALESCE(?, CURRENT_TIMESTAMP), 0, 0)',
+      [data.showId, data.episodeNumber, data.watchedAt ?? null]
+    ),
+
   deleteByShow: (db: DatabaseWrapper, showId: string) =>
     dbRun(db, 'DELETE FROM watched_episodes WHERE showId = ?', [showId]),
 
@@ -99,7 +113,7 @@ export const WatchedEpisodesRepository = {
         (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = we.showId) as watchedCount,
         we.episodeNumber, we.currentTime, we.duration, we.watchedAt
       FROM (
-        SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+        SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY (currentTime > 0 OR duration > 0) DESC, watchedAt DESC) as rn
         FROM watched_episodes
       ) we
       LEFT JOIN watchlist w ON we.showId = w.id

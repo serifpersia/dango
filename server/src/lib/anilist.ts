@@ -517,10 +517,10 @@ export async function getGenreTagLists(): Promise<GenreTagLists> {
   try {
     const result = await anilistRequest<{
       GenreCollection?: string[]
-      TagCollection?: { name: string; isAdult?: boolean }[]
-    }>(`query { GenreCollection TagCollection { name isAdult } }`)
+      MediaTagCollection?: { name: string; isAdult?: boolean }[]
+    }>(`query { GenreCollection MediaTagCollection { name isAdult } }`)
     const genres = result?.data?.GenreCollection?.filter((g) => typeof g === 'string')
-    const tags = (result?.data?.TagCollection ?? [])
+    const tags = (result?.data?.MediaTagCollection ?? [])
       .filter((t) => t && !t.isAdult && typeof t.name === 'string')
       .map((t) => t.name)
     if (genres && genres.length > 0) {

@@ -16,25 +16,25 @@ export const InsightsRepository = {
   getActivityGrid: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      `SELECT date(watchedAt) as day, COUNT(*) as count FROM watched_episodes GROUP BY day`
+      `SELECT date(watchedAt) as day, COUNT(*) as count FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) GROUP BY day`
     ),
 
   getHourlyDist: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      `SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count FROM watched_episodes GROUP BY hour`
+      `SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) GROUP BY hour`
     ),
 
   getSeasonality: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      `SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds FROM watched_episodes GROUP BY month`
+      `SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) GROUP BY month`
     ),
 
   getAllWatches: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      'SELECT watchedAt, currentTime FROM watched_episodes ORDER BY watchedAt ASC'
+      'SELECT watchedAt, currentTime FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) ORDER BY watchedAt ASC'
     ),
 
   getWatchedShowsMeta: (db: DatabaseWrapper) =>
@@ -51,7 +51,7 @@ export const InsightsRepository = {
       `SELECT w.id, w.name, MAX(we.watchedAt) as lastActivity
         FROM watchlist w
         JOIN watched_episodes we ON w.id = we.showId
-        WHERE w.status = 'Watching'
+        WHERE w.status = 'Watching' AND NOT (we.currentTime = 0 AND we.duration = 0)
         GROUP BY w.id
         HAVING lastActivity < date('now', '-90 days')`
     ),
@@ -64,7 +64,8 @@ export const InsightsRepository = {
         FROM watchlist w
         JOIN watched_episodes we ON w.id = we.showId
         WHERE w.status = 'Completed'
-        GROUP BY w.id`
+        GROUP BY w.id
+        HAVING SUM(we.currentTime) > 0`
     ),
 
   getWatchedEpisodesWithMeta: (db: DatabaseWrapper) =>
