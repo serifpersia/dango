@@ -51,6 +51,7 @@ import { SettingsRepository } from './repositories/settings.repository.js'
 import { requestContext } from './utils/request-context.js'
 import { checkAnilistStatus } from './lib/anilist.js'
 import { offlineDb } from './lib/offline-db.js'
+import { initDiscordRolesSync } from './lib/discord-roles-sync.service.js'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -338,6 +339,7 @@ async function main() {
   discordGatewayService.setEnabled(isRpcEnabled)
 
   checkAnilistStatus().catch(() => {})
+  initDiscordRolesSync(db)
 
   await runSyncSequence(db)
 

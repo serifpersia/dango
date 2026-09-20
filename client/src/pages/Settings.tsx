@@ -13,7 +13,9 @@ import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
+import DiscordRolesSettings from '../components/settings/DiscordRolesSettings'
 import Icon from '../components/common/Icon'
+import { fetchApi } from '../lib/fetchApi'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
@@ -30,14 +32,14 @@ import {
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { Alert } from '../components/common/Alert'
 
-type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
+type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database' | 'community'
 
 const Settings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const initialTab = searchParams.get('tab') as SettingsTab | null
   const [activeTab, setActiveTab] = useState<SettingsTab>(
-    initialTab && ['general', 'sync', 'watchlist', 'database'].includes(initialTab)
+    initialTab && ['general', 'sync', 'watchlist', 'database', 'community'].includes(initialTab)
       ? initialTab
       : 'general'
   )
@@ -47,6 +49,7 @@ const Settings: React.FC = () => {
   const tabBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const [sidebarIndicator, setSidebarIndicator] = useState({ top: 0, height: 0, left: 0, width: 0 })
   const { lowEndMode, setLowEndMode } = useLowEndMode()
+  const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState<string>('')
   const [telemetryEnabled, setTelemetryEnabled] = useState(
     localStorage.getItem('telemetry_enabled') !== 'false'
   )
@@ -62,6 +65,15 @@ const Settings: React.FC = () => {
           setInstallationId(data.id)
           localStorage.setItem('installation_id', data.id)
         }
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchApi('/api/discord-roles-config')
+      .then((d) => {
+        if ((d as { workerUrl?: string }).workerUrl)
+          setDiscordRolesWorkerUrl((d as { workerUrl: string }).workerUrl)
       })
       .catch(() => {})
   }, [])
@@ -143,7 +155,7 @@ const Settings: React.FC = () => {
 
   React.useEffect(() => {
     const tab = searchParams.get('tab') as SettingsTab | null
-    if (tab && ['general', 'sync', 'watchlist', 'database'].includes(tab)) {
+    if (tab && ['general', 'sync', 'watchlist', 'database', 'community'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -624,6 +636,19 @@ const Settings: React.FC = () => {
             <ClearDatabaseSettings />
           </div>
         )
+      case 'community':
+        return (
+          <div className={styles.tabContent}>
+            {discordRolesWorkerUrl ? (
+              <DiscordRolesSettings workerUrl={discordRolesWorkerUrl} />
+            ) : (
+              <div className={styles.sectionCard}>
+                <h3>Discord Community Roles</h3>
+                <p>Discord Roles integration is not configured on this instance.</p>
+              </div>
+            )}
+          </div>
+        )
       default:
         return null
     }
@@ -683,6 +708,17 @@ const Settings: React.FC = () => {
           >
             <Icon name="database" /> <span>Database</span>
           </button>
+          {discordRolesWorkerUrl && (
+            <button
+              ref={(el) => {
+                if (el) tabBtnRefs.current.set('community', el)
+              }}
+              className={`${styles.sidebarItem} ${activeTab === 'community' ? styles.active : ''}`}
+              onClick={() => selectTab('community')}
+            >
+              <Icon name="discord" /> <span>Community</span>
+            </button>
+          )}
         </aside>
 
         <main className={styles.mainContent}>

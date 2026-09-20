@@ -6,6 +6,8 @@ import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import { useTelemetry } from './hooks/useTelemetry'
 import TelemetryNoticeModal from './components/modals/TelemetryNoticeModal'
+import DiscordCommunityPromo from './components/modals/DiscordCommunityPromo'
+import { fetchApi } from './lib/fetchApi'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
@@ -48,6 +50,16 @@ function App() {
   const virtualKeyboard = useVirtualKeyboard()
   const { showTelemetryModal, setShowTelemetryModal } = useTelemetry()
   useDiscordPageStatus()
+  const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState('')
+
+  useEffect(() => {
+    fetchApi('/api/discord-roles-config')
+      .then((d) => {
+        if ((d as { workerUrl?: string }).workerUrl)
+          setDiscordRolesWorkerUrl((d as { workerUrl: string }).workerUrl)
+      })
+      .catch(() => {})
+  }, [])
 
   const [lanLocked, setLanLocked] = useState(false)
 
@@ -126,6 +138,7 @@ function App() {
           closeLanAuthModal()
         }}
       />
+      {discordRolesWorkerUrl && <DiscordCommunityPromo workerUrl={discordRolesWorkerUrl} />}
       <Toaster
         position="top-center"
         toastOptions={{

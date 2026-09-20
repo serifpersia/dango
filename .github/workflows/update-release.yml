@@ -82,6 +82,7 @@ jobs:
           G_CLIENT_ID: ${{ secrets.G_CLIENT_ID }}
           GOOGLE_AUTH_WORKER_URL: ${{ secrets.GOOGLE_AUTH_WORKER_URL }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_ROLES_WORKER_URL: ${{ secrets.DISCORD_ROLES_WORKER_URL }}
 
       - name: Build Application
         run: pnpm run build

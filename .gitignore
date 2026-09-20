@@ -10,6 +10,9 @@ node_modules/
 server/.env
 server/google_tokens.json
 server/sync_manifest*.json
+.wrangler/
+worker/**/wrangler.toml
+!worker/**/wrangler.toml.example
 
 # Android
 android-app/local.properties

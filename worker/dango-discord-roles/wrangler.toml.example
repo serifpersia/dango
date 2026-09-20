@@ -1,0 +1,43 @@
+name = "dango-discord-roles"
+main = "worker.js"
+compatibility_date = "2026-03-01"
+
+[vars]
+DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID"
+DISCORD_GUILD_ID = "YOUR_DISCORD_GUILD_ID"
+
+# Rank Role IDs (F to S)
+ROLE_S_RANK = "YOUR_ROLE_ID"
+ROLE_A_RANK = "YOUR_ROLE_ID"
+ROLE_B_RANK = "YOUR_ROLE_ID"
+ROLE_C_RANK = "YOUR_ROLE_ID"
+ROLE_D_RANK = "YOUR_ROLE_ID"
+ROLE_E_RANK = "YOUR_ROLE_ID"
+ROLE_F_RANK = "YOUR_ROLE_ID"
+
+# Dere Role IDs (Genre Archetypes)
+ROLE_TSUNDERE = "YOUR_ROLE_ID"
+ROLE_YANDERE = "YOUR_ROLE_ID"
+ROLE_KUUDERE = "YOUR_ROLE_ID"
+ROLE_DANDERE = "YOUR_ROLE_ID"
+ROLE_DEREDERE = "YOUR_ROLE_ID"
+ROLE_BAKADERE = "YOUR_ROLE_ID"
+ROLE_KAMIDERE = "YOUR_ROLE_ID"
+ROLE_DORODERE = "YOUR_ROLE_ID"
+ROLE_HIMEDERE = "YOUR_ROLE_ID"
+ROLE_SADODERE = "YOUR_ROLE_ID"
+ROLE_UNDERE = "YOUR_ROLE_ID"
+ROLE_MEGADERE = "YOUR_ROLE_ID"
+ROLE_OJIDERE = "YOUR_ROLE_ID"
+ROLE_KANEDERE = "YOUR_ROLE_ID"
+
+# Secrets (Set via: npx wrangler secret put <NAME>)
+# - DISCORD_CLIENT_SECRET
+# - DISCORD_BOT_TOKEN
+
+# D1 Database binding
+# Run: npx wrangler d1 create dango-ranks-db
+[[d1_databases]]
+binding = "DB"
+database_name = "dango-ranks-db"
+database_id = "YOUR_D1_DATABASE_ID"
