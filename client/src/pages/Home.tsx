@@ -16,7 +16,6 @@ import {
   useAllContinueWatching,
   useRemoveFromWatchlist,
   useSpotlightBanners,
-  useBatchedHome,
   useQueue,
   useRemoveFromQueue,
   useClearQueue,
@@ -24,6 +23,7 @@ import {
   useThisWeekSchedule,
 } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { fetchApi } from '../lib/fetchApi'
 import styles from './Home.module.css'
 
 type ActiveTab = 'latest' | 'season' | 'popular' | 'week'
@@ -39,7 +39,11 @@ const Home: React.FC = () => {
   })
   const seasonalRef = useRef<HTMLDivElement>(null)
 
-  const { data: nextPageData } = usePaginatedCurrentSeason(page + 1, seasonFormat)
+  const { data: nextPageData } = usePaginatedCurrentSeason(
+    page + 1,
+    seasonFormat,
+    activeTab === 'season'
+  )
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
@@ -91,13 +95,13 @@ const Home: React.FC = () => {
     fetchMoreContinueWatching,
   ])
 
-  const { data: spotlightAnime } = useSpotlightBanners()
-  const { data: _batchedHome } = useBatchedHome(seasonFormat)
+  const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
     page,
-    seasonFormat
+    seasonFormat,
+    activeTab === 'season'
   )
   const seasonLimit = 14
 
@@ -106,10 +110,9 @@ const Home: React.FC = () => {
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
-      await fetch('/api/continue-watching/remove', {
+      await fetchApi('/api/continue-watching/remove', {
         method: 'POST',
         body: JSON.stringify({ showId }),
-        headers: { 'Content-Type': 'application/json' },
       })
     },
     onSuccess: async () => {
@@ -322,7 +325,20 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      <SpotlightBanner animeList={spotlightAnime || []} />
+      {loadingSpotlight && !spotlightAnime?.length ? (
+        <div
+          className="skeleton"
+          style={{
+            width: '100%',
+            height: 'clamp(480px, 72vh, 660px)',
+            marginTop: 'calc(-1 * var(--header-height))',
+            marginBottom: '2.5rem',
+            borderRadius: 'var(--radius-lg)',
+          }}
+        />
+      ) : (
+        <SpotlightBanner animeList={spotlightAnime || []} />
+      )}
       <AnimeSection
         title="Continue Watching"
         eyebrow="Pick up where you left off"

@@ -1,15 +1,13 @@
 .bannerContainer {
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
   margin-top: calc(-1 * var(--header-height));
   margin-bottom: 2.5rem;
   overflow: hidden;
   background-color: var(--bg-main);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
   z-index: 2;
 }
 
@@ -63,18 +61,23 @@
 /* Story-style segment navigation, doubles as autoplay timer */
 .segments {
   position: absolute;
-  bottom: 1.2rem;
-  left: 1.5rem;
-  right: 1.5rem;
+  bottom: 1.1rem;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 3rem));
   z-index: 5;
   display: flex;
+  justify-content: center;
   gap: 0.45rem;
   padding: 10px 0;
 }
 
 .segments i {
-  flex: 1;
-  height: 4px;
+  flex: 1 1 0;
+  min-width: 24px;
+  max-width: 64px;
+  height: 3px;
   border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.22);
   overflow: hidden;
@@ -405,7 +408,7 @@
 }
 
 /* Portrait: tall centered hero */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .hero {
     height: auto;
     min-height: 92svh;
@@ -495,8 +498,8 @@
   }
 
   .segments {
-    left: 1rem;
-    right: 1rem;
+    width: min(320px, calc(100% - 2.5rem));
+    bottom: 0.9rem;
   }
 }
 
@@ -513,5 +516,36 @@
   .poster {
     width: 200px;
     height: 288px;
+  }
+}
+
+/* Short landscape (phones in landscape): keep hero compact, dots centered */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero {
+    height: 92svh;
+    min-height: 360px;
+  }
+
+  .slide {
+    gap: 1.5rem;
+    padding: 3.5rem 2rem 3rem;
+  }
+
+  .poster {
+    width: 140px;
+    height: 200px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .summary {
+    display: none;
+  }
+
+  .segments {
+    width: min(300px, calc(100% - 2.5rem));
+    bottom: 0.8rem;
   }
 }

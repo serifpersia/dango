@@ -363,9 +363,8 @@ export const usePlayerData = (
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
-      await fetch('/api/settings', {
+      await fetchApi('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'preferredSource', value: sourceName }),
       })
     } catch (e) {
@@ -378,15 +377,10 @@ export const usePlayerData = (
       mutationFn: async ({ status }: { status: string }) => {
         if (!showId) throw new Error('Missing showId')
 
-        const response = await fetch('/api/watchlist/status', {
+        await fetchApi('/api/watchlist/status', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: showId, status }),
         })
-
-        if (!response.ok) {
-          throw new Error('Failed to update watchlist status')
-        }
 
         return status
       },
@@ -416,9 +410,8 @@ export const usePlayerData = (
       showMeta: DetailedShowMeta
       episodes: string[]
     }) => {
-      await fetch('/api/update-progress', {
+      await fetchApi('/api/update-progress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           showId,
           episodeNumber,

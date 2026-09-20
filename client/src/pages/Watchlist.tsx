@@ -20,6 +20,7 @@ import {
   useGenresAndTags,
 } from '../hooks/useAnimeData'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
+import { fetchApi } from '../lib/fetchApi'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import {
@@ -180,10 +181,9 @@ const Watchlist: React.FC = () => {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await fetch('/api/watchlist/status', {
+      await fetchApi('/api/watchlist/status', {
         method: 'POST',
         body: JSON.stringify({ id, status }),
-        headers: { 'Content-Type': 'application/json' },
       })
     },
     onSuccess: () => {
@@ -194,10 +194,9 @@ const Watchlist: React.FC = () => {
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
-      await fetch('/api/continue-watching/remove', {
+      await fetchApi('/api/continue-watching/remove', {
         method: 'POST',
         body: JSON.stringify({ showId }),
-        headers: { 'Content-Type': 'application/json' },
       })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] }),

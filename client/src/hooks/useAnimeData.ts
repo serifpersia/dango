@@ -118,10 +118,16 @@ export const useCurrentSeason = (format: string = 'ALL') => {
   })
 }
 
-export const usePaginatedCurrentSeason = (page: number, format: string = 'TV') => {
+export const usePaginatedCurrentSeason = (
+  page: number,
+  format: string = 'TV',
+  enabled: boolean = true
+) => {
   return useQuery<Anime[]>({
     queryKey: ['currentSeason', page, format],
     queryFn: () => fetchApi(`/api/seasonal?page=${page}&format=${format}&size=14`),
+    enabled,
+    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -161,13 +167,10 @@ export const useAddToQueue = () => {
       englishName?: string
       type?: string
     }) => {
-      const response = await fetch('/api/queue/add', {
+      return fetchApi('/api/queue/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(item),
-      })
-      if (!response.ok) throw new Error('Failed to update queue')
-      return response.json() as Promise<{ success: boolean; queued: boolean }>
+      }) as Promise<{ success: boolean; queued: boolean }>
     },
     onSuccess: (data) => {
       if (data.queued) {
@@ -188,12 +191,10 @@ export const useRemoveFromQueue = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (item: { showId: string; episodeNumber: string }) => {
-      const response = await fetch('/api/queue/remove', {
+      await fetchApi('/api/queue/remove', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(item),
       })
-      if (!response.ok) throw new Error('Failed to remove queue item')
     },
     onSuccess: () => {
       toast.success('Removed from queue')
@@ -232,13 +233,10 @@ export const useAddToQueueBatch = () => {
       episodeNumbers,
       ...meta
     }: QueueAddPayload & { episodeNumbers: string[] }) => {
-      const response = await fetch('/api/queue/batch', {
+      return fetchApi('/api/queue/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...meta, episodeNumbers }),
-      })
-      if (!response.ok) throw new Error('Failed to update queue')
-      return response.json() as Promise<{ success: boolean; added: number }>
+      }) as Promise<{ success: boolean; added: number }>
     },
     onSuccess: (data, variables) => {
       const count = data.added ?? variables.episodeNumbers.length
@@ -262,12 +260,10 @@ export const useRemoveFromQueueBatch = () => {
       showId: string
       episodeNumbers?: string[]
     }) => {
-      const response = await fetch('/api/queue/remove-many', {
+      await fetchApi('/api/queue/remove-many', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ showId, episodeNumbers }),
       })
-      if (!response.ok) throw new Error('Failed to remove queue items')
     },
     onSuccess: () => {
       toast.success('Removed from queue')
@@ -285,8 +281,7 @@ export const useClearQueue = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/queue/clear', { method: 'POST' })
-      if (!response.ok) throw new Error('Failed to clear queue')
+      await fetchApi('/api/queue/clear', { method: 'POST' })
     },
     onSuccess: () => {
       toast.success('Queue cleared')
@@ -304,12 +299,10 @@ export const useReorderQueue = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (items: Pick<QueueItem, 'id' | 'showId' | 'episodeNumber'>[]) => {
-      const response = await fetch('/api/queue/reorder', {
+      await fetchApi('/api/queue/reorder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
       })
-      if (!response.ok) throw new Error('Failed to reorder queue')
     },
     onMutate: async (items) => {
       await queryClient.cancelQueries({ queryKey: ['queue'] })
@@ -433,14 +426,10 @@ export const useRemoveFromWatchlist = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (showId: string) => {
-      const response = await fetch(`/api/watchlist/remove`, {
+      await fetchApi(`/api/watchlist/remove`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: showId }),
       })
-      if (!response.ok) {
-        throw new Error('Failed to remove from watchlist')
-      }
     },
     onSuccess: () => {
       toast.success('Removed from watchlist')
@@ -456,13 +445,10 @@ export const useBatchUpdateWatchlistStatus = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      const response = await fetch('/api/watchlist/batch-status', {
+      return fetchApi('/api/watchlist/batch-status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids, status }),
-      })
-      if (!response.ok) throw new Error('Failed to update watchlist statuses')
-      return response.json() as Promise<{ success: boolean; updated: number }>
+      }) as Promise<{ success: boolean; updated: number }>
     },
     onSuccess: (data) => {
       toast.success(`Status updated for ${data.updated ?? 0} items`)
@@ -479,13 +465,10 @@ export const useBatchRemoveFromWatchlist = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const response = await fetch('/api/watchlist/remove-many', {
+      return fetchApi('/api/watchlist/remove-many', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
-      })
-      if (!response.ok) throw new Error('Failed to remove from watchlist')
-      return response.json() as Promise<{ success: boolean; removed: number }>
+      }) as Promise<{ success: boolean; removed: number }>
     },
     onSuccess: (data) => {
       const count = data.removed ?? 0
@@ -503,13 +486,10 @@ export const useBatchRemoveFromContinueWatching = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const response = await fetch('/api/continue-watching/remove-many', {
+      return fetchApi('/api/continue-watching/remove-many', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
-      })
-      if (!response.ok) throw new Error('Failed to remove from continue watching')
-      return response.json() as Promise<{ success: boolean; removed: number }>
+      }) as Promise<{ success: boolean; removed: number }>
     },
     onSuccess: (data) => {
       const count = data.removed ?? 0
@@ -583,9 +563,9 @@ export const useTriggerDiscovery = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/discovery/refresh', { method: 'POST' })
-      if (!response.ok) throw new Error('Failed to trigger discovery')
-      return response.json() as Promise<DiscoveryStatus & { success: boolean; started: boolean }>
+      return fetchApi('/api/discovery/refresh', { method: 'POST' }) as Promise<
+        DiscoveryStatus & { success: boolean; started: boolean }
+      >
     },
     onSuccess: (data) => {
       queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
@@ -607,9 +587,9 @@ export const useNudgeDiscovery = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/discovery/nudge', { method: 'POST' })
-      if (!response.ok) throw new Error('Failed to trigger discovery')
-      return response.json() as Promise<DiscoveryStatus & { success: boolean; started: boolean }>
+      return fetchApi('/api/discovery/nudge', { method: 'POST' }) as Promise<
+        DiscoveryStatus & { success: boolean; started: boolean }
+      >
     },
     onSuccess: (data) => {
       queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
@@ -631,14 +611,10 @@ export const useDismissNotification = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ showId, episodeNumber }: { showId: string; episodeNumber: string }) => {
-      const response = await fetch(`/api/notifications/dismiss`, {
+      await fetchApi(`/api/notifications/dismiss`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ showId, episodeNumber }),
       })
-      if (!response.ok) {
-        throw new Error('Failed to dismiss notification')
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
@@ -650,14 +626,10 @@ export const useClearAllNotifications = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (showId?: string) => {
-      const response = await fetch(`/api/notifications/clear-all`, {
+      await fetchApi(`/api/notifications/clear-all`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ showId }),
       })
-      if (!response.ok) {
-        throw new Error('Failed to clear notifications')
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
@@ -669,6 +641,7 @@ export const useThisWeekSchedule = () => {
   return useQuery<Anime[]>({
     queryKey: ['thisWeekSchedule'],
     queryFn: () => fetchApi('/api/continue-watching/this-week'),
+    staleTime: 1000 * 60 * 5,
   })
 }
 

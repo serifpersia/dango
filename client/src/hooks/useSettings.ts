@@ -1,25 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { fetchApi } from '../lib/fetchApi'
 
 const fetchSettings = async (key: string) => {
-  const response = await fetch(`/api/settings?key=${key}`)
-  if (!response.ok) {
-    throw new Error('Failed to fetch settings')
-  }
-  const data = await response.json()
+  const data = await fetchApi(`/api/settings?key=${key}`)
   return data.value
 }
 
 const updateSettings = async ({ key, value }: { key: string; value: unknown }) => {
-  const response = await fetch('/api/settings', {
+  return fetchApi('/api/settings', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
   })
-  if (!response.ok) {
-    throw new Error('Failed to update settings')
-  }
-  return response.json()
 }
 
 export const useSetting = (key: string) => {

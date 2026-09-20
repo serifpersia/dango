@@ -31,7 +31,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const bannerSrcFor = useCallback(
     (anime: Anime) =>
       anime.bannerImage
-        ? fixThumbnailUrl(anime.bannerImage, 1920, 840)
+        ? fixThumbnailUrl(anime.bannerImage, 1280, 560)
         : fixThumbnailUrl(anime.thumbnail, 1280, 450),
     []
   )

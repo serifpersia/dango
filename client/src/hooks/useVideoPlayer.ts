@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 import { formatTime } from '../lib/utils'
+import { fetchApi } from '../lib/fetchApi'
 import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
 import {
   toggleFullscreen as toggleFullscreenCrossBrowser,
@@ -160,15 +161,10 @@ const useVideoPlayer = ({
       payload.currentTime = timeToReport
       lastReportedTime.current = timeToReport
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-
       const saveProgress = async () => {
         try {
-          await fetch('/api/update-progress', {
+          await fetchApi('/api/update-progress', {
             method: 'POST',
-            headers,
             body: JSON.stringify(payload),
           })
           queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
@@ -182,9 +178,8 @@ const useVideoPlayer = ({
       if (isFinalUpdate) {
         saveProgress()
       } else {
-        fetch('/api/update-progress', {
+        fetchApi('/api/update-progress', {
           method: 'POST',
-          headers,
           body: JSON.stringify(payload),
           keepalive: true,
         }).catch((err) => console.error('Failed to update progress:', err))
@@ -555,13 +550,8 @@ const useVideoPlayer = ({
 
     payload.currentTime = payload.duration
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-
-    fetch('/api/update-progress', {
+    fetchApi('/api/update-progress', {
       method: 'POST',
-      headers,
       body: JSON.stringify(payload),
     })
       .then(() => {

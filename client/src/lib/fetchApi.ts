@@ -1,6 +1,6 @@
 import { emitAuthRequired } from './auth-bus'
 
-export const fetchApi = async (url: string) => {
+export const fetchApi = async (url: string, init?: RequestInit) => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -19,7 +19,10 @@ export const fetchApi = async (url: string) => {
     if (jasmrCookie) headers['x-jasmr-cookie'] = jasmrCookie
   }
 
-  const response = await fetch(url, { headers })
+  const response = await fetch(url, {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+  })
 
   if (!response.ok) {
     const text = await response.text().catch(() => '')
