@@ -32,6 +32,34 @@ const PROFILE_PRESETS: Record<Anime4KProfile, Preset> = {
 const MAX_CONSECUTIVE_ERRORS = 5
 const METADATA_TIMEOUT_MS = 15000
 
+const BLIT_WGSL = `
+  @group(0) @binding(0) var extTex: texture_external;
+  @group(0) @binding(1) var extSamp: sampler;
+  struct VSOut {
+    @builtin(position) pos: vec4f,
+    @location(0) uv: vec2f,
+  };
+  @vertex
+  fn vs(@builtin(vertex_index) idx: u32) -> VSOut {
+    var positions = array<vec2f, 6>(
+      vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+      vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)
+    );
+    var uvs = array<vec2f, 6>(
+      vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),
+      vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)
+    );
+    var out: VSOut;
+    out.pos = vec4f(positions[idx], 0.0, 1.0);
+    out.uv = uvs[idx];
+    return out;
+  }
+  @fragment
+  fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
+    return textureSampleBaseClampToEdge(extTex, extSamp, uv);
+  }
+`
+
 export default function useAnime4K({
   videoRef,
   canvasRef,
@@ -60,6 +88,13 @@ export default function useAnime4K({
   delayMsRef.current = delayMs
   const delayQueueRef = useRef<{ bitmap: ImageBitmap; capture: number }[]>([])
   const directUploadFailedRef = useRef(false)
+  const blitFailedRef = useRef(false)
+  const blitVerifiedRef = useRef(false)
+  const blitRef = useRef<{
+    pipeline: GPURenderPipeline
+    layout: GPUBindGroupLayout
+    inputView: GPUTextureView
+  } | null>(null)
   const lastTimeRef = useRef(-1)
   const lastCapturedRef = useRef(-1)
   const hasPrimedRef = useRef(false)
@@ -282,6 +317,36 @@ export default function useAnime4K({
           ],
         })
 
+        try {
+          const blitLayout = device.createBindGroupLayout({
+            entries: [
+              { binding: 0, visibility: GPUShaderStage.FRAGMENT, externalTexture: {} },
+              { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+            ],
+          })
+          const blitModule = device.createShaderModule({ code: BLIT_WGSL })
+          const blitPipeline = device.createRenderPipeline({
+            layout: device.createPipelineLayout({ bindGroupLayouts: [blitLayout] }),
+            vertex: {
+              module: blitModule,
+              entryPoint: 'vs',
+            },
+            fragment: {
+              module: blitModule,
+              entryPoint: 'fs',
+              targets: [{ format: 'rgba16float' }],
+            },
+            primitive: { topology: 'triangle-list' },
+          })
+          blitRef.current = {
+            pipeline: blitPipeline,
+            layout: blitLayout,
+            inputView: inputTexture.createView(),
+          }
+        } catch {
+          blitRef.current = null
+        }
+
         if (generationRef.current !== generation) {
           inputTexture.destroy()
           device.destroy()
@@ -296,6 +361,52 @@ export default function useAnime4K({
         renderPipelineRef.current = renderPipeline
         samplerRef.current = sampler
         bindGroupLayoutRef.current = bindGroupLayout
+
+        blitFailedRef.current = false
+        blitVerifiedRef.current = false
+
+        async function blitUpload(): Promise<boolean> {
+          const res = blitRef.current
+          if (!res || blitFailedRef.current) return false
+          const video = videoRef.current
+          if (!video) return false
+          const probing = !blitVerifiedRef.current
+          if (probing) device.pushErrorScope('validation')
+          try {
+            const ext = device.importExternalTexture({ source: video })
+            const bg = device.createBindGroup({
+              layout: res.layout,
+              entries: [
+                { binding: 0, resource: ext },
+                { binding: 1, resource: sampler },
+              ],
+            })
+            const enc = device.createCommandEncoder()
+            const blitPass = enc.beginRenderPass({
+              colorAttachments: [{ view: res.inputView, loadOp: 'load', storeOp: 'store' }],
+            })
+            blitPass.setPipeline(res.pipeline)
+            blitPass.setBindGroup(0, bg)
+            blitPass.draw(6)
+            blitPass.end()
+            device.queue.submit([enc.finish()])
+          } catch {
+            blitFailedRef.current = true
+            blitRef.current = null
+            return false
+          }
+          if (probing) {
+            const gpuErr = await device.popErrorScope().catch(() => null)
+            if (gpuErr) {
+              console.warn('[anime4k] blit probe failed:', gpuErr.message)
+              blitFailedRef.current = true
+              blitRef.current = null
+              return false
+            }
+            blitVerifiedRef.current = true
+          }
+          return true
+        }
 
         setIsInitializing(false)
 
@@ -371,12 +482,15 @@ export default function useAnime4K({
                 } catch (err) {
                   if (err instanceof TypeError) {
                     directUploadFailedRef.current = true
-                    console.info(
-                      '[anime4k] direct video upload unsupported, using ImageBitmap path'
-                    )
                   } else {
                     throw err
                   }
+                }
+              }
+              if (!uploaded && !blitFailedRef.current && blitRef.current) {
+                if (await blitUpload()) {
+                  lastCapturedRef.current = presented
+                  uploaded = true
                 }
               }
               if (!uploaded) {
@@ -510,6 +624,7 @@ export default function useAnime4K({
       renderPipelineRef.current = null
       samplerRef.current = null
       bindGroupLayoutRef.current = null
+      blitRef.current = null
       contextRef.current = null
       inFlightRef.current = false
     }

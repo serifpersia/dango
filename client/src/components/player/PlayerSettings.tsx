@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import Icon from '../common/Icon'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
@@ -208,6 +208,28 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     </div>
   )
 
+  const isChromiumBased = useMemo(() => {
+    try {
+      const nav = navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }
+      const brands = nav.userAgentData?.brands?.map((b) => b.brand.toLowerCase()) ?? []
+      if (brands.length > 0) {
+        return brands.some(
+          (b) =>
+            b.includes('chromium') ||
+            b.includes('chrome') ||
+            b.includes('edge') ||
+            b.includes('opera') ||
+            b.includes('brave') ||
+            b.includes('vivaldi')
+        )
+      }
+      const ua = navigator.userAgent.toLowerCase()
+      return ua.includes('chrome') || ua.includes('chromium') || ua.includes('edg')
+    } catch {
+      return true
+    }
+  }, [])
+
   const renderUpscaler = () => (
     <div className={styles.menuContent}>
       {anime4kInitializing && (
@@ -218,6 +240,11 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       {anime4kError && (
         <div className={styles.menuError} role="alert">
           Upscaler failed: {anime4kError}
+        </div>
+      )}
+      {!isChromiumBased && (
+        <div className={styles.menuNote}>
+          Upscaling performs best in Chrome-based browsers.
         </div>
       )}
       <button
