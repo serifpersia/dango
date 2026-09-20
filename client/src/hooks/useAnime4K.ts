@@ -59,6 +59,7 @@ export default function useAnime4K({
   const delayMsRef = useRef(delayMs)
   delayMsRef.current = delayMs
   const delayQueueRef = useRef<{ bitmap: ImageBitmap; capture: number }[]>([])
+  const directUploadFailedRef = useRef(false)
   const lastTimeRef = useRef(-1)
   const lastCapturedRef = useRef(-1)
   const hasPrimedRef = useRef(false)
@@ -350,17 +351,47 @@ export default function useAnime4K({
           if (effectiveDelay > primedDelayRef.current) hasPrimedRef.current = false
           inFlightRef.current = true
           try {
-            const fresh = await createImageBitmap(current)
             const now = performance.now()
-            lastCapturedRef.current = presented
             let bitmap: ImageBitmap | null = null
             let retainFresh = false
             if (effectiveDelay <= 0) {
               if (delayQueueRef.current.length > 0) flushDelayQueue()
               hasPrimedRef.current = false
               primedDelayRef.current = 0
-              bitmap = fresh
+              let uploaded = false
+              if (!directUploadFailedRef.current) {
+                try {
+                  device.queue.copyExternalImageToTexture(
+                    { source: current },
+                    { texture: inputTexture },
+                    [width, height]
+                  )
+                  lastCapturedRef.current = presented
+                  uploaded = true
+                } catch (err) {
+                  if (err instanceof TypeError) {
+                    directUploadFailedRef.current = true
+                    console.info(
+                      '[anime4k] direct video upload unsupported, using ImageBitmap path'
+                    )
+                  } else {
+                    throw err
+                  }
+                }
+              }
+              if (!uploaded) {
+                const bmp = await createImageBitmap(current)
+                lastCapturedRef.current = presented
+                device.queue.copyExternalImageToTexture(
+                  { source: bmp },
+                  { texture: inputTexture },
+                  [width, height]
+                )
+                closeBitmap(bmp)
+              }
             } else {
+              const fresh = await createImageBitmap(current)
+              lastCapturedRef.current = presented
               const queue = delayQueueRef.current
               queue.push({ bitmap: fresh, capture: now })
               const cap = queueCapFor(effectiveDelay)
@@ -391,17 +422,18 @@ export default function useAnime4K({
                 bitmap = oldest ? oldest.bitmap : fresh
                 if (!oldest) retainFresh = true
               }
+              if (!bitmap) {
+                inFlightRef.current = false
+                schedule()
+                return
+              }
+              device.queue.copyExternalImageToTexture(
+                { source: bitmap },
+                { texture: inputTexture },
+                [width, height]
+              )
+              if (!retainFresh) closeBitmap(bitmap)
             }
-            if (!bitmap) {
-              inFlightRef.current = false
-              schedule()
-              return
-            }
-            device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: inputTexture }, [
-              width,
-              height,
-            ])
-            if (!retainFresh) closeBitmap(bitmap)
 
             const encoder = device.createCommandEncoder()
             await pipeline.pass(encoder)
