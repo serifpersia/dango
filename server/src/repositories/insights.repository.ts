@@ -6,7 +6,18 @@ export const InsightsRepository = {
     dbGet<unknown>(
       db,
       `SELECT
-        (SELECT SUM(currentTime) FROM watched_episodes) as totalSeconds,
+        (SELECT SUM(
+          CASE WHEN we.currentTime > 0 THEN we.currentTime
+               WHEN we.currentTime = 0 AND we.duration = 0 THEN
+                 COALESCE(sm.episodeDuration * 60,
+                   CASE UPPER(COALESCE(sm.type, ''))
+                     WHEN 'MOVIE' THEN 6000
+                     WHEN 'TV_SHORT' THEN 720
+                     WHEN 'MUSIC' THEN 300
+                     ELSE 1440 END)
+               ELSE 0 END)
+         FROM watched_episodes we
+         LEFT JOIN shows_meta sm ON sm.id = we.showId) as totalSeconds,
         (SELECT COUNT(*) FROM watched_episodes) as totalEpisodes,
         (SELECT COUNT(DISTINCT showId) FROM watched_episodes) as totalAnime,
         (SELECT COUNT(*) FROM watchlist WHERE status = 'Completed') as completedCount,
@@ -28,13 +39,37 @@ export const InsightsRepository = {
   getSeasonality: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      `SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) GROUP BY month`
+      `SELECT strftime('%m', we.watchedAt) as month, SUM(
+        CASE WHEN we.currentTime > 0 THEN we.currentTime
+             WHEN we.currentTime = 0 AND we.duration = 0 THEN
+               COALESCE(sm.episodeDuration * 60,
+                 CASE UPPER(COALESCE(sm.type, ''))
+                   WHEN 'MOVIE' THEN 6000
+                   WHEN 'TV_SHORT' THEN 720
+                   WHEN 'MUSIC' THEN 300
+                   ELSE 1440 END)
+             ELSE 0 END) as seconds
+       FROM watched_episodes we
+       LEFT JOIN shows_meta sm ON sm.id = we.showId
+       GROUP BY month`
     ),
 
   getAllWatches: (db: DatabaseWrapper) =>
     dbAll<unknown>(
       db,
-      'SELECT watchedAt, currentTime FROM watched_episodes WHERE NOT (currentTime = 0 AND duration = 0) ORDER BY watchedAt ASC'
+      `SELECT we.watchedAt, we.currentTime,
+        CASE WHEN we.currentTime > 0 THEN we.currentTime
+             WHEN we.currentTime = 0 AND we.duration = 0 THEN
+               COALESCE(sm.episodeDuration * 60,
+                 CASE UPPER(COALESCE(sm.type, ''))
+                   WHEN 'MOVIE' THEN 6000
+                   WHEN 'TV_SHORT' THEN 720
+                   WHEN 'MUSIC' THEN 300
+                   ELSE 1440 END)
+             ELSE 0 END as effectiveSeconds
+       FROM watched_episodes we
+       LEFT JOIN shows_meta sm ON sm.id = we.showId
+       ORDER BY we.watchedAt ASC`
     ),
 
   getWatchedShowsMeta: (db: DatabaseWrapper) =>
@@ -73,6 +108,7 @@ export const InsightsRepository = {
       showId: string
       currentTime: number
       duration: number
+      effectiveSeconds: number
       genres: string
       popularityScore: number
       name: string
@@ -85,6 +121,15 @@ export const InsightsRepository = {
         we.showId,
         we.currentTime,
         we.duration,
+        CASE WHEN we.currentTime > 0 THEN we.currentTime
+             WHEN we.currentTime = 0 AND we.duration = 0 THEN
+               COALESCE(sm.episodeDuration * 60,
+                 CASE UPPER(COALESCE(sm.type, ''))
+                   WHEN 'MOVIE' THEN 6000
+                   WHEN 'TV_SHORT' THEN 720
+                   WHEN 'MUSIC' THEN 300
+                   ELSE 1440 END)
+             ELSE 0 END as effectiveSeconds,
         sm.genres,
         sm.popularityScore,
         sm.name,

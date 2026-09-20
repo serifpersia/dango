@@ -386,6 +386,16 @@
   transition: left 1s var(--ease-spring);
 }
 
+.popLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
 .popDescription {
   font-size: 0.95rem;
   color: var(--text-secondary);

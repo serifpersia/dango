@@ -27,12 +27,13 @@ export const ShowsMetaRepository = {
       type?: string
       anilistId?: number
       isAdult?: number | null
+      episodeDuration?: number
     }
   ) =>
     dbRun(
       db,
-      `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type, anilistId, isAdult)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type, anilistId, isAdult, episodeDuration)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
           name = COALESCE(NULLIF(EXCLUDED.name, ''), shows_meta.name),
           thumbnail = COALESCE(NULLIF(EXCLUDED.thumbnail, ''), shows_meta.thumbnail),
@@ -44,7 +45,8 @@ export const ShowsMetaRepository = {
           episodeCount = COALESCE(EXCLUDED.episodeCount, shows_meta.episodeCount),
           type = COALESCE(NULLIF(EXCLUDED.type, ''), shows_meta.type),
           anilistId = COALESCE(EXCLUDED.anilistId, shows_meta.anilistId),
-          isAdult = COALESCE(EXCLUDED.isAdult, shows_meta.isAdult)`,
+          isAdult = COALESCE(EXCLUDED.isAdult, shows_meta.isAdult),
+          episodeDuration = COALESCE(NULLIF(EXCLUDED.episodeDuration, 0), shows_meta.episodeDuration)`,
       [
         data.id,
         data.name ?? null,
@@ -58,6 +60,7 @@ export const ShowsMetaRepository = {
         data.type ?? null,
         data.anilistId ?? null,
         data.isAdult ?? null,
+        data.episodeDuration ?? null,
       ]
     ),
 

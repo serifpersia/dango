@@ -117,3 +117,8 @@ export function sanitizeText(html: string | undefined | null): string {
     .replace(/&#39;/g, "'")
     .trim()
 }
+
+export function normalizeScore(score: number | null | undefined): number | null | undefined {
+  if (score == null) return score
+  return score > 10 ? Number((score / 10).toFixed(1)) : score
+}

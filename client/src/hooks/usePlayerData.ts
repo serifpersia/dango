@@ -10,6 +10,7 @@ import type {
 } from '../types/player'
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
 import { fetchApi } from '../lib/fetchApi'
+import { normalizeScore } from '../lib/utils'
 import { useShowMeta } from './useShowMeta'
 import { useProviders } from './useProviders'
 
@@ -422,7 +423,7 @@ export const usePlayerData = (
           nativeName: showMeta.names?.native,
           englishName: showMeta.names?.english,
           genres: showMeta.genres?.map((genre) => genre.name),
-          popularityScore: showMeta.score ?? showMeta.stats?.averageScore,
+          popularityScore: normalizeScore(showMeta.score ?? showMeta.stats?.averageScore),
           type: showMeta.type,
           status: showMeta.status,
           episodeCount: episodes.length,

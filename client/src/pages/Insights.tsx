@@ -205,6 +205,19 @@ const Insights: React.FC = () => {
         <div className={styles.statCard}>
           <div
             className={styles.statIcon}
+            style={{ background: 'rgba(45, 212, 191, 0.2)', color: '#2dd4bf' }}
+          >
+            <Icon name="tv" />
+          </div>
+          <div className={styles.statInfo}>
+            <span className={styles.statValue}>{data.completedAnime}</span>
+            <span className={styles.statLabel}>Completed Shows</span>
+          </div>
+        </div>
+
+        <div className={styles.statCard}>
+          <div
+            className={styles.statIcon}
             style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
           >
             <Icon name="fire" />

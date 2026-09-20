@@ -363,6 +363,7 @@ export class WatchlistController {
       type?: string
       anilistId?: number
       isAdult?: number | null
+      episodeDuration?: number
     }
   ): boolean {
     const existing = ShowsMetaRepository.getById(db, showId) as {
@@ -377,6 +378,7 @@ export class WatchlistController {
       type?: string | null
       anilistId?: number | null
       isAdult?: number | null
+      episodeDuration?: number | null
     } | null
 
     if (!existing) return true
@@ -397,7 +399,8 @@ export class WatchlistController {
       differs(candidate.episodeCount, existing.episodeCount) ||
       differs(candidate.type, existing.type) ||
       differs(candidate.anilistId, existing.anilistId) ||
-      differs(candidate.isAdult, existing.isAdult)
+      differs(candidate.isAdult, existing.isAdult) ||
+      differs(candidate.episodeDuration, existing.episodeDuration)
     )
   }
 
@@ -759,6 +762,7 @@ export class WatchlistController {
       type,
       anilistId,
       isAdult: typeof isAdult === 'boolean' ? (isAdult ? 1 : 0) : null,
+      episodeDuration: duration > 0 ? Math.round(duration / 60) : undefined,
     }
 
     const metaChanged = this.showsMetaChanged(req.db, showId, metaCandidate)

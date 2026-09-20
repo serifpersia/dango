@@ -38,6 +38,7 @@ export interface RemoteMediaEntry {
   title: { romaji?: string; english?: string; native?: string }
   coverImage?: string
   totalEpisodes?: number
+  episodeDuration?: number
 }
 
 interface RequestOptions {
@@ -151,6 +152,7 @@ export class AniListTracker {
                 id
                 idMal
                 episodes
+                duration
                 title { romaji english native }
                 coverImage { large }
               }
@@ -188,6 +190,7 @@ export class AniListTracker {
           title: entry.media.title ?? {},
           coverImage: entry.media.coverImage?.large,
           totalEpisodes: entry.media.episodes ?? undefined,
+          episodeDuration: entry.media.duration ?? undefined,
         })
       }
     }
@@ -331,6 +334,7 @@ interface AnilistListEntry {
       id: number
       idMal?: number
       episodes?: number
+      duration?: number
       title?: { romaji?: string; english?: string; native?: string }
       coverImage?: { large?: string }
     }
