@@ -1,6 +1,7 @@
 import logger from './logger.js'
+import path from 'path'
 import { DatabaseWrapper } from './db.js'
-import { dbAll } from './utils/db-utils.js'
+import { dbAll, dbGet } from './utils/db-utils.js'
 import { isTempSyncRow } from './lib/temp-ids.js'
 import { updateEnvFile } from './utils/env.utils.js'
 import { CONFIG } from './config.js'
@@ -483,15 +484,36 @@ class GitHubSyncService {
   }
 
   private importDatabase(db: DatabaseWrapper, payload: SyncPayload) {
+    const remoteLibraryRows =
+      (payload.tables.watchlist?.length ?? 0) + (payload.tables.watched_episodes?.length ?? 0)
+    const localLibraryRows =
+      dbGet<{ n: number }>(
+        db,
+        'SELECT (SELECT COUNT(*) FROM watchlist) + (SELECT COUNT(*) FROM watched_episodes) AS n'
+      )?.n ?? 0
+    if (remoteLibraryRows === 0 && localLibraryRows > 0) {
+      throw new Error('Sync down refused: remote library is empty while local library has data')
+    }
+    try {
+      db.backup(path.join(CONFIG.ROOT, 'pre-sync-backup.db'))
+    } catch (err) {
+      log.warn({ err }, 'Pre-sync backup failed, continuing without backup')
+    }
+    const localColumns = new Map<string, Set<string>>()
+    for (const table of SYNC_TABLES) {
+      const cols = db.all<{ name: string }>(`PRAGMA table_info("${table}")`)
+      localColumns.set(table, new Set(cols.map((c) => c.name)))
+    }
     db.serialize(() => {
       for (const table of SYNC_TABLES) {
         db.run(`DELETE FROM ${quoteIdentifier(table)}`)
       }
 
       for (const table of SYNC_TABLES) {
+        const known = localColumns.get(table)
         for (const row of payload.tables[table]) {
           if (isTempSyncRow(row)) continue
-          const columns = Object.keys(row)
+          const columns = Object.keys(row).filter((c) => known?.has(c))
           if (columns.length === 0) continue
 
           const columnSql = columns.map(quoteIdentifier).join(', ')
