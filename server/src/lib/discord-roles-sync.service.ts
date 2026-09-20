@@ -87,7 +87,20 @@ export async function computeDiscordSyncStats(db: DatabaseWrapper): Promise<{
 export async function syncDiscordRoles(
   db: DatabaseWrapper,
   force = false
-): Promise<{ success: boolean; message: string; skipped?: boolean; dere?: string[] }> {
+): Promise<{
+  success: boolean
+  message: string
+  skipped?: boolean
+  dere?: string[]
+  code?: string
+  failures?: Array<{
+    action: string
+    roleId: string | null
+    label: string
+    status: number
+    error: string
+  }>
+}> {
   const workerUrl = CONFIG.DISCORD_ROLES_WORKER_URL
   if (!workerUrl) {
     return { success: false, message: 'DISCORD_ROLES_WORKER_URL not configured' }
@@ -123,10 +136,26 @@ export async function syncDiscordRoles(
       message?: string
       rank?: string
       dere?: string[]
+      code?: string
+      failures?: Array<{
+        action: string
+        roleId: string | null
+        label: string
+        status: number
+        error: string
+      }>
     }
     if (!res.ok || data.error) {
-      logger.warn({ error: data.error || res.statusText }, 'Discord role sync returned error')
-      return { success: false, message: data.error || 'Worker sync failed' }
+      logger.warn(
+        { error: data.error || res.statusText, code: data.code, failures: data.failures },
+        'Discord role sync returned error'
+      )
+      return {
+        success: false,
+        message: data.error || 'Worker sync failed',
+        code: data.code,
+        failures: data.failures,
+      }
     }
 
     lastSyncedSeconds = totalSeconds

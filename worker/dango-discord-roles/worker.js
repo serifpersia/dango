@@ -79,20 +79,34 @@ const DISCORD_HEADERS = (token) => ({
   'Content-Type': 'application/json',
 })
 
-async function getMemberRoles(env, userId) {
-  if (!env.DISCORD_BOT_TOKEN || !env.DISCORD_GUILD_ID) return []
+async function getMemberRolesDetailed(env, userId) {
+  if (!env.DISCORD_BOT_TOKEN || !env.DISCORD_GUILD_ID)
+    return {
+      ok: false,
+      roles: [],
+      status: 0,
+      error: 'Missing DISCORD_BOT_TOKEN or DISCORD_GUILD_ID',
+    }
   const res = await fetch(
     `https://discord.com/api/v10/guilds/${env.DISCORD_GUILD_ID}/members/${userId}`,
     { headers: DISCORD_HEADERS(env.DISCORD_BOT_TOKEN) }
   )
-  if (!res.ok) return []
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    return { ok: false, roles: [], status: res.status, error: text.slice(0, 500) }
+  }
   const data = await res.json().catch(() => ({}))
-  return data.roles || []
+  return { ok: true, roles: data.roles || [], status: 200, error: null }
+}
+
+async function getMemberRoles(env, userId) {
+  const result = await getMemberRolesDetailed(env, userId)
+  return result.roles
 }
 
 async function addDiscordRole(env, userId, roleId) {
   if (!roleId || !env.DISCORD_BOT_TOKEN || !env.DISCORD_GUILD_ID)
-    return { ok: false, error: 'Missing config' }
+    return { ok: false, status: 0, error: 'Missing config' }
   const res = await fetch(
     `https://discord.com/api/v10/guilds/${env.DISCORD_GUILD_ID}/members/${userId}/roles/${roleId}`,
     {
@@ -101,14 +115,15 @@ async function addDiscordRole(env, userId, roleId) {
     }
   )
   if (!res.ok) {
-    const text = await res.text()
-    return { ok: false, status: res.status, error: text }
+    const text = await res.text().catch(() => '')
+    return { ok: false, status: res.status, error: text.slice(0, 500) }
   }
-  return { ok: true }
+  return { ok: true, status: res.status, error: null }
 }
 
 async function removeDiscordRole(env, userId, roleId) {
-  if (!roleId || !env.DISCORD_BOT_TOKEN || !env.DISCORD_GUILD_ID) return { ok: false }
+  if (!roleId || !env.DISCORD_BOT_TOKEN || !env.DISCORD_GUILD_ID)
+    return { ok: false, status: 0, error: 'Missing config' }
   const res = await fetch(
     `https://discord.com/api/v10/guilds/${env.DISCORD_GUILD_ID}/members/${userId}/roles/${roleId}`,
     {
@@ -116,7 +131,11 @@ async function removeDiscordRole(env, userId, roleId) {
       headers: DISCORD_HEADERS(env.DISCORD_BOT_TOKEN),
     }
   )
-  return { ok: res.ok }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    return { ok: false, status: res.status, error: text.slice(0, 500) }
+  }
+  return { ok: true, status: res.status, error: null }
 }
 
 export default {
@@ -332,16 +351,72 @@ export default {
 
       const allDereRoleIds = Object.values(dereKeyMap).filter(Boolean)
 
-      const currentRoles = await getMemberRoles(env, discordId)
+      const member = await getMemberRolesDetailed(env, discordId)
+      if (!member.ok) {
+        if (member.status === 404) {
+          return json(
+            {
+              success: false,
+              error:
+                'User is not a member of the Discord server. Ask them to join the server first, then Sync Roles again.',
+              code: 'NOT_MEMBER',
+              status: 404,
+              detail: member.error,
+            },
+            404
+          )
+        }
+        if (member.status === 401 || member.status === 403) {
+          return json(
+            {
+              success: false,
+              error:
+                'Bot cannot read server members (401/403). Check bot is in the guild, has Manage Roles, and Server Members Intent if required.',
+              code: 'BOT_FORBIDDEN',
+              status: member.status,
+              detail: member.error,
+            },
+            502
+          )
+        }
+        return json(
+          {
+            success: false,
+            error: `Could not fetch Discord member (status ${member.status || 'unknown'}).`,
+            code: 'MEMBER_FETCH_FAILED',
+            status: member.status,
+            detail: member.error,
+          },
+          502
+        )
+      }
+      const currentRoles = member.roles
+
+      const failures = []
+      const recordFailure = (action, roleId, label, result) => {
+        failures.push({ action, roleId, label, status: result.status, error: result.error })
+      }
 
       for (const roleId of allRankRoleIds) {
         if (roleId !== targetRankRoleId && currentRoles.includes(roleId)) {
-          await removeDiscordRole(env, discordId, roleId)
+          const r = await removeDiscordRole(env, discordId, roleId)
+          if (!r.ok) recordFailure('remove', roleId, 'rank-cleanup', r)
         }
       }
 
-      if (targetRankRoleId && !currentRoles.includes(targetRankRoleId)) {
-        await addDiscordRole(env, discordId, targetRankRoleId)
+      if (!targetRankRoleId) {
+        return json(
+          {
+            success: false,
+            error: `No role ID configured for ${targetRank} (${rankKey} missing in worker vars).`,
+            code: 'MISSING_RANK_CONFIG',
+          },
+          500
+        )
+      }
+      if (!currentRoles.includes(targetRankRoleId)) {
+        const r = await addDiscordRole(env, discordId, targetRankRoleId)
+        if (!r.ok) recordFailure('add', targetRankRoleId, targetRank, r)
       }
 
       const allKnownDereKeys = [
@@ -363,15 +438,45 @@ export default {
       for (const d of allKnownDereKeys) {
         const roleId = env[`ROLE_${d.toUpperCase()}`]
         if (roleId && !targetDereTypes.includes(d) && currentRoles.includes(roleId)) {
-          await removeDiscordRole(env, discordId, roleId)
+          const r = await removeDiscordRole(env, discordId, roleId)
+          if (!r.ok) recordFailure('remove', roleId, d, r)
         }
       }
 
       for (const d of targetDereTypes) {
         const roleId = dereKeyMap[d]
-        if (roleId && !currentRoles.includes(roleId)) {
-          await addDiscordRole(env, discordId, roleId)
+        if (!roleId) {
+          recordFailure('add', null, d, {
+            status: 0,
+            error: `ROLE_${d.toUpperCase()} not configured`,
+          })
+          continue
         }
+        if (!currentRoles.includes(roleId)) {
+          const r = await addDiscordRole(env, discordId, roleId)
+          if (!r.ok) recordFailure('add', roleId, d, r)
+        }
+      }
+
+      if (failures.length > 0) {
+        const firstAddFailure = failures.find((f) => f.action === 'add')
+        const hint =
+          firstAddFailure && (firstAddFailure.status === 403 || firstAddFailure.status === 401)
+            ? ' Discord returned 403/401: bot role must sit ABOVE the rank/dere roles and have Manage Roles in Server Settings.'
+            : firstAddFailure && firstAddFailure.status === 404
+              ? ' Discord returned 404: user left the server or role ID does not exist.'
+              : ''
+        return json(
+          {
+            success: false,
+            error: `Discord rejected ${failures.length} role update(s).${hint}`,
+            code: 'DISCORD_REJECTED',
+            rank: targetRank,
+            dere: targetDereTypes,
+            failures,
+          },
+          502
+        )
       }
 
       return json({

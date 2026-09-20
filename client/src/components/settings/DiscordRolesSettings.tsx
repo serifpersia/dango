@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchApi } from '../../lib/fetchApi'
 import styles from './DiscordRolesSettings.module.css'
 
@@ -104,7 +104,9 @@ function getRankProgress(hours: number): {
   const next = rankIdx < RANK_THRESHOLDS.length - 1 ? RANK_THRESHOLDS[rankIdx + 1] : null
   if (!next) return { pct: 100, current, next: 'MAX', nextHours: 0 }
   const prev = RANK_THRESHOLDS[rankIdx].hours
-  const pct = Math.min(100, ((hours - prev) / (next.hours - prev)) * 100)
+  const segments = RANK_THRESHOLDS.length - 1
+  const intra = (hours - prev) / (next.hours - prev)
+  const pct = Math.min(100, ((rankIdx + intra) / segments) * 100)
   return { pct, current, next: next.label, nextHours: next.hours - hours }
 }
 
@@ -184,7 +186,7 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
     }
   }, [])
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     if (user) {
       setLoadingUser(false)
       return
@@ -200,21 +202,21 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
     } finally {
       setLoadingUser(false)
     }
-  }
+  }, [user])
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const data = (await fetchApi('/api/insights/discord-sync-stats')) as SyncStats
       setStats(data)
     } catch {
       // ignore
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadUser()
     fetchStats()
-  }, [])
+  }, [loadUser, fetchStats])
 
   const handleUnlink = () => {
     localStorage.removeItem(DISCORD_USER_KEY)
