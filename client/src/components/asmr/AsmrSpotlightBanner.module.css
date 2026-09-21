@@ -1,0 +1,23 @@
+.posterLandscape {
+  width: min(400px, 38vw);
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 1024px) {
+  .posterLandscape {
+    width: min(320px, 36vw);
+  }
+}
+
+@media (max-width: 768px) {
+  .posterLandscape {
+    width: 100%;
+    max-width: 420px;
+  }
+}

@@ -22,6 +22,10 @@ const TV_LIBRARY_TABLES = ['tv_library', 'tv_progress'] as const
 
 export type TvLibraryCounts = Record<(typeof TV_LIBRARY_TABLES)[number], number>
 
+const ASMR_LIBRARY_TABLES = ['asmr_library', 'asmr_progress'] as const
+
+export type AsmrLibraryCounts = Record<(typeof ASMR_LIBRARY_TABLES)[number], number>
+
 export const LibraryRepository = {
   countAll: (db: DatabaseWrapper): LibraryCounts => {
     const counts = {} as LibraryCounts
@@ -84,6 +88,29 @@ export const LibraryRepository = {
 
   clearTv: (db: DatabaseWrapper): void => {
     for (const table of TV_LIBRARY_TABLES) {
+      try {
+        dbRun(db, `DELETE FROM "${table}"`)
+      } catch {
+        // ignore
+      }
+    }
+  },
+
+  countAsmr: (db: DatabaseWrapper): AsmrLibraryCounts => {
+    const counts = {} as AsmrLibraryCounts
+    for (const table of ASMR_LIBRARY_TABLES) {
+      try {
+        counts[table] =
+          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
+      } catch {
+        counts[table] = 0
+      }
+    }
+    return counts
+  },
+
+  clearAsmr: (db: DatabaseWrapper): void => {
+    for (const table of ASMR_LIBRARY_TABLES) {
       try {
         dbRun(db, `DELETE FROM "${table}"`)
       } catch {

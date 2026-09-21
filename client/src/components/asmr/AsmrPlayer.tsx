@@ -1,7 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
+import { useNavigate } from 'react-router'
 import Icon from '../common/Icon'
+import { Modal } from '../common/Modal'
+import { Button } from '../common/Button'
 import type { AsmrChapter, AsmrTrack } from '../../hooks/useAsmr'
+import {
+  useAsmrProgress,
+  useSaveAsmrProgress,
+  useAddAsmrBookmark,
+} from '../../hooks/useAsmrLibrary'
+import { buildAsmrId } from '../../lib/asmr'
 import { formatTime } from '../../lib/utils'
 import { loadHls } from '../../lib/hls'
 import type Hls from 'hls.js'
@@ -63,10 +72,78 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     volumeRef.current = volume
   }, [volume])
 
+  const navigate = useNavigate()
+  const workId = React.useMemo(() => (rjCode ? buildAsmrId(rjCode) : ''), [rjCode])
+  const saveProgress = useSaveAsmrProgress()
+  const addBookmark = useAddAsmrBookmark()
+  const { data: progressData } = useAsmrProgress(workId || undefined)
+  const [showResumeModal, setShowResumeModal] = useState(false)
+  const [resumeTime, setResumeTime] = useState(0)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const hasResumedRef = useRef('')
+  const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedTimeRef = useRef(0)
+  const timeRef = useRef(0)
+  const durationRef = useRef(0)
+
   const track = tracks[trackIndex]
   const trackLink = track?.link
   const trackIsHls = track?.hls
+  const trackLabel = track?.resolutionStr || ''
   const hasImages = images.length > 0
+  const trackKey = `${workId}:${trackIndex}`
+
+  const savedRow = React.useMemo(() => {
+    const rows = progressData?.progress ?? []
+    return rows.find((r) => r.trackIndex === trackIndex) ?? null
+  }, [progressData, trackIndex])
+
+  const trackMetaRef = useRef({ workId: '', trackIndex: 0, trackLabel: '' })
+  trackMetaRef.current = {
+    workId,
+    trackIndex,
+    trackLabel,
+  }
+
+  const saveTrack = useCallback(
+    (
+      meta: { workId: string; trackIndex: number; trackLabel: string },
+      time: number,
+      dur: number,
+      force = false
+    ) => {
+      if (!meta.workId || !dur || dur < 10) return
+      if (!force && Math.abs(time - lastSavedTimeRef.current) < 5) return
+      lastSavedTimeRef.current = time
+      saveProgress.mutate({
+        workId: meta.workId,
+        trackIndex: meta.trackIndex,
+        trackLabel: meta.trackLabel,
+        currentTime: Math.floor(time),
+        duration: Math.floor(dur),
+        title,
+        thumbnail: images[0] || '',
+        rjCode: meta.workId,
+        isAdult: isAdult ? 1 : 0,
+      })
+    },
+    [saveProgress, title, images, isAdult]
+  )
+
+  const flushSave = useCallback(
+    (force = false) => {
+      if (progressSaveTimerRef.current) {
+        clearTimeout(progressSaveTimerRef.current)
+        progressSaveTimerRef.current = null
+      }
+      saveTrack(trackMetaRef.current, timeRef.current, durationRef.current, force)
+    },
+    [saveTrack]
+  )
+  const flushSaveRef = useRef(flushSave)
+  flushSaveRef.current = flushSave
+  const saveTrackRef = useRef(saveTrack)
+  saveTrackRef.current = saveTrack
 
   const destroyHls = useCallback(() => {
     if (hlsRef.current) {
@@ -79,10 +156,26 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     const audio = audioRef.current
     if (!audio || !trackLink) return
 
+    const metaAtLoad = {
+      workId,
+      trackIndex,
+      trackLabel,
+    }
+    const saveAtUnload = () => {
+      if (progressSaveTimerRef.current) {
+        clearTimeout(progressSaveTimerRef.current)
+        progressSaveTimerRef.current = null
+      }
+      saveTrackRef.current(metaAtLoad, timeRef.current, durationRef.current, true)
+    }
+
     setCurrentTime(0)
     setDuration(0)
     setBufferedEnd(0)
     setIsPlaying(false)
+    timeRef.current = 0
+    durationRef.current = 0
+    lastSavedTimeRef.current = 0
     destroyHls()
 
     if (trackIsHls) {
@@ -107,6 +200,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         cancelled = true
         destroyHls()
         audio.removeAttribute('src')
+        saveAtUnload()
       }
     } else {
       audio.src = trackLink
@@ -119,10 +213,38 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     return () => {
       destroyHls()
       audio.removeAttribute('src')
+      saveAtUnload()
     }
-  }, [trackLink, trackIsHls, destroyHls])
+  }, [trackLink, trackIsHls, destroyHls, workId, trackIndex, trackLabel])
 
   useEffect(() => () => destroyHls(), [destroyHls])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushSaveRef.current()
+    }
+    const onPageHide = () => flushSaveRef.current()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', onPageHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', onPageHide)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!savedRow || hasResumedRef.current === trackKey) return
+    if (!(duration > 0)) return
+    const ct = savedRow.currentTime || 0
+    const dur = savedRow.duration || duration
+    if (ct >= 10 && dur - ct >= 15 && timeRef.current < ct) {
+      hasResumedRef.current = trackKey
+      setResumeTime(ct)
+      setShowResumeModal(true)
+    } else {
+      hasResumedRef.current = trackKey
+    }
+  }, [savedRow, duration, trackKey])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -289,10 +411,62 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   }
 
   const handleEnded = () => {
+    flushSave(true)
     if (trackIndex < tracks.length - 1) {
       onTrackChange(trackIndex + 1)
+    } else {
+      setShowCompleteModal(true)
     }
   }
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const t = e.currentTarget.currentTime
+    timeRef.current = t
+    setCurrentTime(t)
+    if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+    progressSaveTimerRef.current = setTimeout(() => flushSaveRef.current(), 5000)
+  }
+
+  const handlePause = () => {
+    setIsPlaying(false)
+    flushSaveRef.current()
+  }
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const d = e.currentTarget.duration
+    durationRef.current = Number.isFinite(d) ? d : 0
+    setDuration(e.currentTarget.duration)
+  }
+
+  const handleResume = useCallback(() => {
+    const audio = audioRef.current
+    if (audio && resumeTime > 0) {
+      audio.currentTime = resumeTime
+      timeRef.current = resumeTime
+      audio.play().catch(() => {})
+    }
+    setShowResumeModal(false)
+  }, [resumeTime])
+
+  const handleSkipResume = useCallback(() => {
+    setShowResumeModal(false)
+  }, [])
+
+  const handleCompleteAndHome = useCallback(() => {
+    if (workId) {
+      addBookmark.mutate({
+        rjCode: workId,
+        title,
+        thumbnail: images[0] || '',
+        status: 'Completed',
+        isAdult: !!isAdult,
+        silent: true,
+      })
+    }
+    setShowCompleteModal(false)
+    onClose()
+    navigate('/')
+  }, [workId, addBookmark, title, images, isAdult, onClose, navigate])
 
   const activeChapter = chapters.reduce((acc, c, i) => (currentTime >= c.time ? i : acc), -1)
 
@@ -464,9 +638,9 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       ref={audioRef}
       preload="metadata"
       onPlay={() => setIsPlaying(true)}
-      onPause={() => setIsPlaying(false)}
-      onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-      onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+      onPause={handlePause}
+      onTimeUpdate={handleTimeUpdate}
+      onLoadedMetadata={handleLoadedMetadata}
       onProgress={(e) => {
         const a = e.currentTarget
         if (a.buffered.length > 0) setBufferedEnd(a.buffered.end(a.buffered.length - 1))
@@ -475,11 +649,64 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     />
   )
 
+  const resumeModal = (
+    <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Listening">
+      <div style={{ padding: '1rem', textAlign: 'center' }}>
+        <p>
+          You were at <strong>{formatTime(resumeTime)}</strong>
+          {track?.resolutionStr ? ` in ${track.resolutionStr}` : ''}
+        </p>
+        <div
+          style={{
+            marginTop: '1rem',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'center',
+          }}
+        >
+          <Button variant="secondary" onClick={handleSkipResume}>
+            Start from Beginning
+          </Button>
+          <Button onClick={handleResume}>Resume</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+
+  const completeModal = (
+    <Modal isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)} title="Finished!">
+      <div style={{ padding: '1rem', textAlign: 'center' }}>
+        <Icon
+          name="check-circle"
+          size={48}
+          style={{ color: 'var(--accent-lighter)', marginBottom: '0.5rem' }}
+        />
+        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{t ? t(title) : title}</p>
+        <p style={{ color: 'var(--text-secondary)' }}>You finished this work!</p>
+        <div
+          style={{
+            marginTop: '1rem',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'center',
+          }}
+        >
+          <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>
+            Close
+          </Button>
+          <Button onClick={handleCompleteAndHome}>Mark Completed & Back to Home</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+
   if (!expanded) {
     return createPortal(
       <>
         {audioEl}
         <div className={styles.playerBar}>{barContent}</div>
+        {resumeModal}
+        {completeModal}
       </>,
       document.body
     )
@@ -492,6 +719,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   return createPortal(
     <>
       {audioEl}
+      {resumeModal}
+      {completeModal}
       <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
         <div
           className={`${styles.npStage} ${!showArt || !hasImages ? styles.npStageBlank : ''}`}

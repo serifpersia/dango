@@ -14,6 +14,9 @@ import {
   useRemoveMangaBookmark,
   useUpdateMangaStatus,
   useToggleMangaBookmark,
+  useBatchUpdateMangaStatus,
+  useBatchRemoveManga,
+  useBatchRemoveMangaProgress,
   mangaLibraryId,
   MANGA_LIBRARY_STATUSES,
   type ContinueReadingItem,
@@ -58,6 +61,8 @@ export default function ReadingList() {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [manageMode, setManageMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     document.title = 'Reading List - dango'
@@ -65,6 +70,7 @@ export default function ReadingList() {
 
   useEffect(() => {
     setPage(1)
+    setSelectedIds(new Set())
   }, [filterBy])
 
   const isCR = filterBy === 'Continue Reading'
@@ -75,6 +81,25 @@ export default function ReadingList() {
   const { toggle, bookmarkedIds } = useToggleMangaBookmark()
   const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
   const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
+  const bulkUpdateStatus = useBatchUpdateMangaStatus()
+  const bulkRemove = useBatchRemoveManga()
+  const bulkResetProgress = useBatchRemoveMangaProgress()
+
+  const toggleManageMode = () => {
+    setManageMode((prev) => {
+      if (prev) setSelectedIds(new Set())
+      return !prev
+    })
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const entries: GridEntry[] = useMemo(() => {
     if (isCR) {
@@ -125,6 +150,37 @@ export default function ReadingList() {
   const isLoading = isCR ? crQuery.isLoading : libraryQuery.isLoading
   const error = isCR ? crQuery.error : libraryQuery.error
 
+  const pageIds = entries.map((entry) => entry.libId)
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
+
+  const handleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        for (const id of pageIds) next.delete(id)
+      } else {
+        for (const id of pageIds) next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleBulkStatus = (status: string) => {
+    if (selectedIds.size === 0) return
+    bulkUpdateStatus.mutate({ ids: [...selectedIds], status })
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkAction = () => {
+    if (selectedIds.size === 0) return
+    if (isCR) {
+      bulkResetProgress.mutate([...selectedIds])
+    } else {
+      bulkRemove.mutate([...selectedIds])
+    }
+    setSelectedIds(new Set())
+  }
+
   return (
     <div className="page-container">
       <header className={styles.header}>
@@ -151,30 +207,81 @@ export default function ReadingList() {
           {filterBy}
           <span className={styles.itemCount}>({total} items)</span>
         </h3>
-        {total > 0 && (
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || isLoading}
-              aria-label="Previous page"
-            >
-              <Icon name="chevron-left" size={14} />
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => p + 1)}
-              disabled={entries.length < PAGE_SIZE || isLoading}
-              aria-label="Next page"
-            >
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
-        )}
+        <div className={styles.headerActions}>
+          <button
+            className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
+            onClick={toggleManageMode}
+          >
+            <Icon name="pencil-alt" size={13} />
+            <span>Bulk Manage</span>
+          </button>
+          {total > 0 && (
+            <div className={styles.pagination}>
+              <button
+                className={styles.pageBtn}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || isLoading}
+                aria-label="Previous page"
+              >
+                <Icon name="chevron-left" size={14} />
+              </button>
+              <span className={styles.pageInfo}>
+                Page <strong>{page}</strong>
+              </span>
+              <button
+                className={styles.pageBtn}
+                onClick={() => setPage((p) => p + 1)}
+                disabled={entries.length < PAGE_SIZE || isLoading}
+                aria-label="Next page"
+              >
+                <Icon name="chevron-right" size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {manageMode && (
+        <div className={styles.manageBar}>
+          <button className={styles.selectAllBtn} onClick={handleSelectAll}>
+            <span
+              className={`${styles.selectAllBox} ${allSelected ? styles.selectAllBoxChecked : ''}`}
+              aria-hidden="true"
+            />
+            <span>{allSelected ? 'Clear Page' : 'Select All'}</span>
+          </button>
+          <span className={styles.manageCount}>{selectedIds.size} selected</span>
+          <div className={styles.manageSpacer} />
+          {!isCR && (
+            <select
+              className={styles.manageStatusSelect}
+              value=""
+              onChange={(e) => {
+                if (e.currentTarget.value) {
+                  handleBulkStatus(e.currentTarget.value)
+                }
+              }}
+              disabled={selectedIds.size === 0}
+              title="Set status for selected items"
+            >
+              <option value="">Set status…</option>
+              {MANGA_LIBRARY_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            className={styles.manageRemoveBtn}
+            onClick={handleBulkAction}
+            disabled={selectedIds.size === 0}
+          >
+            <Icon name="trash" size={13} />
+            <span>{isCR ? 'Reset Selected' : 'Remove Selected'}</span>
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <SkeletonGrid />
@@ -194,7 +301,21 @@ export default function ReadingList() {
       ) : (
         <div className={styles.grid}>
           {entries.map((entry) => (
-            <div key={entry.key} className={styles.itemWrapper}>
+            <div
+              key={entry.key}
+              className={`${styles.itemWrapper} ${selectedIds.has(entry.libId) ? styles.selected : ''}`}
+            >
+              {manageMode && (
+                <div
+                  className={styles.selectOverlay}
+                  onClick={() => toggleSelect(entry.libId)}
+                  title={selectedIds.has(entry.libId) ? 'Deselect' : 'Select'}
+                >
+                  <span className={styles.selectBadge}>
+                    {selectedIds.has(entry.libId) ? <Icon name="check" size={12} /> : null}
+                  </span>
+                </div>
+              )}
               <MediaCard
                 item={{
                   id: entry.libId,
@@ -223,7 +344,7 @@ export default function ReadingList() {
                 onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
                 rawThumbnail
               />
-              {!isCR && (
+              {!isCR && !manageMode && (
                 <div className={styles.cardActions}>
                   <select
                     className={styles.statusSelect}

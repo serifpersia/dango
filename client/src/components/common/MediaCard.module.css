@@ -97,6 +97,10 @@
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
+.card.horizontal .posterContainer {
+  aspect-ratio: 16 / 9;
+}
+
 .posterImg {
   width: 100%;
   height: 100%;

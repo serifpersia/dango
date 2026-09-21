@@ -20,12 +20,15 @@ import {
   initializeDatabase,
   initializeMangaDatabase,
   initializeTvDatabase,
+  initializeAsmrDatabase,
   syncDownOnBoot,
   syncUp,
   mangaSyncDownOnBoot,
   mangaSyncUp,
   tvSyncDownOnBoot,
   tvSyncUp,
+  asmrSyncDownOnBoot,
+  asmrSyncUp,
   initSyncProvider,
   waitForSync,
   getActiveProvider,
@@ -36,6 +39,7 @@ import { lanAuthMiddleware } from './app-auth.js'
 import { createWatchlistRouter } from './routes/watchlist.routes.js'
 import { createDataRouter } from './routes/data.routes.js'
 import { createAsmrRouter, type JasmrApi } from './routes/asmr.routes.js'
+import { createAsmrLibraryRouter } from './routes/asmr-library.routes.js'
 import { createMangaRouter } from './routes/manga.routes.js'
 import { createMangaLibraryRouter } from './routes/manga-library.routes.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
@@ -66,6 +70,7 @@ declare module 'express-serve-static-core' {
     db: DatabaseWrapper
     mangaDb: DatabaseWrapper
     tvDb: DatabaseWrapper
+    asmrDb: DatabaseWrapper
   }
 }
 
@@ -161,6 +166,7 @@ async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
 let db: DatabaseWrapper
 let mangaDb: DatabaseWrapper
 let tvDb: DatabaseWrapper
+let asmrDb: DatabaseWrapper
 let isShuttingDown = false
 
 async function runSyncSequence(
@@ -229,18 +235,31 @@ async function runSyncSequence(
   } catch (err) {
     logger.error({ err }, 'TV sync up on boot failed')
   }
+
+  try {
+    await asmrSyncDownOnBoot(asmrDb, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'ASMR sync down on boot failed')
+  }
+
+  try {
+    await asmrSyncUp(asmrDb, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'ASMR sync up on boot failed')
+  }
 }
 
 app.use((req, res, next) => {
   if (isShuttingDown) {
     return res.status(503).send('Server is shutting down...')
   }
-  if (!db || !mangaDb || !tvDb) {
+  if (!db || !mangaDb || !tvDb || !asmrDb) {
     return res.status(503).send('Database initializing...')
   }
   req.db = db
   req.mangaDb = mangaDb
   req.tvDb = tvDb
+  req.asmrDb = asmrDb
   next()
 })
 
@@ -285,6 +304,7 @@ app.use(
   '/api',
   createAsmrRouter(apiCache, () => providers['jasmr'] as unknown as JasmrApi | undefined)
 )
+app.use('/api', createAsmrLibraryRouter())
 app.use(
   '/api',
   createMangaRouter(apiCache, (name) => mangaProviders[name])
@@ -378,6 +398,11 @@ async function main() {
   tvDb = await initializeTvDatabase(tvDbPath)
   logger.info(`TV database initialized at ${tvDbPath}`)
 
+  const asmrDbName = CONFIG.IS_DEV ? CONFIG.ASMR_DB_NAME_DEV : CONFIG.ASMR_DB_NAME_PROD
+  const asmrDbPath = path.join(CONFIG.ROOT, asmrDbName)
+  asmrDb = await initializeAsmrDatabase(asmrDbPath)
+  logger.info(`ASMR database initialized at ${asmrDbPath}`)
+
   await offlineDb.init(db)
   if (offlineDb.checkWeeklyUpdateDue(db)) {
     logger.info('Weekly offline database update is due on startup, starting background update...')
@@ -414,10 +439,14 @@ async function main() {
   if (!fs.existsSync(CONFIG.TV_LOCAL_MANIFEST_PATH)) {
     fs.writeFileSync(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
   }
+  if (!fs.existsSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH)) {
+    fs.writeFileSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
+  }
 
   let hasUnsyncedChanges = false
   let hasMangaUnsyncedChanges = false
   let hasTvUnsyncedChanges = false
+  let hasAsmrUnsyncedChanges = false
 
   const watcher = fs.watch(CONFIG.LOCAL_MANIFEST_PATH, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
@@ -434,6 +463,12 @@ async function main() {
   const tvWatcher = fs.watch(CONFIG.TV_LOCAL_MANIFEST_PATH, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
       hasTvUnsyncedChanges = true
+    }
+  })
+
+  const asmrWatcher = fs.watch(CONFIG.ASMR_LOCAL_MANIFEST_PATH, (eventType) => {
+    if (eventType === 'change' || eventType === 'rename') {
+      hasAsmrUnsyncedChanges = true
     }
   })
 
@@ -472,6 +507,16 @@ async function main() {
         hasTvUnsyncedChanges = true
       }
     }
+    if (hasAsmrUnsyncedChanges) {
+      logger.info('Uploading accumulated ASMR database changes...')
+      hasAsmrUnsyncedChanges = false
+      try {
+        await asmrSyncUp(asmrDb, remoteFolder)
+      } catch (err) {
+        logger.error({ err }, 'Failed to upload ASMR database changes')
+        hasAsmrUnsyncedChanges = true
+      }
+    }
   }, 300000)
 
   const offlineDbInterval = setInterval(
@@ -498,6 +543,7 @@ async function main() {
     await watcher.close()
     await mangaWatcher.close()
     await tvWatcher.close()
+    await asmrWatcher.close()
 
     if (expressServer) {
       await new Promise<void>((resolve) => expressServer.close(() => resolve()))
@@ -533,8 +579,19 @@ async function main() {
       }
     }
 
+    if (hasAsmrUnsyncedChanges) {
+      logger.info('Sync on shutdown: uploading final ASMR database changes...')
+      hasAsmrUnsyncedChanges = false
+      try {
+        await asmrSyncUp(asmrDb, remoteFolder)
+      } catch (e) {
+        logger.error({ err: e }, 'Final ASMR sync on shutdown failed')
+      }
+    }
+
     await waitForSync()
 
+    asmrDb.close(() => {})
     tvDb.close(() => {})
     mangaDb.close(() => {})
     db.close(() => {

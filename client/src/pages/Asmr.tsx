@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import Icon from '../components/common/Icon'
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
-import AsmrCard from '../components/asmr/AsmrCard'
+import MediaCard from '../components/common/MediaCard'
 import AsmrDetail from '../components/asmr/AsmrDetail'
+import AsmrPopup from '../components/asmr/AsmrPopup'
+import { useAsmrPopup } from '../hooks/useAsmrPopup'
 import AsmrPlayer from '../components/asmr/AsmrPlayer'
 import JasmrCookieModal from '../components/asmr/JasmrCookieModal'
 import { subscribeAuthRequired } from '../lib/auth-bus'
 import { useAsmrBrowse, useAsmrWork } from '../hooks/useAsmr'
+import { useToggleAsmrBookmark, asmrLibraryId } from '../hooks/useAsmrLibrary'
+import { asmrWorkId, isAsmrAdult } from '../lib/asmr'
 import { useTranslate } from '../hooks/useTranslate'
 import type { AsmrTrack, AsmrWork } from '../hooks/useAsmr'
 import styles from '../components/asmr/Asmr.module.css'
@@ -74,12 +78,13 @@ const MATURE_CONSENT_KEY = 'agreedToViewMature'
 const Asmr: React.FC = () => {
   const { rj: rjParam } = useParams<{ rj: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [hasConsent, setHasConsent] = useState(
     () => localStorage.getItem(MATURE_CONSENT_KEY) === 'true'
   )
   const [showMatureModal, setShowMatureModal] = useState(false)
-  const [queryInput, setQueryInput] = useState('')
-  const [query, setQuery] = useState('')
+  const [queryInput, setQueryInput] = useState(() => searchParams.get('q') || '')
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
   const [sort, setSort] = useState('latest')
   const [rating, setRating] = useState('sfw')
   const [page, setPage] = useState(1)
@@ -95,6 +100,8 @@ const Asmr: React.FC = () => {
   )
   const [showJasmrModal, setShowJasmrModal] = useState(false)
   const queryClient = useQueryClient()
+  const { toggle: toggleBookmark, bookmarkedIds } = useToggleAsmrBookmark()
+  const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useAsmrPopup()
 
   useEffect(() => {
     return subscribeAuthRequired('jasmr', () => setShowJasmrModal(true))
@@ -145,15 +152,6 @@ const Asmr: React.FC = () => {
     }
   }, [rjParam, shows, player, selectedWork])
 
-  const handleSelectWork = useCallback(
-    (work: AsmrWork) => {
-      const rj = work.id || work._id
-      if (rj) navigate(`/asmr/${rj}`)
-      else setSelectedWork(work)
-    },
-    [navigate]
-  )
-
   const handleCloseDetail = useCallback(() => {
     navigate('/asmr')
   }, [navigate])
@@ -197,7 +195,19 @@ const Asmr: React.FC = () => {
     e.preventDefault()
     setQuery(queryInput)
     setPage(1)
+    const next = new URLSearchParams(searchParams)
+    if (queryInput.trim()) next.set('q', queryInput.trim())
+    else next.delete('q')
+    next.delete('page')
+    setSearchParams(next, { replace: true })
   }
+
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    setQueryInput((prev) => (prev === q ? prev : q))
+    setQuery((prev) => (prev === q ? prev : q))
+    setPage(1)
+  }, [searchParams])
 
   const handleMatureToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked && !hasConsent) {
@@ -340,12 +350,64 @@ const Asmr: React.FC = () => {
               <div className={`${styles.grid} ${isFetching ? styles.fetching : ''}`}>
                 {shows.map((work) => {
                   const displayWork = translateEN ? { ...work, name: tAsmr(work.name) } : work
+                  const rj = asmrWorkId(work)
+                  const libId = asmrLibraryId(rj)
+                  const bookmarked = bookmarkedIds.has(libId)
+                  const listenTarget = `/asmr/${encodeURIComponent(rj)}`
                   return (
-                    <AsmrCard
-                      key={work._id || work.id}
-                      work={displayWork}
-                      onSelect={handleSelectWork}
-                    />
+                    <div key={work._id || work.id} className={styles.asmrCardWrap}>
+                      <MediaCard
+                        item={{
+                          id: libId,
+                          title: displayWork.name,
+                          thumbnail: work.thumbnail || '',
+                          typeBadge: rj || undefined,
+                          isAdult: isAsmrAdult(work),
+                        }}
+                        linkTo={listenTarget}
+                        hoverIcon="info"
+                        layout="horizontal"
+                        showInfoButton
+                        display={{
+                          elements: {
+                            poster: { typeBadge: true, chapterBadge: false, adultBadge: true },
+                            info: { title: true, mobileBadges: true, progress: false, meta: false },
+                          },
+                        }}
+                        onOpenDetails={(rect) =>
+                          openPopup(rect, {
+                            rjCode: rj,
+                            title: displayWork.name,
+                            thumbnail: work.thumbnail || '',
+                            isAdult: isAsmrAdult(work),
+                            rating: work.rating,
+                            listenTarget,
+                          })
+                        }
+                        onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
+                        rawThumbnail
+                      />
+                      <button
+                        className={`${styles.bookmarkBtn} ${bookmarked ? styles.bookmarked : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          toggleBookmark({
+                            rjCode: rj,
+                            title: work.name,
+                            thumbnail: work.thumbnail || '',
+                            isAdult: isAsmrAdult(work),
+                          })
+                        }}
+                        title={bookmarked ? 'Remove from listening list' : 'Add to listening list'}
+                        aria-label={
+                          bookmarked ? 'Remove from listening list' : 'Add to listening list'
+                        }
+                        aria-pressed={bookmarked}
+                      >
+                        <Icon name={bookmarked ? 'check' : 'plus'} size={12} />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -374,6 +436,25 @@ const Asmr: React.FC = () => {
 
       {selectedWork && (
         <AsmrDetail work={selectedWork} onClose={handleCloseDetail} onPlay={handlePlay} t={tAsmr} />
+      )}
+
+      {popup && (
+        <AsmrPopup
+          data={popup.data}
+          anchorRect={popup.rect}
+          bookmarked={bookmarkedIds.has(asmrLibraryId(popup.data.rjCode))}
+          onToggleBookmark={() =>
+            toggleBookmark({
+              rjCode: popup.data.rjCode,
+              title: popup.data.title,
+              thumbnail: popup.data.thumbnail || '',
+              isAdult: popup.data.isAdult,
+            })
+          }
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          onRequestClose={closePopup}
+        />
       )}
 
       {showJasmrModal && (

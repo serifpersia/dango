@@ -157,6 +157,75 @@
   color: var(--text-tertiary);
 }
 
+.asmrCardWrap {
+  position: relative;
+  min-width: 0;
+}
+
+.bookmarkBtn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.15s ease;
+  z-index: 20;
+}
+
+.asmrCardWrap:hover .bookmarkBtn,
+.asmrCardWrap:focus-within .bookmarkBtn,
+.bookmarkBtn.bookmarked {
+  opacity: 1;
+}
+
+.bookmarkBtn:hover {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  transform: scale(1.08);
+}
+
+.bookmarkBtn.bookmarked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.popupCover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  background: var(--bg-tertiary);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .bookmarkBtn {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .popupCover {
+    aspect-ratio: 3 / 4;
+    max-height: 38vh;
+  }
+}
+
 .statusMsg {
   text-align: center;
   color: var(--text-secondary);
@@ -310,12 +379,13 @@
 
 .detailHeader {
   display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
 .detailCover {
-  width: var(--size-180);
-  aspect-ratio: 2 / 3;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--radius-lg);
   flex-shrink: 0;
@@ -708,7 +778,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-5);
   padding: var(--space-2-5) var(--space-5);
   border: none;
   border-radius: var(--radius-md);
@@ -716,6 +785,13 @@
   color: var(--accent-text);
   font-size: var(--font-size-base);
   cursor: pointer;
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .playerBar {
@@ -986,7 +1062,7 @@
   }
 
   .detailCover {
-    width: var(--size-140);
+    width: 100%;
   }
 
   .filterBar {

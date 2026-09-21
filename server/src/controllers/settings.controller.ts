@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import {
+  performAsmrWriteTransaction,
   performMangaWriteTransaction,
   performTvWriteTransaction,
   performWriteTransaction,
@@ -531,6 +532,7 @@ export class SettingsController {
       const before = LibraryRepository.countAll(req.db)
       const beforeManga = LibraryRepository.countManga(req.mangaDb)
       const beforeTv = LibraryRepository.countTv(req.tvDb)
+      const beforeAsmr = LibraryRepository.countAsmr(req.asmrDb)
       await performWriteTransaction(req.db, (tx) => {
         LibraryRepository.clearAll(tx)
       })
@@ -540,8 +542,20 @@ export class SettingsController {
       await performTvWriteTransaction(req.tvDb, (tx) => {
         LibraryRepository.clearTv(tx)
       })
-      logger.warn({ before, beforeManga, beforeTv }, 'Library database cleared by user request')
-      res.json({ success: true, deleted: before, deletedManga: beforeManga, deletedTv: beforeTv })
+      await performAsmrWriteTransaction(req.asmrDb, (tx) => {
+        LibraryRepository.clearAsmr(tx)
+      })
+      logger.warn(
+        { before, beforeManga, beforeTv, beforeAsmr },
+        'Library database cleared by user request'
+      )
+      res.json({
+        success: true,
+        deleted: before,
+        deletedManga: beforeManga,
+        deletedTv: beforeTv,
+        deletedAsmr: beforeAsmr,
+      })
     } catch {
       res.status(500).json({ error: 'DB error' })
     }

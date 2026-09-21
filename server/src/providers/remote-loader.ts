@@ -12,6 +12,7 @@ import { requestContext } from '../utils/request-context.js'
 import { sanitizeCfClearance, buildCfClearanceCookie } from '../utils/cookie.utils.js'
 import { buildQueryVariants, pickBestMatch } from './title-matching.js'
 import { anilistRequest, parseMalId, searchAnilistByTitle } from '../lib/anilist.js'
+import type { AnilistResponse } from '../lib/anilist.js'
 import { kitsuMetaByAnilistId } from '../lib/kitsu.js'
 import type { Provider } from './provider.interface.js'
 import type { MangaProvider } from './manga/manga.types.js'
@@ -218,8 +219,7 @@ function createCtx(cache: AppCache) {
       pickBestMatch,
     },
     anilist: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      request: <T>(query: string, vars?: Record<string, unknown>): Promise<any> =>
+      request: <T>(query: string, vars?: Record<string, unknown>): Promise<AnilistResponse<T>> =>
         anilistRequest<T>(query, vars),
       parseMalId,
       searchByTitle: searchAnilistByTitle,

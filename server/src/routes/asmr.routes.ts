@@ -82,9 +82,11 @@ export function createAsmrRouter(
         }
         const rjCode = String(req.params.rj).trim().toUpperCase()
         const episodes = await provider.getEpisodes(rjCode)
-        const streams = await provider.getStreamUrls(rjCode, '1')
-        const images = await provider.getImages(rjCode)
-        const chapters = await provider.getChapters(rjCode)
+        const [streams, images, chapters] = await Promise.all([
+          provider.getStreamUrls(rjCode, '1'),
+          provider.getImages(rjCode),
+          provider.getChapters(rjCode),
+        ])
         res.json({
           rjCode,
           description: episodes?.description || '',

@@ -30,6 +30,7 @@ const Sidebar: React.FC = () => {
 
   const isManga = contentType === 'manga'
   const isTv = contentType === 'tv'
+  const isAsmr = contentType === 'asmr'
 
   const navItems = [
     { to: '/', icon: <Icon name="home" />, label: 'Home' },
@@ -37,17 +38,19 @@ const Sidebar: React.FC = () => {
       ? { to: '/manga', icon: <Icon name="book" />, label: 'Manga' }
       : isTv
         ? { to: '/tv-search', icon: <Icon name="tv" />, label: 'TV and Movies' }
-        : { to: '/search', icon: <Icon name="search" />, label: 'Search' },
+        : isAsmr
+          ? { to: '/asmr', icon: <Icon name="headphones" />, label: 'ASMR' }
+          : { to: '/search', icon: <Icon name="search" />, label: 'Search' },
     isManga
       ? { to: '/reading-list', icon: <Icon name="bookmark" />, label: 'Reading List' }
       : isTv
         ? { to: '/tv-watchlist', icon: <Icon name="clock" />, label: 'TV Watchlist' }
-        : { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
+        : isAsmr
+          ? { to: '/listening-list', icon: <Icon name="history" />, label: 'Listening List' }
+          : { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
     { to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' },
     { to: '/trackers', icon: <Icon name="sync-alt" />, label: 'Trackers' },
-    { to: '/asmr', icon: <Icon name="headphones" />, label: 'ASMR' },
     { to: '/radio', icon: <Icon name="broadcast-tower" />, label: 'Radio' },
-    ...(isTv ? [] : [{ to: '/tv-search', icon: <Icon name="tv" />, label: 'TV & Movies' }]),
     ...(hasMatureConsent
       ? [{ to: '/mature', icon: <Icon name="pepper-hot" />, label: 'Mature' }]
       : []),

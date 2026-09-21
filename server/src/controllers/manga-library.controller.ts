@@ -221,4 +221,59 @@ export class MangaLibraryController {
       res.status(500).json({ error: 'Failed to reset progress' })
     }
   }
+
+  batchUpdateStatus = async (req: Request, res: Response) => {
+    const { ids: idsRaw, status } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    if (!status || !(MANGA_STATUSES as string[]).includes(status)) {
+      return res.status(400).json({ error: 'a valid status is required' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performMangaWriteTransaction(mangaDb(req), (tx) => {
+        MangaLibraryRepository.updateStatusMany(tx, ids, String(status))
+      })
+      res.json({ success: true, updated: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch update manga status')
+      res.status(500).json({ error: 'Failed to update statuses' })
+    }
+  }
+
+  batchRemove = async (req: Request, res: Response) => {
+    const { ids: idsRaw } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performMangaWriteTransaction(mangaDb(req), (tx) => {
+        MangaLibraryRepository.deleteMany(tx, ids)
+        MangaProgressRepository.deleteMany(tx, ids)
+      })
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch remove manga')
+      res.status(500).json({ error: 'Failed to remove bookmarks' })
+    }
+  }
+
+  batchRemoveProgress = async (req: Request, res: Response) => {
+    const { ids: idsRaw } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performMangaWriteTransaction(mangaDb(req), (tx) => {
+        MangaProgressRepository.deleteMany(tx, ids)
+      })
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch remove manga progress')
+      res.status(500).json({ error: 'Failed to reset progress' })
+    }
+  }
 }

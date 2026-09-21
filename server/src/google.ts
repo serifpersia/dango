@@ -13,6 +13,7 @@ import {
   importTables,
   MANGA_SYNC_TABLES,
   TV_SYNC_TABLES,
+  ASMR_SYNC_TABLES,
   normalizePayload as normalizeGenericPayload,
   readPayloadVersion,
 } from './sync-payload.js'
@@ -558,6 +559,13 @@ export class GoogleDriveService {
     )
   }
 
+  private getAsmrSyncFilename(): string {
+    return (
+      (CONFIG as { ASMR_GOOGLE_SYNC_FILENAME?: string }).ASMR_GOOGLE_SYNC_FILENAME ||
+      'asmr.sync.json'
+    )
+  }
+
   private async findFileInAppData(filename: string): Promise<GoogleDriveFile | null> {
     if (!this.isAuthenticated()) return null
     const safeName = filename.replace(/'/g, "\\'")
@@ -730,6 +738,43 @@ export class GoogleDriveService {
     importTables(db, TV_SYNC_TABLES, payload, {
       libraryTables: ['tv_library', 'tv_progress'],
       backupName: 'pre-sync-tv-backup.db',
+    })
+    return readPayloadVersion(payload)
+  }
+
+  async getAsmrRemoteVersion(): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getAsmrSyncFilename())
+    if (!file) return 0
+    try {
+      const payload = (await this.downloadJson(file.id)) as {
+        version?: number
+        tables?: { sync_metadata?: Array<{ key: string; value: number | string }> }
+      }
+      const row = payload?.tables?.sync_metadata?.find((r) => r.key === 'db_version')
+      const v = row?.value
+      return typeof v === 'number' ? v : Number(v || payload?.version || 0)
+    } catch {
+      return 0
+    }
+  }
+
+  async syncAsmrUp(db: DatabaseWrapper): Promise<void> {
+    if (!this.isAuthenticated()) return
+    const payload = exportTables(db, ASMR_SYNC_TABLES)
+    const existing = await this.findFileInAppData(this.getAsmrSyncFilename())
+    await this.uploadJson(this.getAsmrSyncFilename(), payload, existing?.id)
+  }
+
+  async syncAsmrDown(db: DatabaseWrapper): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getAsmrSyncFilename())
+    if (!file) return 0
+    const raw = await this.downloadJson(file.id)
+    const payload = normalizeGenericPayload(raw, ASMR_SYNC_TABLES, 'Google ASMR')
+    importTables(db, ASMR_SYNC_TABLES, payload, {
+      libraryTables: ['asmr_library', 'asmr_progress'],
+      backupName: 'pre-sync-asmr-backup.db',
     })
     return readPayloadVersion(payload)
   }

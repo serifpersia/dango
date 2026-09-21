@@ -38,14 +38,17 @@ const ClearDatabaseSettings: React.FC = () => {
       const deleted = data.deleted as Record<string, number>
       const deletedManga = data.deletedManga as Record<string, number> | undefined
       const deletedTv = data.deletedTv as Record<string, number> | undefined
+      const deletedAsmr = data.deletedAsmr as Record<string, number> | undefined
       const total =
         Object.values(deleted).reduce((sum, n) => sum + (n || 0), 0) +
         Object.values(deletedManga ?? {}).reduce((sum, n) => sum + (n || 0), 0) +
-        Object.values(deletedTv ?? {}).reduce((sum, n) => sum + (n || 0), 0)
+        Object.values(deletedTv ?? {}).reduce((sum, n) => sum + (n || 0), 0) +
+        Object.values(deletedAsmr ?? {}).reduce((sum, n) => sum + (n || 0), 0)
       const mangaCount = (deletedManga?.manga_library ?? 0) + (deletedManga?.manga_progress ?? 0)
       const tvCount = (deletedTv?.tv_library ?? 0) + (deletedTv?.tv_progress ?? 0)
+      const asmrCount = (deletedAsmr?.asmr_library ?? 0) + (deletedAsmr?.asmr_progress ?? 0)
       setStatusMessage(
-        `Library cleared — ${deleted.watchlist ?? 0} watchlist entries, ${mangaCount} manga rows, ${tvCount} TV rows and ${total} total rows removed.`
+        `Library cleared — ${deleted.watchlist ?? 0} watchlist entries, ${mangaCount} manga rows, ${tvCount} TV rows, ${asmrCount} ASMR rows and ${total} total rows removed.`
       )
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
@@ -55,6 +58,9 @@ const ClearDatabaseSettings: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['tv-library'] })
       queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
       setShowModal(false)
     } catch (err) {
       setStatusMessage((err as Error).message)
@@ -69,8 +75,9 @@ const ClearDatabaseSettings: React.FC = () => {
       <h3>Danger Zone</h3>
       <p>
         Permanently delete your library (watchlist, watched episodes, queue, cached show metadata,
-        manga reading list and reading progress, TV watchlist and watch progress) to start fresh.
-        Your settings, sync state and the offline metadata cache are preserved.
+        manga reading list and reading progress, TV watchlist and watch progress, ASMR listening
+        list and listening progress) to start fresh. Your settings, sync state and the offline
+        metadata cache are preserved.
       </p>
       <Button variant="danger" onClick={openModal}>
         Clear Library Data

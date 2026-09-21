@@ -141,6 +141,16 @@ export const MangaLibraryRepository = {
       [status, id]
     ),
 
+  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(', ')
+    dbRun(
+      db,
+      `UPDATE manga_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id IN (${placeholders})`,
+      [status, ...ids]
+    )
+  },
+
   touchProgress: (
     db: DatabaseWrapper,
     id: string,
@@ -229,6 +239,12 @@ export const MangaProgressRepository = {
 
   deleteByManga: (db: DatabaseWrapper, mangaId: string) =>
     dbRun(db, 'DELETE FROM manga_progress WHERE mangaId = ?', [mangaId]),
+
+  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(', ')
+    dbRun(db, `DELETE FROM manga_progress WHERE mangaId IN (${placeholders})`, ids)
+  },
 
   deleteChapter: (db: DatabaseWrapper, mangaId: string, chapterId: string) =>
     dbRun(db, 'DELETE FROM manga_progress WHERE mangaId = ? AND chapterId = ?', [

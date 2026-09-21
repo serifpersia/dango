@@ -152,7 +152,9 @@ const Header: React.FC = () => {
       ? 'Search manga...'
       : contentType === 'tv'
         ? 'Search TV & movies...'
-        : 'Search anime...'
+        : contentType === 'asmr'
+          ? 'Search ASMR...'
+          : 'Search anime...'
 
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -163,6 +165,8 @@ const Header: React.FC = () => {
       navigate(`/manga?q=${encodeURIComponent(trimmed)}`)
     } else if (contentType === 'tv') {
       navigate(`/tv-search?q=${encodeURIComponent(trimmed)}`)
+    } else if (contentType === 'asmr') {
+      navigate(`/asmr?q=${encodeURIComponent(trimmed)}`)
     } else {
       navigate(`/search?query=${encodeURIComponent(trimmed)}`)
     }

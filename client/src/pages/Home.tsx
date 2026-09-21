@@ -27,10 +27,13 @@ import { useContentType, type ContentType } from '../contexts/ContentTypeContext
 import OptionTabs from '../components/common/OptionTabs'
 import MangaHome from '../components/manga/MangaHome'
 import TvHome from '../components/tv/TvHome'
+import AsmrHome from '../components/asmr/AsmrHome'
 import TvSpotlightBanner from '../components/tv/TvSpotlightBanner'
 import MangaSpotlightBanner from '../components/manga/MangaSpotlightBanner'
+import AsmrSpotlightBanner from '../components/asmr/AsmrSpotlightBanner'
 import { useTvTrending } from '../hooks/useTv'
 import { useMangaTrending } from '../hooks/useManga'
+import { useAsmrSpotlight } from '../hooks/useAsmr'
 import { fetchApi } from '../lib/fetchApi'
 import styles from './Home.module.css'
 
@@ -113,6 +116,7 @@ const Home: React.FC = () => {
 
   const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
   const { data: tvTrending } = useTvTrending('all', 'week', 1, contentType === 'tv')
+  const { data: asmrSpotlight } = useAsmrSpotlight(contentType === 'asmr')
   const { data: mangaTrending } = useMangaTrending()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
@@ -326,6 +330,10 @@ const Home: React.FC = () => {
         <MangaSpotlightBanner mangaList={mangaTrending} />
       )}
 
+      {contentType === 'asmr' && asmrSpotlight && asmrSpotlight.length > 0 && (
+        <AsmrSpotlightBanner works={asmrSpotlight} />
+      )}
+
       <OptionTabs
         ariaLabel="Content type"
         options={CONTENT_OPTIONS}
@@ -338,23 +346,7 @@ const Home: React.FC = () => {
       ) : contentType === 'tv' ? (
         <TvHome />
       ) : contentType === 'asmr' ? (
-        <div className={styles.emptyState} style={{ marginTop: '2rem' }}>
-          <Icon name="headphones" size={48} className={styles.emptyStateIcon} />
-          <div>
-            <h3 className={styles.emptyStateTitle}>ASMR tracking is coming soon</h3>
-            <p className={styles.emptyStateText}>
-              Library, progress, and sync for this section will follow the same pattern as manga.
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setContentType('anime')}
-            style={{ marginTop: '1rem' }}
-          >
-            Back to Anime
-          </Button>
-        </div>
+        <AsmrHome />
       ) : (
         <>
           <AnimeSection

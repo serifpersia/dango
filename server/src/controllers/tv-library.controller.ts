@@ -228,4 +228,59 @@ export class TvLibraryController {
       res.status(500).json({ error: 'Failed to reset progress' })
     }
   }
+
+  batchUpdateStatus = async (req: Request, res: Response) => {
+    const { ids: idsRaw, status } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    if (!status || !(TV_STATUSES as string[]).includes(status)) {
+      return res.status(400).json({ error: 'a valid status is required' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performTvWriteTransaction(tvDb(req), (tx) => {
+        TvLibraryRepository.updateStatusMany(tx, ids, String(status))
+      })
+      res.json({ success: true, updated: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch update TV status')
+      res.status(500).json({ error: 'Failed to update statuses' })
+    }
+  }
+
+  batchRemove = async (req: Request, res: Response) => {
+    const { ids: idsRaw } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performTvWriteTransaction(tvDb(req), (tx) => {
+        TvLibraryRepository.deleteMany(tx, ids)
+        TvProgressRepository.deleteMany(tx, ids)
+      })
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch remove TV titles')
+      res.status(500).json({ error: 'Failed to remove from TV watchlist' })
+    }
+  }
+
+  batchRemoveProgress = async (req: Request, res: Response) => {
+    const { ids: idsRaw } = req.body ?? {}
+    if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' })
+    }
+    const ids = idsRaw.map((id) => String(id))
+    try {
+      await performTvWriteTransaction(tvDb(req), (tx) => {
+        TvProgressRepository.deleteMany(tx, ids)
+      })
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to batch remove TV progress')
+      res.status(500).json({ error: 'Failed to reset progress' })
+    }
+  }
 }

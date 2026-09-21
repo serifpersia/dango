@@ -1,6 +1,13 @@
 import React, { useMemo } from 'react'
 import Icon from '../common/Icon'
 import { useAsmrWork } from '../../hooks/useAsmr'
+import {
+  useAsmrLibraryCheck,
+  useAsmrProgress,
+  useToggleAsmrBookmark,
+} from '../../hooks/useAsmrLibrary'
+import { asmrWorkId } from '../../lib/asmr'
+import { formatTime } from '../../lib/utils'
 import type { AsmrTrack, AsmrWork } from '../../hooks/useAsmr'
 import styles from './Asmr.module.css'
 
@@ -13,6 +20,11 @@ interface AsmrDetailProps {
 
 const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => {
   const { data, isLoading } = useAsmrWork(work.id || null)
+  const workId = asmrWorkId(work)
+  const { data: libraryCheck } = useAsmrLibraryCheck(workId || undefined)
+  const { toggle: toggleBookmark, bookmarkedIds } = useToggleAsmrBookmark()
+  const { data: progressData } = useAsmrProgress(workId || undefined)
+  const bookmarked = workId ? bookmarkedIds.has(workId) : !!libraryCheck?.inLibrary
 
   const metaRows = useMemo(() => {
     return (data?.description || work.description || '')
@@ -26,6 +38,12 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
   }, [data?.description, work.description])
 
   const tracks = data?.tracks || []
+  const latestProgress = useMemo(() => {
+    const rows = progressData?.progress ?? []
+    return rows.length > 0 ? rows.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b)) : null
+  }, [progressData])
+  const resumeIndex =
+    latestProgress && latestProgress.trackIndex < tracks.length ? latestProgress.trackIndex : null
 
   return (
     <div className={styles.detailOverlay} onClick={onClose}>
@@ -92,11 +110,39 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
             ))}
         </div>
 
-        {!isLoading && tracks.length > 0 && (
-          <button className={styles.playAllBtn} onClick={() => onPlay(work, tracks, 0)}>
-            <Icon name="play" /> Play from start
-          </button>
-        )}
+        <div className={styles.detailActions}>
+          {!isLoading && tracks.length > 0 && (
+            <button className={styles.playAllBtn} onClick={() => onPlay(work, tracks, 0)}>
+              <Icon name="play" /> Play from start
+            </button>
+          )}
+
+          {!isLoading && resumeIndex !== null && latestProgress && (
+            <button className={styles.playAllBtn} onClick={() => onPlay(work, tracks, resumeIndex)}>
+              <Icon name="history" /> Resume track {resumeIndex + 1} ·{' '}
+              {formatTime(latestProgress.currentTime)}
+              {latestProgress.duration > 0 ? ` / ${formatTime(latestProgress.duration)}` : ''}
+            </button>
+          )}
+
+          {workId && (
+            <button
+              className={styles.playAllBtn}
+              onClick={() =>
+                toggleBookmark({
+                  rjCode: workId,
+                  title: work.name,
+                  thumbnail: work.thumbnail || '',
+                  isAdult: !!work.isAdult,
+                })
+              }
+              aria-pressed={bookmarked}
+            >
+              <Icon name={bookmarked ? 'check' : 'plus'} />{' '}
+              {bookmarked ? 'In listening list' : 'Add to listening list'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

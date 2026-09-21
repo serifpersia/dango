@@ -11,6 +11,7 @@ import {
   importTables,
   MANGA_SYNC_TABLES,
   TV_SYNC_TABLES,
+  ASMR_SYNC_TABLES,
   normalizePayload as normalizeGenericPayload,
   readPayloadVersion,
   type SyncPayload as GenericSyncPayload,
@@ -132,6 +133,10 @@ function getMangaSyncFilename() {
 
 function getTvSyncFilename() {
   return CONFIG.IS_DEV ? 'tv.sync.dev.json' : 'tv.sync.json'
+}
+
+function getAsmrSyncFilename() {
+  return CONFIG.IS_DEV ? 'asmr.sync.dev.json' : 'asmr.sync.json'
 }
 
 async function loadOctokit(token: string): Promise<OctokitInstance> {
@@ -334,6 +339,11 @@ class GitHubSyncService {
     return payload ? readPayloadVersion(payload) : 0
   }
 
+  async getAsmrRemoteVersion(): Promise<number> {
+    const payload = await this.fetchAsmrSyncPayload()
+    return payload ? readPayloadVersion(payload) : 0
+  }
+
   async syncUp(db: DatabaseWrapper): Promise<void> {
     const payload = await this.exportDatabase(db)
     const octokit = await this.getOctokit()
@@ -420,6 +430,37 @@ class GitHubSyncService {
     importTables(db, TV_SYNC_TABLES, payload, {
       libraryTables: ['tv_library', 'tv_progress'],
       backupName: 'pre-sync-tv-backup.db',
+    })
+    return readPayloadVersion(payload)
+  }
+
+  async syncAsmrUp(db: DatabaseWrapper): Promise<void> {
+    const payload = exportTables(db, ASMR_SYNC_TABLES)
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const existing = await this.getSyncFile(octokit, owner, getAsmrSyncFilename())
+    const content = Buffer.from(JSON.stringify(payload, null, 2), 'utf8').toString('base64')
+
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo: REPO_NAME,
+      path: getAsmrSyncFilename(),
+      message: `Sync dango ASMR data v${payload.version}`,
+      content,
+      sha: existing?.sha,
+      headers: GITHUB_API_HEADERS,
+    })
+  }
+
+  async syncAsmrDown(db: DatabaseWrapper): Promise<number> {
+    const payload = await this.fetchAsmrSyncPayload()
+    if (!payload) {
+      return 0
+    }
+
+    importTables(db, ASMR_SYNC_TABLES, payload, {
+      libraryTables: ['asmr_library', 'asmr_progress'],
+      backupName: 'pre-sync-asmr-backup.db',
     })
     return readPayloadVersion(payload)
   }
@@ -584,6 +625,20 @@ class GitHubSyncService {
     }
 
     return normalizeGenericPayload(JSON.parse(file.content), TV_SYNC_TABLES, 'GitHub TV')
+  }
+
+  private async fetchAsmrSyncPayload(): Promise<GenericSyncPayload<
+    (typeof ASMR_SYNC_TABLES)[number]
+  > | null> {
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const file = await this.getSyncFile(octokit, owner, getAsmrSyncFilename())
+
+    if (!file) {
+      return null
+    }
+
+    return normalizeGenericPayload(JSON.parse(file.content), ASMR_SYNC_TABLES, 'GitHub ASMR')
   }
 
   private async exportDatabase(db: DatabaseWrapper): Promise<SyncPayload> {

@@ -249,6 +249,70 @@ export const useRemoveTvProgress = () => {
   })
 }
 
+export const useBatchUpdateTvStatus = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      return fetchApi('/api/tv/library/batch-status', {
+        method: 'POST',
+        body: JSON.stringify({ ids, status }),
+      }) as Promise<{ success: boolean; updated: number }>
+    },
+    onSuccess: (data) => {
+      toast.success(`Status updated for ${data.updated ?? 0} items`)
+      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update statuses: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveTv = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      return fetchApi('/api/tv/library/remove-many', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }) as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from TV watchlist`)
+      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveTvProgress = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      return fetchApi('/api/tv/progress/remove-many', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }) as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
+      queryClient.invalidateQueries({ queryKey: ['tv-progress'] })
+      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reset progress: ${error.message}`)
+    },
+  })
+}
+
 export const useToggleTvBookmark = () => {
   const add = useAddTvBookmark()
   const remove = useRemoveTvBookmark()

@@ -228,6 +228,70 @@ export const useRemoveMangaProgress = () => {
   })
 }
 
+export const useBatchUpdateMangaStatus = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      return fetchApi('/api/manga/library/batch-status', {
+        method: 'POST',
+        body: JSON.stringify({ ids, status }),
+      }) as Promise<{ success: boolean; updated: number }>
+    },
+    onSuccess: (data) => {
+      toast.success(`Status updated for ${data.updated ?? 0} items`)
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update statuses: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveManga = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      return fetchApi('/api/manga/library/remove-many', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }) as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from reading list`)
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveMangaProgress = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      return fetchApi('/api/manga/progress/remove-many', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      }) as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
+      queryClient.invalidateQueries({ queryKey: ['manga-progress'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reset progress: ${error.message}`)
+    },
+  })
+}
+
 export const useToggleMangaBookmark = () => {
   const add = useAddMangaBookmark()
   const remove = useRemoveMangaBookmark()

@@ -28,7 +28,8 @@
 }
 
 .header-select {
-  width: 120px;
+  width: auto;
+  min-width: 120px;
   height: 34px;
   padding: 0 var(--space-3);
   padding-right: 2rem;

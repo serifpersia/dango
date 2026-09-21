@@ -149,7 +149,7 @@ const anilistMemoryCache = new Map<string, { data: unknown; expiry: number }>()
 const ANILIST_MEMORY_TTL = 60 * 60 * 1000
 const airedEpisodesCache = new Map<string, { data: unknown; expiry: number }>()
 const AIRED_EPISODES_TTL = 60 * 60 * 1000
-type AnilistResponse<T> = { data: T | null; errors?: { message: string }[] } | null
+export type AnilistResponse<T> = { data: T | null; errors?: { message: string }[] } | null
 const inFlightAnilistRequests = new Map<string, Promise<AnilistResponse<unknown>>>()
 
 export interface AnilistMedia {

@@ -29,6 +29,7 @@ const TvSearch = lazy(() => import('./pages/TvSearch'))
 const TvInfo = lazy(() => import('./pages/TvInfo'))
 const Tv = lazy(() => import('./pages/Tv'))
 const TvWatchlist = lazy(() => import('./pages/TvWatchlist'))
+const ListeningList = lazy(() => import('./pages/ListeningList'))
 const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
@@ -193,6 +194,7 @@ function App() {
               <Route path="/tv/:id/watch" element={<Tv />} />
               <Route path="/tv-search" element={<TvSearch />} />
               <Route path="/tv-watchlist/:filter?" element={<TvWatchlist />} />
+              <Route path="/listening-list/:filter?" element={<ListeningList />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/trackers" element={<Trackers />} />
               <Route path="/mal" element={<Navigate to="/trackers" replace />} />

@@ -17,6 +17,7 @@ import {
   importTables,
   MANGA_SYNC_TABLES,
   TV_SYNC_TABLES,
+  ASMR_SYNC_TABLES,
   normalizePayload,
   readPayloadVersion,
   type SyncPayload,
@@ -25,14 +26,16 @@ import {
 const log = logger.child({ module: 'Sync' })
 
 export const SYNC_TABLES = ANIME_SYNC_TABLES
-export { MANGA_SYNC_TABLES, TV_SYNC_TABLES }
+export { MANGA_SYNC_TABLES, TV_SYNC_TABLES, ASMR_SYNC_TABLES }
 
 export type SyncTable = (typeof SYNC_TABLES)[number]
 export type MangaSyncTable = (typeof MANGA_SYNC_TABLES)[number]
 export type TvSyncTable = (typeof TV_SYNC_TABLES)[number]
+export type AsmrSyncTable = (typeof ASMR_SYNC_TABLES)[number]
 export type AnimeSyncPayload = SyncPayload<SyncTable>
 export type MangaSyncPayload = SyncPayload<MangaSyncTable>
 export type TvSyncPayload = SyncPayload<TvSyncTable>
+export type AsmrSyncPayload = SyncPayload<AsmrSyncTable>
 // anime_id_map (offline MAL<->AniList metadata) is intentionally local-only:
 // it is rebuilt weekly from the upstream JSON dump and never synced.
 
@@ -55,6 +58,10 @@ async function exportTvSyncPayload(db: DatabaseWrapper): Promise<TvSyncPayload> 
   return exportTables(db, TV_SYNC_TABLES)
 }
 
+async function exportAsmrSyncPayload(db: DatabaseWrapper): Promise<AsmrSyncPayload> {
+  return exportTables(db, ASMR_SYNC_TABLES)
+}
+
 function importMangaSyncPayload(db: DatabaseWrapper, payload: MangaSyncPayload) {
   importTables(db, MANGA_SYNC_TABLES, payload, {
     libraryTables: ['manga_library', 'manga_progress'],
@@ -66,6 +73,13 @@ function importTvSyncPayload(db: DatabaseWrapper, payload: TvSyncPayload) {
   importTables(db, TV_SYNC_TABLES, payload, {
     libraryTables: ['tv_library', 'tv_progress'],
     backupName: 'pre-sync-tv-backup.db',
+  })
+}
+
+function importAsmrSyncPayload(db: DatabaseWrapper, payload: AsmrSyncPayload) {
+  importTables(db, ASMR_SYNC_TABLES, payload, {
+    libraryTables: ['asmr_library', 'asmr_progress'],
+    backupName: 'pre-sync-asmr-backup.db',
   })
 }
 
@@ -142,6 +156,17 @@ async function rcloneTvSyncUp(db: DatabaseWrapper, remoteFolder: string): Promis
   }
 }
 
+async function rcloneAsmrSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
+  const payload = await exportAsmrSyncPayload(db)
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_asmr_up.json`)
+  try {
+    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
+    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.ASMR_RCLONE_SYNC_FILENAME)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
 async function rcloneMangaSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_down.json`)
   try {
@@ -162,6 +187,19 @@ async function rcloneTvSyncDown(db: DatabaseWrapper, remoteFolder: string): Prom
     const content = await fs.readFile(tempPath, 'utf-8')
     const payload = normalizePayload(JSON.parse(content), TV_SYNC_TABLES, 'rclone tv')
     importTvSyncPayload(db, payload)
+    return readPayloadVersion(payload)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
+async function rcloneAsmrSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_asmr_down.json`)
+  try {
+    await rcloneService.downloadFile(remoteFolder, CONFIG.ASMR_RCLONE_SYNC_FILENAME, tempPath)
+    const content = await fs.readFile(tempPath, 'utf-8')
+    const payload = normalizePayload(JSON.parse(content), ASMR_SYNC_TABLES, 'rclone asmr')
+    importAsmrSyncPayload(db, payload)
     return readPayloadVersion(payload)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
@@ -310,6 +348,22 @@ export async function setLocalTvManifestVersion(version: number): Promise<void> 
   await fs.writeFile(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
 }
 
+export async function getLocalAsmrManifestVersion(): Promise<number> {
+  if (existsSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH)) {
+    try {
+      const content = await fs.readFile(CONFIG.ASMR_LOCAL_MANIFEST_PATH, 'utf-8')
+      return JSON.parse(content).version || 0
+    } catch {
+      return 0
+    }
+  }
+  return 0
+}
+
+export async function setLocalAsmrManifestVersion(version: number): Promise<void> {
+  await fs.writeFile(CONFIG.ASMR_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+}
+
 async function getRemoteManifestVersion(
   remoteFolder: string
 ): Promise<{ version: number; fileId?: string }> {
@@ -370,6 +424,30 @@ async function getTvRemoteManifestVersion(
     }
   } catch (err) {
     log.warn({ err }, 'Could not read remote TV manifest.')
+  }
+  return { version: 0 }
+}
+
+async function getAsmrRemoteManifestVersion(
+  remoteFolder: string
+): Promise<{ version: number; fileId?: string }> {
+  try {
+    if (activeProvider === 'github') {
+      if (!githubSyncService.isAuthenticated()) return { version: 0 }
+      return { version: await githubSyncService.getAsmrRemoteVersion() }
+    } else if (activeProvider === 'google') {
+      if (!googleDriveService.isAuthenticated()) return { version: 0 }
+      return { version: await googleDriveService.getAsmrRemoteVersion() }
+    } else if (activeProvider === 'rclone') {
+      return {
+        version: await getRcloneRemotePayloadVersion(
+          remoteFolder,
+          CONFIG.ASMR_RCLONE_SYNC_FILENAME
+        ),
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Could not read remote ASMR manifest.')
   }
   return { version: 0 }
 }
@@ -597,6 +675,24 @@ export async function performTvWriteTransaction(
   const newVersion = row?.value ?? 1
 
   await setLocalTvManifestVersion(newVersion)
+}
+
+export async function performAsmrWriteTransaction(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => void
+): Promise<void> {
+  db.serialize(() => {
+    runnable(db)
+    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalAsmrManifestVersion(newVersion)
 }
 
 export async function mangaSyncDownOnBoot(
@@ -885,6 +981,120 @@ export async function tvSyncUp(db: DatabaseWrapper, remoteFolderName: string): P
   }
 }
 
+export async function asmrSyncDownOnBoot(
+  db: DatabaseWrapper,
+  remoteFolderName: string
+): Promise<void> {
+  let localVersion = await getLocalAsmrManifestVersion()
+
+  if (localVersion === 0 && db) {
+    const row = dbGet<{ value: number }>(
+      db,
+      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+    )
+    localVersion = row?.value ?? 0
+    if (localVersion > 0) {
+      await setLocalAsmrManifestVersion(localVersion)
+    }
+  }
+
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    notifySyncStart(`Initial ASMR sync check (${activeProvider})`)
+    const { version: remoteVersion } = await getAsmrRemoteManifestVersion(remoteFolderName)
+    notifySyncEnd()
+
+    log.info(`ASMR Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
+
+    if (remoteVersion > localVersion) {
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        notifySyncStart(`Importing GitHub ASMR sync data (Remote v${remoteVersion})`)
+        const importedVersion = await githubSyncService.syncAsmrDown(db)
+        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('GitHub ASMR sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        notifySyncStart(`Importing Google ASMR sync data (Remote v${remoteVersion})`)
+        const importedVersion = await googleDriveService.syncAsmrDown(db)
+        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Google ASMR sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'rclone') {
+        notifySyncStart(`Importing Rclone ASMR sync data (Remote v${remoteVersion})`)
+        const importedVersion = await rcloneAsmrSyncDown(db, remoteFolderName)
+        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Rclone ASMR sync down complete.')
+        return
+      }
+    } else {
+      log.info('Local ASMR DB is up to date.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'ASMR sync boot error.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
+export async function asmrSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    const localVersion = await getLocalAsmrManifestVersion()
+    const { version: remoteVersion } = await getAsmrRemoteManifestVersion(remoteFolderName)
+
+    if (localVersion > remoteVersion) {
+      notifySyncStart(`Syncing ASMR up (Local v${localVersion})`)
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        await githubSyncService.syncAsmrUp(db)
+      } else if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        await googleDriveService.syncAsmrUp(db)
+      } else if (activeProvider === 'rclone') {
+        await rcloneAsmrSyncUp(db, remoteFolderName)
+      }
+
+      notifySyncEnd()
+      log.info('ASMR sync up complete.')
+    } else {
+      log.info('No ASMR changes to sync up or remote is newer.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'ASMR sync up failed.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
 export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrapper> {
   try {
     const db = await DatabaseWrapper.create(dbPath)
@@ -939,6 +1149,52 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
     return db
   } catch (err) {
     log.error({ err }, 'TV database opening error')
+    throw err
+  }
+}
+
+export async function initializeAsmrDatabase(dbPath: string): Promise<DatabaseWrapper> {
+  try {
+    const db = await DatabaseWrapper.create(dbPath)
+    db.configure('busyTimeout', 5000)
+
+    db.run('PRAGMA journal_mode = WAL;')
+    db.run('PRAGMA synchronous = NORMAL;')
+    db.run('PRAGMA cache_size = -20000;')
+    db.run('PRAGMA temp_store = MEMORY;')
+    db.run('PRAGMA mmap_size = 268435456;')
+    db.run('PRAGMA foreign_keys = ON;')
+
+    db.run(
+      `CREATE TABLE IF NOT EXISTS asmr_library (id TEXT PRIMARY KEY, rjCode TEXT NOT NULL, title TEXT, thumbnail TEXT, status TEXT DEFAULT 'Listening', isAdult INTEGER DEFAULT 0, lastTrackIndex INTEGER, lastTrackLabel TEXT, lastPosition REAL, updatedAt INTEGER)`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS asmr_progress (workId TEXT NOT NULL, trackIndex INTEGER NOT NULL, trackLabel TEXT, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (workId, trackIndex))`
+    )
+    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
+
+    db.run(`CREATE INDEX IF NOT EXISTS idx_asmr_library_status ON asmr_library(status)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_asmr_library_rjcode ON asmr_library(rjCode)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_asmr_progress_work ON asmr_progress(workId, updatedAt)`)
+
+    const asmrProgressColumns = db.all<{ name: string }>(`PRAGMA table_info(asmr_progress)`)
+    if (!asmrProgressColumns.some((c) => c.name === 'title')) {
+      db.run(`ALTER TABLE asmr_progress ADD COLUMN title TEXT`)
+    }
+    if (!asmrProgressColumns.some((c) => c.name === 'thumbnail')) {
+      db.run(`ALTER TABLE asmr_progress ADD COLUMN thumbnail TEXT`)
+    }
+    if (!asmrProgressColumns.some((c) => c.name === 'rjCode')) {
+      db.run(`ALTER TABLE asmr_progress ADD COLUMN rjCode TEXT`)
+    }
+    if (!asmrProgressColumns.some((c) => c.name === 'isAdult')) {
+      db.run(`ALTER TABLE asmr_progress ADD COLUMN isAdult INTEGER`)
+    }
+
+    return db
+  } catch (err) {
+    log.error({ err }, 'ASMR database opening error')
     throw err
   }
 }

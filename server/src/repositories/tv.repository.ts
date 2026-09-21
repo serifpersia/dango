@@ -142,6 +142,16 @@ export const TvLibraryRepository = {
       id,
     ]),
 
+  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(', ')
+    dbRun(
+      db,
+      `UPDATE tv_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id IN (${placeholders})`,
+      [status, ...ids]
+    )
+  },
+
   touchProgress: (db: DatabaseWrapper, id: string, progress: { season: number; episode: number }) =>
     dbRun(
       db,
@@ -151,6 +161,12 @@ export const TvLibraryRepository = {
 
   delete: (db: DatabaseWrapper, id: string) =>
     dbRun(db, 'DELETE FROM tv_library WHERE id = ?', [id]),
+
+  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(', ')
+    dbRun(db, `DELETE FROM tv_library WHERE id IN (${placeholders})`, ids)
+  },
 }
 
 export const TvProgressRepository = {
@@ -228,6 +244,12 @@ export const TvProgressRepository = {
 
   deleteByMedia: (db: DatabaseWrapper, mediaId: string) =>
     dbRun(db, 'DELETE FROM tv_progress WHERE mediaId = ?', [mediaId]),
+
+  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
+    if (ids.length === 0) return
+    const placeholders = ids.map(() => '?').join(', ')
+    dbRun(db, `DELETE FROM tv_progress WHERE mediaId IN (${placeholders})`, ids)
+  },
 
   deleteEpisode: (db: DatabaseWrapper, mediaId: string, season: number, episode: number) =>
     dbRun(db, 'DELETE FROM tv_progress WHERE mediaId = ? AND season = ? AND episode = ?', [

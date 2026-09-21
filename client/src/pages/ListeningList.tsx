@@ -4,57 +4,61 @@ import Icon from '../components/common/Icon'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import ErrorMessage from '../components/common/ErrorMessage'
 import MediaCard from '../components/common/MediaCard'
-import { Modal } from '../components/common/Modal'
-import { Button } from '../components/common/Button'
-import TvPopup from '../components/tv/TvPopup'
+import AsmrPopup from '../components/asmr/AsmrPopup'
+import { useAsmrPopup } from '../hooks/useAsmrPopup'
+import AsmrResetProgressModal from '../components/asmr/AsmrResetProgressModal'
 import { formatTime } from '../lib/utils'
-import { isTvAdult, tvWatchPath } from '../lib/tv'
 import {
-  useTvLibrary,
-  useTvContinueWatching,
-  useRemoveTvBookmark,
-  useRemoveTvProgress,
-  useUpdateTvStatus,
-  useBatchUpdateTvStatus,
-  useBatchRemoveTv,
-  useBatchRemoveTvProgress,
-  TV_LIBRARY_STATUSES,
-  type ContinueWatchingTvItem,
-  type TvLibraryItem,
-} from '../hooks/useTvLibrary'
+  useAsmrLibrary,
+  useAsmrContinueListening,
+  useRemoveAsmrBookmark,
+  useUpdateAsmrStatus,
+  useToggleAsmrBookmark,
+  useBatchUpdateAsmrStatus,
+  useBatchRemoveAsmr,
+  useBatchRemoveAsmrProgress,
+  asmrLibraryId,
+  ASMR_LIBRARY_STATUSES,
+  type ContinueListeningItem,
+  type AsmrLibraryItem,
+} from '../hooks/useAsmrLibrary'
 import styles from './Watchlist.module.css'
 
-const FILTERS = ['All', 'Continue Watching', ...TV_LIBRARY_STATUSES]
+const FILTERS = ['All', 'Continue Listening', ...ASMR_LIBRARY_STATUSES]
 
 const PAGE_SIZE = 24
 
 type GridEntry = {
   key: string
-  libId: string
-  tmdbId: number
-  mediaType: string
+  rjCode: string
   title: string
-  poster: string
-  year?: string | null
-  adult: boolean
+  thumbnail: string
   status: string
-  badge?: string
+  isAdult: boolean
+  trackLabel?: string
   progressPercent?: number
   progressLabel?: string
-  watchTarget: string
+  detailTarget: string
+  libId: string
 }
 
-export default function TvWatchlist() {
+function continueLabel(item: ContinueListeningItem): string | undefined {
+  const current = item.currentTime ?? 0
+  const total = item.duration ?? 0
+  const trackNo = (item.trackIndex ?? 0) + 1
+  if (total > 0) return `Track ${trackNo} · ${formatTime(current)} / ${formatTime(total)}`
+  return `Track ${trackNo}`
+}
+
+export default function ListeningList() {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [manageMode, setManageMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
-  const [alsoRemoveFromWatchlist, setAlsoRemoveFromWatchlist] = useState(false)
 
   useEffect(() => {
-    document.title = 'TV Watchlist - dango'
+    document.title = 'Listening List - dango'
   }, [])
 
   useEffect(() => {
@@ -62,15 +66,17 @@ export default function TvWatchlist() {
     setSelectedIds(new Set())
   }, [filterBy])
 
-  const isCW = filterBy === 'Continue Watching'
-  const libraryQuery = useTvLibrary(isCW ? 'All' : filterBy, page, PAGE_SIZE)
-  const cwQuery = useTvContinueWatching(100)
-  const removeBookmark = useRemoveTvBookmark()
-  const removeProgress = useRemoveTvProgress()
-  const updateStatus = useUpdateTvStatus()
-  const bulkUpdateStatus = useBatchUpdateTvStatus()
-  const bulkRemove = useBatchRemoveTv()
-  const bulkResetProgress = useBatchRemoveTvProgress()
+  const isCL = filterBy === 'Continue Listening'
+  const libraryQuery = useAsmrLibrary(isCL ? 'All' : filterBy, page, PAGE_SIZE)
+  const clQuery = useAsmrContinueListening(100)
+  const removeBookmark = useRemoveAsmrBookmark()
+  const updateStatus = useUpdateAsmrStatus()
+  const { toggle, bookmarkedIds } = useToggleAsmrBookmark()
+  const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useAsmrPopup()
+  const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
+  const bulkUpdateStatus = useBatchUpdateAsmrStatus()
+  const bulkRemove = useBatchRemoveAsmr()
+  const bulkResetProgress = useBatchRemoveAsmrProgress()
 
   const toggleManageMode = () => {
     setManageMode((prev) => {
@@ -89,58 +95,50 @@ export default function TvWatchlist() {
   }
 
   const entries: GridEntry[] = useMemo(() => {
-    if (isCW) {
-      return (cwQuery.data?.data ?? []).map((item: ContinueWatchingTvItem) => {
-        const ct = item.currentTime ?? 0
-        const dur = item.duration ?? 0
-        const s = item.season ?? item.lastSeason ?? 1
-        const e = item.episode ?? item.lastEpisode ?? 1
+    if (isCL) {
+      return (clQuery.data?.data ?? []).map((item: ContinueListeningItem) => {
+        const current = item.currentTime ?? 0
+        const total = item.duration ?? 0
+        const rj = item.rjCode || item.id
         return {
           key: item.id,
-          libId: item.id,
-          tmdbId: item.tmdbId,
-          mediaType: item.mediaType,
+          rjCode: rj,
           title: item.title,
-          poster: item.poster || '',
-          year: item.year,
-          adult: isTvAdult({ adult: item.adult === 1 }),
+          thumbnail: item.thumbnail || '',
           status: item.status,
-          badge: `S${s} E${e}`,
-          progressPercent: dur > 0 ? (ct / dur) * 100 : 0,
-          progressLabel:
-            dur > 0 ? `S${s} E${e} · ${formatTime(ct)} / ${formatTime(dur)}` : `S${s} E${e}`,
-          watchTarget: tvWatchPath(item.mediaType, item.tmdbId, s, e),
+          isAdult: !!item.isAdult,
+          trackLabel: `Track ${(item.trackIndex ?? 0) + 1}`,
+          progressPercent: total > 0 ? Math.min(100, (current / total) * 100) : 0,
+          progressLabel: continueLabel(item),
+          detailTarget: `/asmr/${encodeURIComponent(rj)}`,
+          libId: item.id,
         }
       })
     }
-    return ((libraryQuery.data?.data ?? []) as TvLibraryItem[]).map((item) => ({
-      key: item.id,
-      libId: item.id,
-      tmdbId: item.tmdbId,
-      mediaType: item.mediaType,
-      title: item.title,
-      poster: item.poster || '',
-      year: item.year,
-      adult: isTvAdult({ adult: item.adult === 1 }),
-      status: item.status,
-      badge:
-        item.lastSeason && item.lastEpisode
-          ? `S${item.lastSeason} E${item.lastEpisode}`
-          : undefined,
-      progressPercent: undefined,
-      progressLabel: undefined,
-      watchTarget: tvWatchPath(
-        item.mediaType,
-        item.tmdbId,
-        item.lastSeason ?? undefined,
-        item.lastEpisode ?? undefined
-      ),
-    }))
-  }, [isCW, cwQuery.data, libraryQuery.data])
+    return ((libraryQuery.data?.data ?? []) as AsmrLibraryItem[]).map((item) => {
+      const rj = item.rjCode || item.id
+      return {
+        key: item.id,
+        rjCode: rj,
+        title: item.title,
+        thumbnail: item.thumbnail || '',
+        status: item.status,
+        isAdult: !!item.isAdult,
+        trackLabel:
+          item.lastTrackIndex !== null && item.lastTrackIndex !== undefined
+            ? `Track ${item.lastTrackIndex + 1}`
+            : undefined,
+        progressPercent: undefined,
+        progressLabel: undefined,
+        detailTarget: `/asmr/${encodeURIComponent(rj)}`,
+        libId: item.id,
+      }
+    })
+  }, [isCL, clQuery.data, libraryQuery.data])
 
-  const total = isCW ? (cwQuery.data?.total ?? 0) : (libraryQuery.data?.total ?? 0)
-  const isLoading = isCW ? cwQuery.isLoading : libraryQuery.isLoading
-  const error = isCW ? cwQuery.error : libraryQuery.error
+  const total = isCL ? (clQuery.data?.total ?? 0) : (libraryQuery.data?.total ?? 0)
+  const isLoading = isCL ? clQuery.isLoading : libraryQuery.isLoading
+  const error = isCL ? clQuery.error : libraryQuery.error
 
   const pageIds = entries.map((entry) => entry.libId)
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -165,7 +163,7 @@ export default function TvWatchlist() {
 
   const handleBulkAction = () => {
     if (selectedIds.size === 0) return
-    if (isCW) {
+    if (isCL) {
       bulkResetProgress.mutate([...selectedIds])
     } else {
       bulkRemove.mutate([...selectedIds])
@@ -173,19 +171,11 @@ export default function TvWatchlist() {
     setSelectedIds(new Set())
   }
 
-  const handleConfirmReset = () => {
-    if (!resetTarget) return
-    removeProgress.mutate({ mediaId: resetTarget.libId })
-    if (alsoRemoveFromWatchlist) removeBookmark.mutate(resetTarget.libId)
-    setResetTarget(null)
-    setAlsoRemoveFromWatchlist(false)
-  }
-
   return (
     <div className="page-container">
       <header className={styles.header}>
-        <h2 className={styles.title}>My TV Watchlist</h2>
-        <p className={styles.subtitle}>Track and manage your movies and shows</p>
+        <h2 className={styles.title}>My Listening List</h2>
+        <p className={styles.subtitle}>Track and manage your ASMR collection</p>
       </header>
 
       <div className={styles.controls}>
@@ -194,7 +184,7 @@ export default function TvWatchlist() {
             <button
               key={f}
               className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
-              onClick={() => navigate(`/tv-watchlist/${f === 'All' ? '' : f}`)}
+              onClick={() => navigate(`/listening-list/${f === 'All' ? '' : f}`)}
             >
               {f}
             </button>
@@ -252,7 +242,7 @@ export default function TvWatchlist() {
           </button>
           <span className={styles.manageCount}>{selectedIds.size} selected</span>
           <div className={styles.manageSpacer} />
-          {!isCW && (
+          {!isCL && (
             <select
               className={styles.manageStatusSelect}
               value=""
@@ -265,7 +255,7 @@ export default function TvWatchlist() {
               title="Set status for selected items"
             >
               <option value="">Set status…</option>
-              {TV_LIBRARY_STATUSES.map((s) => (
+              {ASMR_LIBRARY_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -278,7 +268,7 @@ export default function TvWatchlist() {
             disabled={selectedIds.size === 0}
           >
             <Icon name="trash" size={13} />
-            <span>{isCW ? 'Reset Selected' : 'Remove Selected'}</span>
+            <span>{isCL ? 'Reset Selected' : 'Remove Selected'}</span>
           </button>
         </div>
       )}
@@ -289,13 +279,15 @@ export default function TvWatchlist() {
         <ErrorMessage message={(error as Error).message} />
       ) : entries.length === 0 ? (
         <div className={styles.emptyState}>
-          <h3 className={styles.emptyTitle}>Your TV watchlist is looking a bit empty</h3>
+          <h3 className={styles.emptyTitle}>Your listening list is looking a bit lonely</h3>
           <p className={styles.emptyText}>
-            {filterBy !== 'All' ? 'No titles match this filter.' : "Let's find something to watch!"}
+            {filterBy !== 'All'
+              ? 'No works match this filter.'
+              : "Let's find something to listen to!"}
           </p>
-          <button className={styles.emptyBtn} onClick={() => navigate('/tv')}>
+          <button className={styles.emptyBtn} onClick={() => navigate('/asmr')}>
             <Icon name="search" size={14} />
-            <span>Browse TV & Movies</span>
+            <span>Browse ASMR</span>
           </button>
         </div>
       ) : (
@@ -320,40 +312,45 @@ export default function TvWatchlist() {
                 item={{
                   id: entry.libId,
                   title: entry.title,
-                  thumbnail: entry.poster,
-                  typeBadge: entry.mediaType === 'movie' ? 'Movie' : 'TV',
-                  chapterBadge: entry.badge ?? null,
-                  isAdult: entry.adult,
+                  thumbnail: entry.thumbnail,
+                  typeBadge: entry.rjCode || undefined,
+                  chapterBadge: entry.trackLabel ?? null,
+                  isAdult: entry.isAdult,
                 }}
-                linkTo={entry.watchTarget}
-                hoverIcon="play"
+                linkTo={entry.detailTarget}
+                hoverIcon="info"
+                layout="horizontal"
+                showInfoButton={!isCL}
                 progress={
                   entry.progressPercent !== undefined && entry.progressLabel
                     ? { percent: entry.progressPercent, label: entry.progressLabel }
                     : undefined
                 }
-                showProgress={isCW}
-                metaRow={
-                  entry.year ? <span style={{ opacity: 0.75 }}>{entry.year}</span> : undefined
+                showProgress={isCL}
+                display={{
+                  elements: {
+                    poster: { typeBadge: true, chapterBadge: true, adultBadge: true },
+                    info: { title: true, mobileBadges: true, progress: true, meta: false },
+                  },
+                }}
+                onRemove={isCL ? () => setResetTarget(entry) : undefined}
+                onOpenDetails={
+                  isCL
+                    ? undefined
+                    : (rect) =>
+                        openPopup(rect, {
+                          rjCode: entry.rjCode,
+                          title: entry.title,
+                          thumbnail: entry.thumbnail,
+                          isAdult: entry.isAdult,
+                          listenTarget: entry.detailTarget,
+                          progressLabel: entry.progressLabel,
+                        })
                 }
-                onRemove={isCW ? () => setResetTarget(entry) : undefined}
-                renderPopup={(anchorRect, helpers) => (
-                  <TvPopup
-                    item={{
-                      id: entry.tmdbId ?? 0,
-                      title: entry.title || '',
-                      year: entry.year || '',
-                      type: entry.mediaType || 'tv',
-                      image: entry.poster || '',
-                    }}
-                    anchorRect={anchorRect}
-                    onMouseEnter={helpers.onMouseEnter}
-                    onMouseLeave={helpers.onMouseLeave}
-                    onRequestClose={helpers.close}
-                  />
-                )}
+                onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
+                rawThumbnail
               />
-              {!isCW && !manageMode && (
+              {!isCL && !manageMode && (
                 <div className={styles.cardActions}>
                   <select
                     className={styles.statusSelect}
@@ -362,7 +359,7 @@ export default function TvWatchlist() {
                       updateStatus.mutate({ id: entry.libId, status: e.currentTarget.value })
                     }
                   >
-                    {TV_LIBRARY_STATUSES.map((s) => (
+                    {ASMR_LIBRARY_STATUSES.map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>
@@ -371,8 +368,8 @@ export default function TvWatchlist() {
                   <button
                     className={styles.removeBtn}
                     onClick={() => removeBookmark.mutate(entry.libId)}
-                    title="Remove from TV Watchlist"
-                    aria-label="Remove from TV Watchlist"
+                    title="Remove from Listening List"
+                    aria-label="Remove from Listening List"
                   >
                     <Icon name="trash" size={12} />
                   </button>
@@ -409,43 +406,29 @@ export default function TvWatchlist() {
         </div>
       )}
 
-      <Modal
-        isOpen={!!resetTarget}
-        onClose={() => {
-          setResetTarget(null)
-          setAlsoRemoveFromWatchlist(false)
-        }}
-        title="Reset Progress"
-      >
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove your watch progress for &quot;{resetTarget?.title}
-            &quot;?
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={alsoRemoveFromWatchlist}
-              onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
-            />
-            Also remove from my TV watchlist
-          </label>
-        </Modal.Body>
-        <Modal.Actions>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setResetTarget(null)
-              setAlsoRemoveFromWatchlist(false)
-            }}
-          >
-            No
-          </Button>
-          <Button variant="danger" onClick={handleConfirmReset}>
-            Yes
-          </Button>
-        </Modal.Actions>
-      </Modal>
+      <AsmrResetProgressModal
+        workId={resetTarget ? resetTarget.libId : null}
+        title={resetTarget?.title}
+        onClose={() => setResetTarget(null)}
+      />
+      {popup && (
+        <AsmrPopup
+          data={popup.data}
+          anchorRect={popup.rect}
+          bookmarked={bookmarkedIds.has(asmrLibraryId(popup.data.rjCode))}
+          onToggleBookmark={() =>
+            toggle({
+              rjCode: popup.data.rjCode,
+              title: popup.data.title,
+              thumbnail: popup.data.thumbnail || '',
+              isAdult: popup.data.isAdult,
+            })
+          }
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          onRequestClose={closePopup}
+        />
+      )}
     </div>
   )
 }
