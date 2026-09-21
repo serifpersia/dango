@@ -349,7 +349,7 @@ class DiscordRPCService {
             : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
           largeImageKey: imageKey,
           largeImageText: data.title,
-          ...(imageKey !== 'logo' ? { smallImageKey: 'logo', smallImageText: 'dango' } : {}),
+          ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
           type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
           statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
@@ -384,7 +384,7 @@ class DiscordRPCService {
           : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
         largeImageKey: imageKey,
         largeImageText: data.title,
-        ...(imageKey !== 'logo' ? { smallImageKey: 'logo', smallImageText: 'dango' } : {}),
+        ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
         type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [

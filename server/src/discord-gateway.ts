@@ -155,7 +155,12 @@ class DiscordGatewayService {
       if (CONFIG.DISCORD_CLIENT_ID) {
         const proxied = await this.getExternalAsset(imageUrl)
         if (proxied) {
-          assets = { large_image: proxied, large_text: data.title.slice(0, 128) }
+          assets = {
+            large_image: proxied,
+            large_text: data.title.slice(0, 128),
+            small_image: 'small',
+            small_text: 'dango',
+          }
         } else {
           assets = { large_image: 'logo', large_text: data.title.slice(0, 128) }
         }
@@ -257,6 +262,9 @@ class DiscordGatewayService {
                 state: label.state,
                 details: label.details,
                 ...(CONFIG.DISCORD_CLIENT_ID ? { application_id: CONFIG.DISCORD_CLIENT_ID } : {}),
+                ...(CONFIG.DISCORD_CLIENT_ID
+                  ? { assets: { large_image: 'logo', large_text: 'dango' } }
+                  : {}),
                 buttons: ['Learn More'],
                 metadata: { button_urls: ['https://github.com/serifpersia/dango'] },
                 status_display_type: 2,
