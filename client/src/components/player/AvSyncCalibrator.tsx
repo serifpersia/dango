@@ -1,166 +1,116 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Modal } from '../common/Modal'
+import React from 'react'
 import { Button } from '../common/Button'
 import { MenuSlider } from './MenuControls'
-import useDelayCanvas from '../../hooks/useDelayCanvas'
 
 interface AvSyncCalibratorProps {
   isOpen: boolean
-  initialMs: number
-  onApply: (ms: number) => void
+  ms: number
+  onChange: (ms: number) => void
+  onApply: () => void
   onClose: () => void
+  testClipActive: boolean
+  onTestClip: () => void
 }
 
 const STEP_MS = 10
 const MAX_MS = 500
-const TEST_CLIP = '/av-sync-test.mp4'
+
+const clamp = (v: number) => Math.max(0, Math.min(MAX_MS, Math.round(v)))
 
 const AvSyncCalibrator: React.FC<AvSyncCalibratorProps> = ({
   isOpen,
-  initialMs,
+  ms,
+  onChange,
   onApply,
   onClose,
+  testClipActive,
+  onTestClip,
 }) => {
-  const [tempMs, setTempMs] = useState(initialMs)
-  const [videoFailed, setVideoFailed] = useState(false)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-
-  useDelayCanvas({
-    videoRef,
-    canvasRef,
-    delayMs: tempMs,
-    enabled: isOpen && !videoFailed,
-  })
-
-  useEffect(() => {
-    if (isOpen) {
-      setTempMs(Math.max(0, Math.min(MAX_MS, Math.round(initialMs))))
-      setVideoFailed(false)
-    }
-  }, [isOpen, initialMs])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const video = videoRef.current
-    if (!video) return
-    video.currentTime = 0
-    const start = () => {
-      video.play().catch(() => {})
-    }
-    if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) start()
-    else {
-      video.addEventListener('canplay', start, { once: true })
-      return () => video.removeEventListener('canplay', start)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) {
-      const video = videoRef.current
-      if (video) {
-        video.pause()
-        try {
-          video.currentTime = 0
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }, [isOpen])
-
-  const clamp = (v: number) => Math.max(0, Math.min(MAX_MS, Math.round(v)))
+  if (!isOpen) return null
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Calibrate A/V sync">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        {!videoFailed ? (
-          <button
-            type="button"
-            aria-label="Replay test clip"
-            onClick={() => videoRef.current?.play().catch(() => {})}
-            style={{
-              width: '100%',
-              maxWidth: 420,
-              aspectRatio: '16 / 9',
-              padding: 0,
-              border: '1px solid var(--glass-border)',
-              borderRadius: 'var(--radius-md)',
-              overflow: 'hidden',
-              background: 'black',
-              cursor: 'pointer',
-            }}
-          >
-            <video
-              ref={videoRef}
-              src={TEST_CLIP}
-              loop
-              playsInline
-              preload="auto"
-              onError={() => setVideoFailed(true)}
-              style={{ display: 'none' }}
-            />
-            <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
-          </button>
-        ) : (
-          <div
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-tertiary)',
-              textAlign: 'center',
-              maxWidth: 320,
-            }}
-          >
-            Test clip failed to load. You can still set the delay manually below.
-          </div>
-        )}
-        <div
-          style={{
-            fontSize: '0.85rem',
-            color: 'var(--text-tertiary)',
-            textAlign: 'center',
-            maxWidth: 340,
-          }}
-        >
-          The circle flashes white with a click every second. Adjust ms until the flash lands
-          exactly on the heard click — this runs through the same video-delay pipeline as playback.
-          The clip loops, so judge the average over several beats.
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button
-            onClick={() => setTempMs((v) => clamp(v - STEP_MS))}
-            aria-label="Decrease delay by 10 milliseconds"
-          >
-            − {STEP_MS}ms
-          </Button>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, minWidth: 90, textAlign: 'center' }}>
-            {tempMs}ms
-          </div>
-          <Button
-            onClick={() => setTempMs((v) => clamp(v + STEP_MS))}
-            aria-label="Increase delay by 10 milliseconds"
-          >
-            + {STEP_MS}ms
-          </Button>
-        </div>
-        <div style={{ width: '100%' }}>
-          <MenuSlider
-            label="Video delay"
-            display={`${tempMs}ms`}
-            min={0}
-            max={MAX_MS}
-            step={5}
-            value={tempMs}
-            percent={(tempMs / MAX_MS) * 100}
-            onChange={(v) => setTempMs(clamp(v))}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={() => onApply(tempMs)}>Use {tempMs}ms</Button>
-        </div>
+    <div
+      role="dialog"
+      aria-label="Calibrate audio video sync"
+      data-speed-boost-ignore="true"
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        right: 8,
+        bottom: 112,
+        width: 'min(260px, calc(100% - 16px))',
+        maxHeight: 'calc(100% - 124px)',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        zIndex: 60,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        padding: 12,
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--glass-border)',
+        background: 'rgba(18, 18, 22, 0.95)',
+        boxShadow: 'var(--glass-shadow)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+        A/V sync
       </div>
-    </Modal>
+      <div>
+        <Button size="sm" variant="secondary" onClick={onTestClip}>
+          {testClipActive ? 'Back to video' : 'Preview test clip'}
+        </Button>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Button
+          size="sm"
+          onClick={() => onChange(clamp(ms - STEP_MS))}
+          aria-label="Decrease delay by 10 milliseconds"
+        >
+          − {STEP_MS}ms
+        </Button>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, minWidth: 64, textAlign: 'center' }}>
+          {ms}ms
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onChange(clamp(ms + STEP_MS))}
+          aria-label="Increase delay by 10 milliseconds"
+        >
+          + {STEP_MS}ms
+        </Button>
+      </div>
+      <MenuSlider
+        label="Video delay"
+        display={`${ms}ms`}
+        min={0}
+        max={MAX_MS}
+        step={5}
+        value={ms}
+        percent={(ms / MAX_MS) * 100}
+        onChange={(v) => onChange(clamp(v))}
+      />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Button size="sm" variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={onApply}>
+          Apply {ms}ms
+        </Button>
+      </div>
+    </div>
   )
 }
 

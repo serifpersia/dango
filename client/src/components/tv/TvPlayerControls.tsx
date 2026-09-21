@@ -11,24 +11,16 @@ import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyl
 import AvSyncMenu from '../player/AvSyncMenu'
 import AudioTrackMenu from '../player/AudioTrackMenu'
 import OptionListMenu from '../player/OptionListMenu'
-import {
-  buildCueCss,
-  loadSubtitleStyle,
-  type SubtitleEdge,
-  type SubtitleStyleSettings,
-} from '../../lib/subtitleStyle'
-import {
-  toggleFullscreen as toggleFullscreenCrossBrowser,
-  isFullscreenActive,
-  subscribeFullscreen,
-} from '../../lib/fullscreen'
+import type useVideoPlayer from '../../hooks/useVideoPlayer'
+import { buildCueCss, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
 
 type SettingsView =
   'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
 
 interface TvPlayerControlsProps {
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  player: ReturnType<typeof useVideoPlayer>
   title: string
+  episodeLabel?: string
   audioTracks: { language: string; label: string }[]
   selectedAudioTrack: number
   onAudioTrackChange: (index: number) => void
@@ -52,8 +44,9 @@ interface TvPlayerControlsProps {
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
-  videoRef,
+  player,
   title,
+  episodeLabel,
   audioTracks,
   selectedAudioTrack,
   onAudioTrackChange,
@@ -75,31 +68,19 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   onVideoDelayChange,
   onCalibrateAvSync,
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [showControls, setShowControls] = useState(true)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-  const [volume, setVolume] = useState(() => {
-    try {
-      const saved = parseFloat(localStorage.getItem('playerVolume') || '1')
-      return isNaN(saved) ? 1 : Math.max(0, Math.min(1, saved))
-    } catch {
-      return 1
-    }
-  })
-  const [isMuted, setIsMuted] = useState(() => localStorage.getItem('playerMuted') === 'true')
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const { state, refs, actions } = player
+  const videoRef = refs.videoRef
+  const {
+    subtitleFontSize,
+    subtitlePosition,
+    subtitleBgOpacity,
+    subtitleBgColor,
+    subtitleTextColor,
+    subtitleEdge,
+    subtitleBold,
+  } = state
   const [settingsView, setSettingsView] = useState<SettingsView>(null)
-  const [isScrubbing, setIsScrubbing] = useState(false)
   const timeLabelRef = useRef<HTMLSpanElement>(null)
-  const [initialSubtitleStyle] = useState(loadSubtitleStyle)
-  const [subtitleFontSize, setSubtitleFontSize] = useState(initialSubtitleStyle.fontSize)
-  const [subtitlePosition, setSubtitlePosition] = useState(initialSubtitleStyle.position)
-  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(initialSubtitleStyle.bgOpacity)
-  const [subtitleBgColor, setSubtitleBgColor] = useState(initialSubtitleStyle.bgColor)
-  const [subtitleTextColor, setSubtitleTextColor] = useState(initialSubtitleStyle.textColor)
-  const [subtitleEdge, setSubtitleEdge] = useState<SubtitleEdge>(initialSubtitleStyle.edge)
-  const [subtitleBold, setSubtitleBold] = useState(initialSubtitleStyle.bold)
   const persistSubtitleSetting = (key: string, value: string | number | boolean) => {
     try {
       localStorage.setItem(key, String(value))
@@ -111,83 +92,52 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     switch (key) {
       case 'fontSize':
         if (typeof value === 'number') {
-          setSubtitleFontSize(value)
+          actions.setSubtitleFontSize(value)
           persistSubtitleSetting('subtitleFontSize', value)
         }
         break
       case 'position':
         if (typeof value === 'number') {
-          setSubtitlePosition(value)
+          actions.setSubtitlePosition(value)
           persistSubtitleSetting('subtitlePosition', value)
         }
         break
       case 'bgOpacity':
         if (typeof value === 'number') {
-          setSubtitleBgOpacity(value)
+          actions.setSubtitleBgOpacity(value)
           persistSubtitleSetting('subtitleBgOpacity', value)
         }
         break
       case 'bgColor':
         if (typeof value === 'string') {
-          setSubtitleBgColor(value)
+          actions.setSubtitleBgColor(value)
           persistSubtitleSetting('subtitleBgColor', value)
         }
         break
       case 'textColor':
         if (typeof value === 'string') {
-          setSubtitleTextColor(value)
+          actions.setSubtitleTextColor(value)
           persistSubtitleSetting('subtitleTextColor', value)
         }
         break
       case 'edge':
         if (value === 'shadow' || value === 'outline' || value === 'none') {
-          setSubtitleEdge(value)
+          actions.setSubtitleEdge(value)
           persistSubtitleSetting('subtitleEdge', value)
         }
         break
       case 'bold':
         if (typeof value === 'boolean') {
-          setSubtitleBold(value)
+          actions.setSubtitleBold(value)
           persistSubtitleSetting('subtitleBold', value)
         }
         break
     }
   }
-  const inactivityTimer = useRef<number | null>(null)
   const lastInteractionTimeRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
-  const clickCountRef = useRef(0)
-  const clickTimerRef = useRef<number | null>(null)
   const controlsRef = useRef<HTMLDivElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    const updateState = () => {
-      setIsPlaying(!video.paused)
-      setCurrentTime(video.currentTime)
-      setDuration(video.duration || 0)
-    }
-
-    video.addEventListener('play', updateState)
-    video.addEventListener('pause', updateState)
-    video.addEventListener('timeupdate', updateState)
-    video.addEventListener('loadedmetadata', updateState)
-    video.addEventListener('volumechange', () => {
-      setVolume(video.volume)
-      setIsMuted(video.muted)
-    })
-
-    return () => {
-      video.removeEventListener('play', updateState)
-      video.removeEventListener('pause', updateState)
-      video.removeEventListener('timeupdate', updateState)
-      video.removeEventListener('loadedmetadata', updateState)
-      video.removeEventListener('volumechange', updateState)
-    }
-  }, [videoRef])
+  const containerRef = refs.playerContainerRef
 
   useEffect(() => {
     const styleId = 'tv-player-subtitle-style'
@@ -312,15 +262,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
 
       if (rafIdRef.current === null) {
         rafIdRef.current = requestAnimationFrame(() => {
-          setShowControls(true)
+          actions.setShowControls(true)
           container.style.cursor = 'default'
 
-          if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+          if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
 
-          if (isPlaying && !settingsView && !isScrubbing) {
-            inactivityTimer.current = window.setTimeout(() => {
-              setShowControls(false)
-              if (isFullscreenActive(videoRef.current)) {
+          if (state.isPlaying && !settingsView && !state.isScrubbing) {
+            actions.inactivityTimer.current = window.setTimeout(() => {
+              actions.setShowControls(false)
+              if (state.isFullscreen) {
                 container.style.cursor = 'none'
               }
             }, 3000)
@@ -329,7 +279,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         })
       }
     },
-    [isPlaying, settingsView, isScrubbing, videoRef]
+    [state.isPlaying, state.isFullscreen, state.isScrubbing, settingsView, actions, containerRef]
   )
 
   useEffect(() => {
@@ -341,7 +291,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     container.addEventListener('touchstart', handleTouch, { passive: true })
 
     const handleMouseLeave = () => {
-      setShowControls(false)
+      actions.setShowControls(false)
     }
     container.addEventListener('mouseleave', handleMouseLeave)
 
@@ -350,77 +300,71 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       container.removeEventListener('touchstart', handleTouch)
       container.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [handleUserActivity])
+  }, [handleUserActivity, actions, containerRef])
 
   useEffect(() => {
-    if (isScrubbing || settingsView) {
-      setShowControls(true)
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+    if (state.isScrubbing || settingsView) {
+      actions.setShowControls(true)
+      if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
     }
-  }, [isScrubbing, settingsView])
+  }, [state.isScrubbing, settingsView, actions])
 
   useEffect(() => {
     return () => {
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-      if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+      if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
     }
-  }, [])
-
-  const togglePlay = () => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.paused) video.play().catch(() => {})
-    else video.pause()
-  }
+  }, [actions])
 
   const isOverUi = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    return !!(
-      target.closest(`.${styles.controlsOverlay}`) || target.closest(`.${styles.settingsPanel}`)
+    return !!target.closest(
+      `.${styles.topControls}, .${styles.bottomControls}, .${styles.settingsPanel}`
     )
   }
 
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isOverUi(e)) return
 
-    const isHiding = showControls
-    setShowControls(!showControls)
+    const isHiding = state.showControls
+    actions.setShowControls(!state.showControls)
     if (isHiding) lastInteractionTimeRef.current = Date.now()
+  }
 
-    clickCountRef.current += 1
-    if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
-
-    if (clickCountRef.current === 2) {
-      toggleFullscreen()
-      clickCountRef.current = 0
+  const handleStageDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (
+      target.closest(
+        `button, input, select, textarea, a, [role="button"], .${styles.topControls}, .${styles.bottomControls}, .${styles.settingsPanel}`
+      )
+    )
       return
-    }
-
-    clickTimerRef.current = setTimeout(() => {
-      clickCountRef.current = 0
-    }, 250)
+    actions.toggleFullscreen()
   }
 
   const handleSeek = (percent: number) => {
     const video = videoRef.current
-    if (!video || isNaN(duration) || duration === 0) return
-    video.currentTime = percent * duration
+    if (!video || isNaN(state.duration) || state.duration === 0) return
+    video.currentTime = percent * state.duration
   }
 
   const handleScrubStart = () => {
-    setIsScrubbing(true)
-    videoRef.current?.pause()
+    if (!videoRef.current) return
+    actions.setIsScrubbing(true)
+    actions.wasPlayingBeforeScrub.current = !videoRef.current.paused
+    videoRef.current.pause()
   }
 
   const handleScrubMove = (percent: number) => {
     const video = videoRef.current
-    if (video && duration) video.currentTime = percent * duration
+    if (video && state.duration) video.currentTime = percent * state.duration
   }
 
   const handleScrubEnd = () => {
-    setIsScrubbing(false)
-    videoRef.current?.play().catch(() => {})
+    actions.setIsScrubbing(false)
+    if (actions.wasPlayingBeforeScrub.current) {
+      videoRef.current?.play().catch(() => {})
+    }
   }
 
   const handleVolumeChange = (newVolume: number) => {
@@ -432,35 +376,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   }
 
   const toggleMute = () => {
-    const video = videoRef.current
-    if (!video) return
-    video.muted = !video.muted
-    localStorage.setItem('playerMuted', video.muted.toString())
+    actions.toggleMute()
   }
-
-  const toggleFullscreen = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
-    void toggleFullscreenCrossBrowser(container, videoRef.current)
-      .then(() => {
-        setIsFullscreen(isFullscreenActive(videoRef.current))
-      })
-      .catch(() => {})
-  }, [videoRef])
-
-  useEffect(() => {
-    const getVideo = () => videoRef.current
-    const cleanup = subscribeFullscreen(getVideo, setIsFullscreen)
-    setIsFullscreen(isFullscreenActive(getVideo()))
-    return cleanup
-  }, [videoRef])
 
   const hasSubtitles = subtitles.length > 0
   const isSubtitleActive = selectedSubtitle >= 0
 
   const openSettings = () => {
     setSettingsView('main')
-    setShowControls(true)
+    actions.setShowControls(true)
   }
 
   const toggleSubtitles = () => {
@@ -605,41 +529,50 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       delayMs={videoDelayMs}
       onToggle={(v) => onVideoDelayToggle?.(v)}
       onDelayChange={(ms) => onVideoDelayChange?.(ms)}
-      onCalibrate={onCalibrateAvSync}
+      onCalibrate={() => {
+        setSettingsView(null)
+        onCalibrateAvSync?.()
+      }}
     />
   )
 
   return (
-    <div ref={containerRef} className={styles.container} onClick={handleContainerClick}>
+    <div
+      ref={containerRef}
+      className={`${styles.container} ${state.isFullscreen ? styles.fullscreenFlat : ''}`}
+      onClick={handleContainerClick}
+      onDoubleClick={handleStageDoubleClick}
+    >
       {children}
+      {state.isSpeedBoostActive && (
+        <div className={styles.speedBoostBadge} aria-hidden="true">
+          <span>2x</span>
+          <Icon name="forward" size={12} />
+        </div>
+      )}
       <div
         ref={controlsRef}
-        className={`${styles.controlsOverlay} ${!showControls && !settingsView ? styles.hidden : ''}`}
-        onClick={(e) => e.stopPropagation()}
+        className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
+        data-speed-boost-ignore="true"
       >
-        <div className={styles.topControls}>
+        <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
           <button className={styles.backBtn} onClick={onBack} title="Back" aria-label="Back">
             <Icon name="chevron-left" />
           </button>
           <div className={styles.videoTitleInfo}>
             <span className={styles.animeTitle}>{title}</span>
+            {episodeLabel && <span className={styles.episodeLabel}>{episodeLabel}</span>}
           </div>
         </div>
 
         <CenterControls
-          isPlaying={isPlaying}
-          onTogglePlay={togglePlay}
-          onSkipBack={() => {
-            const v = videoRef.current
-            if (v) v.currentTime = Math.max(0, v.currentTime - 10)
-          }}
-          onSkipForward={() => {
-            const v = videoRef.current
-            if (v) v.currentTime = Math.min(duration, v.currentTime + 10)
-          }}
+          isPlaying={state.isPlaying}
+          onTogglePlay={actions.togglePlay}
+          onSkipBack={() => actions.seek(-10)}
+          onSkipForward={() => actions.seek(10)}
         />
 
-        <div className={styles.bottomControls}>
+        <div className={styles.bottomControls} onClick={(e) => e.stopPropagation()}>
           <SeekBar
             classes={{
               container: styles.progressBarContainer,
@@ -651,9 +584,9 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
               thumb: styles.thumb,
             }}
             videoRef={videoRef}
-            duration={duration}
+            duration={state.duration}
             formatTime={formatTime}
-            isScrubbing={isScrubbing}
+            isScrubbing={state.isScrubbing}
             buffered="full"
             onSeek={handleSeek}
             onScrubStart={handleScrubStart}
@@ -666,10 +599,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             <div className={styles.leftControls}>
               <button
                 className={styles.controlBtn}
-                onClick={togglePlay}
-                aria-label={isPlaying ? 'Pause' : 'Play'}
+                onClick={actions.togglePlay}
+                aria-label={state.isPlaying ? 'Pause' : 'Play'}
               >
-                {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
+                {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
               </button>
               <VolumeControl
                 classes={{
@@ -677,12 +610,12 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                   button: styles.controlBtn,
                   slider: styles.volumeSlider,
                 }}
-                muted={isMuted}
-                volume={volume}
+                muted={state.isMuted}
+                volume={state.volume}
                 volumeIcon={
-                  isMuted ? (
+                  state.isMuted ? (
                     <Icon name="volume-mute" />
-                  ) : volume < 0.5 ? (
+                  ) : state.volume < 0.5 ? (
                     <Icon name="volume-down" />
                   ) : (
                     <Icon name="volume-up" />
@@ -692,7 +625,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                 onVolumeChange={handleVolumeChange}
               />
               <span className={styles.timeDisplay} ref={timeLabelRef}>
-                {formatTime(currentTime)} / {formatTime(duration)}
+                {formatTime(0)} / {formatTime(state.duration)}
               </span>
             </div>
 
@@ -715,10 +648,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
               </button>
               <button
                 className={styles.controlBtn}
-                onClick={toggleFullscreen}
-                aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                onClick={actions.toggleFullscreen}
+                aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
               >
-                {isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
+                {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
               </button>
             </div>
           </div>
@@ -726,37 +659,39 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       </div>
 
       {settingsView && (
-        <SettingsShell
-          classes={{
-            panel: styles.settingsPanel,
-            header: styles.settingsHeader,
-            backBtn: styles.settingsBackBtn,
-            title: styles.settingsTitle,
-            content: styles.settingsContent,
-          }}
-          title={
-            settingsView === 'main'
-              ? 'Settings'
-              : settingsView === 'subtitle-style'
-                ? 'Subtitle Style'
-                : settingsView === 'audio'
-                  ? 'Audio Track'
-                  : settingsView === 'server'
-                    ? 'Movy Server'
-                    : settingsView === 'av-sync'
-                      ? 'A/V Sync'
-                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
-          }
-          onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
-        >
-          {settingsView === 'main' && renderMainSettings()}
-          {settingsView === 'quality' && renderQualitySettings()}
-          {settingsView === 'subtitles' && renderSubtitleSettings()}
-          {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
-          {settingsView === 'audio' && renderAudioSettings()}
-          {settingsView === 'server' && renderServerSettings()}
-          {settingsView === 'av-sync' && renderAvSyncSettings()}
-        </SettingsShell>
+        <div data-speed-boost-ignore="true" onClick={(e) => e.stopPropagation()}>
+          <SettingsShell
+            classes={{
+              panel: styles.settingsPanel,
+              header: styles.settingsHeader,
+              backBtn: styles.settingsBackBtn,
+              title: styles.settingsTitle,
+              content: styles.settingsContent,
+            }}
+            title={
+              settingsView === 'main'
+                ? 'Settings'
+                : settingsView === 'subtitle-style'
+                  ? 'Subtitle Style'
+                  : settingsView === 'audio'
+                    ? 'Audio Track'
+                    : settingsView === 'server'
+                      ? 'Movy Server'
+                      : settingsView === 'av-sync'
+                        ? 'A/V Sync'
+                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
+            }
+            onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
+          >
+            {settingsView === 'main' && renderMainSettings()}
+            {settingsView === 'quality' && renderQualitySettings()}
+            {settingsView === 'subtitles' && renderSubtitleSettings()}
+            {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
+            {settingsView === 'audio' && renderAudioSettings()}
+            {settingsView === 'server' && renderServerSettings()}
+            {settingsView === 'av-sync' && renderAvSyncSettings()}
+          </SettingsShell>
+        </div>
       )}
     </div>
   )

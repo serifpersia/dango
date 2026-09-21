@@ -1,16 +1,18 @@
 import React, { useEffect } from 'react'
 import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
-import EpisodeList from './EpisodeList'
+import EpisodeList, { type EpisodeListItem } from './EpisodeList'
 import styles from './EpisodeDrawer.module.css'
 
 interface EpisodeDrawerProps {
   isOpen: boolean
   onClose: () => void
-  episodes: string[]
+  episodes: Array<string | EpisodeListItem>
   currentEpisode?: string
-  watchedEpisodes: string[]
+  watchedEpisodes?: string[]
   onEpisodeClick: (ep: string) => void
+  title?: string
+  header?: React.ReactNode
 }
 
 export default function EpisodeDrawer({
@@ -18,8 +20,10 @@ export default function EpisodeDrawer({
   onClose,
   episodes,
   currentEpisode,
-  watchedEpisodes,
+  watchedEpisodes = [],
   onEpisodeClick,
+  title,
+  header,
 }: EpisodeDrawerProps) {
   useEffect(() => {
     if (!isOpen) return
@@ -70,6 +74,8 @@ export default function EpisodeDrawer({
             watchedEpisodes={watchedEpisodes}
             onEpisodeClick={onEpisodeClick}
             variant="drawer"
+            title={title}
+            header={header}
           />
         </div>
       </aside>

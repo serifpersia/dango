@@ -162,3 +162,35 @@
   align-items: center;
   gap: var(--space-3);
 }
+
+.episodeThumb {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.episodeText {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  min-width: 0;
+  flex: 1;
+}
+
+.episodeLabel {
+  font-weight: 700;
+  color: inherit;
+}
+
+.episodeSub {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

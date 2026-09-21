@@ -107,7 +107,7 @@ export const useTvLatestProgress = (mediaId?: string, season?: number, episode?:
     queryKey: ['tv-progress-latest', mediaId, season, episode],
     queryFn: () => fetchApi(`/api/tv/progress/${encodeURIComponent(mediaId || '')}/latest`),
     enabled: !!mediaId,
-    staleTime: 1000 * 60,
+    staleTime: 0,
   })
 }
 
@@ -213,6 +213,7 @@ export const useSaveTvProgress = () => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tv-progress', variables.mediaId] })
+      queryClient.invalidateQueries({ queryKey: ['tv-progress-latest', variables.mediaId] })
       queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
       queryClient.invalidateQueries({ queryKey: ['tv-library'] })
       queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })

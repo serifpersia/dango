@@ -162,12 +162,63 @@ const Player: React.FC = () => {
     }
   })
   const [isCalibrating, setIsCalibrating] = useState(false)
-  const wasPlayingBeforeCalibRef = useRef(false)
-  const resumeAfterCalib = () => {
-    if (wasPlayingBeforeCalibRef.current) {
-      wasPlayingBeforeCalibRef.current = false
-      refs.videoRef.current?.play()?.catch(() => {})
+  const [testClipActive, setTestClipActive] = useState(false)
+  const calibSnapshotRef = useRef<{ enabled: boolean; ms: number } | null>(null)
+  const calibReturnRef = useRef<number | null>(null)
+  const persistVideoDelay = (ms: number, enabled: boolean) => {
+    try {
+      localStorage.setItem('playerVideoDelayMs', String(ms))
+      localStorage.setItem('playerVideoDelayEnabled', String(enabled))
+    } catch {
+      // ignore
     }
+  }
+  const handleVideoDelayChange = (ms: number) => {
+    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+    setVideoDelayMs(clamped)
+    try {
+      localStorage.setItem('playerVideoDelayMs', String(clamped))
+    } catch {
+      // ignore
+    }
+  }
+  const openAvSyncCalibrator = () => {
+    calibSnapshotRef.current = { enabled: videoDelayEnabled, ms: videoDelayMs }
+    setVideoDelayEnabled(true)
+    try {
+      localStorage.setItem('playerVideoDelayEnabled', 'true')
+    } catch {
+      // ignore
+    }
+    actions.setShowSettings(false)
+    setIsCalibrating(true)
+  }
+  const cancelAvSyncCalibrator = () => {
+    const snap = calibSnapshotRef.current
+    calibSnapshotRef.current = null
+    if (snap) {
+      setVideoDelayMs(snap.ms)
+      setVideoDelayEnabled(snap.enabled)
+      persistVideoDelay(snap.ms, snap.enabled)
+    }
+    setTestClipActive(false)
+    setIsCalibrating(false)
+  }
+  const applyAvSyncCalibrator = () => {
+    calibSnapshotRef.current = null
+    setVideoDelayEnabled(true)
+    persistVideoDelay(videoDelayMs, true)
+    setTestClipActive(false)
+    setIsCalibrating(false)
+  }
+  const toggleTestClip = () => {
+    if (testClipActive) {
+      setTestClipActive(false)
+      return
+    }
+    const v = refs.videoRef.current
+    if (v && !isNaN(v.currentTime)) calibReturnRef.current = v.currentTime
+    setTestClipActive(true)
   }
   const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -233,6 +284,8 @@ const Player: React.FC = () => {
       setPendingQueueTransition(null)
       setQueueCountdown(null)
       hasDismissedShowCompletedRef.current = false
+      setTestClipActive(false)
+      setIsCalibrating(false)
     }
   }, [episodeNumber])
 
@@ -384,6 +437,16 @@ const Player: React.FC = () => {
       videoElement.removeChild(videoElement.firstChild)
     }
 
+    if (testClipActive) {
+      videoElement.src = '/av-sync-test.mp4'
+      videoElement.play().catch(() => {
+        actions.setShowControls(true)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
     if (!state.selectedSource || !state.selectedLink) return
 
     if (state.selectedSource.type === 'iframe') {
@@ -391,7 +454,10 @@ const Player: React.FC = () => {
       return
     }
 
-    if (resumeTimeRef.current > 5 && !showResumeModalRef.current) {
+    if (calibReturnRef.current != null) {
+      seekToTimeRef.current = calibReturnRef.current
+      calibReturnRef.current = null
+    } else if (resumeTimeRef.current > 5 && !showResumeModalRef.current) {
       seekToTimeRef.current = resumeTimeRef.current
     } else if (showResumeModalRef.current) {
       seekToTimeRef.current = 0
@@ -489,6 +555,24 @@ const Player: React.FC = () => {
             handleVideoSourceErrorRef.current()
           }
         })
+        const hasManualSubs = (state.selectedSource?.subtitles?.length ?? 0) > 0
+        const disableEmbeddedSubs = () => {
+          try {
+            if (
+              hasManualSubs &&
+              typeof hls.subtitleTrack === 'number' &&
+              hls.subtitleTrack !== -1
+            ) {
+              hls.subtitleTrack = -1
+            }
+          } catch {
+            // ignore
+          }
+        }
+        hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => {
+          if (data?.id !== -1) disableEmbeddedSubs()
+        })
+        disableEmbeddedSubs()
         hls.loadSource(proxiedUrl)
         hls.attachMedia(videoElement)
         hls.once(HlsClass.Events.MANIFEST_PARSED, () => {
@@ -518,7 +602,14 @@ const Player: React.FC = () => {
         hlsInstance.current = null
       }
     }
-  }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
+  }, [
+    state.selectedSource,
+    state.selectedLink,
+    refs.videoRef,
+    actions,
+    state.loadingVideo,
+    testClipActive,
+  ])
 
   const switchToIframeFallback = useCallback(
     (fallbackSource: VideoSource) => {
@@ -801,6 +892,7 @@ const Player: React.FC = () => {
     const videoElement = refs.videoRef.current
     if (!videoElement) return
     const handleVideoEnd = () => {
+      if (testClipActive) return
       handlePlaybackFinished()
     }
     videoElement.addEventListener('ended', handleVideoEnd)
@@ -809,7 +901,7 @@ const Player: React.FC = () => {
         videoElement.removeEventListener('ended', handleVideoEnd)
       }
     }
-  }, [handlePlaybackFinished, refs.videoRef, player.state.isFullscreen])
+  }, [handlePlaybackFinished, refs.videoRef, player.state.isFullscreen, testClipActive])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -1818,21 +1910,8 @@ const Player: React.FC = () => {
                       }
                     }}
                     videoDelayMs={videoDelayMs}
-                    onVideoDelayChange={(ms) => {
-                      const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-                      setVideoDelayMs(clamped)
-                      try {
-                        localStorage.setItem('playerVideoDelayMs', String(clamped))
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                    onCalibrateAvSync={() => {
-                      const v = refs.videoRef.current
-                      wasPlayingBeforeCalibRef.current = !!v && !v.paused && !v.ended
-                      v?.pause()
-                      setIsCalibrating(true)
-                    }}
+                    onVideoDelayChange={handleVideoDelayChange}
+                    onCalibrateAvSync={openAvSyncCalibrator}
                   />
                 )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
@@ -1847,6 +1926,7 @@ const Player: React.FC = () => {
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}
                   onTimeUpdate={() => {
+                    if (testClipActive) return
                     actions.onTimeUpdate()
                     if (
                       pendingQueueTransition &&
@@ -1885,24 +1965,12 @@ const Player: React.FC = () => {
               )}
               <AvSyncCalibrator
                 isOpen={isCalibrating}
-                initialMs={videoDelayMs}
-                onClose={() => {
-                  setIsCalibrating(false)
-                  resumeAfterCalib()
-                }}
-                onApply={(ms) => {
-                  const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-                  setVideoDelayMs(clamped)
-                  setVideoDelayEnabled(true)
-                  try {
-                    localStorage.setItem('playerVideoDelayMs', String(clamped))
-                    localStorage.setItem('playerVideoDelayEnabled', 'true')
-                  } catch {
-                    // ignore
-                  }
-                  setIsCalibrating(false)
-                  resumeAfterCalib()
-                }}
+                ms={videoDelayMs}
+                onChange={handleVideoDelayChange}
+                onApply={applyAvSyncCalibrator}
+                onClose={cancelAvSyncCalibrator}
+                testClipActive={testClipActive}
+                onTestClip={toggleTestClip}
               />
             </>
           )}

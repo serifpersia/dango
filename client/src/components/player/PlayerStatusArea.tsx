@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styles from './PlayerStatusArea.module.css'
 import Icon from '../common/Icon'
 
-const PlayerStatusArea: React.FC = () => {
+const PlayerStatusArea: React.FC<{ showTheater?: boolean }> = ({ showTheater = true }) => {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -47,10 +47,12 @@ const PlayerStatusArea: React.FC = () => {
               <span className={styles.key}>M</span>
               <span className={styles.label}>Mute</span>
             </div>
-            <div className={styles.shortcut}>
-              <span className={styles.key}>T</span>
-              <span className={styles.label}>Theater</span>
-            </div>
+            {showTheater && (
+              <div className={styles.shortcut}>
+                <span className={styles.key}>T</span>
+                <span className={styles.label}>Theater</span>
+              </div>
+            )}
             <div className={styles.shortcut}>
               <span className={styles.key}>N</span>
               <span className={styles.label}>Next</span>

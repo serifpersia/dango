@@ -111,6 +111,11 @@ export default function TvInfo() {
     return details.genres.map((g) => g.name).slice(0, 5)
   }, [details?.genres])
 
+  const seasonOptions = useMemo(() => {
+    if (!details?.seasons) return []
+    return details.seasons.filter((s) => s.season_number > 0)
+  }, [details?.seasons])
+
   const meta = [
     details?.year,
     details?.status,
@@ -243,100 +248,83 @@ export default function TvInfo() {
                 {inTvLibrary ? 'In Watchlist' : 'Add to Watchlist'}
               </button>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {isTv && details.seasons && details.seasons.length > 0 && (
-        <div className={styles.seasonsSection}>
-          <h2 className={styles.sectionTitle}>Seasons</h2>
-          <div className={styles.seasonsList}>
-            {details.seasons
-              .filter((s) => s.season_number > 0)
-              .map((s) => (
-                <button
-                  key={s.season_number}
-                  className={`${styles.seasonCard} ${selectedSeason === s.season_number ? styles.activeSeason : ''}`}
-                  onClick={() => setSelectedSeason(s.season_number)}
+            {isTv && seasonOptions.length > 1 && (
+              <label className={styles.seasonPickerLabel}>
+                <span>Season</span>
+                <select
+                  value={selectedSeason}
+                  onChange={(e) => setSelectedSeason(parseInt(e.target.value, 10) || 1)}
+                  className={styles.seasonSelect}
                 >
-                  <div className={styles.seasonPoster}>
-                    {s.poster_path ? (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w200${s.poster_path}`}
-                        alt={s.name}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className={styles.seasonPlaceholder}>
-                        <Icon name="tv" size={24} />
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.seasonInfo}>
-                    <span className={styles.seasonNumber}>Season {s.season_number}</span>
-                    <span className={styles.seasonEpisodes}>{s.episode_count} Episodes</span>
-                  </div>
-                </button>
-              ))}
+                  {seasonOptions.map((s) => (
+                    <option key={s.season_number} value={s.season_number}>
+                      Season {s.season_number} ({s.episode_count} Episodes)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <button
+              className={styles.detailsToggleBtn}
+              onClick={() => setShowDetails(!showDetails)}
+            >
+              {showDetails ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
+              {showDetails ? 'Hide Details' : 'Show Details'}
+            </button>
+
+            {showDetails && (
+              <div className={styles.expandedContent}>
+                <div className={styles.detailGrid}>
+                  {details.first_air_date && (
+                    <div className={styles.detailItem}>
+                      <strong>{isMovie ? 'Release Date' : 'First Air Date'}</strong>
+                      <span>{details.first_air_date}</span>
+                    </div>
+                  )}
+                  {details.last_air_date && (
+                    <div className={styles.detailItem}>
+                      <strong>Last Air Date</strong>
+                      <span>{details.last_air_date}</span>
+                    </div>
+                  )}
+                  {details.networks && details.networks.length > 0 && (
+                    <div className={styles.detailItem}>
+                      <strong>Networks</strong>
+                      <span>{details.networks.map((n) => n.name).join(', ')}</span>
+                    </div>
+                  )}
+                  {details.created_by && details.created_by.length > 0 && (
+                    <div className={styles.detailItem}>
+                      <strong>Created By</strong>
+                      <span>{details.created_by.map((c) => c.name).join(', ')}</span>
+                    </div>
+                  )}
+                  {details.episode_run_time && details.episode_run_time.length > 0 && (
+                    <div className={styles.detailItem}>
+                      <strong>Episode Runtime</strong>
+                      <span>{details.episode_run_time[0]} min</span>
+                    </div>
+                  )}
+                  {details.imdb_id && (
+                    <div className={styles.detailItem}>
+                      <strong>IMDb</strong>
+                      <a
+                        href={`https://www.imdb.com/title/${details.imdb_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.imdbLink}
+                      >
+                        View on IMDb
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
-
-      <div className={styles.detailsSection}>
-        <button className={styles.detailsToggleBtn} onClick={() => setShowDetails(!showDetails)}>
-          {showDetails ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
-          {showDetails ? 'Hide Details' : 'Show Details'}
-        </button>
-
-        {showDetails && (
-          <div className={styles.expandedContent}>
-            <div className={styles.detailGrid}>
-              {details.first_air_date && (
-                <div className={styles.detailItem}>
-                  <strong>{isMovie ? 'Release Date' : 'First Air Date'}</strong>
-                  <span>{details.first_air_date}</span>
-                </div>
-              )}
-              {details.last_air_date && (
-                <div className={styles.detailItem}>
-                  <strong>Last Air Date</strong>
-                  <span>{details.last_air_date}</span>
-                </div>
-              )}
-              {details.networks && details.networks.length > 0 && (
-                <div className={styles.detailItem}>
-                  <strong>Networks</strong>
-                  <span>{details.networks.map((n) => n.name).join(', ')}</span>
-                </div>
-              )}
-              {details.created_by && details.created_by.length > 0 && (
-                <div className={styles.detailItem}>
-                  <strong>Created By</strong>
-                  <span>{details.created_by.map((c) => c.name).join(', ')}</span>
-                </div>
-              )}
-              {details.episode_run_time && details.episode_run_time.length > 0 && (
-                <div className={styles.detailItem}>
-                  <strong>Episode Runtime</strong>
-                  <span>{details.episode_run_time[0]} min</span>
-                </div>
-              )}
-              {details.imdb_id && (
-                <div className={styles.detailItem}>
-                  <strong>IMDb</strong>
-                  <a
-                    href={`https://www.imdb.com/title/${details.imdb_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.imdbLink}
-                  >
-                    View on IMDb
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {matureBlocked && (

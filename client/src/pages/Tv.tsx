@@ -1,21 +1,42 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
+import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useProviders } from '../hooks/useProviders'
-import { useSaveTvProgress, useTvLatestProgress, useToggleTvBookmark } from '../hooks/useTvLibrary'
+import {
+  useSaveTvProgress,
+  useTvLatestProgress,
+  useTvProgress,
+  useToggleTvBookmark,
+} from '../hooks/useTvLibrary'
 import { useTvLibraryCheck } from '../hooks/useTvLibrary'
 import { buildTvId } from '../lib/tv'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
 import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
+import {
+  buildOverlayCss,
+  renderCueHtml,
+  stripCueTags,
+  type SubtitleStyleSettings,
+} from '../lib/subtitleStyle'
 import useDelayCanvas from '../hooks/useDelayCanvas'
+import useIsMobile from '../hooks/useIsMobile'
+import useVideoPlayer from '../hooks/useVideoPlayer'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
+import EpisodeList, { type EpisodeListItem } from '../components/player/EpisodeList'
+import EpisodeListSkeleton from '../components/player/EpisodeListSkeleton'
+import EpisodeDrawer from '../components/player/EpisodeDrawer'
+import PlayerStatusArea from '../components/player/PlayerStatusArea'
+import SynopsisText from '../components/anime/SynopsisText'
 import type Hls from 'hls.js'
 import styles from './Tv.module.css'
+import layoutStyles from './PlayerPageLayout.module.css'
+import playerStyles from './Player.module.css'
 
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
 
@@ -24,13 +45,22 @@ interface TvDetails {
   title: string
   overview: string
   vote_average?: number
+  vote_count?: number
   year: string
   poster: string
   backdrop: string
   imdb_id?: string
   adult?: boolean
-  seasons?: { season_number: number; episode_count: number }[]
+  status?: string
+  genres?: { id: number; name: string }[]
+  seasons?: { season_number: number; episode_count: number; name?: string }[]
   number_of_seasons?: number
+  number_of_episodes?: number
+  first_air_date?: string
+  last_air_date?: string
+  networks?: { name: string }[]
+  created_by?: { name: string }[]
+  episode_run_time?: number[]
 }
 
 interface Episode {
@@ -140,7 +170,8 @@ const Tv: React.FC = () => {
   useEffect(() => {
     selectedSubtitleRef.current = selectedSubtitle
   }, [selectedSubtitle])
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const player = useVideoPlayer({ skipIntervals: [] })
+  const videoRef = player.refs.videoRef
   const hlsRef = useRef<Hls | null>(null)
   const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -162,7 +193,63 @@ const Tv: React.FC = () => {
     }
   })
   const [isCalibrating, setIsCalibrating] = useState(false)
-  const wasPlayingBeforeCalibRef = useRef(false)
+  const [testClipActive, setTestClipActive] = useState(false)
+  const calibSnapshotRef = useRef<{ enabled: boolean; ms: number } | null>(null)
+  const calibReturnRef = useRef<number | null>(null)
+  const persistVideoDelay = (ms: number, enabled: boolean) => {
+    try {
+      localStorage.setItem('playerVideoDelayMs', String(ms))
+      localStorage.setItem('playerVideoDelayEnabled', String(enabled))
+    } catch {
+      // ignore
+    }
+  }
+  const handleVideoDelayChange = (ms: number) => {
+    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
+    setVideoDelayMs(clamped)
+    try {
+      localStorage.setItem('playerVideoDelayMs', String(clamped))
+    } catch {
+      // ignore
+    }
+  }
+  const openAvSyncCalibrator = () => {
+    calibSnapshotRef.current = { enabled: videoDelayEnabled, ms: videoDelayMs }
+    setVideoDelayEnabled(true)
+    try {
+      localStorage.setItem('playerVideoDelayEnabled', 'true')
+    } catch {
+      // ignore
+    }
+    setIsCalibrating(true)
+  }
+  const cancelAvSyncCalibrator = () => {
+    const snap = calibSnapshotRef.current
+    calibSnapshotRef.current = null
+    if (snap) {
+      setVideoDelayMs(snap.ms)
+      setVideoDelayEnabled(snap.enabled)
+      persistVideoDelay(snap.ms, snap.enabled)
+    }
+    setTestClipActive(false)
+    setIsCalibrating(false)
+  }
+  const applyAvSyncCalibrator = () => {
+    calibSnapshotRef.current = null
+    setVideoDelayEnabled(true)
+    persistVideoDelay(videoDelayMs, true)
+    setTestClipActive(false)
+    setIsCalibrating(false)
+  }
+  const toggleTestClip = () => {
+    if (testClipActive) {
+      setTestClipActive(false)
+      return
+    }
+    const v = videoRef.current
+    if (v && !isNaN(v.currentTime)) calibReturnRef.current = v.currentTime
+    setTestClipActive(true)
+  }
   const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
   useDelayCanvas({
     videoRef,
@@ -171,12 +258,6 @@ const Tv: React.FC = () => {
     enabled: videoDelayEnabled,
   })
   const delayCanvasActive = videoDelayEnabled
-  const resumeAfterCalib = () => {
-    if (wasPlayingBeforeCalibRef.current) {
-      wasPlayingBeforeCalibRef.current = false
-      videoRef.current?.play().catch(() => {})
-    }
-  }
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const discordSessionRef = useRef<string>('')
   if (!discordSessionRef.current) {
@@ -215,10 +296,17 @@ const Tv: React.FC = () => {
   const [resumeTime, setResumeTime] = useState(0)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
   const [completeTitle, setCompleteTitle] = useState('')
+  const [showDetails, setShowDetails] = useState(false)
+  const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
+  const isMobile = useIsMobile()
   const hasResumedRef = useRef(false)
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedTimeRef = useRef(0)
   const videoEndedRef = useRef(false)
+  const showResumeModalRef = useRef(false)
+  useEffect(() => {
+    showResumeModalRef.current = showResumeModal
+  }, [showResumeModal])
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
@@ -254,6 +342,8 @@ const Tv: React.FC = () => {
 
   const updateUrlEpisode = useCallback(
     (nextSeason: number, nextEpisode: number) => {
+      setTestClipActive(false)
+      setIsCalibrating(false)
       const params = new URLSearchParams(searchParams)
       params.set('type', searchParams.get('type') || 'tv')
       params.set('s', String(nextSeason))
@@ -264,13 +354,14 @@ const Tv: React.FC = () => {
   )
 
   const handleVideoTimeUpdate = useCallback(() => {
+    if (testClipActive) return
     const video = videoRef.current
     if (!video || video.paused || video.ended) return
     if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
     progressSaveTimerRef.current = setTimeout(() => {
       saveVideoProgress(video.currentTime, video.duration || 0)
     }, 5000)
-  }, [saveVideoProgress])
+  }, [saveVideoProgress, videoRef, testClipActive])
 
   const handleVideoEnded = useCallback(() => {
     const video = videoRef.current
@@ -293,11 +384,25 @@ const Tv: React.FC = () => {
         setShowCompleteModal(true)
       }
     }
-  }, [isMovie, details, episode, season, episodes, saveVideoProgress, updateUrlEpisode])
+  }, [isMovie, details, episode, season, episodes, saveVideoProgress, updateUrlEpisode, videoRef])
 
   const handleVideoPlay = useCallback(() => {
     videoEndedRef.current = false
-  }, [])
+    player.actions.onPlay()
+  }, [player.actions])
+
+  const handleVideoLoadedMetadata = useCallback(() => {
+    player.actions.onLoadedMetadata()
+    const video = videoRef.current
+    if (!video) return
+    try {
+      const storedVolume = parseFloat(localStorage.getItem('playerVolume') || '')
+      if (!isNaN(storedVolume)) video.volume = Math.max(0, Math.min(1, storedVolume))
+      video.muted = localStorage.getItem('playerMuted') === 'true'
+    } catch {
+      // ignore
+    }
+  }, [player.actions, videoRef])
 
   const handleResume = useCallback(() => {
     const video = videoRef.current
@@ -307,12 +412,17 @@ const Tv: React.FC = () => {
     }
     setShowResumeModal(false)
     hasResumedRef.current = true
-  }, [resumeTime])
+  }, [resumeTime, videoRef])
 
   const handleSkipResume = useCallback(() => {
+    const video = videoRef.current
+    if (video) {
+      video.currentTime = 0
+      video.play().catch(() => {})
+    }
     setShowResumeModal(false)
     hasResumedRef.current = true
-  }, [])
+  }, [videoRef])
 
   useEffect(() => {
     if (!savedProgress || hasResumedRef.current) return
@@ -325,6 +435,12 @@ const Tv: React.FC = () => {
   }, [savedProgress])
 
   useEffect(() => {
+    if (showResumeModal && videoRef.current) {
+      videoRef.current.pause()
+    }
+  }, [showResumeModal, videoRef])
+
+  useEffect(() => {
     const video = videoRef.current
     return () => {
       if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
@@ -332,7 +448,7 @@ const Tv: React.FC = () => {
         saveVideoProgress(video.currentTime, video.duration || 0)
       }
     }
-  }, [saveVideoProgress])
+  }, [saveVideoProgress, videoRef])
 
   const pickDefaultSubtitle = useCallback((subs: SubtitleTrack[]): number => {
     let lastKey: string | null = null
@@ -382,6 +498,55 @@ const Tv: React.FC = () => {
   )
   const isEmbedProvider = activeProvider?.tier === 'embed'
   const activeServers = useMemo(() => activeProvider?.servers ?? [], [activeProvider])
+
+  const { data: tvProgress } = useTvProgress(mediaId || undefined)
+  const watchedEpisodeIds = useMemo(() => {
+    const rows = tvProgress?.progress ?? []
+    return rows
+      .filter(
+        (row) => row.season === season && row.duration > 0 && row.currentTime >= row.duration * 0.8
+      )
+      .map((row) => String(row.episode))
+  }, [tvProgress, season])
+
+  const tvEpisodeItems = useMemo<EpisodeListItem[]>(
+    () =>
+      episodes.map((ep) => ({
+        id: String(ep.episode_number),
+        label: `Episode ${ep.episode_number}`,
+        sublabel: ep.name || undefined,
+        thumbnail: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : undefined,
+      })),
+    [episodes]
+  )
+
+  const sortedEpisodeNumbers = useMemo(
+    () => episodes.map((ep) => ep.episode_number).sort((a, b) => a - b),
+    [episodes]
+  )
+  const episodeIndex = sortedEpisodeNumbers.indexOf(episode)
+  const prevEpisodeNumber = episodeIndex > 0 ? sortedEpisodeNumbers[episodeIndex - 1] : null
+  const nextEpisodeNumber =
+    episodeIndex >= 0 && episodeIndex < sortedEpisodeNumbers.length - 1
+      ? sortedEpisodeNumbers[episodeIndex + 1]
+      : null
+
+  const genreNames = useMemo(
+    () => (details?.genres ?? []).map((g) => g.name).slice(0, 5),
+    [details]
+  )
+  const metaRow = useMemo(
+    () =>
+      [
+        details?.year,
+        details?.status,
+        details?.number_of_seasons
+          ? `${details.number_of_seasons} Season${details.number_of_seasons > 1 ? 's' : ''}`
+          : null,
+        details?.number_of_episodes ? `${details.number_of_episodes} Episodes` : null,
+      ].filter(Boolean) as string[],
+    [details]
+  )
 
   useEffect(() => {
     if (tvProviders.length === 0) return
@@ -632,6 +797,20 @@ const Tv: React.FC = () => {
 
     let cancelled = false
 
+    if (testClipActive) {
+      const clipVideo = videoRef.current
+      if (clipVideo) {
+        clipVideo.pause()
+        clipVideo.removeAttribute('src')
+        clipVideo.load()
+        clipVideo.src = '/av-sync-test.mp4'
+        if (!showResumeModalRef.current) clipVideo.play().catch(() => {})
+      }
+      return () => {
+        cancelled = true
+      }
+    }
+
     const filtered =
       sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
     const currentUrl = filtered[qualityIdx]?.url || ''
@@ -675,6 +854,10 @@ const Tv: React.FC = () => {
           }
           const applySubtitlePreference = () => {
             if (typeof hls.subtitleTrack !== 'number') return
+            if (manualTrackElsRef.current.length > 0) {
+              hls.subtitleTrack = -1
+              return
+            }
             const tracks = Array.isArray(hls.subtitleTracks) ? hls.subtitleTracks : []
             if (tracks.length === 0) {
               hls.subtitleTrack = -1
@@ -695,12 +878,26 @@ const Tv: React.FC = () => {
           })
           hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
             applySubtitlePreference()
-            video.play().catch(() => {})
+            if (calibReturnRef.current != null) {
+              video.currentTime = calibReturnRef.current
+              calibReturnRef.current = null
+            }
+            if (!showResumeModalRef.current) video.play().catch(() => {})
           })
           hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
             applySubtitlePreference()
           })
           hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, (_e, data) => {
+            if (manualTrackElsRef.current.length > 0) {
+              if (data.id !== -1) {
+                try {
+                  hls.subtitleTrack = -1
+                } catch {
+                  // ignore
+                }
+              }
+              return
+            }
             const tracks = Array.isArray(hls.subtitleTracks) ? hls.subtitleTracks : []
             if (tracks.length === 0) return
             if (data.id === -1) {
@@ -715,16 +912,28 @@ const Tv: React.FC = () => {
           })
         } else if (canPlayHlsNatively(video)) {
           video.src = proxiedUrl
-          video.play().catch(() => {
-            setStreamError('Failed to play stream. Try another source.')
-          })
+          if (calibReturnRef.current != null) {
+            video.currentTime = calibReturnRef.current
+            calibReturnRef.current = null
+          }
+          if (!showResumeModalRef.current) {
+            video.play().catch(() => {
+              setStreamError('Failed to play stream. Try another source.')
+            })
+          }
         }
       })()
     } else {
       video.src = proxiedUrl
-      video.play().catch(() => {
-        setStreamError('Failed to play stream. Try another source.')
-      })
+      if (calibReturnRef.current != null) {
+        video.currentTime = calibReturnRef.current
+        calibReturnRef.current = null
+      }
+      if (!showResumeModalRef.current) {
+        video.play().catch(() => {
+          setStreamError('Failed to play stream. Try another source.')
+        })
+      }
     }
 
     const handleVideoError = () => {
@@ -742,7 +951,16 @@ const Tv: React.FC = () => {
       cancelled = true
       video.removeEventListener('error', handleVideoError)
     }
-  }, [streams, qualityIdx, sourceTypeFilter, source, referer, isEmbedProvider])
+  }, [
+    streams,
+    qualityIdx,
+    sourceTypeFilter,
+    source,
+    referer,
+    isEmbedProvider,
+    videoRef,
+    testClipActive,
+  ])
 
   useEffect(() => {
     const hls = hlsRef.current
@@ -754,6 +972,7 @@ const Tv: React.FC = () => {
     const hls = hlsRef.current
     if (!hls || typeof hls.subtitleTrack !== 'number') return
     if (!Array.isArray(hls.subtitleTracks) || hls.subtitleTracks.length === 0) return
+    if (manualTrackElsRef.current.length > 0) return
     if (selectedSubtitle >= 0) hls.subtitleTrack = selectedSubtitle
     else hls.subtitleTrack = -1
   }, [selectedSubtitle])
@@ -779,7 +998,17 @@ const Tv: React.FC = () => {
       video.appendChild(track)
       manualTrackElsRef.current.push(track)
     })
-  }, [subtitles, referer, isEmbedProvider, source])
+    if (subtitles.length > 0) {
+      try {
+        const hls = hlsRef.current
+        if (hls && typeof hls.subtitleTrack === 'number' && hls.subtitleTrack !== -1) {
+          hls.subtitleTrack = -1
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [subtitles, referer, isEmbedProvider, source, videoRef])
 
   useEffect(() => {
     const video = videoRef.current
@@ -818,7 +1047,7 @@ const Tv: React.FC = () => {
       video.removeEventListener('loadedmetadata', sync)
       window.clearTimeout(timeout)
     }
-  }, [selectedSubtitle, subtitles, isEmbedProvider, source])
+  }, [selectedSubtitle, subtitles, isEmbedProvider, source, videoRef])
 
   useEffect(() => {
     if (!delayCanvasActive) return
@@ -842,35 +1071,25 @@ const Tv: React.FC = () => {
         cues = Array.from(showing.activeCues ?? [])
       }
       if (cues.length === 0) return
-      let fontSize = 1.8
-      let bottom = 10
-      try {
-        const fs = parseFloat(localStorage.getItem('subtitleFontSize') || '1.8')
-        if (!isNaN(fs)) fontSize = fs
-        const pos = parseInt(localStorage.getItem('subtitlePosition') || '10')
-        if (!isNaN(pos)) bottom = Math.max(0, Math.min(100, pos))
-      } catch {
-        // ignore
+      const subtitleStyle: SubtitleStyleSettings = {
+        fontSize: player.state.subtitleFontSize,
+        position: player.state.subtitlePosition,
+        bgOpacity: player.state.subtitleBgOpacity,
+        bgColor: player.state.subtitleBgColor,
+        textColor: player.state.subtitleTextColor,
+        edge: player.state.subtitleEdge,
+        bold: player.state.subtitleBold,
       }
-      cues.forEach((cue) => {
-        const text = String((cue as { text?: unknown }).text ?? '').replace(/<[^>]*>/g, '')
-        if (!text) return
+      const baseCss = buildOverlayCss(subtitleStyle)
+      const baseBottom = subtitleStyle.position
+      const cueArray = Array.from(cues)
+      cueArray.forEach((cue, index) => {
+        const raw = String((cue as { text?: unknown }).text ?? '')
+        if (!stripCueTags(raw).trim()) return
         const div = document.createElement('div')
-        div.style.cssText = `
-          font-size: ${fontSize}rem;
-          color: white;
-          background-color: rgba(0, 0, 0, 0.5);
-          text-shadow: 0 0 4px black;
-          padding: 0.2em 0.5em;
-          text-align: center;
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          bottom: ${bottom}%;
-          white-space: pre-wrap;
-          line-height: 1.4;
-        `
-        div.textContent = text
+        const stackOffset = (cueArray.length - 1 - index) * 1.7
+        div.style.cssText = `${baseCss}\nbottom: calc(${baseBottom}% + ${stackOffset}em);`
+        div.innerHTML = renderCueHtml(raw)
         overlay.appendChild(div)
       })
     }
@@ -887,7 +1106,20 @@ const Tv: React.FC = () => {
       video.removeEventListener('timeupdate', handleCueChange)
       overlay.innerHTML = ''
     }
-  }, [delayCanvasActive, selectedSubtitle, subtitles, effectiveVideoDelayMs])
+  }, [
+    delayCanvasActive,
+    selectedSubtitle,
+    subtitles,
+    effectiveVideoDelayMs,
+    videoRef,
+    player.state.subtitleFontSize,
+    player.state.subtitlePosition,
+    player.state.subtitleBgOpacity,
+    player.state.subtitleBgColor,
+    player.state.subtitleTextColor,
+    player.state.subtitleEdge,
+    player.state.subtitleBold,
+  ])
 
   const handleBack = () => {
     setDetails(null)
@@ -895,6 +1127,51 @@ const Tv: React.FC = () => {
     setIframeUrl('')
     navigate(-1)
   }
+
+  const handleSeasonSelect = useCallback(
+    (next: number) => {
+      setSeason(next)
+      setEpisode(1)
+      updateUrlEpisode(next, 1)
+    },
+    [updateUrlEpisode]
+  )
+
+  const handleTvEpisodeClick = useCallback(
+    (epId: string) => {
+      const next = parseInt(epId, 10)
+      if (!isNaN(next)) {
+        setEpisode(next)
+        updateUrlEpisode(season, next)
+      }
+      setIsEpisodeDrawerOpen(false)
+    },
+    [season, updateUrlEpisode]
+  )
+
+  useEffect(() => {
+    if (isMovie) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
+        )
+      )
+        return
+      if (e.key.toLowerCase() === 'n') {
+        if (nextEpisodeNumber != null) {
+          handleTvEpisodeClick(String(nextEpisodeNumber))
+        } else {
+          toast.error('No next episode available')
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isMovie, nextEpisodeNumber, handleTvEpisodeClick])
 
   const handleAudioTrackChange = (index: number) => {
     setSelectedAudioTrack(index)
@@ -965,7 +1242,7 @@ const Tv: React.FC = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: discordSessionRef.current }),
     }).catch(() => {})
-  }, [details, isMovie, season, episode])
+  }, [details, isMovie, season, episode, videoRef])
 
   useEffect(() => {
     if (!details) return
@@ -975,7 +1252,7 @@ const Tv: React.FC = () => {
       if (!video || !video.paused) sendTvPresence()
     }, 15000)
     return () => window.clearInterval(id)
-  }, [sendTvPresence, details])
+  }, [sendTvPresence, details, videoRef])
 
   useEffect(() => {
     if (!details || isEmbedProvider || streamLoading || streamError || streams.length === 0) return
@@ -990,7 +1267,7 @@ const Tv: React.FC = () => {
       video.removeEventListener('pause', send)
       video.removeEventListener('seeked', send)
     }
-  }, [details, isEmbedProvider, streamLoading, streamError, streams, sendTvPresence])
+  }, [details, isEmbedProvider, streamLoading, streamError, streams, sendTvPresence, videoRef])
 
   useEffect(() => {
     const sid = discordSessionRef.current
@@ -1052,367 +1329,489 @@ const Tv: React.FC = () => {
   }, [details, isMovie, season, episode, searchParams, navigate])
 
   return (
-    <div className={styles.page}>
-      {details && (
-        <div className={styles.header}>
-          <button className={styles.backBtn} onClick={handleBack}>
-            <Icon name="arrow-left" /> Back
-          </button>
-          <h1>{details.title}</h1>
-          <div className={styles.meta}>
-            <span className={styles.year}>{details.year}</span>
-            {details.vote_average != null && (
-              <span className={styles.rating}>
-                <Icon name="star" size={12} />
-                {Number(details.vote_average).toFixed(1)}
-              </span>
-            )}
-            <span className={`${styles.typeBadge} ${styles[isMovie ? 'movie' : 'tv']}`}>
-              {isMovie ? 'Movie' : 'TV Show'}
-            </span>
-          </div>
-          <div className={styles.headerActions}>
-            <button
-              className={`${styles.watchlistBtn} ${inTvLibrary ? styles.active : ''}`}
-              onClick={handleToggleWatchlist}
-              disabled={bookmarkPending}
-              type="button"
-            >
-              {inTvLibrary ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
-              {inTvLibrary ? 'In Watchlist' : 'Add to Watchlist'}
-            </button>
-          </div>
-          {details.overview && <p className={styles.overview}>{details.overview}</p>}
-        </div>
-      )}
-
-      {details && !isMovie && (
-        <div className={styles.controls}>
-          <label className={styles.controlLabel}>
-            Season
-            <select
-              value={season}
-              onChange={(e) => {
-                const next = parseInt(e.target.value, 10) || 1
-                setSeason(next)
-                setEpisode(1)
-                updateUrlEpisode(next, 1)
-              }}
-              className={styles.select}
-            >
-              {details.seasons?.map((s) => (
-                <option key={s.season_number} value={s.season_number}>
-                  Season {s.season_number} ({s.episode_count} ep)
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.controlLabel}>
-            Episode
-            <select
-              value={episode}
-              onChange={(e) => {
-                const next = parseInt(e.target.value, 10) || 1
-                setEpisode(next)
-                updateUrlEpisode(season, next)
-              }}
-              className={styles.select}
-            >
-              {episodes.map((ep) => (
-                <option key={ep.episode_number} value={ep.episode_number}>
-                  Ep {ep.episode_number} - {ep.name || ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.controlLabel}>
-            Source
-            <select
-              value={source}
-              onChange={(e) => handleSourceSelect(e.target.value)}
-              className={styles.select}
-              disabled={tvProviders.length === 0}
-            >
-              {providersLoading ? (
-                <option value="">Loading…</option>
-              ) : tvProviders.length === 0 ? (
-                <option value="">No providers available</option>
-              ) : (
-                <>
-                  {directProviders.length > 0 && (
-                    <optgroup label="Direct HLS">
-                      {directProviders.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {embedProviders.length > 0 && (
-                    <optgroup label="Embeds">
-                      {embedProviders.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </>
+    <div className={layoutStyles.playerPageLayout}>
+      <aside className={layoutStyles.episodeSidebar}>
+        {details ? (
+          isMovie ? (
+            <div className={styles.sidebarPosterCard}>
+              {details.poster && (
+                <img
+                  src={`https://image.tmdb.org/t/p/w342${details.poster}`}
+                  alt={details.title}
+                  loading="lazy"
+                  decoding="async"
+                />
               )}
-            </select>
-          </label>
-        </div>
-      )}
-
-      {details && isMovie && (
-        <div className={styles.controls}>
-          <label className={styles.controlLabel}>
-            Source
-            <select
-              value={source}
-              onChange={(e) => handleSourceSelect(e.target.value)}
-              className={styles.select}
-              disabled={tvProviders.length === 0}
-            >
-              {providersLoading ? (
-                <option value="">Loading…</option>
-              ) : tvProviders.length === 0 ? (
-                <option value="">No providers available</option>
-              ) : (
-                <>
-                  {directProviders.length > 0 && (
-                    <optgroup label="Direct HLS">
-                      {directProviders.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {embedProviders.length > 0 && (
-                    <optgroup label="Embeds">
-                      {embedProviders.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </>
-              )}
-            </select>
-          </label>
-        </div>
-      )}
-
-      {details && (
-        <div
-          className={styles.playerSection}
-          style={
-            details.adult && !hasMatureConsent
-              ? { filter: 'blur(14px)', pointerEvents: 'none', userSelect: 'none' }
-              : undefined
-          }
-        >
-          {streamLoading && !isEmbedProvider && (
-            <div className={styles.statusMsg}>
-              <Icon name="spinner" className={styles.spinner} /> Loading stream...
+              <div className={styles.sidebarPosterMeta}>
+                <strong>{details.title}</strong>
+                <span>{details.year}</span>
+              </div>
             </div>
-          )}
-          {isEmbedProvider && iframeUrl ? (
-            <iframe
-              src={iframeUrl}
-              className={styles.videoIframe}
-              allow="autoplay; fullscreen"
-              allowFullScreen
+          ) : (
+            <EpisodeList
+              episodes={tvEpisodeItems}
+              currentEpisode={String(episode)}
+              watchedEpisodes={watchedEpisodeIds}
+              onEpisodeClick={handleTvEpisodeClick}
+              header={
+                <label className={styles.sidebarSeason}>
+                  <span>Season</span>
+                  <select
+                    value={season}
+                    onChange={(e) => handleSeasonSelect(parseInt(e.target.value, 10) || 1)}
+                    className={styles.select}
+                  >
+                    {details.seasons?.map((s) => (
+                      <option key={s.season_number} value={s.season_number}>
+                        Season {s.season_number} ({s.episode_count} ep)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              }
             />
-          ) : !isEmbedProvider && !streamLoading && filteredStreams.length > 0 ? (
-            <>
-              {streamError && (
-                <div
-                  className={`${styles.statusMsg} ${styles.error}`}
-                  style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ flex: 1 }}>{streamError}</span>
-                    <button className={styles.retryButton} onClick={loadStreams}>
-                      Retry
-                    </button>
-                  </div>
-                  {activeServers.length > 0 && (
+          )
+        ) : isMovie ? (
+          <div className={styles.statusMsg}>
+            <Icon name="spinner" className={styles.spinner} /> Loading...
+          </div>
+        ) : (
+          <EpisodeListSkeleton variant="sidebar" />
+        )}
+      </aside>
+
+      <div className={layoutStyles.playerMain}>
+        {details && (
+          <div
+            className={styles.playerSection}
+            style={
+              details.adult && !hasMatureConsent
+                ? { filter: 'blur(14px)', pointerEvents: 'none', userSelect: 'none' }
+                : undefined
+            }
+          >
+            {streamLoading && !isEmbedProvider && (
+              <div className={styles.statusMsg}>
+                <Icon name="spinner" className={styles.spinner} /> Loading stream...
+              </div>
+            )}
+            {isEmbedProvider && iframeUrl ? (
+              <iframe
+                src={iframeUrl}
+                className={styles.videoIframe}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+            ) : !isEmbedProvider && !streamLoading && filteredStreams.length > 0 ? (
+              <>
+                {streamError && (
+                  <div
+                    className={`${styles.statusMsg} ${styles.error}`}
+                    style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
+                  >
                     <div
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 6,
-                        alignItems: 'center',
-                        marginTop: 4,
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
                     >
-                      <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
-                        Servers:
+                      <span style={{ flex: 1 }}>{streamError}</span>
+                      <button className={styles.retryButton} onClick={loadStreams}>
+                        Retry
+                      </button>
+                    </div>
+                    {activeServers.length > 0 && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                          alignItems: 'center',
+                          marginTop: 4,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
+                          Servers:
+                        </span>
+                        {activeServers.map((city) => (
+                          <button
+                            key={city}
+                            onClick={() => handleMovyServerSelect(city)}
+                            className={styles.retryButton}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              textTransform: 'capitalize',
+                              background: selectedMovyServer === city ? 'var(--accent)' : undefined,
+                              color: selectedMovyServer === city ? 'white' : undefined,
+                            }}
+                          >
+                            {city}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <TvPlayerControls
+                  player={player}
+                  title={details.title}
+                  episodeLabel={isMovie ? undefined : `S${season} E${episode}`}
+                  audioTracks={audioTracks}
+                  selectedAudioTrack={selectedAudioTrack}
+                  onAudioTrackChange={handleAudioTrackChange}
+                  subtitles={subtitles}
+                  selectedSubtitle={selectedSubtitle}
+                  onSubtitleChange={handleSubtitleChange}
+                  streams={filteredStreams}
+                  qualityIdx={qualityIdx}
+                  onQualityChange={setQualityIdx}
+                  onBack={handleBack}
+                  movyServers={activeServers}
+                  selectedMovyServer={selectedMovyServer}
+                  onMovyServerSelect={handleMovyServerSelect}
+                  isMovySource={activeServers.length > 0}
+                  videoDelayEnabled={videoDelayEnabled}
+                  onVideoDelayToggle={(v) => {
+                    setVideoDelayEnabled(v)
+                    try {
+                      localStorage.setItem('playerVideoDelayEnabled', String(v))
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  videoDelayMs={videoDelayMs}
+                  onVideoDelayChange={handleVideoDelayChange}
+                  onCalibrateAvSync={openAvSyncCalibrator}
+                >
+                  <video
+                    ref={videoRef}
+                    autoPlay={!showResumeModal}
+                    playsInline
+                    disablePictureInPicture
+                    className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
+                    onTimeUpdate={handleVideoTimeUpdate}
+                    onEnded={() => {
+                      if (!testClipActive) handleVideoEnded()
+                    }}
+                    onPlay={handleVideoPlay}
+                    onPause={player.actions.onPause}
+                    onLoadedMetadata={handleVideoLoadedMetadata}
+                    onVolumeChange={player.actions.onVolumeChange}
+                    onError={() => {
+                      setStreamError('Video failed to load. Try another server or reload.')
+                      setStreamLoading(false)
+                    }}
+                  />
+                  <canvas
+                    ref={delayCanvasRef}
+                    className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
+                  />
+                  {delayCanvasActive && (
+                    <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                  )}
+                  <AvSyncCalibrator
+                    isOpen={isCalibrating}
+                    ms={videoDelayMs}
+                    onChange={handleVideoDelayChange}
+                    onApply={applyAvSyncCalibrator}
+                    onClose={cancelAvSyncCalibrator}
+                    testClipActive={testClipActive}
+                    onTestClip={toggleTestClip}
+                  />
+                </TvPlayerControls>
+              </>
+            ) : streamError && !isEmbedProvider ? (
+              <div
+                className={`${styles.statusMsg} ${styles.error}`}
+                style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ flex: 1 }}>{streamError}</span>
+                  <button className={styles.retryButton} onClick={loadStreams}>
+                    Retry
+                  </button>
+                </div>
+                {activeServers.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      alignItems: 'center',
+                      marginTop: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
+                      Servers:
+                    </span>
+                    {activeServers.map((city) => (
+                      <button
+                        key={city}
+                        onClick={() => handleMovyServerSelect(city)}
+                        className={styles.retryButton}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          textTransform: 'capitalize',
+                          background: selectedMovyServer === city ? 'var(--accent)' : undefined,
+                          color: selectedMovyServer === city ? 'white' : undefined,
+                        }}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {details && <PlayerStatusArea showTheater={false} />}
+
+        {details && (
+          <div className={styles.providerSelectWrap}>
+            <label className={styles.controlLabel}>
+              Source
+              <select
+                value={source}
+                onChange={(e) => handleSourceSelect(e.target.value)}
+                className={styles.select}
+                disabled={tvProviders.length === 0}
+              >
+                {providersLoading ? (
+                  <option value="">Loading…</option>
+                ) : tvProviders.length === 0 ? (
+                  <option value="">No providers available</option>
+                ) : (
+                  <>
+                    {directProviders.length > 0 && (
+                      <optgroup label="Direct HLS">
+                        {directProviders.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {embedProviders.length > 0 && (
+                      <optgroup label="Embeds">
+                        {embedProviders.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </>
+                )}
+              </select>
+            </label>
+          </div>
+        )}
+
+        {details && (
+          <div className={layoutStyles.playerInfoContainer}>
+            <div className={layoutStyles.playerInfoHeader}>
+              <div className={layoutStyles.playerAnimeCard}>
+                {details.poster && (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w342${details.poster}`}
+                    alt={details.title}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+              </div>
+              <div className={layoutStyles.videoTitleSection}>
+                <div className={playerStyles.titleContainer}>
+                  <h1>{details.title}</h1>
+                  <div className={styles.meta}>
+                    <span className={styles.year}>{details.year}</span>
+                    {details.vote_average != null && details.vote_average > 0 && (
+                      <span className={styles.rating}>
+                        <Icon name="star" size={12} />
+                        {Number(details.vote_average).toFixed(1)}
                       </span>
-                      {activeServers.map((city) => (
-                        <button
-                          key={city}
-                          onClick={() => handleMovyServerSelect(city)}
-                          className={styles.retryButton}
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '0.75rem',
-                            textTransform: 'capitalize',
-                            background: selectedMovyServer === city ? 'var(--accent)' : undefined,
-                            color: selectedMovyServer === city ? 'white' : undefined,
-                          }}
-                        >
-                          {city}
-                        </button>
+                    )}
+                    <span className={`${styles.typeBadge} ${styles[isMovie ? 'movie' : 'tv']}`}>
+                      {isMovie ? 'Movie' : 'TV Show'}
+                    </span>
+                  </div>
+                  {genreNames.length > 0 && (
+                    <div className={styles.genreRow}>
+                      {genreNames.map((g) => (
+                        <span key={g} className={styles.genreChip}>
+                          {g}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {metaRow.length > 0 && (
+                    <div className={styles.metaRow}>
+                      {metaRow.map((m, i) => (
+                        <span key={`${m}-${i}`}>
+                          {m}
+                          {i < metaRow.length - 1 ? ' · ' : ''}
+                        </span>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
-              <TvPlayerControls
-                videoRef={videoRef}
-                title={details.title}
-                audioTracks={audioTracks}
-                selectedAudioTrack={selectedAudioTrack}
-                onAudioTrackChange={handleAudioTrackChange}
-                subtitles={subtitles}
-                selectedSubtitle={selectedSubtitle}
-                onSubtitleChange={handleSubtitleChange}
-                streams={filteredStreams}
-                qualityIdx={qualityIdx}
-                onQualityChange={setQualityIdx}
-                onBack={handleBack}
-                movyServers={activeServers}
-                selectedMovyServer={selectedMovyServer}
-                onMovyServerSelect={handleMovyServerSelect}
-                isMovySource={activeServers.length > 0}
-                videoDelayEnabled={videoDelayEnabled}
-                onVideoDelayToggle={(v) => {
-                  setVideoDelayEnabled(v)
-                  try {
-                    localStorage.setItem('playerVideoDelayEnabled', String(v))
-                  } catch {
-                    // ignore
-                  }
-                }}
-                videoDelayMs={videoDelayMs}
-                onVideoDelayChange={(ms) => {
-                  const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-                  setVideoDelayMs(clamped)
-                  try {
-                    localStorage.setItem('playerVideoDelayMs', String(clamped))
-                  } catch {
-                    // ignore
-                  }
-                }}
-                onCalibrateAvSync={() => {
-                  const v = videoRef.current
-                  wasPlayingBeforeCalibRef.current = !!v && !v.paused && !v.ended
-                  v?.pause()
-                  setIsCalibrating(true)
+                <div className={playerStyles.controls}>
+                  <button
+                    className={`${playerStyles.watchlistBtn} ${inTvLibrary ? playerStyles.inList : ''}`}
+                    onClick={handleToggleWatchlist}
+                    disabled={bookmarkPending}
+                    type="button"
+                  >
+                    {inTvLibrary ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
+                    {inTvLibrary ? 'In Watchlist' : 'Add to Watchlist'}
+                  </button>
+                  {!isMovie && (
+                    <>
+                      <button
+                        className={`${playerStyles.watchlistBtn}`}
+                        onClick={() =>
+                          prevEpisodeNumber != null &&
+                          handleTvEpisodeClick(String(prevEpisodeNumber))
+                        }
+                        disabled={prevEpisodeNumber == null}
+                        type="button"
+                      >
+                        <Icon name="chevron-left" size={14} />
+                        Prev EP
+                      </button>
+                      <button
+                        className={`${playerStyles.watchlistBtn}`}
+                        onClick={() =>
+                          nextEpisodeNumber != null &&
+                          handleTvEpisodeClick(String(nextEpisodeNumber))
+                        }
+                        disabled={nextEpisodeNumber == null}
+                        type="button"
+                      >
+                        Next EP
+                        <Icon name="chevron-right" size={14} />
+                      </button>
+                      {isMobile && (
+                        <button
+                          className={`${playerStyles.watchlistBtn}`}
+                          onClick={() => setIsEpisodeDrawerOpen(true)}
+                          type="button"
+                        >
+                          <Icon name="list-ul" size={14} />
+                          Episodes
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className={playerStyles.descriptionSection}>
+              <h3>Synopsis</h3>
+              <SynopsisText text={details.overview} emptyText="No description available." />
+            </div>
+
+            <button
+              className={playerStyles.detailsToggleBtn}
+              onClick={() => setShowDetails(!showDetails)}
+              type="button"
+            >
+              {showDetails ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
+              {showDetails ? 'Hide Details' : 'Show Details'}
+            </button>
+
+            {showDetails && (
+              <div className={styles.detailGrid}>
+                {details.first_air_date && (
+                  <div className={styles.detailItem}>
+                    <strong>{isMovie ? 'Release Date' : 'First Air Date'}</strong>
+                    <span>{details.first_air_date}</span>
+                  </div>
+                )}
+                {details.last_air_date && (
+                  <div className={styles.detailItem}>
+                    <strong>Last Air Date</strong>
+                    <span>{details.last_air_date}</span>
+                  </div>
+                )}
+                {details.networks && details.networks.length > 0 && (
+                  <div className={styles.detailItem}>
+                    <strong>Networks</strong>
+                    <span>{details.networks.map((n) => n.name).join(', ')}</span>
+                  </div>
+                )}
+                {details.created_by && details.created_by.length > 0 && (
+                  <div className={styles.detailItem}>
+                    <strong>Created By</strong>
+                    <span>{details.created_by.map((c) => c.name).join(', ')}</span>
+                  </div>
+                )}
+                {details.episode_run_time && details.episode_run_time.length > 0 && (
+                  <div className={styles.detailItem}>
+                    <strong>Episode Runtime</strong>
+                    <span>{details.episode_run_time[0]} min</span>
+                  </div>
+                )}
+                {details.imdb_id && (
+                  <div className={styles.detailItem}>
+                    <strong>IMDb</strong>
+                    <a
+                      href={`https://www.imdb.com/title/${details.imdb_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.imdbLink}
+                    >
+                      View on IMDb
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isMovie && (
+          <EpisodeDrawer
+            isOpen={isEpisodeDrawerOpen}
+            onClose={() => setIsEpisodeDrawerOpen(false)}
+            episodes={tvEpisodeItems}
+            currentEpisode={String(episode)}
+            watchedEpisodes={watchedEpisodeIds}
+            onEpisodeClick={handleTvEpisodeClick}
+          />
+        )}
+
+        {details?.adult && !hasMatureConsent && (
+          <Modal isOpen title="Content Warning" onClose={handleBack}>
+            <div style={{ padding: '1rem', textAlign: 'center' }}>
+              <p>This title contains mature content intended for adult audiences.</p>
+              <p>
+                By proceeding, you confirm that you are <strong>18 years of age or older</strong>{' '}
+                (or the age of majority in your jurisdiction) and wish to view this content.
+              </p>
+              <div
+                style={{
+                  marginTop: '1rem',
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'center',
                 }}
               >
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  disablePictureInPicture
-                  className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
-                  onTimeUpdate={handleVideoTimeUpdate}
-                  onEnded={handleVideoEnded}
-                  onPlay={handleVideoPlay}
-                  onError={() => {
-                    setStreamError('Video failed to load. Try another server or reload.')
-                    setStreamLoading(false)
-                  }}
-                />
-                <canvas
-                  ref={delayCanvasRef}
-                  className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
-                />
-                {delayCanvasActive && (
-                  <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
-                )}
-                <AvSyncCalibrator
-                  isOpen={isCalibrating}
-                  initialMs={videoDelayMs}
-                  onClose={() => {
-                    setIsCalibrating(false)
-                    resumeAfterCalib()
-                  }}
-                  onApply={(ms) => {
-                    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-                    setVideoDelayMs(clamped)
-                    setVideoDelayEnabled(true)
-                    try {
-                      localStorage.setItem('playerVideoDelayMs', String(clamped))
-                      localStorage.setItem('playerVideoDelayEnabled', 'true')
-                    } catch {
-                      // ignore
-                    }
-                    setIsCalibrating(false)
-                    resumeAfterCalib()
-                  }}
-                />
-              </TvPlayerControls>
-            </>
-          ) : streamError && !isEmbedProvider ? (
-            <div
-              className={`${styles.statusMsg} ${styles.error}`}
-              style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ flex: 1 }}>{streamError}</span>
-                <button className={styles.retryButton} onClick={loadStreams}>
-                  Retry
-                </button>
+                <Button variant="secondary" onClick={handleBack}>
+                  Go Back
+                </Button>
+                <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
               </div>
-              {activeServers.length > 0 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 6,
-                    alignItems: 'center',
-                    marginTop: 4,
-                  }}
-                >
-                  <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
-                    Servers:
-                  </span>
-                  {activeServers.map((city) => (
-                    <button
-                      key={city}
-                      onClick={() => handleMovyServerSelect(city)}
-                      className={styles.retryButton}
-                      style={{
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        textTransform: 'capitalize',
-                        background: selectedMovyServer === city ? 'var(--accent)' : undefined,
-                        color: selectedMovyServer === city ? 'white' : undefined,
-                      }}
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          ) : null}
-        </div>
-      )}
+          </Modal>
+        )}
 
-      {details?.adult && !hasMatureConsent && (
-        <Modal isOpen title="Content Warning" onClose={handleBack}>
+        <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Watching">
           <div style={{ padding: '1rem', textAlign: 'center' }}>
-            <p>This title contains mature content intended for adult audiences.</p>
             <p>
-              By proceeding, you confirm that you are <strong>18 years of age or older</strong> (or
-              the age of majority in your jurisdiction) and wish to view this content.
+              You were at <strong>{formatTime(resumeTime)}</strong>
             </p>
             <div
               style={{
@@ -1422,79 +1821,58 @@ const Tv: React.FC = () => {
                 justifyContent: 'center',
               }}
             >
-              <Button variant="secondary" onClick={handleBack}>
-                Go Back
+              <Button variant="secondary" onClick={handleSkipResume}>
+                Start from Beginning
               </Button>
-              <Button onClick={grantMatureConsent}>I'm 18+, Continue</Button>
+              <Button onClick={handleResume}>Resume</Button>
             </div>
           </div>
         </Modal>
-      )}
 
-      <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Watching">
-        <div style={{ padding: '1rem', textAlign: 'center' }}>
-          <p>
-            You were at <strong>{formatTime(resumeTime)}</strong>
-          </p>
-          <div
-            style={{
-              marginTop: '1rem',
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'center',
-            }}
-          >
-            <Button variant="secondary" onClick={handleSkipResume}>
-              Start from Beginning
-            </Button>
-            <Button onClick={handleResume}>Resume</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={showCompleteModal}
-        onClose={() => setShowCompleteModal(false)}
-        title="Finished!"
-      >
-        <div style={{ padding: '1rem', textAlign: 'center' }}>
-          <Icon
-            name="check-circle"
-            size={48}
-            style={{ color: 'var(--accent-lighter)', marginBottom: '0.5rem' }}
-          />
-          <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{completeTitle}</p>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            {isMovie ? 'You finished this movie!' : 'You finished this season!'}
-          </p>
-          <div
-            style={{
-              marginTop: '1rem',
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'center',
-            }}
-          >
-            <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                setShowCompleteModal(false)
-                handleBack()
+        <Modal
+          isOpen={showCompleteModal}
+          onClose={() => setShowCompleteModal(false)}
+          title="Finished!"
+        >
+          <div style={{ padding: '1rem', textAlign: 'center' }}>
+            <Icon
+              name="check-circle"
+              size={48}
+              style={{ color: 'var(--accent-lighter)', marginBottom: '0.5rem' }}
+            />
+            <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{completeTitle}</p>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              {isMovie ? 'You finished this movie!' : 'You finished this season!'}
+            </p>
+            <div
+              style={{
+                marginTop: '1rem',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'center',
               }}
             >
-              Back to Details
-            </Button>
+              <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowCompleteModal(false)
+                  handleBack()
+                }}
+              >
+                Back to Details
+              </Button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
 
-      {!details && (
-        <div className={styles.statusMsg}>
-          <Icon name="spinner" className={styles.spinner} /> Loading...
-        </div>
-      )}
+        {!details && (
+          <div className={styles.statusMsg}>
+            <Icon name="spinner" className={styles.spinner} /> Loading...
+          </div>
+        )}
+      </div>
     </div>
   )
 }

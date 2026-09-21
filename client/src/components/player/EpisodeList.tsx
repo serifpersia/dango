@@ -1,23 +1,41 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import styles from './EpisodeList.module.css'
 
+export interface EpisodeListItem {
+  id: string
+  label?: string
+  sublabel?: string
+  thumbnail?: string
+  watched?: boolean
+}
+
 interface EpisodeListProps {
-  episodes: string[]
+  episodes: Array<string | EpisodeListItem>
   currentEpisode?: string
-  watchedEpisodes: string[]
+  watchedEpisodes?: string[]
   onEpisodeClick: (ep: string) => void
   variant?: 'sidebar' | 'drawer'
+  title?: string
+  header?: React.ReactNode
 }
 
 const EpisodeList = ({
   episodes,
   currentEpisode,
-  watchedEpisodes,
+  watchedEpisodes = [],
   onEpisodeClick,
   variant = 'sidebar',
+  title = 'Episodes',
+  header,
 }: EpisodeListProps) => {
   const [selectedRange, setSelectedRange] = useState(0)
   const activeItemRef = useRef<HTMLDivElement>(null)
+
+  const normalizedItems = useMemo<EpisodeListItem[]>(
+    () => episodes.map((ep) => (typeof ep === 'string' ? { id: ep, label: `Episode ${ep}` } : ep)),
+    [episodes]
+  )
+  const watchedSet = useMemo(() => new Set(watchedEpisodes), [watchedEpisodes])
 
   useEffect(() => {
     const item = activeItemRef.current
@@ -43,24 +61,25 @@ const EpisodeList = ({
   }, [currentEpisode, selectedRange])
 
   const episodeRanges = useMemo(() => {
-    if (episodes.length <= 100) return []
+    if (normalizedItems.length <= 100) return []
     const ranges = []
-    for (let i = 0; i < episodes.length; i += 100) {
+    for (let i = 0; i < normalizedItems.length; i += 100) {
       const start = i + 1
-      const end = Math.min(i + 100, episodes.length)
+      const end = Math.min(i + 100, normalizedItems.length)
       ranges.push(`${start}-${end}`)
     }
     return ranges
-  }, [episodes])
+  }, [normalizedItems])
 
-  const filteredEpisodes = useMemo(() => {
-    if (episodeRanges.length === 0) return episodes
+  const filteredItems = useMemo(() => {
+    if (episodeRanges.length === 0) return normalizedItems
     const range = episodeRanges[selectedRange]
+    if (!range) return normalizedItems
     const [startStr, endStr] = range.split('-')
     const start = parseInt(startStr, 10)
     const end = parseInt(endStr, 10)
-    return episodes.slice(start - 1, end)
-  }, [episodes, episodeRanges, selectedRange])
+    return normalizedItems.slice(start - 1, end)
+  }, [normalizedItems, episodeRanges, selectedRange])
 
   return (
     <div
@@ -69,7 +88,8 @@ const EpisodeList = ({
       <div
         className={`${styles.episodeListHeader} ${variant === 'drawer' ? styles.drawerHeader : ''}`}
       >
-        <h3 className={styles.episodeListTitle}>Episodes</h3>
+        {header}
+        <h3 className={styles.episodeListTitle}>{title}</h3>
         {episodeRanges.length > 0 && (
           <div className={styles.rangeSelector}>
             {episodeRanges.map((range, index) => (
@@ -85,16 +105,32 @@ const EpisodeList = ({
         )}
       </div>
       <div className={`${styles.episodeList} ${variant === 'drawer' ? styles.drawerList : ''}`}>
-        {filteredEpisodes.map((ep) => (
-          <div
-            key={ep}
-            ref={ep === currentEpisode ? activeItemRef : undefined}
-            className={`${styles.episodeItem} ${watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === currentEpisode ? styles.active : ''}`}
-            onClick={() => onEpisodeClick(ep)}
-          >
-            <span>Episode {ep}</span>
-          </div>
-        ))}
+        {filteredItems.map((item) => {
+          const isActive = item.id === currentEpisode
+          const isWatched = watchedSet.has(item.id) || item.watched === true
+          return (
+            <div
+              key={item.id}
+              ref={isActive ? activeItemRef : undefined}
+              className={`${styles.episodeItem} ${isWatched ? styles.watched : ''} ${isActive ? styles.active : ''}`}
+              onClick={() => onEpisodeClick(item.id)}
+            >
+              {item.thumbnail && (
+                <img
+                  src={item.thumbnail}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className={styles.episodeThumb}
+                />
+              )}
+              <span className={styles.episodeText}>
+                <span className={styles.episodeLabel}>{item.label ?? `Episode ${item.id}`}</span>
+                {item.sublabel && <span className={styles.episodeSub}>{item.sublabel}</span>}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

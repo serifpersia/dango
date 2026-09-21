@@ -16,6 +16,22 @@
   border-radius: 0;
 }
 
+.container:fullscreen .video,
+.container:fullscreen .delayCanvas,
+.container:fullscreen .subtitleOverlay,
+.container:-webkit-full-screen .video,
+.container:-webkit-full-screen .delayCanvas,
+.container:-webkit-full-screen .subtitleOverlay {
+  border-radius: 0;
+}
+
+.fullscreenFlat,
+.fullscreenFlat .video,
+.fullscreenFlat .delayCanvas,
+.fullscreenFlat .subtitleOverlay {
+  border-radius: 0;
+}
+
 @media (max-width: 900px) and (orientation: landscape) {
   .container {
     aspect-ratio: auto;
@@ -148,6 +164,42 @@
   color: white;
   letter-spacing: -0.01em;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.episodeLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.speedBoostBadge {
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 22, 0.92);
+  color: #f5f3ff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  z-index: 11;
+  pointer-events: none;
+}
+
+.speedBoostBadge span {
+  line-height: 1;
+}
+
+.speedBoostBadge svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .bottomControls {
