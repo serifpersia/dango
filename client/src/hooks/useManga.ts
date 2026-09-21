@@ -155,3 +155,21 @@ export const useMangaPages = (
     staleTime: 30 * 60 * 1000,
   })
 }
+
+export interface MangaTrendingItem {
+  id: string
+  title: string
+  description: string
+  tags: string[]
+  year: number | null
+  status: string | null
+  cover: string
+}
+
+export const useMangaTrending = () => {
+  return useQuery({
+    queryKey: ['mangaTrending'],
+    queryFn: () => fetchApi('/api/manga/trending') as Promise<MangaTrendingItem[]>,
+    staleTime: 10 * 60 * 1000,
+  })
+}

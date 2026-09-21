@@ -146,5 +146,61 @@ export function createMangaRouter(
     }
   )
 
+  router.get(
+    '/manga/trending',
+    makeCacheMiddleware(apiCache, () => 'route-manga-trending', 600),
+    async (_req, res) => {
+      try {
+        const url =
+          'https://api.mangadex.org/manga?limit=6&order%5BfollowedCount%5D=desc&includes%5B%5D=cover_art&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive'
+        const upstream = await fetch(url, {
+          headers: { 'User-Agent': 'dango/3.1.9' },
+        })
+        if (!upstream.ok) return res.json([])
+        const data = (await upstream.json()) as {
+          data?: Array<{
+            id: string
+            attributes?: {
+              title?: Record<string, string>
+              description?: Record<string, string>
+              tags?: Array<{ attributes?: { name?: Record<string, string> } }>
+              year?: number
+              status?: string
+            }
+            relationships?: Array<{
+              type: string
+              attributes?: { fileName?: string }
+            }>
+          }>
+        }
+        const results = (data.data || []).map((m) => {
+          const title = m.attributes?.title?.en || Object.values(m.attributes?.title || {})[0] || ''
+          const desc = m.attributes?.description?.en || ''
+          const tags = (m.attributes?.tags || [])
+            .map((t) => t.attributes?.name?.en)
+            .filter(Boolean)
+          const coverArt = m.relationships?.find((r) => r.type === 'cover_art')
+          const fileName = coverArt?.attributes?.fileName
+          const cover = fileName
+            ? `https://uploads.mangadex.org/covers/${m.id}/${fileName}.512.jpg`
+            : ''
+          return {
+            id: m.id,
+            title,
+            description: desc,
+            tags,
+            year: m.attributes?.year || null,
+            status: m.attributes?.status || null,
+            cover,
+          }
+        })
+        res.json(results)
+      } catch (err) {
+        logger.error({ err }, '[Manga] trending failed')
+        res.json([])
+      }
+    }
+  )
+
   return router
 }
