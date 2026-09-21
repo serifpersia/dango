@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import Icon from '../components/common/Icon'
-import TvCard from '../components/tv/TvCard'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
@@ -16,16 +15,6 @@ import type Hls from 'hls.js'
 import styles from './Tv.module.css'
 
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
-
-interface TvSearchResult {
-  id: number
-  title: string
-  year: string
-  type: MediaType
-  image: string
-  vote_average?: number
-  adult?: boolean
-}
 
 interface TvDetails {
   id: number
@@ -79,28 +68,12 @@ interface TvProviderOption {
 
 const NO_TV_PROVIDERS: TvProviderOption[] = []
 
-const SUGGESTIONS = [
-  'Stranger Things',
-  'Breaking Bad',
-  'The Boys',
-  'Interstellar',
-  'Dune',
-  'Avengers',
-  'House of the Dragon',
-  'Wednesday',
-]
-
 const Tv: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const typeParam = searchParams.get('type') as MediaType | null
 
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<TvSearchResult[]>([])
-  const [status, setStatus] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<TvSearchResult | null>(null)
   const [details, setDetails] = useState<TvDetails | null>(null)
   const [_detailsLoading, setDetailsLoading] = useState(false)
   const [season, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
@@ -207,10 +180,7 @@ const Tv: React.FC = () => {
     discordSessionRef.current = `tv-${Date.now()}-${Math.random().toString(36).slice(2)}`
   }
 
-  const isMovie =
-    details?.seasons === undefined && details?.number_of_seasons === undefined
-      ? selectedItem?.type === 'movie'
-      : false
+  const isMovie = typeParam === 'movie'
 
   const pickDefaultSubtitle = useCallback((subs: SubtitleTrack[]): number => {
     let lastKey: string | null = null
@@ -288,7 +258,6 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     if (!id) {
-      setSelectedItem(null)
       setDetails(null)
       setStreams([])
       setStreamError('')
@@ -297,8 +266,7 @@ const Tv: React.FC = () => {
     }
 
     const itemId = Number(id)
-    const type = typeParam || 'tv'
-    setSelectedItem({ id: itemId, title: '', year: '', type: type as MediaType, image: '' })
+    const mediaType = typeParam || 'tv'
     setDetailsLoading(true)
     setDetails(null)
     setStreams([])
@@ -310,7 +278,7 @@ const Tv: React.FC = () => {
     setEpisode(isNaN(eParam) ? 1 : eParam)
     setQualityIdx(0)
 
-    fetch(`/api/tv/details/${type}/${itemId}`)
+    fetch(`/api/tv/details/${mediaType}/${itemId}`)
       .then((r) => r.json())
       .then((d: TvDetails) => {
         setDetails(d)
@@ -321,7 +289,7 @@ const Tv: React.FC = () => {
       })
       .catch(() => {
         setDetailsLoading(false)
-        setStatus('Failed to load details.')
+        // ignore
       })
   }, [id, typeParam, searchParams])
 
@@ -346,7 +314,7 @@ const Tv: React.FC = () => {
         }
       })
       .catch(() => {
-        setStatus('Failed to load episodes.')
+        // ignore
       })
   }, [details, id, season, searchParams])
 
@@ -769,41 +737,11 @@ const Tv: React.FC = () => {
     }
   }, [delayCanvasActive, selectedSubtitle, subtitles, effectiveVideoDelayMs])
 
-  const doSearch = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const q = query.trim()
-    if (!q) return
-    setLoading(true)
-    setStatus(`Searching for "${q}"...`)
-    setResults([])
-    try {
-      const res = await fetch(`/api/tv/search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
-      setLoading(false)
-      setStatus(data.length ? '' : 'No results found.')
-      setResults(data)
-    } catch {
-      setLoading(false)
-      setStatus('Search failed.')
-    }
-  }
-
-  const handleSuggestion = (tag: string) => {
-    setQuery(tag)
-    doSearch()
-  }
-
-  const _handleSelectItem = (item: TvSearchResult) => {
-    const isTV = item.type === 'tv' || item.type === 'tvSeries' || item.type === 'tvMiniSeries'
-    navigate(`/tv/${item.id}?type=${isTV ? 'tv' : 'movie'}`)
-  }
-
   const handleBack = () => {
-    setSelectedItem(null)
     setDetails(null)
     setStreams([])
     setIframeUrl('')
-    navigate('/tv')
+    navigate(-1)
   }
 
   const handleAudioTrackChange = (index: number) => {
@@ -1344,68 +1282,9 @@ const Tv: React.FC = () => {
       )}
 
       {!details && (
-        <>
-          <header className={styles.header}>
-            <h1 className={styles.pageTitle}>
-              <Icon name="tv" /> TV & Movies
-            </h1>
-            <form className={styles.searchForm} onSubmit={(e) => doSearch(e)}>
-              <input
-                className={styles.searchInput}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search movies or shows..."
-                aria-label="Search TV and Movies"
-              />
-              <button className={styles.searchBtn} type="submit" aria-label="Search">
-                <Icon name="search" />
-              </button>
-            </form>
-          </header>
-
-          <div className={styles.suggestions}>
-            {SUGGESTIONS.map((tag) => (
-              <button
-                key={tag}
-                className={styles.suggestionPill}
-                onClick={() => handleSuggestion(tag)}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-
-          {status && (
-            <div className={`${styles.statusMsg} ${loading ? '' : styles.textOnly}`}>{status}</div>
-          )}
-
-          {loading && results.length === 0 && (
-            <div className={styles.grid} aria-hidden>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className={styles.skeletonCard}>
-                  <div className={`${styles.skeletonThumb} ${styles.shimmer}`} />
-                  <div
-                    className={`${styles.skeletonLine} ${styles.shimmer}`}
-                    style={{ width: '88%' }}
-                  />
-                  <div
-                    className={`${styles.skeletonLine} ${styles.shimmer}`}
-                    style={{ width: '55%' }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!loading && results.length > 0 && (
-            <div className={styles.grid}>
-              {results.map((item) => (
-                <TvCard key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-        </>
+        <div className={styles.statusMsg}>
+          <Icon name="spinner" className={styles.spinner} /> Loading...
+        </div>
       )}
     </div>
   )

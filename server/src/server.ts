@@ -19,10 +19,13 @@ import { CONFIG } from './config.js'
 import {
   initializeDatabase,
   initializeMangaDatabase,
+  initializeTvDatabase,
   syncDownOnBoot,
   syncUp,
   mangaSyncDownOnBoot,
   mangaSyncUp,
+  tvSyncDownOnBoot,
+  tvSyncUp,
   initSyncProvider,
   waitForSync,
   getActiveProvider,
@@ -39,6 +42,7 @@ import type { MangaProvider } from './providers/manga/manga.types.js'
 import type { TvProvider } from './providers/tv.types.js'
 import { createRadioRouter } from './routes/radio.routes.js'
 import { createTvRouter } from './routes/tv.routes.js'
+import { createTvLibraryRouter } from './routes/tv-library.routes.js'
 import { createProxyRouter } from './routes/proxy.routes.js'
 import { createProvidersRouter } from './routes/providers.routes.js'
 import { loadRemoteProviders } from './providers/remote-loader.js'
@@ -61,6 +65,7 @@ declare module 'express-serve-static-core' {
   interface Request {
     db: DatabaseWrapper
     mangaDb: DatabaseWrapper
+    tvDb: DatabaseWrapper
   }
 }
 
@@ -155,6 +160,7 @@ async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
 
 let db: DatabaseWrapper
 let mangaDb: DatabaseWrapper
+let tvDb: DatabaseWrapper
 let isShuttingDown = false
 
 async function runSyncSequence(
@@ -211,17 +217,30 @@ async function runSyncSequence(
   } catch (err) {
     logger.error({ err }, 'Manga sync up on boot failed')
   }
+
+  try {
+    await tvSyncDownOnBoot(tvDb, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'TV sync down on boot failed')
+  }
+
+  try {
+    await tvSyncUp(tvDb, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'TV sync up on boot failed')
+  }
 }
 
 app.use((req, res, next) => {
   if (isShuttingDown) {
     return res.status(503).send('Server is shutting down...')
   }
-  if (!db || !mangaDb) {
+  if (!db || !mangaDb || !tvDb) {
     return res.status(503).send('Database initializing...')
   }
   req.db = db
   req.mangaDb = mangaDb
+  req.tvDb = tvDb
   next()
 })
 
@@ -276,6 +295,7 @@ app.use(
   '/api',
   createTvRouter(apiCache, (name) => tvProviders[name])
 )
+app.use('/api', createTvLibraryRouter())
 app.use('/api', createProxyRouter())
 app.use('/api', createProvidersRouter(getProviderCatalog, refreshRemoteProviders))
 app.use('/api', createInsightsRouter())
@@ -353,6 +373,11 @@ async function main() {
   mangaDb = await initializeMangaDatabase(mangaDbPath)
   logger.info(`Manga database initialized at ${mangaDbPath}`)
 
+  const tvDbName = CONFIG.IS_DEV ? CONFIG.TV_DB_NAME_DEV : CONFIG.TV_DB_NAME_PROD
+  const tvDbPath = path.join(CONFIG.ROOT, tvDbName)
+  tvDb = await initializeTvDatabase(tvDbPath)
+  logger.info(`TV database initialized at ${tvDbPath}`)
+
   await offlineDb.init(db)
   if (offlineDb.checkWeeklyUpdateDue(db)) {
     logger.info('Weekly offline database update is due on startup, starting background update...')
@@ -386,9 +411,13 @@ async function main() {
   if (!fs.existsSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH)) {
     fs.writeFileSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
   }
+  if (!fs.existsSync(CONFIG.TV_LOCAL_MANIFEST_PATH)) {
+    fs.writeFileSync(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
+  }
 
   let hasUnsyncedChanges = false
   let hasMangaUnsyncedChanges = false
+  let hasTvUnsyncedChanges = false
 
   const watcher = fs.watch(CONFIG.LOCAL_MANIFEST_PATH, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
@@ -399,6 +428,12 @@ async function main() {
   const mangaWatcher = fs.watch(CONFIG.MANGA_LOCAL_MANIFEST_PATH, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
       hasMangaUnsyncedChanges = true
+    }
+  })
+
+  const tvWatcher = fs.watch(CONFIG.TV_LOCAL_MANIFEST_PATH, (eventType) => {
+    if (eventType === 'change' || eventType === 'rename') {
+      hasTvUnsyncedChanges = true
     }
   })
 
@@ -427,6 +462,16 @@ async function main() {
         hasMangaUnsyncedChanges = true
       }
     }
+    if (hasTvUnsyncedChanges) {
+      logger.info('Uploading accumulated TV database changes...')
+      hasTvUnsyncedChanges = false
+      try {
+        await tvSyncUp(tvDb, remoteFolder)
+      } catch (err) {
+        logger.error({ err }, 'Failed to upload TV database changes')
+        hasTvUnsyncedChanges = true
+      }
+    }
   }, 300000)
 
   const offlineDbInterval = setInterval(
@@ -452,6 +497,7 @@ async function main() {
     discordGatewayService.shutdown()
     await watcher.close()
     await mangaWatcher.close()
+    await tvWatcher.close()
 
     if (expressServer) {
       await new Promise<void>((resolve) => expressServer.close(() => resolve()))
@@ -477,8 +523,19 @@ async function main() {
       }
     }
 
+    if (hasTvUnsyncedChanges) {
+      logger.info('Sync on shutdown: uploading final TV database changes...')
+      hasTvUnsyncedChanges = false
+      try {
+        await tvSyncUp(tvDb, remoteFolder)
+      } catch (e) {
+        logger.error({ err: e }, 'Final TV sync on shutdown failed')
+      }
+    }
+
     await waitForSync()
 
+    tvDb.close(() => {})
     mangaDb.close(() => {})
     db.close(() => {
       notifyServerExit()

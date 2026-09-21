@@ -124,7 +124,7 @@
 }
 
 .iconStar {
-  color: #fbbf24;
+  color: var(--accent-lighter);
 }
 .iconTv {
   color: var(--accent);

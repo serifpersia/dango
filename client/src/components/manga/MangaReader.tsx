@@ -100,8 +100,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
     setDeadPages(new Set())
     stripRefs.current = []
     if (initialPage <= 0) window.scrollTo(0, 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter.id])
+  }, [chapter.id, initialPage])
 
   const onProgressRef = useRef(onProgress)
   onProgressRef.current = onProgress

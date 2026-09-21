@@ -12,6 +12,7 @@ import {
   exportTables,
   importTables,
   MANGA_SYNC_TABLES,
+  TV_SYNC_TABLES,
   normalizePayload as normalizeGenericPayload,
   readPayloadVersion,
 } from './sync-payload.js'
@@ -551,6 +552,12 @@ export class GoogleDriveService {
     )
   }
 
+  private getTvSyncFilename(): string {
+    return (
+      (CONFIG as { TV_GOOGLE_SYNC_FILENAME?: string }).TV_GOOGLE_SYNC_FILENAME || 'tv.sync.json'
+    )
+  }
+
   private async findFileInAppData(filename: string): Promise<GoogleDriveFile | null> {
     if (!this.isAuthenticated()) return null
     const safeName = filename.replace(/'/g, "\\'")
@@ -686,6 +693,43 @@ export class GoogleDriveService {
     importTables(db, MANGA_SYNC_TABLES, payload, {
       libraryTables: ['manga_library', 'manga_progress'],
       backupName: 'pre-sync-manga-backup.db',
+    })
+    return readPayloadVersion(payload)
+  }
+
+  async getTvRemoteVersion(): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getTvSyncFilename())
+    if (!file) return 0
+    try {
+      const payload = (await this.downloadJson(file.id)) as {
+        version?: number
+        tables?: { sync_metadata?: Array<{ key: string; value: number | string }> }
+      }
+      const row = payload?.tables?.sync_metadata?.find((r) => r.key === 'db_version')
+      const v = row?.value
+      return typeof v === 'number' ? v : Number(v || payload?.version || 0)
+    } catch {
+      return 0
+    }
+  }
+
+  async syncTvUp(db: DatabaseWrapper): Promise<void> {
+    if (!this.isAuthenticated()) return
+    const payload = exportTables(db, TV_SYNC_TABLES)
+    const existing = await this.findFileInAppData(this.getTvSyncFilename())
+    await this.uploadJson(this.getTvSyncFilename(), payload, existing?.id)
+  }
+
+  async syncTvDown(db: DatabaseWrapper): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getTvSyncFilename())
+    if (!file) return 0
+    const raw = await this.downloadJson(file.id)
+    const payload = normalizeGenericPayload(raw, TV_SYNC_TABLES, 'Google TV')
+    importTables(db, TV_SYNC_TABLES, payload, {
+      libraryTables: ['tv_library', 'tv_progress'],
+      backupName: 'pre-sync-tv-backup.db',
     })
     return readPayloadVersion(payload)
   }

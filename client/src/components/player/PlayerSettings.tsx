@@ -243,9 +243,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         </div>
       )}
       {!isChromiumBased && (
-        <div className={styles.menuNote}>
-          Upscaling performs best in Chrome-based browsers.
-        </div>
+        <div className={styles.menuNote}>Upscaling performs best in Chrome-based browsers.</div>
       )}
       <button
         className={`${styles.menuItem} ${anime4kProfile === 'low' ? styles.selected : ''}`}

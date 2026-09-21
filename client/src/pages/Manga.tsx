@@ -139,8 +139,7 @@ export default function Manga() {
 
   useEffect(() => {
     if (queryInput !== query) setQueryInput(query)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+  }, [query, queryInput, setQueryInput])
 
   if (legacyId) {
     const params = new URLSearchParams()

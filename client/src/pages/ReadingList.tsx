@@ -21,7 +21,6 @@ import {
 } from '../hooks/useMangaLibrary'
 import { useMangaPopup, type MangaPopupData } from '../hooks/useMangaPopup'
 import styles from './Watchlist.module.css'
-import mangaStyles from '../components/manga/Manga.module.css'
 
 const FILTERS = ['All', 'Continue Reading', ...MANGA_LIBRARY_STATUSES]
 
@@ -152,7 +151,7 @@ export default function ReadingList() {
           {filterBy}
           <span className={styles.itemCount}>({total} items)</span>
         </h3>
-        {total > 0 && !isCR && (
+        {total > 0 && (
           <div className={styles.pagination}>
             <button
               className={styles.pageBtn}
@@ -193,7 +192,7 @@ export default function ReadingList() {
           </button>
         </div>
       ) : (
-        <div className={mangaStyles.grid}>
+        <div className={styles.grid}>
           {entries.map((entry) => (
             <div key={entry.key} className={styles.itemWrapper}>
               <MediaCard
@@ -224,35 +223,37 @@ export default function ReadingList() {
                 onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
                 rawThumbnail
               />
-              <div className={styles.cardActions}>
-                <select
-                  className={styles.statusSelect}
-                  value={entry.status}
-                  onChange={(e) =>
-                    updateStatus.mutate({ id: entry.libId, status: e.currentTarget.value })
-                  }
-                >
-                  {MANGA_LIBRARY_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => removeBookmark.mutate(entry.libId)}
-                  title="Remove from Reading List"
-                  aria-label="Remove from Reading List"
-                >
-                  <Icon name="trash" size={12} />
-                </button>
-              </div>
+              {!isCR && (
+                <div className={styles.cardActions}>
+                  <select
+                    className={styles.statusSelect}
+                    value={entry.status}
+                    onChange={(e) =>
+                      updateStatus.mutate({ id: entry.libId, status: e.currentTarget.value })
+                    }
+                  >
+                    {MANGA_LIBRARY_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => removeBookmark.mutate(entry.libId)}
+                    title="Remove from Reading List"
+                    aria-label="Remove from Reading List"
+                  >
+                    <Icon name="trash" size={12} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {total > 0 && !isCR && (
+      {total > 0 && (
         <div className={styles.bottomPagination}>
           <div className={styles.pagination}>
             <button

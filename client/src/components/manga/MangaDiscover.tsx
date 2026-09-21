@@ -87,6 +87,7 @@ const MangaDiscoverRail: React.FC<{
               }}
               linkTo={`/manga/${item.provider}/${encodeURIComponent(item.id)}`}
               hoverIcon="info"
+              showInfoButton
               display={{
                 elements: {
                   poster: { typeBadge: true, chapterBadge: true, adultBadge: true },

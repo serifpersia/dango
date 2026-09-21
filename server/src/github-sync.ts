@@ -10,6 +10,7 @@ import {
   exportTables,
   importTables,
   MANGA_SYNC_TABLES,
+  TV_SYNC_TABLES,
   normalizePayload as normalizeGenericPayload,
   readPayloadVersion,
   type SyncPayload as GenericSyncPayload,
@@ -127,6 +128,10 @@ function getSyncFilename() {
 
 function getMangaSyncFilename() {
   return CONFIG.IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json'
+}
+
+function getTvSyncFilename() {
+  return CONFIG.IS_DEV ? 'tv.sync.dev.json' : 'tv.sync.json'
 }
 
 async function loadOctokit(token: string): Promise<OctokitInstance> {
@@ -324,6 +329,11 @@ class GitHubSyncService {
     return payload ? readPayloadVersion(payload) : 0
   }
 
+  async getTvRemoteVersion(): Promise<number> {
+    const payload = await this.fetchTvSyncPayload()
+    return payload ? readPayloadVersion(payload) : 0
+  }
+
   async syncUp(db: DatabaseWrapper): Promise<void> {
     const payload = await this.exportDatabase(db)
     const octokit = await this.getOctokit()
@@ -379,6 +389,37 @@ class GitHubSyncService {
     importTables(db, MANGA_SYNC_TABLES, payload, {
       libraryTables: ['manga_library', 'manga_progress'],
       backupName: 'pre-sync-manga-backup.db',
+    })
+    return readPayloadVersion(payload)
+  }
+
+  async syncTvUp(db: DatabaseWrapper): Promise<void> {
+    const payload = exportTables(db, TV_SYNC_TABLES)
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const existing = await this.getSyncFile(octokit, owner, getTvSyncFilename())
+    const content = Buffer.from(JSON.stringify(payload, null, 2), 'utf8').toString('base64')
+
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo: REPO_NAME,
+      path: getTvSyncFilename(),
+      message: `Sync dango TV data v${payload.version}`,
+      content,
+      sha: existing?.sha,
+      headers: GITHUB_API_HEADERS,
+    })
+  }
+
+  async syncTvDown(db: DatabaseWrapper): Promise<number> {
+    const payload = await this.fetchTvSyncPayload()
+    if (!payload) {
+      return 0
+    }
+
+    importTables(db, TV_SYNC_TABLES, payload, {
+      libraryTables: ['tv_library', 'tv_progress'],
+      backupName: 'pre-sync-tv-backup.db',
     })
     return readPayloadVersion(payload)
   }
@@ -529,6 +570,20 @@ class GitHubSyncService {
     }
 
     return normalizeGenericPayload(JSON.parse(file.content), MANGA_SYNC_TABLES, 'GitHub manga')
+  }
+
+  private async fetchTvSyncPayload(): Promise<GenericSyncPayload<
+    (typeof TV_SYNC_TABLES)[number]
+  > | null> {
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const file = await this.getSyncFile(octokit, owner, getTvSyncFilename())
+
+    if (!file) {
+      return null
+    }
+
+    return normalizeGenericPayload(JSON.parse(file.content), TV_SYNC_TABLES, 'GitHub TV')
   }
 
   private async exportDatabase(db: DatabaseWrapper): Promise<SyncPayload> {

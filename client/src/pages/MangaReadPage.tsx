@@ -58,8 +58,7 @@ export default function MangaReadPage() {
       contentRating: detail.contentRating,
       silent: true,
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detail, libId])
+  }, [detail, libId, addBookmark, provider, id])
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSave = useRef<{
@@ -104,8 +103,7 @@ export default function MangaReadPage() {
 
   useEffect(() => {
     flushSave()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapterId])
+  }, [chapterId, flushSave])
 
   useEffect(() => () => flushSave(), [flushSave])
 

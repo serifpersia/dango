@@ -131,33 +131,215 @@ export function createTvRouter(
 
   router.get('/tv/search', async (req, res) => {
     const query = (req.query.q as string) || ''
-    if (!query) return res.json([])
     const page = parseInt(req.query.page as string) || 1
-    const cacheKey = `tv-search-${query.toLowerCase()}-${page}`
+    const type = (req.query.type as string) || 'multi'
+    const genre = (req.query.genre as string) || ''
+    const year = (req.query.year as string) || ''
+    const sortBy = (req.query.sort_by as string) || 'popularity.desc'
+    const hasTypeFilter = type === 'tv' || type === 'movie'
+    const hasGenre = !!genre
+    const hasYear = !!year && year !== 'ALL'
+    const shouldFallbackToTrending = !query && !hasTypeFilter && !hasGenre && !hasYear
+    const cacheKey = `tv-search-${query.toLowerCase()}-${page}-${type}-${genre}-${year}-${sortBy}`
+    const cached = apiCache.get(cacheKey)
+    if (cached) return res.json(cached)
+    const key = await getTmdbKey()
+    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    try {
+      let url: string
+      if (type === 'tv' || type === 'movie') {
+        if (!query.trim()) {
+          const params = new URLSearchParams({
+            api_key: key,
+            page: String(page),
+            sort_by: sortBy,
+          })
+          if (genre) params.set('with_genres', genre)
+          if (year) {
+            if (type === 'tv') params.set('first_air_date_year', year)
+            else params.set('primary_release_year', year)
+          }
+          url = `${TMDB_BASE}/discover/${type}?${params.toString()}`
+        } else {
+          const params = new URLSearchParams({
+            api_key: key,
+            query: encodeURIComponent(query.trim()),
+            page: String(page),
+            include_adult: 'true',
+          })
+          url = `${TMDB_BASE}/search/${type}?${params.toString()}`
+        }
+      } else if (!query.trim()) {
+        const params = new URLSearchParams({
+          api_key: key,
+          page: String(page),
+          sort_by: sortBy,
+        })
+        if (genre) params.set('with_genres', genre)
+        if (year) params.set('first_air_date_year', year)
+        url = `${TMDB_BASE}/discover/tv?${params.toString()}`
+      } else {
+        const params = new URLSearchParams({
+          api_key: key,
+          query: encodeURIComponent(query),
+          page: String(page),
+          include_adult: 'true',
+        })
+        url = `${TMDB_BASE}/search/multi?${params.toString()}`
+      }
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      if (!r.ok) return res.status(500).json({ error: 'TMDB search failed' })
+      const d = await r.json()
+      let results: Array<{
+        id: number
+        title: string
+        year: string
+        type: string
+        image: string
+        backdrop: string
+        overview: string
+        vote_average: number
+        adult: boolean
+        genre_ids: number[]
+      }>
+      if (type === 'tv' || type === 'movie') {
+        results = (d.results || []).map(
+          (
+            item: TmdbSearchItem & {
+              overview?: string
+              genre_ids?: number[]
+              backdrop_path?: string | null
+            }
+          ) => ({
+            id: item.id,
+            title: item.title || item.name || '',
+            year: (item.release_date || item.first_air_date || '').split('-')[0],
+            type,
+            image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
+            backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
+            overview: item.overview || '',
+            vote_average: item.vote_average || 0,
+            adult: item.adult === true,
+            genre_ids: item.genre_ids || [],
+          })
+        )
+      } else {
+        results = (d.results || [])
+          .filter((item: TmdbSearchItem) => item.media_type !== 'person')
+          .map(
+            (
+              item: TmdbSearchItem & {
+                overview?: string
+                genre_ids?: number[]
+                backdrop_path?: string | null
+              }
+            ) => ({
+              id: item.id,
+              title: item.title || item.name || '',
+              year: (item.release_date || item.first_air_date || '').split('-')[0],
+              type: item.media_type || 'tv',
+              image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
+              backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
+              overview: item.overview || '',
+              vote_average: item.vote_average || 0,
+              adult: item.adult === true,
+              genre_ids: item.genre_ids || [],
+            })
+          )
+      }
+      const payload = {
+        results,
+        total_results: d.total_results || 0,
+        total_pages: d.total_pages || 0,
+        page: d.page || page,
+      }
+      apiCache.set(cacheKey, payload, 1800)
+      res.json(payload)
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message })
+    }
+  })
+
+  router.get('/tv/trending', async (req, res) => {
+    const mediaType = (req.query.media_type as string) || 'all'
+    const timeWindow = (req.query.time_window as string) || 'week'
+    const page = parseInt(req.query.page as string) || 1
+    const cacheKey = `tv-trending-${mediaType}-${timeWindow}-${page}`
     const cached = apiCache.get(cacheKey)
     if (cached) return res.json(cached)
     const key = await getTmdbKey()
     if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
     try {
       const r = await fetch(
-        `${TMDB_BASE}/search/multi?api_key=${key}&query=${encodeURIComponent(query)}&page=${page}&include_adult=true`,
+        `${TMDB_BASE}/trending/${mediaType}/${timeWindow}?api_key=${key}&page=${page}`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
-      if (!r.ok) return res.status(500).json({ error: 'TMDB search failed' })
+      if (!r.ok) return res.status(500).json({ error: 'TMDB trending failed' })
       const d = await r.json()
       const results = (d.results || [])
         .filter((item: TmdbSearchItem) => item.media_type !== 'person')
-        .map((item: TmdbSearchItem) => ({
-          id: item.id,
-          title: item.title || item.name,
-          year: (item.release_date || item.first_air_date || '').split('-')[0],
-          type: item.media_type,
-          image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
-          vote_average: item.vote_average,
-          adult: item.adult === true,
-        }))
-      apiCache.set(cacheKey, results, 3600)
-      res.json(results)
+        .map(
+          (
+            item: TmdbSearchItem & {
+              overview?: string
+              genre_ids?: number[]
+              backdrop_path?: string | null
+            }
+          ) => ({
+            id: item.id,
+            title: item.title || item.name || '',
+            year: (item.release_date || item.first_air_date || '').split('-')[0],
+            type: item.media_type || 'tv',
+            image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
+            backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
+            overview: item.overview || '',
+            vote_average: item.vote_average || 0,
+            adult: item.adult === true,
+            genre_ids: item.genre_ids || [],
+          })
+        )
+      const payload = {
+        results,
+        total_results: d.total_results || 0,
+        total_pages: d.total_pages || 0,
+        page: d.page || page,
+      }
+      apiCache.set(cacheKey, payload, 3600)
+      res.json(payload)
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message })
+    }
+  })
+
+  router.get('/tv/genres', async (_req, res) => {
+    const cacheKey = 'tv-genres-list'
+    const cached = apiCache.get(cacheKey)
+    if (cached) return res.json(cached)
+    const key = await getTmdbKey()
+    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    try {
+      const [tvRes, movieRes] = await Promise.all([
+        fetch(`${TMDB_BASE}/genre/tv/list?api_key=${key}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        }),
+        fetch(`${TMDB_BASE}/genre/movie/list?api_key=${key}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        }),
+      ])
+      const tvData = tvRes.ok ? await tvRes.json() : { genres: [] }
+      const movieData = movieRes.ok ? await movieRes.json() : { genres: [] }
+      const payload = {
+        tv: (tvData.genres || []).map((g: { id: number; name: string }) => ({
+          id: g.id,
+          name: g.name,
+        })),
+        movie: (movieData.genres || []).map((g: { id: number; name: string }) => ({
+          id: g.id,
+          name: g.name,
+        })),
+      }
+      apiCache.set(cacheKey, payload, 86400)
+      res.json(payload)
     } catch (e) {
       res.status(500).json({ error: (e as Error).message })
     }

@@ -66,6 +66,14 @@ function migrateLegacyData(packageServerRoot: string, dataRoot: string) {
     'manga.dev.db-wal',
     'manga.sync_manifest.json',
     'manga.sync_manifest.dev.json',
+    'tv.db',
+    'tv.db-shm',
+    'tv.db-wal',
+    'tv.dev.db',
+    'tv.dev.db-shm',
+    'tv.dev.db-wal',
+    'tv.sync_manifest.json',
+    'tv.sync_manifest.dev.json',
   ]) {
     moveFileIfNeeded(path.join(packageServerRoot, filename), path.join(dataRoot, filename))
   }
@@ -142,10 +150,16 @@ export const CONFIG = {
     DATA_ROOT,
     IS_DEV ? 'manga.sync_manifest.dev.json' : 'manga.sync_manifest.json'
   ),
+  TV_LOCAL_MANIFEST_PATH: path.join(
+    DATA_ROOT,
+    IS_DEV ? 'tv.sync_manifest.dev.json' : 'tv.sync_manifest.json'
+  ),
   DB_NAME_PROD: 'anime.db',
   DB_NAME_DEV: 'anime.dev.db',
   MANGA_DB_NAME_PROD: 'manga.db',
   MANGA_DB_NAME_DEV: 'manga.dev.db',
+  TV_DB_NAME_PROD: 'tv.db',
+  TV_DB_NAME_DEV: 'tv.dev.db',
   REMOTE_FOLDER_PROD: 'dango_db',
   REMOTE_FOLDER_DEV: 'dango_dev_db',
   MANIFEST_FILENAME: IS_DEV ? 'sync_manifest.dev.json' : 'sync_manifest.json',
@@ -156,8 +170,10 @@ export const CONFIG = {
   ],
   GOOGLE_SYNC_FILENAME: IS_DEV ? 'sync.dev.json' : 'sync.json',
   MANGA_GOOGLE_SYNC_FILENAME: IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json',
+  TV_GOOGLE_SYNC_FILENAME: IS_DEV ? 'tv.sync.dev.json' : 'tv.sync.json',
   RCLONE_SYNC_FILENAME: IS_DEV ? 'sync.dev.json' : 'sync.json',
   MANGA_RCLONE_SYNC_FILENAME: IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json',
+  TV_RCLONE_SYNC_FILENAME: IS_DEV ? 'tv.sync.dev.json' : 'tv.sync.json',
   IS_DEV,
   PORT,
   HOST,

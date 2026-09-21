@@ -25,7 +25,10 @@ const MangaInfoPage = lazy(() => import('./pages/MangaInfoPage'))
 const MangaReadPage = lazy(() => import('./pages/MangaReadPage'))
 const ReadingList = lazy(() => import('./pages/ReadingList'))
 const Radio = lazy(() => import('./pages/Radio'))
+const TvSearch = lazy(() => import('./pages/TvSearch'))
+const TvInfo = lazy(() => import('./pages/TvInfo'))
 const Tv = lazy(() => import('./pages/Tv'))
+const TvWatchlist = lazy(() => import('./pages/TvWatchlist'))
 const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
 const UserMap = lazy(() => import('./pages/Map'))
@@ -185,8 +188,11 @@ function App() {
               <Route path="/manga/:provider/:id" element={<MangaInfoPage />} />
               <Route path="/manga/:provider/:id/read" element={<MangaReadPage />} />
               <Route path="/radio" element={<Radio />} />
-              <Route path="/tv" element={<Tv />} />
-              <Route path="/tv/:id" element={<Tv />} />
+              <Route path="/tv" element={<TvSearch />} />
+              <Route path="/tv/:id" element={<TvInfo />} />
+              <Route path="/tv/:id/watch" element={<Tv />} />
+              <Route path="/tv-search" element={<TvSearch />} />
+              <Route path="/tv-watchlist/:filter?" element={<TvWatchlist />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/trackers" element={<Trackers />} />
               <Route path="/mal" element={<Navigate to="/trackers" replace />} />

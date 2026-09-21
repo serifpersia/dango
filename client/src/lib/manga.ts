@@ -11,10 +11,6 @@ export interface MangaTitleSource {
 
 export type TitlePreference = 'name' | 'nativeName' | 'englishName'
 
-// Providers collapse per-language titles into one picked `title`
-// (MangaDex prefers English) plus a single `altTitle` that is usually the
-// original-language title. Optional `titles` carries exact variants once a
-// provider supplies them.
 export function resolveMangaTitle(source: MangaTitleSource, preference: TitlePreference): string {
   const variants = source.titles ?? {}
   if (preference === 'englishName') return variants.en || source.title

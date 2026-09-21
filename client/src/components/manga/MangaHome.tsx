@@ -114,7 +114,12 @@ const MangaHome: React.FC = () => {
               showProgress
               display={{
                 elements: {
-                  poster: { typeBadge: false, chapterBadge: true, adultBadge: true },
+                  poster: {
+                    typeBadge: false,
+                    chapterBadge: true,
+                    adultBadge: true,
+                    removeButton: true,
+                  },
                   info: { title: true, mobileBadges: true, progress: true, meta: false },
                 },
               }}

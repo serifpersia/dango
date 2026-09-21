@@ -26,6 +26,9 @@ import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { useContentType, type ContentType } from '../contexts/ContentTypeContext'
 import OptionTabs from '../components/common/OptionTabs'
 import MangaHome from '../components/manga/MangaHome'
+import TvHome from '../components/tv/TvHome'
+import TvSpotlightBanner from '../components/tv/TvSpotlightBanner'
+import { useTvTrending } from '../hooks/useTv'
 import { fetchApi } from '../lib/fetchApi'
 import styles from './Home.module.css'
 
@@ -107,6 +110,7 @@ const Home: React.FC = () => {
   ])
 
   const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
+  const { data: tvTrending } = useTvTrending('all', 'week', 1, contentType === 'tv')
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
@@ -311,6 +315,10 @@ const Home: React.FC = () => {
           <SpotlightBanner animeList={spotlightAnime || []} />
         ))}
 
+      {contentType === 'tv' && tvTrending?.results && tvTrending.results.length > 0 && (
+        <TvSpotlightBanner items={tvTrending.results} />
+      )}
+
       <OptionTabs
         ariaLabel="Content type"
         options={CONTENT_OPTIONS}
@@ -320,17 +328,13 @@ const Home: React.FC = () => {
 
       {contentType === 'manga' ? (
         <MangaHome />
-      ) : contentType === 'tv' || contentType === 'asmr' ? (
+      ) : contentType === 'tv' ? (
+        <TvHome />
+      ) : contentType === 'asmr' ? (
         <div className={styles.emptyState} style={{ marginTop: '2rem' }}>
-          <Icon
-            name={contentType === 'tv' ? 'tv' : 'headphones'}
-            size={48}
-            className={styles.emptyStateIcon}
-          />
+          <Icon name="headphones" size={48} className={styles.emptyStateIcon} />
           <div>
-            <h3 className={styles.emptyStateTitle}>
-              {contentType === 'tv' ? 'TV & Movies' : 'ASMR'} tracking is coming soon
-            </h3>
+            <h3 className={styles.emptyStateTitle}>ASMR tracking is coming soon</h3>
             <p className={styles.emptyStateText}>
               Library, progress, and sync for this section will follow the same pattern as manga.
             </p>

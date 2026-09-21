@@ -27,6 +27,8 @@ export const ANIME_SYNC_TABLES = [
 
 export const MANGA_SYNC_TABLES = ['manga_library', 'manga_progress', 'sync_metadata'] as const
 
+export const TV_SYNC_TABLES = ['tv_library', 'tv_progress', 'sync_metadata'] as const
+
 export function readPayloadVersion<TTable extends string>(payload: SyncPayload<TTable>): number {
   const meta = (payload.tables as Record<string, SyncRow[] | undefined>)['sync_metadata']
   const row = meta?.find((r) => r.key === 'db_version')

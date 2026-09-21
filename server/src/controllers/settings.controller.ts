@@ -1,5 +1,9 @@
 import { Request, Response } from 'express'
-import { performMangaWriteTransaction, performWriteTransaction } from '../sync.js'
+import {
+  performMangaWriteTransaction,
+  performTvWriteTransaction,
+  performWriteTransaction,
+} from '../sync.js'
 import { searchAnilistByTitle, isAnilistRateLimited, getShowMetaById } from '../lib/anilist.js'
 import { kitsuSearchAnime } from '../lib/kitsu.js'
 import { offlineDb } from '../lib/offline-db.js'
@@ -526,14 +530,18 @@ export class SettingsController {
     try {
       const before = LibraryRepository.countAll(req.db)
       const beforeManga = LibraryRepository.countManga(req.mangaDb)
+      const beforeTv = LibraryRepository.countTv(req.tvDb)
       await performWriteTransaction(req.db, (tx) => {
         LibraryRepository.clearAll(tx)
       })
       await performMangaWriteTransaction(req.mangaDb, (tx) => {
         LibraryRepository.clearManga(tx)
       })
-      logger.warn({ before, beforeManga }, 'Library database cleared by user request')
-      res.json({ success: true, deleted: before, deletedManga: beforeManga })
+      await performTvWriteTransaction(req.tvDb, (tx) => {
+        LibraryRepository.clearTv(tx)
+      })
+      logger.warn({ before, beforeManga, beforeTv }, 'Library database cleared by user request')
+      res.json({ success: true, deleted: before, deletedManga: beforeManga, deletedTv: beforeTv })
     } catch {
       res.status(500).json({ error: 'DB error' })
     }

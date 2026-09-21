@@ -16,6 +16,7 @@ import {
   exportTables,
   importTables,
   MANGA_SYNC_TABLES,
+  TV_SYNC_TABLES,
   normalizePayload,
   readPayloadVersion,
   type SyncPayload,
@@ -24,12 +25,14 @@ import {
 const log = logger.child({ module: 'Sync' })
 
 export const SYNC_TABLES = ANIME_SYNC_TABLES
-export { MANGA_SYNC_TABLES }
+export { MANGA_SYNC_TABLES, TV_SYNC_TABLES }
 
 export type SyncTable = (typeof SYNC_TABLES)[number]
 export type MangaSyncTable = (typeof MANGA_SYNC_TABLES)[number]
+export type TvSyncTable = (typeof TV_SYNC_TABLES)[number]
 export type AnimeSyncPayload = SyncPayload<SyncTable>
 export type MangaSyncPayload = SyncPayload<MangaSyncTable>
+export type TvSyncPayload = SyncPayload<TvSyncTable>
 // anime_id_map (offline MAL<->AniList metadata) is intentionally local-only:
 // it is rebuilt weekly from the upstream JSON dump and never synced.
 
@@ -48,10 +51,21 @@ async function exportMangaSyncPayload(db: DatabaseWrapper): Promise<MangaSyncPay
   return exportTables(db, MANGA_SYNC_TABLES)
 }
 
+async function exportTvSyncPayload(db: DatabaseWrapper): Promise<TvSyncPayload> {
+  return exportTables(db, TV_SYNC_TABLES)
+}
+
 function importMangaSyncPayload(db: DatabaseWrapper, payload: MangaSyncPayload) {
   importTables(db, MANGA_SYNC_TABLES, payload, {
     libraryTables: ['manga_library', 'manga_progress'],
     backupName: 'pre-sync-manga-backup.db',
+  })
+}
+
+function importTvSyncPayload(db: DatabaseWrapper, payload: TvSyncPayload) {
+  importTables(db, TV_SYNC_TABLES, payload, {
+    libraryTables: ['tv_library', 'tv_progress'],
+    backupName: 'pre-sync-tv-backup.db',
   })
 }
 
@@ -117,6 +131,17 @@ async function rcloneMangaSyncUp(db: DatabaseWrapper, remoteFolder: string): Pro
   }
 }
 
+async function rcloneTvSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
+  const payload = await exportTvSyncPayload(db)
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_tv_up.json`)
+  try {
+    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
+    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
 async function rcloneMangaSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_down.json`)
   try {
@@ -124,6 +149,19 @@ async function rcloneMangaSyncDown(db: DatabaseWrapper, remoteFolder: string): P
     const content = await fs.readFile(tempPath, 'utf-8')
     const payload = normalizePayload(JSON.parse(content), MANGA_SYNC_TABLES, 'rclone manga')
     importMangaSyncPayload(db, payload)
+    return readPayloadVersion(payload)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
+async function rcloneTvSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_tv_down.json`)
+  try {
+    await rcloneService.downloadFile(remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME, tempPath)
+    const content = await fs.readFile(tempPath, 'utf-8')
+    const payload = normalizePayload(JSON.parse(content), TV_SYNC_TABLES, 'rclone tv')
+    importTvSyncPayload(db, payload)
     return readPayloadVersion(payload)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
@@ -256,6 +294,22 @@ export async function setLocalMangaManifestVersion(version: number): Promise<voi
   await fs.writeFile(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
 }
 
+export async function getLocalTvManifestVersion(): Promise<number> {
+  if (existsSync(CONFIG.TV_LOCAL_MANIFEST_PATH)) {
+    try {
+      const content = await fs.readFile(CONFIG.TV_LOCAL_MANIFEST_PATH, 'utf-8')
+      return JSON.parse(content).version || 0
+    } catch {
+      return 0
+    }
+  }
+  return 0
+}
+
+export async function setLocalTvManifestVersion(version: number): Promise<void> {
+  await fs.writeFile(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+}
+
 async function getRemoteManifestVersion(
   remoteFolder: string
 ): Promise<{ version: number; fileId?: string }> {
@@ -295,6 +349,27 @@ async function getMangaRemoteManifestVersion(
     }
   } catch (err) {
     log.warn({ err }, 'Could not read remote manga manifest.')
+  }
+  return { version: 0 }
+}
+
+async function getTvRemoteManifestVersion(
+  remoteFolder: string
+): Promise<{ version: number; fileId?: string }> {
+  try {
+    if (activeProvider === 'github') {
+      if (!githubSyncService.isAuthenticated()) return { version: 0 }
+      return { version: await githubSyncService.getTvRemoteVersion() }
+    } else if (activeProvider === 'google') {
+      if (!googleDriveService.isAuthenticated()) return { version: 0 }
+      return { version: await googleDriveService.getTvRemoteVersion() }
+    } else if (activeProvider === 'rclone') {
+      return {
+        version: await getRcloneRemotePayloadVersion(remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME),
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Could not read remote TV manifest.')
   }
   return { version: 0 }
 }
@@ -506,6 +581,24 @@ export async function performMangaWriteTransaction(
   await setLocalMangaManifestVersion(newVersion)
 }
 
+export async function performTvWriteTransaction(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => void
+): Promise<void> {
+  db.serialize(() => {
+    runnable(db)
+    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalTvManifestVersion(newVersion)
+}
+
 export async function mangaSyncDownOnBoot(
   db: DatabaseWrapper,
   remoteFolderName: string
@@ -657,6 +750,152 @@ export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseW
     return db
   } catch (err) {
     log.error({ err }, 'Manga database opening error')
+    throw err
+  }
+}
+
+export async function tvSyncDownOnBoot(
+  db: DatabaseWrapper,
+  remoteFolderName: string
+): Promise<void> {
+  let localVersion = await getLocalTvManifestVersion()
+
+  if (localVersion === 0 && db) {
+    const row = dbGet<{ value: number }>(
+      db,
+      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+    )
+    localVersion = row?.value ?? 0
+    if (localVersion > 0) {
+      await setLocalTvManifestVersion(localVersion)
+    }
+  }
+
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    notifySyncStart(`Initial TV sync check (${activeProvider})`)
+    const { version: remoteVersion } = await getTvRemoteManifestVersion(remoteFolderName)
+    notifySyncEnd()
+
+    log.info(`TV Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
+
+    if (remoteVersion > localVersion) {
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        notifySyncStart(`Importing GitHub TV sync data (Remote v${remoteVersion})`)
+        const importedVersion = await githubSyncService.syncTvDown(db)
+        await setLocalTvManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('GitHub TV sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        notifySyncStart(`Importing Google TV sync data (Remote v${remoteVersion})`)
+        const importedVersion = await googleDriveService.syncTvDown(db)
+        await setLocalTvManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Google TV sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'rclone') {
+        notifySyncStart(`Importing Rclone TV sync data (Remote v${remoteVersion})`)
+        const importedVersion = await rcloneTvSyncDown(db, remoteFolderName)
+        await setLocalTvManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Rclone TV sync down complete.')
+        return
+      }
+    } else {
+      log.info('Local TV DB is up to date.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'TV sync boot error.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
+export async function tvSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    const localVersion = await getLocalTvManifestVersion()
+    const { version: remoteVersion } = await getTvRemoteManifestVersion(remoteFolderName)
+
+    if (localVersion > remoteVersion) {
+      notifySyncStart(`Syncing TV up (Local v${localVersion})`)
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        await githubSyncService.syncTvUp(db)
+      } else if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        await googleDriveService.syncTvUp(db)
+      } else if (activeProvider === 'rclone') {
+        await rcloneTvSyncUp(db, remoteFolderName)
+      }
+
+      notifySyncEnd()
+      log.info('TV sync up complete.')
+    } else {
+      log.info('No TV changes to sync up or remote is newer.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'TV sync up failed.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
+export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrapper> {
+  try {
+    const db = await DatabaseWrapper.create(dbPath)
+    db.configure('busyTimeout', 5000)
+
+    db.run('PRAGMA journal_mode = WAL;')
+    db.run('PRAGMA synchronous = NORMAL;')
+    db.run('PRAGMA cache_size = -20000;')
+    db.run('PRAGMA temp_store = MEMORY;')
+    db.run('PRAGMA mmap_size = 268435456;')
+    db.run('PRAGMA foreign_keys = ON;')
+
+    db.run(
+      `CREATE TABLE IF NOT EXISTS tv_library (id TEXT PRIMARY KEY, tmdbId INTEGER NOT NULL, mediaType TEXT NOT NULL, title TEXT, poster TEXT, backdrop TEXT, year TEXT, overview TEXT, status TEXT DEFAULT 'Watching', adult INTEGER DEFAULT 0, lastSeason INTEGER, lastEpisode INTEGER, updatedAt INTEGER)`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS tv_progress (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mediaId, season, episode))`
+    )
+    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
+
+    db.run(`CREATE INDEX IF NOT EXISTS idx_tv_library_status ON tv_library(status)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_tv_library_tmdb ON tv_library(tmdbId, mediaType)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_tv_progress_media ON tv_progress(mediaId, updatedAt)`)
+
+    return db
+  } catch (err) {
+    log.error({ err }, 'TV database opening error')
     throw err
   }
 }

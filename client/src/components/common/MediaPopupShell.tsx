@@ -28,11 +28,14 @@ const MediaPopupShell: React.FC<MediaPopupShellProps> = ({
   )
 
   const { refs, floatingStyles } = useFloating({
-    elements: { reference: virtualEl },
     placement: 'right-start',
     middleware: [flip({ fallbackAxisSideDirection: 'start' }), shift({ padding: 20 })],
     whileElementsMounted: autoUpdate,
   })
+
+  React.useEffect(() => {
+    refs.setPositionReference(virtualEl)
+  }, [refs, virtualEl])
 
   React.useEffect(() => {
     if (!isTouch) return
