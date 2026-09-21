@@ -7,101 +7,65 @@ import { rcloneService } from './rclone.js'
 import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import { DatabaseWrapper } from './db.js'
-import { dbAll, dbGet } from './utils/db-utils.js'
+import { dbGet } from './utils/db-utils.js'
 import { TempShowIdsRepository } from './repositories/temp-show-ids.repository.js'
 import { malCachePruneExpired } from './repositories/mal-cache.repository.js'
-import { isTempSyncRow } from './lib/temp-ids.js'
 import { notifySyncStart, notifySyncEnd } from './lib/ipc.js'
+import {
+  ANIME_SYNC_TABLES,
+  exportTables,
+  importTables,
+  MANGA_SYNC_TABLES,
+  normalizePayload,
+  readPayloadVersion,
+  type SyncPayload,
+} from './sync-payload.js'
 
 const log = logger.child({ module: 'Sync' })
 
-const SYNC_TABLES = [
-  'watchlist',
-  'watched_episodes',
-  'queue',
-  'settings',
-  'shows_meta',
-  'sync_metadata',
-  'dismissed_notifications',
-  'discovered_notifications',
-] as const
+export const SYNC_TABLES = ANIME_SYNC_TABLES
+export { MANGA_SYNC_TABLES }
+
+export type SyncTable = (typeof SYNC_TABLES)[number]
+export type MangaSyncTable = (typeof MANGA_SYNC_TABLES)[number]
+export type AnimeSyncPayload = SyncPayload<SyncTable>
+export type MangaSyncPayload = SyncPayload<MangaSyncTable>
 // anime_id_map (offline MAL<->AniList metadata) is intentionally local-only:
 // it is rebuilt weekly from the upstream JSON dump and never synced.
 
-type SyncRow = Record<string, string | number | null>
-type SyncPayload = {
-  version: number
-  exportedAt: string
-  tables: Record<(typeof SYNC_TABLES)[number], SyncRow[]>
+async function exportSyncPayload(db: DatabaseWrapper): Promise<AnimeSyncPayload> {
+  return exportTables(db, SYNC_TABLES)
 }
 
-function readPayloadVersion(payload: SyncPayload): number {
-  const row = payload.tables.sync_metadata.find((r) => r.key === 'db_version')
-  const v = row?.value
-  return typeof v === 'number' ? v : Number(v || payload.version || 0)
-}
-
-async function exportSyncPayload(db: DatabaseWrapper): Promise<SyncPayload> {
-  const tables = {} as Record<(typeof SYNC_TABLES)[number], SyncRow[]>
-  for (const table of SYNC_TABLES) {
-    const rows = dbAll<SyncRow>(db, `SELECT * FROM "${table.replace(/"/g, '""')}"`)
-    tables[table] = rows.filter((row) => !isTempSyncRow(row))
-  }
-  return {
-    version: readPayloadVersion({ version: 0, exportedAt: '', tables }),
-    exportedAt: new Date().toISOString(),
-    tables,
-  }
-}
-
-function importSyncPayload(db: DatabaseWrapper, payload: SyncPayload) {
-  const remoteLibraryRows =
-    (payload.tables.watchlist?.length ?? 0) + (payload.tables.watched_episodes?.length ?? 0)
-  const localLibraryRows =
-    dbGet<{ n: number }>(
-      db,
-      'SELECT (SELECT COUNT(*) FROM watchlist) + (SELECT COUNT(*) FROM watched_episodes) AS n'
-    )?.n ?? 0
-  if (remoteLibraryRows === 0 && localLibraryRows > 0) {
-    throw new Error('Sync down refused: remote library is empty while local library has data')
-  }
-  try {
-    db.backup(path.join(CONFIG.ROOT, 'pre-sync-backup.db'))
-  } catch (err) {
-    log.warn({ err }, 'Pre-sync backup failed, continuing without backup')
-  }
-  const localColumns = new Map<string, Set<string>>()
-  for (const table of SYNC_TABLES) {
-    const cols = db.all<{ name: string }>(`PRAGMA table_info("${table}")`)
-    localColumns.set(table, new Set(cols.map((c) => c.name)))
-  }
-  db.serialize(() => {
-    for (const table of SYNC_TABLES) {
-      db.run(`DELETE FROM "${table}"`)
-    }
-    for (const table of SYNC_TABLES) {
-      const known = localColumns.get(table)
-      for (const row of payload.tables[table] || []) {
-        if (isTempSyncRow(row)) continue
-        const columns = Object.keys(row).filter((c) => known?.has(c))
-        if (columns.length === 0) continue
-        const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
-        const placeholders = columns.map(() => '?').join(', ')
-        const values = columns.map((c) => row[c])
-        db.run(`INSERT INTO "${table}" (${columnSql}) VALUES (${placeholders})`, values)
-      }
-    }
+function importSyncPayload(db: DatabaseWrapper, payload: AnimeSyncPayload) {
+  importTables(db, SYNC_TABLES, payload, {
+    libraryTables: ['watchlist', 'watched_episodes'],
+    backupName: 'pre-sync-backup.db',
   })
 }
 
-async function getRcloneRemotePayloadVersion(remoteFolder: string): Promise<number> {
-  const exists = await rcloneService.fileExists(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME)
+async function exportMangaSyncPayload(db: DatabaseWrapper): Promise<MangaSyncPayload> {
+  return exportTables(db, MANGA_SYNC_TABLES)
+}
+
+function importMangaSyncPayload(db: DatabaseWrapper, payload: MangaSyncPayload) {
+  importTables(db, MANGA_SYNC_TABLES, payload, {
+    libraryTables: ['manga_library', 'manga_progress'],
+    backupName: 'pre-sync-manga-backup.db',
+  })
+}
+
+async function getRcloneRemotePayloadVersion(
+  remoteFolder: string,
+  fileName: string = CONFIG.RCLONE_SYNC_FILENAME
+): Promise<number> {
+  const exists = await rcloneService.fileExists(remoteFolder, fileName)
   if (!exists) return 0
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_sync.json`)
   try {
-    await rcloneService.downloadFile(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME, tempPath)
+    await rcloneService.downloadFile(remoteFolder, fileName, tempPath)
     const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = JSON.parse(content) as SyncPayload
+    const payload = JSON.parse(content) as AnimeSyncPayload
     return readPayloadVersion(payload)
   } catch {
     return 0
@@ -110,24 +74,56 @@ async function getRcloneRemotePayloadVersion(remoteFolder: string): Promise<numb
   }
 }
 
-async function rcloneSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
+async function rcloneSyncUp(
+  db: DatabaseWrapper,
+  remoteFolder: string,
+  fileName: string = CONFIG.RCLONE_SYNC_FILENAME
+): Promise<void> {
   const payload = await exportSyncPayload(db)
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_up.json`)
   try {
     await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.RCLONE_SYNC_FILENAME)
+    await rcloneService.uploadFile(tempPath, remoteFolder, fileName)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
   }
 }
 
-async function rcloneSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
+async function rcloneSyncDown(
+  db: DatabaseWrapper,
+  remoteFolder: string,
+  fileName: string = CONFIG.RCLONE_SYNC_FILENAME
+): Promise<number> {
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_down.json`)
   try {
-    await rcloneService.downloadFile(remoteFolder, CONFIG.RCLONE_SYNC_FILENAME, tempPath)
+    await rcloneService.downloadFile(remoteFolder, fileName, tempPath)
     const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = JSON.parse(content) as SyncPayload
+    const payload = normalizePayload(JSON.parse(content), SYNC_TABLES, 'rclone') as AnimeSyncPayload
     importSyncPayload(db, payload)
+    return readPayloadVersion(payload)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
+async function rcloneMangaSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
+  const payload = await exportMangaSyncPayload(db)
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_up.json`)
+  try {
+    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
+    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.MANGA_RCLONE_SYNC_FILENAME)
+  } finally {
+    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
+  }
+}
+
+async function rcloneMangaSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_down.json`)
+  try {
+    await rcloneService.downloadFile(remoteFolder, CONFIG.MANGA_RCLONE_SYNC_FILENAME, tempPath)
+    const content = await fs.readFile(tempPath, 'utf-8')
+    const payload = normalizePayload(JSON.parse(content), MANGA_SYNC_TABLES, 'rclone manga')
+    importMangaSyncPayload(db, payload)
     return readPayloadVersion(payload)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
@@ -244,6 +240,22 @@ export async function setLocalManifestVersion(version: number): Promise<void> {
   await fs.writeFile(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
 }
 
+export async function getLocalMangaManifestVersion(): Promise<number> {
+  if (existsSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH)) {
+    try {
+      const content = await fs.readFile(CONFIG.MANGA_LOCAL_MANIFEST_PATH, 'utf-8')
+      return JSON.parse(content).version || 0
+    } catch {
+      return 0
+    }
+  }
+  return 0
+}
+
+export async function setLocalMangaManifestVersion(version: number): Promise<void> {
+  await fs.writeFile(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+}
+
 async function getRemoteManifestVersion(
   remoteFolder: string
 ): Promise<{ version: number; fileId?: string }> {
@@ -259,6 +271,30 @@ async function getRemoteManifestVersion(
     }
   } catch (err) {
     log.warn({ err }, 'Could not read remote manifest.')
+  }
+  return { version: 0 }
+}
+
+async function getMangaRemoteManifestVersion(
+  remoteFolder: string
+): Promise<{ version: number; fileId?: string }> {
+  try {
+    if (activeProvider === 'github') {
+      if (!githubSyncService.isAuthenticated()) return { version: 0 }
+      return { version: await githubSyncService.getMangaRemoteVersion() }
+    } else if (activeProvider === 'google') {
+      if (!googleDriveService.isAuthenticated()) return { version: 0 }
+      return { version: await googleDriveService.getMangaRemoteVersion() }
+    } else if (activeProvider === 'rclone') {
+      return {
+        version: await getRcloneRemotePayloadVersion(
+          remoteFolder,
+          CONFIG.MANGA_RCLONE_SYNC_FILENAME
+        ),
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Could not read remote manga manifest.')
   }
   return { version: 0 }
 }
@@ -450,6 +486,179 @@ export async function performWriteTransaction(
   const newVersion = row?.value ?? 1
 
   await setLocalManifestVersion(newVersion)
+}
+
+export async function performMangaWriteTransaction(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => void
+): Promise<void> {
+  db.serialize(() => {
+    runnable(db)
+    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalMangaManifestVersion(newVersion)
+}
+
+export async function mangaSyncDownOnBoot(
+  db: DatabaseWrapper,
+  remoteFolderName: string
+): Promise<void> {
+  let localVersion = await getLocalMangaManifestVersion()
+
+  if (localVersion === 0 && db) {
+    const row = dbGet<{ value: number }>(
+      db,
+      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+    )
+    localVersion = row?.value ?? 0
+    if (localVersion > 0) {
+      await setLocalMangaManifestVersion(localVersion)
+    }
+  }
+
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    notifySyncStart(`Initial manga sync check (${activeProvider})`)
+    const { version: remoteVersion } = await getMangaRemoteManifestVersion(remoteFolderName)
+    notifySyncEnd()
+
+    log.info(`Manga Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
+
+    if (remoteVersion > localVersion) {
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        notifySyncStart(`Importing GitHub manga sync data (Remote v${remoteVersion})`)
+        const importedVersion = await githubSyncService.syncMangaDown(db)
+        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('GitHub manga sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        notifySyncStart(`Importing Google manga sync data (Remote v${remoteVersion})`)
+        const importedVersion = await googleDriveService.syncMangaDown(db)
+        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Google manga sync down complete.')
+        return
+      }
+
+      if (activeProvider === 'rclone') {
+        notifySyncStart(`Importing Rclone manga sync data (Remote v${remoteVersion})`)
+        const importedVersion = await rcloneMangaSyncDown(db, remoteFolderName)
+        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
+        notifySyncEnd()
+        log.info('Rclone manga sync down complete.')
+        return
+      }
+    } else {
+      log.info('Local manga DB is up to date.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'Manga sync boot error.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
+export async function mangaSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
+  if (activeProvider === 'none') return
+
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
+  isSyncing = true
+
+  try {
+    const localVersion = await getLocalMangaManifestVersion()
+    const { version: remoteVersion } = await getMangaRemoteManifestVersion(remoteFolderName)
+
+    if (localVersion > remoteVersion) {
+      notifySyncStart(`Syncing manga up (Local v${localVersion})`)
+      if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return
+        await githubSyncService.syncMangaUp(db)
+      } else if (activeProvider === 'google') {
+        if (!googleDriveService.isAuthenticated()) return
+        await googleDriveService.syncMangaUp(db)
+      } else if (activeProvider === 'rclone') {
+        await rcloneMangaSyncUp(db, remoteFolderName)
+      }
+
+      notifySyncEnd()
+      log.info('Manga sync up complete.')
+    } else {
+      log.info('No manga changes to sync up or remote is newer.')
+    }
+  } catch (err) {
+    notifySyncEnd()
+    log.error({ err }, 'Manga sync up failed.')
+  } finally {
+    isSyncing = false
+    syncMutex.unlock()
+  }
+}
+
+export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseWrapper> {
+  try {
+    const db = await DatabaseWrapper.create(dbPath)
+    db.configure('busyTimeout', 5000)
+
+    db.run('PRAGMA journal_mode = WAL;')
+    db.run('PRAGMA synchronous = NORMAL;')
+    db.run('PRAGMA cache_size = -20000;')
+    db.run('PRAGMA temp_store = MEMORY;')
+    db.run('PRAGMA mmap_size = 268435456;')
+    db.run('PRAGMA foreign_keys = ON;')
+
+    db.run(
+      `CREATE TABLE IF NOT EXISTS manga_library (id TEXT PRIMARY KEY, provider TEXT NOT NULL, mangaId TEXT NOT NULL, title TEXT, cover TEXT, status TEXT DEFAULT 'Reading', author TEXT, contentRating TEXT, lastChapterId TEXT, lastChapterNumber TEXT, lastPage INTEGER, updatedAt INTEGER, altTitle TEXT)`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS manga_progress (mangaId TEXT NOT NULL, chapterId TEXT NOT NULL, chapterNumber TEXT, page INTEGER DEFAULT 0, pageCount INTEGER DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mangaId, chapterId))`
+    )
+    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
+
+    db.run(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_manga_library_provider_manga ON manga_library(provider, mangaId)`
+    )
+    db.run(`CREATE INDEX IF NOT EXISTS idx_manga_library_status ON manga_library(status)`)
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_manga_progress_manga ON manga_progress(mangaId, updatedAt)`
+    )
+
+    const mangaColumns = db.all<{ name: string }>(`PRAGMA table_info(manga_library)`)
+    if (!mangaColumns.some((c) => c.name === 'altTitle')) {
+      db.run(`ALTER TABLE manga_library ADD COLUMN altTitle TEXT`)
+    }
+
+    return db
+  } catch (err) {
+    log.error({ err }, 'Manga database opening error')
+    throw err
+  }
 }
 
 export async function initializeDatabase(dbPath: string): Promise<DatabaseWrapper> {

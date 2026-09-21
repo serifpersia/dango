@@ -340,20 +340,6 @@
   font-size: 14px;
 }
 
-.cardWrapper .removeBtn:hover {
-  background-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
-  color: var(--color-danger-text);
-  transform: scale(1.08);
-}
-
-.infoBtn:hover {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
-  transform: scale(1.08);
-}
-
 .cardWrapper:hover .removeBtn,
 .card:hover .removeBtn,
 .cardWrapper:hover .infoBtn,
@@ -366,6 +352,20 @@
   .infoBtn {
     display: none; /* Only works on desktop as requested */
   }
+}
+
+.cardWrapper .removeBtn:hover {
+  background-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 90%, transparent);
+  color: var(--color-danger-text);
+  transform: scale(1.08);
+}
+
+.infoBtn:hover {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  transform: scale(1.08);
 }
 
 .mobileBadges {

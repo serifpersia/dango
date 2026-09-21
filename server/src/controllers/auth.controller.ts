@@ -11,12 +11,14 @@ import path from 'path'
 export class AuthController {
   private runSyncSequence: (
     db: DatabaseWrapper,
+    mangaDb: DatabaseWrapper,
     provider?: 'github' | 'google' | 'rclone' | 'none'
   ) => Promise<void>
 
   constructor(
     runSyncSequence: (
       db: DatabaseWrapper,
+      mangaDb: DatabaseWrapper,
       provider?: 'github' | 'google' | 'rclone' | 'none'
     ) => Promise<void>
   ) {
@@ -140,7 +142,11 @@ export class AuthController {
   }
 
   startGitHubDeviceAuth = async (req: Request, res: Response) => {
-    const state = await githubSyncService.startDeviceAuth(req.db, this.runSyncSequence)
+    const mangaDb = req.mangaDb
+    const runSync = this.runSyncSequence
+    const state = await githubSyncService.startDeviceAuth(req.db, (db, provider) =>
+      runSync(db, mangaDb, provider)
+    )
     res.json(state)
   }
 
@@ -164,7 +170,7 @@ export class AuthController {
       RCLONE_REMOTE: remote,
       SYNC_PROVIDER: 'rclone',
     })
-    await this.runSyncSequence(req.db, 'rclone')
+    await this.runSyncSequence(req.db, req.mangaDb, 'rclone')
     res.json({ success: true })
   }
 
@@ -179,7 +185,7 @@ export class AuthController {
       if (user) {
         const { updateEnvFile } = await import('../utils/env.utils.js')
         await updateEnvFile({ SYNC_PROVIDER: 'google' })
-        await this.runSyncSequence(req.db, 'google')
+        await this.runSyncSequence(req.db, req.mangaDb, 'google')
         return res.json({ url: null, authenticated: true })
       } else {
         logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
@@ -204,7 +210,7 @@ export class AuthController {
 
     logger.info('User logged in. Syncing database (please wait)...')
     try {
-      await this.runSyncSequence(req.db, 'google')
+      await this.runSyncSequence(req.db, req.mangaDb, 'google')
     } catch (err) {
       logger.error({ err }, 'Post-login sync failed')
     }

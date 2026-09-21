@@ -1,0 +1,86 @@
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2.5rem;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabIndicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  box-shadow: 0 4px 15px var(--accent-glow);
+  transition:
+    left 0.22s cubic-bezier(0.2, 1.2, 0.3, 1),
+    width 0.22s cubic-bezier(0.2, 1.2, 0.3, 1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.tabButton {
+  border-radius: var(--radius-full) !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  padding: 0.65rem 1.4rem !important;
+  letter-spacing: 0.02em;
+  transition: color 0.25s ease !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.tabButton:hover:not(:disabled) {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.tabButton:active {
+  transform: scale(0.96);
+}
+
+.tabActive {
+  color: var(--accent-text) !important;
+}
+
+.tabActive:hover:not(:disabled) {
+  color: var(--accent-text) !important;
+  transform: none !important;
+}
+
+@media (max-width: 600px) {
+  .tabBar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .tabButton {
+    flex: 1;
+    justify-content: center !important;
+    padding: 0.65rem 0.5rem !important;
+    text-align: center;
+    font-size: 0.78rem !important;
+  }
+}

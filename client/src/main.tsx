@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import './styles/base.css'
 import { SidebarProvider } from './contexts/SidebarProvider'
+import { ContentTypeProvider } from './contexts/ContentTypeProvider'
 import { TitlePreferenceProvider } from './contexts/TitlePreferenceProvider'
 import { LowEndModeProvider } from './contexts/LowEndModeProvider'
 import { ThemeProvider } from './contexts/ThemeProvider'
@@ -27,13 +28,15 @@ if (root) {
       <QueryClientProvider client={queryClient}>
         <AnimePaheCookieProvider>
           <SidebarProvider>
-            <TitlePreferenceProvider>
-              <LowEndModeProvider>
-                <ThemeProvider>
-                  <App />
-                </ThemeProvider>
-              </LowEndModeProvider>
-            </TitlePreferenceProvider>
+            <ContentTypeProvider>
+              <TitlePreferenceProvider>
+                <LowEndModeProvider>
+                  <ThemeProvider>
+                    <App />
+                  </ThemeProvider>
+                </LowEndModeProvider>
+              </TitlePreferenceProvider>
+            </ContentTypeProvider>
           </SidebarProvider>
         </AnimePaheCookieProvider>
       </QueryClientProvider>

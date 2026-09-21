@@ -8,6 +8,13 @@ import { DatabaseWrapper } from './db.js'
 import { dbAll, dbGet } from './utils/db-utils.js'
 import { isTempSyncRow } from './lib/temp-ids.js'
 import { fetchWithRetry, HttpError } from './utils/http.utils.js'
+import {
+  exportTables,
+  importTables,
+  MANGA_SYNC_TABLES,
+  normalizePayload as normalizeGenericPayload,
+  readPayloadVersion,
+} from './sync-payload.js'
 
 type GoogleTokenSet = {
   access_token?: string
@@ -537,6 +544,13 @@ export class GoogleDriveService {
     return (CONFIG as { GOOGLE_SYNC_FILENAME?: string }).GOOGLE_SYNC_FILENAME || 'sync.json'
   }
 
+  private getMangaSyncFilename(): string {
+    return (
+      (CONFIG as { MANGA_GOOGLE_SYNC_FILENAME?: string }).MANGA_GOOGLE_SYNC_FILENAME ||
+      'manga.sync.json'
+    )
+  }
+
   private async findFileInAppData(filename: string): Promise<GoogleDriveFile | null> {
     if (!this.isAuthenticated()) return null
     const safeName = filename.replace(/'/g, "\\'")
@@ -616,6 +630,23 @@ export class GoogleDriveService {
     }
   }
 
+  async getMangaRemoteVersion(): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getMangaSyncFilename())
+    if (!file) return 0
+    try {
+      const payload = (await this.downloadJson(file.id)) as {
+        version?: number
+        tables?: { sync_metadata?: Array<{ key: string; value: number | string }> }
+      }
+      const row = payload?.tables?.sync_metadata?.find((r) => r.key === 'db_version')
+      const v = row?.value
+      return typeof v === 'number' ? v : Number(v || payload?.version || 0)
+    } catch {
+      return 0
+    }
+  }
+
   async syncUp(db: DatabaseWrapper): Promise<void> {
     if (!this.isAuthenticated()) return
     const payload = await this.exportDatabase(db)
@@ -637,6 +668,26 @@ export class GoogleDriveService {
       payload.tables?.sync_metadata as Array<{ key: string; value: number }> | undefined
     )?.find((r) => r.key === 'db_version')
     return Number(row?.value || payload.version || 0)
+  }
+
+  async syncMangaUp(db: DatabaseWrapper): Promise<void> {
+    if (!this.isAuthenticated()) return
+    const payload = exportTables(db, MANGA_SYNC_TABLES)
+    const existing = await this.findFileInAppData(this.getMangaSyncFilename())
+    await this.uploadJson(this.getMangaSyncFilename(), payload, existing?.id)
+  }
+
+  async syncMangaDown(db: DatabaseWrapper): Promise<number> {
+    if (!this.isAuthenticated()) return 0
+    const file = await this.findFileInAppData(this.getMangaSyncFilename())
+    if (!file) return 0
+    const raw = await this.downloadJson(file.id)
+    const payload = normalizeGenericPayload(raw, MANGA_SYNC_TABLES, 'Google manga')
+    importTables(db, MANGA_SYNC_TABLES, payload, {
+      libraryTables: ['manga_library', 'manga_progress'],
+      backupName: 'pre-sync-manga-backup.db',
+    })
+    return readPayloadVersion(payload)
   }
 
   private async exportDatabase(db: DatabaseWrapper) {

@@ -13,6 +13,9 @@ interface MangaReaderProps {
   chapters: MangaChapter[]
   onBack: () => void
   onOpenChapter: (chapter: MangaChapter) => void
+  initialPage?: number
+  onProgress?: (page: number, pageCount: number) => void
+  savedPage?: number
 }
 
 type ReadMode = 'strip' | 'page'
@@ -44,6 +47,9 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   chapters,
   onBack,
   onOpenChapter,
+  initialPage = 0,
+  onProgress,
+  savedPage = 0,
 }) => {
   const [mode, setMode] = useState<ReadMode>(loadMode)
   const [fit, setFit] = useState<FitMode>(loadFit)
@@ -58,6 +64,11 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   const pages = data?.pages ?? []
   const proxied = pages.map((src) => mangaPageSrc(provider, src))
 
+  const pageIndexRef = useRef(0)
+  const pageCountRef = useRef(0)
+  const userMovedRef = useRef(false)
+  pageCountRef.current = pages.length
+
   const idx = chapters.findIndex((c) => c.id === chapter.id)
   const prev =
     idx > 0 ? ([...chapters.slice(0, idx)].reverse().find((c) => !c.externalUrl) ?? null) : null
@@ -65,6 +76,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
 
   const goPage = useCallback(
     (dir: 1 | -1) => {
+      userMovedRef.current = true
       setPageIndex((i) => {
         const n = i + dir
         if (n < 0) {
@@ -82,11 +94,45 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   )
 
   useEffect(() => {
-    setPageIndex(0)
+    userMovedRef.current = false
+    pageIndexRef.current = Math.max(0, initialPage)
+    setPageIndex(Math.max(0, initialPage))
     setDeadPages(new Set())
     stripRefs.current = []
-    window.scrollTo(0, 0)
+    if (initialPage <= 0) window.scrollTo(0, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter.id])
+
+  const onProgressRef = useRef(onProgress)
+  onProgressRef.current = onProgress
+  const scrolledToInitial = useRef('')
+
+  useEffect(() => {
+    pageIndexRef.current = pageIndex
+    if (pages.length === 0) return
+    onProgressRef.current?.(Math.min(pageIndex + 1, pages.length), pages.length)
+  }, [pageIndex, pages.length])
+
+  useEffect(() => {
+    if (initialPage <= 0 || userMovedRef.current) return
+    if (pageIndexRef.current !== 0) return
+    userMovedRef.current = false
+    pageIndexRef.current = initialPage
+    setPageIndex(initialPage)
+  }, [initialPage])
+
+  useEffect(() => {
+    if (mode !== 'strip' || pages.length === 0 || initialPage <= 0) return
+    const key = `${chapter.id}:${initialPage}`
+    if (scrolledToInitial.current === key) return
+    scrolledToInitial.current = key
+    const t = window.setTimeout(() => {
+      stripRefs.current[Math.min(initialPage, pages.length - 1)]?.scrollIntoView({
+        block: 'start',
+      })
+    }, 150)
+    return () => window.clearTimeout(t)
+  }, [mode, pages.length, initialPage, chapter.id])
 
   useEffect(() => {
     document.title = `${mangaTitle} Ch. ${chapter.number} - dango`
@@ -133,7 +179,10 @@ const MangaReader: React.FC<MangaReaderProps> = ({
         for (const entry of entries) {
           if (entry.isIntersecting) {
             const i = Number((entry.target as HTMLElement).dataset.pageIndex)
-            if (!Number.isNaN(i)) setPageIndex(i)
+            if (!Number.isNaN(i)) {
+              if (i !== pageIndexRef.current) userMovedRef.current = true
+              setPageIndex(i)
+            }
           }
         }
       },
@@ -142,6 +191,32 @@ const MangaReader: React.FC<MangaReaderProps> = ({
     stripRefs.current.forEach((el) => el && observer.observe(el))
     return () => observer.disconnect()
   }, [mode, pages.length, data])
+
+  useEffect(() => {
+    if (mode !== 'strip' || pages.length === 0) return
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const reportSettled = () => {
+      idleTimer = null
+      const count = pageCountRef.current
+      if (count === 0) return
+      onProgressRef.current?.(Math.min(pageIndexRef.current + 1, count), count)
+    }
+    const pokeActivity = () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(reportSettled, 1200)
+    }
+    window.addEventListener('scroll', pokeActivity, { passive: true })
+    window.addEventListener('touchmove', pokeActivity, { passive: true })
+    window.addEventListener('touchend', pokeActivity)
+    window.addEventListener('wheel', pokeActivity, { passive: true })
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      window.removeEventListener('scroll', pokeActivity)
+      window.removeEventListener('touchmove', pokeActivity)
+      window.removeEventListener('touchend', pokeActivity)
+      window.removeEventListener('wheel', pokeActivity)
+    }
+  }, [mode, pages.length])
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX
@@ -194,6 +269,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   )
 
   const fitHeight = fit === 'height'
+  const savedIndex = savedPage > 0 ? savedPage - 1 : -1
 
   return (
     <div className={styles.readerShell}>
@@ -298,6 +374,12 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               data-page-index={i}
               className={styles.readerPageWrap}
             >
+              {i === savedIndex && (
+                <div className={styles.saveMarker} role="note" aria-label="Saved reading position">
+                  <Icon name="bookmark" size={12} />
+                  <span>Saved · p. {savedPage}</span>
+                </div>
+              )}
               {deadPages.has(i) ? (
                 renderDeadPage(i)
               ) : (

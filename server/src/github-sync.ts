@@ -6,6 +6,14 @@ import { isTempSyncRow } from './lib/temp-ids.js'
 import { updateEnvFile } from './utils/env.utils.js'
 import { CONFIG } from './config.js'
 import { SHIPPED_DEFAULTS } from './shipped-defaults.js'
+import {
+  exportTables,
+  importTables,
+  MANGA_SYNC_TABLES,
+  normalizePayload as normalizeGenericPayload,
+  readPayloadVersion,
+  type SyncPayload as GenericSyncPayload,
+} from './sync-payload.js'
 
 const log = logger.child({ module: 'GitHubSync' })
 
@@ -115,6 +123,10 @@ function getGitHubClientId() {
 
 function getSyncFilename() {
   return CONFIG.IS_DEV ? 'sync.dev.json' : 'sync.json'
+}
+
+function getMangaSyncFilename() {
+  return CONFIG.IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json'
 }
 
 async function loadOctokit(token: string): Promise<OctokitInstance> {
@@ -307,6 +319,11 @@ class GitHubSyncService {
     return payload ? readVersion(payload) : 0
   }
 
+  async getMangaRemoteVersion(): Promise<number> {
+    const payload = await this.fetchMangaSyncPayload()
+    return payload ? readPayloadVersion(payload) : 0
+  }
+
   async syncUp(db: DatabaseWrapper): Promise<void> {
     const payload = await this.exportDatabase(db)
     const octokit = await this.getOctokit()
@@ -333,6 +350,37 @@ class GitHubSyncService {
 
     this.importDatabase(db, payload)
     return readVersion(payload)
+  }
+
+  async syncMangaUp(db: DatabaseWrapper): Promise<void> {
+    const payload = exportTables(db, MANGA_SYNC_TABLES)
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const existing = await this.getSyncFile(octokit, owner, getMangaSyncFilename())
+    const content = Buffer.from(JSON.stringify(payload, null, 2), 'utf8').toString('base64')
+
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo: REPO_NAME,
+      path: getMangaSyncFilename(),
+      message: `Sync dango manga data v${payload.version}`,
+      content,
+      sha: existing?.sha,
+      headers: GITHUB_API_HEADERS,
+    })
+  }
+
+  async syncMangaDown(db: DatabaseWrapper): Promise<number> {
+    const payload = await this.fetchMangaSyncPayload()
+    if (!payload) {
+      return 0
+    }
+
+    importTables(db, MANGA_SYNC_TABLES, payload, {
+      libraryTables: ['manga_library', 'manga_progress'],
+      backupName: 'pre-sync-manga-backup.db',
+    })
+    return readPayloadVersion(payload)
   }
 
   private async runDeviceAuth(
@@ -429,13 +477,14 @@ class GitHubSyncService {
 
   private async getSyncFile(
     octokit: OctokitInstance,
-    owner: string
+    owner: string,
+    filePath: string = getSyncFilename()
   ): Promise<{ content: string; sha: string } | null> {
     try {
       const response = await octokit.rest.repos.getContent({
         owner,
         repo: REPO_NAME,
-        path: getSyncFilename(),
+        path: filePath,
         headers: GITHUB_API_HEADERS,
       })
 
@@ -466,6 +515,20 @@ class GitHubSyncService {
     }
 
     return normalizePayload(JSON.parse(file.content))
+  }
+
+  private async fetchMangaSyncPayload(): Promise<GenericSyncPayload<
+    (typeof MANGA_SYNC_TABLES)[number]
+  > | null> {
+    const octokit = await this.getOctokit()
+    const owner = await this.ensureRepo(octokit)
+    const file = await this.getSyncFile(octokit, owner, getMangaSyncFilename())
+
+    if (!file) {
+      return null
+    }
+
+    return normalizeGenericPayload(JSON.parse(file.content), MANGA_SYNC_TABLES, 'GitHub manga')
   }
 
   private async exportDatabase(db: DatabaseWrapper): Promise<SyncPayload> {

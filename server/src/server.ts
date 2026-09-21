@@ -18,8 +18,11 @@ import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import {
   initializeDatabase,
+  initializeMangaDatabase,
   syncDownOnBoot,
   syncUp,
+  mangaSyncDownOnBoot,
+  mangaSyncUp,
   initSyncProvider,
   waitForSync,
   getActiveProvider,
@@ -31,6 +34,7 @@ import { createWatchlistRouter } from './routes/watchlist.routes.js'
 import { createDataRouter } from './routes/data.routes.js'
 import { createAsmrRouter, type JasmrApi } from './routes/asmr.routes.js'
 import { createMangaRouter } from './routes/manga.routes.js'
+import { createMangaLibraryRouter } from './routes/manga-library.routes.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
 import type { TvProvider } from './providers/tv.types.js'
 import { createRadioRouter } from './routes/radio.routes.js'
@@ -56,6 +60,7 @@ import { initDiscordRolesSync } from './lib/discord-roles-sync.service.js'
 declare module 'express-serve-static-core' {
   interface Request {
     db: DatabaseWrapper
+    mangaDb: DatabaseWrapper
   }
 }
 
@@ -149,10 +154,12 @@ async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
 }
 
 let db: DatabaseWrapper
+let mangaDb: DatabaseWrapper
 let isShuttingDown = false
 
 async function runSyncSequence(
   database: DatabaseWrapper,
+  mangaDatabase: DatabaseWrapper,
   preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
 ) {
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
@@ -192,16 +199,29 @@ async function runSyncSequence(
   } catch (err) {
     logger.error({ err }, 'Sync up on boot failed')
   }
+
+  try {
+    await mangaSyncDownOnBoot(mangaDatabase, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'Manga sync down on boot failed')
+  }
+
+  try {
+    await mangaSyncUp(mangaDatabase, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'Manga sync up on boot failed')
+  }
 }
 
 app.use((req, res, next) => {
   if (isShuttingDown) {
     return res.status(503).send('Server is shutting down...')
   }
-  if (!db) {
+  if (!db || !mangaDb) {
     return res.status(503).send('Database initializing...')
   }
   req.db = db
+  req.mangaDb = mangaDb
   next()
 })
 
@@ -234,7 +254,9 @@ app.use(lanAuthMiddleware)
 
 app.use(
   '/api/auth',
-  createAuthRouter((database) => runSyncSequence(database))
+  createAuthRouter((database, mangaDatabase, preferred) =>
+    runSyncSequence(database, mangaDatabase, preferred)
+  )
 )
 
 const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(() => db)
@@ -248,6 +270,7 @@ app.use(
   '/api',
   createMangaRouter(apiCache, (name) => mangaProviders[name])
 )
+app.use('/api', createMangaLibraryRouter())
 app.use('/api', createRadioRouter(apiCache))
 app.use(
   '/api',
@@ -325,6 +348,11 @@ async function main() {
   db = await initializeDatabase(dbPath)
   logger.info(`Database initialized at ${dbPath}`)
 
+  const mangaDbName = CONFIG.IS_DEV ? CONFIG.MANGA_DB_NAME_DEV : CONFIG.MANGA_DB_NAME_PROD
+  const mangaDbPath = path.join(CONFIG.ROOT, mangaDbName)
+  mangaDb = await initializeMangaDatabase(mangaDbPath)
+  logger.info(`Manga database initialized at ${mangaDbPath}`)
+
   await offlineDb.init(db)
   if (offlineDb.checkWeeklyUpdateDue(db)) {
     logger.info('Weekly offline database update is due on startup, starting background update...')
@@ -341,7 +369,7 @@ async function main() {
   checkAnilistStatus().catch(() => {})
   initDiscordRolesSync(db)
 
-  await runSyncSequence(db)
+  await runSyncSequence(db, mangaDb)
 
   await refreshRemoteProviders()
   if (CONFIG.PROVIDER_REPO_URL.trim()) {
@@ -355,12 +383,22 @@ async function main() {
   if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
     fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
   }
+  if (!fs.existsSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH)) {
+    fs.writeFileSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
+  }
 
   let hasUnsyncedChanges = false
+  let hasMangaUnsyncedChanges = false
 
   const watcher = fs.watch(CONFIG.LOCAL_MANIFEST_PATH, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
       hasUnsyncedChanges = true
+    }
+  })
+
+  const mangaWatcher = fs.watch(CONFIG.MANGA_LOCAL_MANIFEST_PATH, (eventType) => {
+    if (eventType === 'change' || eventType === 'rename') {
+      hasMangaUnsyncedChanges = true
     }
   })
 
@@ -377,6 +415,16 @@ async function main() {
       } catch (err) {
         logger.error({ err }, 'Failed to upload database changes')
         hasUnsyncedChanges = true
+      }
+    }
+    if (hasMangaUnsyncedChanges) {
+      logger.info('Uploading accumulated manga database changes...')
+      hasMangaUnsyncedChanges = false
+      try {
+        await mangaSyncUp(mangaDb, remoteFolder)
+      } catch (err) {
+        logger.error({ err }, 'Failed to upload manga database changes')
+        hasMangaUnsyncedChanges = true
       }
     }
   }, 300000)
@@ -403,6 +451,7 @@ async function main() {
     discordRPCService.disconnect()
     discordGatewayService.shutdown()
     await watcher.close()
+    await mangaWatcher.close()
 
     if (expressServer) {
       await new Promise<void>((resolve) => expressServer.close(() => resolve()))
@@ -418,8 +467,19 @@ async function main() {
       }
     }
 
+    if (hasMangaUnsyncedChanges) {
+      logger.info('Sync on shutdown: uploading final manga database changes...')
+      hasMangaUnsyncedChanges = false
+      try {
+        await mangaSyncUp(mangaDb, remoteFolder)
+      } catch (e) {
+        logger.error({ err: e }, 'Final manga sync on shutdown failed')
+      }
+    }
+
     await waitForSync()
 
+    mangaDb.close(() => {})
     db.close(() => {
       notifyServerExit()
       if (signal === 'SIGUSR2') {

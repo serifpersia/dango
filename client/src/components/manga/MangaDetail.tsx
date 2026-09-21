@@ -5,15 +5,30 @@ import {
   type MangaChapter,
   type MangaDetail as MangaDetailType,
 } from '../../hooks/useManga'
+import type { MangaProgressItem } from '../../hooks/useMangaLibrary'
 import styles from './Manga.module.css'
 
 interface MangaDetailProps {
   detail: MangaDetailType
+  altTitle?: string
   onBack: () => void
   onOpenChapter: (chapter: MangaChapter) => void
+  bookmarkButton?: React.ReactNode
+  statusSelect?: React.ReactNode
+  primaryAction?: React.ReactNode
+  progressByChapter?: Map<string, MangaProgressItem>
 }
 
-const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter }) => {
+const MangaDetail: React.FC<MangaDetailProps> = ({
+  detail,
+  altTitle,
+  onBack,
+  onOpenChapter,
+  bookmarkButton,
+  statusSelect,
+  primaryAction,
+  progressByChapter,
+}) => {
   const meta = [
     detail.type,
     detail.status,
@@ -37,6 +52,7 @@ const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter
         )}
         <div className={styles.detailInfo}>
           <h2 className={styles.detailTitle}>{detail.title}</h2>
+          {altTitle && <p className={styles.detailAltTitle}>Also known as: {altTitle}</p>}
           {meta.length > 0 && (
             <div className={styles.detailMeta}>
               {meta.map((m) => (
@@ -56,6 +72,13 @@ const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter
             </div>
           )}
           {detail.description && <p className={styles.detailDesc}>{detail.description}</p>}
+          {(bookmarkButton || statusSelect || primaryAction) && (
+            <div className={styles.detailActions}>
+              {primaryAction}
+              {bookmarkButton}
+              {statusSelect}
+            </div>
+          )}
         </div>
       </div>
       <h3 className={styles.detailTitle} style={{ fontSize: '1rem' }}>
@@ -65,22 +88,36 @@ const MangaDetail: React.FC<MangaDetailProps> = ({ detail, onBack, onOpenChapter
         <p className={styles.statusMsg}>No chapters found for this title on this provider.</p>
       ) : (
         <div className={styles.chapterList}>
-          {detail.chapters.map((ch) => (
-            <button
-              key={ch.id}
-              className={styles.chapterRow}
-              onClick={() => onOpenChapter(ch)}
-              title={ch.externalUrl ? 'External only — opens on source site' : undefined}
-            >
-              <span>
-                Ch. {ch.number}
-                {ch.title ? ` — ${ch.title}` : ''}
-              </span>
-              <span className={styles.chapterMeta}>
-                {[ch.group, ch.externalUrl ? 'external' : ''].filter(Boolean).join(' · ')}
-              </span>
-            </button>
-          ))}
+          {detail.chapters.map((ch) => {
+            const progress = progressByChapter?.get(ch.id)
+            const done = !!progress && progress.pageCount > 0 && progress.page >= progress.pageCount
+            return (
+              <button
+                key={ch.id}
+                className={`${styles.chapterRow} ${done ? styles.chapterDone : ''}`}
+                onClick={() => onOpenChapter(ch)}
+                title={ch.externalUrl ? 'External only — opens on source site' : undefined}
+              >
+                <span>
+                  Ch. {ch.number}
+                  {ch.title ? ` — ${ch.title}` : ''}
+                </span>
+                <span className={styles.chapterMeta}>
+                  {[
+                    progress && progress.pageCount > 0
+                      ? done
+                        ? 'read'
+                        : `p. ${progress.page}/${progress.pageCount}`
+                      : '',
+                    ch.group,
+                    ch.externalUrl ? 'external' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

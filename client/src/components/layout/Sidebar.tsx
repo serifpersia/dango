@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
+import { useContentType } from '../../contexts/ContentTypeContext'
 import styles from './Sidebar.module.css'
 import Icon from '../common/Icon'
 import Logo from '../common/Logo'
@@ -8,6 +9,7 @@ import packageJson from '../../../package.json'
 
 const Sidebar: React.FC = () => {
   const { isOpen, setIsOpen } = useSidebar()
+  const { contentType } = useContentType()
   const [hasMatureConsent, setHasMatureConsent] = useState(
     () => localStorage.getItem('agreedToViewMature') === 'true'
   )
@@ -26,14 +28,19 @@ const Sidebar: React.FC = () => {
     setIsOpen(false)
   }
 
+  const isManga = contentType === 'manga'
+
   const navItems = [
     { to: '/', icon: <Icon name="home" />, label: 'Home' },
-    { to: '/search', icon: <Icon name="search" />, label: 'Search' },
-    { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
+    isManga
+      ? { to: '/manga', icon: <Icon name="book" />, label: 'Manga' }
+      : { to: '/search', icon: <Icon name="search" />, label: 'Search' },
+    isManga
+      ? { to: '/reading-list', icon: <Icon name="bookmark" />, label: 'Reading List' }
+      : { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
     { to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' },
     { to: '/trackers', icon: <Icon name="sync-alt" />, label: 'Trackers' },
     { to: '/asmr', icon: <Icon name="headphones" />, label: 'ASMR' },
-    { to: '/manga', icon: <Icon name="book" />, label: 'Manga' },
     { to: '/radio', icon: <Icon name="broadcast-tower" />, label: 'Radio' },
     { to: '/tv', icon: <Icon name="tv" />, label: 'TV & Movies' },
     ...(hasMatureConsent

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { fetchApi } from '../lib/fetchApi'
 
 export type MangaProviderName = string
@@ -71,7 +71,7 @@ export interface MangaBrowseParams {
   mature: boolean
 }
 
-export const useMangaBrowse = (params: MangaBrowseParams) => {
+export const useMangaBrowse = (params: MangaBrowseParams, enabled: boolean = true) => {
   const { provider, query, page, sort, status, type, rating, mature } = params
   return useQuery({
     queryKey: ['mangaBrowse', provider, query, page, sort, status, type, rating, mature],
@@ -88,6 +88,34 @@ export const useMangaBrowse = (params: MangaBrowseParams) => {
       return fetchApi(`/api/manga/search?${p.toString()}`) as Promise<MangaBrowseResult>
     },
     staleTime: STALE_5_MIN,
+    enabled: enabled && !!provider,
+  })
+}
+
+export const useInfiniteMangaBrowse = (
+  params: Omit<MangaBrowseParams, 'page'>,
+  size: number = 14
+) => {
+  const { provider, query, sort, status, type, rating, mature } = params
+  return useInfiniteQuery<MangaBrowseResult>({
+    queryKey: ['mangaBrowseInfinite', provider, query, sort, status, type, rating, mature, size],
+    queryFn: ({ pageParam = 1 }) => {
+      const p = new URLSearchParams()
+      p.set('provider', provider)
+      if (query.trim()) p.set('q', query.trim())
+      p.set('page', String(pageParam as number))
+      p.set('limit', String(size))
+      if (sort) p.set('sort', sort)
+      if (status) p.set('status', status)
+      if (type) p.set('type', type)
+      if (rating) p.set('rating', rating)
+      if (mature) p.set('mature', '1')
+      return fetchApi(`/api/manga/search?${p.toString()}`) as Promise<MangaBrowseResult>
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasNext ? allPages.length + 1 : undefined),
+    staleTime: STALE_5_MIN,
+    enabled: !!provider,
   })
 }
 

@@ -5,6 +5,7 @@ import { DatabaseWrapper } from '../db.js'
 export function createAuthRouter(
   runSyncSequence: (
     db: DatabaseWrapper,
+    mangaDb: DatabaseWrapper,
     provider?: 'github' | 'google' | 'rclone' | 'none'
   ) => Promise<void>
 ): Router {

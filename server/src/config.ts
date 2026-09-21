@@ -55,6 +55,20 @@ function migrateLegacyData(packageServerRoot: string, dataRoot: string) {
   for (const filename of legacyFiles) {
     moveFileIfNeeded(path.join(packageServerRoot, filename), path.join(dataRoot, filename))
   }
+
+  // Manga library database + manifests (added after anime DB; migrate if present)
+  for (const filename of [
+    'manga.db',
+    'manga.db-shm',
+    'manga.db-wal',
+    'manga.dev.db',
+    'manga.dev.db-shm',
+    'manga.dev.db-wal',
+    'manga.sync_manifest.json',
+    'manga.sync_manifest.dev.json',
+  ]) {
+    moveFileIfNeeded(path.join(packageServerRoot, filename), path.join(dataRoot, filename))
+  }
 }
 
 function resolveLegacyDataRoot() {
@@ -124,8 +138,14 @@ export const CONFIG = {
     DATA_ROOT,
     IS_DEV ? 'sync_manifest.dev.json' : 'sync_manifest.json'
   ),
+  MANGA_LOCAL_MANIFEST_PATH: path.join(
+    DATA_ROOT,
+    IS_DEV ? 'manga.sync_manifest.dev.json' : 'manga.sync_manifest.json'
+  ),
   DB_NAME_PROD: 'anime.db',
   DB_NAME_DEV: 'anime.dev.db',
+  MANGA_DB_NAME_PROD: 'manga.db',
+  MANGA_DB_NAME_DEV: 'manga.dev.db',
   REMOTE_FOLDER_PROD: 'dango_db',
   REMOTE_FOLDER_DEV: 'dango_dev_db',
   MANIFEST_FILENAME: IS_DEV ? 'sync_manifest.dev.json' : 'sync_manifest.json',
@@ -135,7 +155,9 @@ export const CONFIG = {
     'https://www.googleapis.com/auth/userinfo.email',
   ],
   GOOGLE_SYNC_FILENAME: IS_DEV ? 'sync.dev.json' : 'sync.json',
+  MANGA_GOOGLE_SYNC_FILENAME: IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json',
   RCLONE_SYNC_FILENAME: IS_DEV ? 'sync.dev.json' : 'sync.json',
+  MANGA_RCLONE_SYNC_FILENAME: IS_DEV ? 'manga.sync.dev.json' : 'manga.sync.json',
   IS_DEV,
   PORT,
   HOST,

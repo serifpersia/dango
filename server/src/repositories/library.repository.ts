@@ -14,6 +14,10 @@ const LIBRARY_TABLES = [
 
 export type LibraryCounts = Record<(typeof LIBRARY_TABLES)[number], number>
 
+const MANGA_LIBRARY_TABLES = ['manga_library', 'manga_progress'] as const
+
+export type MangaLibraryCounts = Record<(typeof MANGA_LIBRARY_TABLES)[number], number>
+
 export const LibraryRepository = {
   countAll: (db: DatabaseWrapper): LibraryCounts => {
     const counts = {} as LibraryCounts
@@ -30,6 +34,29 @@ export const LibraryRepository = {
 
   clearAll: (db: DatabaseWrapper): void => {
     for (const table of LIBRARY_TABLES) {
+      try {
+        dbRun(db, `DELETE FROM "${table}"`)
+      } catch {
+        // ignore
+      }
+    }
+  },
+
+  countManga: (db: DatabaseWrapper): MangaLibraryCounts => {
+    const counts = {} as MangaLibraryCounts
+    for (const table of MANGA_LIBRARY_TABLES) {
+      try {
+        counts[table] =
+          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
+      } catch {
+        counts[table] = 0
+      }
+    }
+    return counts
+  },
+
+  clearManga: (db: DatabaseWrapper): void => {
+    for (const table of MANGA_LIBRARY_TABLES) {
       try {
         dbRun(db, `DELETE FROM "${table}"`)
       } catch {

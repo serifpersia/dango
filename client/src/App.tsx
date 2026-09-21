@@ -21,6 +21,9 @@ const Search = lazy(() => import('./pages/Search'))
 const Mature = lazy(() => import('./pages/Mature'))
 const Asmr = lazy(() => import('./pages/Asmr'))
 const Manga = lazy(() => import('./pages/Manga'))
+const MangaInfoPage = lazy(() => import('./pages/MangaInfoPage'))
+const MangaReadPage = lazy(() => import('./pages/MangaReadPage'))
+const ReadingList = lazy(() => import('./pages/ReadingList'))
 const Radio = lazy(() => import('./pages/Radio'))
 const Tv = lazy(() => import('./pages/Tv'))
 const Trackers = lazy(() => import('./pages/Trackers'))
@@ -173,11 +176,14 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/watchlist/:filter?" element={<Watchlist />} />
+              <Route path="/reading-list/:filter?" element={<ReadingList />} />
               <Route path="/search" element={<Search />} />
               <Route path="/mature" element={<Mature />} />
               <Route path="/asmr" element={<Asmr />} />
               <Route path="/asmr/:rj" element={<Asmr />} />
               <Route path="/manga" element={<Manga />} />
+              <Route path="/manga/:provider/:id" element={<MangaInfoPage />} />
+              <Route path="/manga/:provider/:id/read" element={<MangaReadPage />} />
               <Route path="/radio" element={<Radio />} />
               <Route path="/tv" element={<Tv />} />
               <Route path="/tv/:id" element={<Tv />} />

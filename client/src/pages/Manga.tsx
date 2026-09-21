@@ -1,20 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams, Navigate } from 'react-router'
 import Icon from '../components/common/Icon'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
-import MangaCard from '../components/manga/MangaCard'
-import MangaDetail from '../components/manga/MangaDetail'
-import MangaReader from '../components/manga/MangaReader'
+import MediaCard from '../components/common/MediaCard'
+import MangaPopup from '../components/manga/MangaPopup'
+import { isMangaAdult, mangaNameVariants } from '../lib/manga'
 import {
   useMangaBrowse,
-  useMangaDetail,
+  mangaCoverSrc,
   type MangaCard as MangaCardType,
-  type MangaChapter,
   type MangaProviderName,
 } from '../hooks/useManga'
+import { useToggleMangaBookmark, mangaLibraryId } from '../hooks/useMangaLibrary'
+import { useMangaPopup } from '../hooks/useMangaPopup'
 import { useProviders } from '../hooks/useProviders'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from '../components/manga/Manga.module.css'
@@ -90,8 +91,7 @@ export default function Manga() {
   const status = searchParams.get('status') || ''
   const type = searchParams.get('type') || ''
   const rating = searchParams.get('rating') || 'safe'
-  const mangaId = searchParams.get('id') || ''
-  const chapterId = searchParams.get('chapter') || ''
+  const legacyId = searchParams.get('id') || ''
 
   useEffect(() => {
     document.title = 'Manga - dango'
@@ -134,63 +134,23 @@ export default function Manga() {
   const items = (browse.data?.items ?? []) as MangaCardType[]
   const hasNext = browse.data?.hasNext ?? false
 
-  const detailQuery = useMangaDetail(
-    mangaId ? provider : null,
-    mangaId || null,
-    activeRating,
-    showMature
-  )
-  const detail = detailQuery.data
-  const activeChapter: MangaChapter | null =
-    detail && chapterId ? (detail.chapters.find((c) => c.id === chapterId) ?? null) : null
-
-  const discordSessionRef = useRef<string>('')
-  if (!discordSessionRef.current) {
-    discordSessionRef.current = `manga-${Date.now()}-${Math.random().toString(36).slice(2)}`
-  }
-
-  useEffect(() => {
-    if (!detail || !activeChapter) {
-      fetch('/api/discord/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page: 'manga' }),
-      }).catch(() => {})
-      return
-    }
-    const isAdult =
-      detail.contentRating === 'erotica' ||
-      detail.contentRating === 'pornographic' ||
-      detail.type === 'doujinshi'
-    const send = () => {
-      fetch('/api/discord/manga', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: detail.title,
-          chapterLabel: `Chapter ${activeChapter.number}`,
-          isPlaying: true,
-          thumbnail: detail.cover || '',
-          thumbnails: [detail.cover].filter(Boolean),
-          isAdult,
-          sessionId: discordSessionRef.current,
-        }),
-      }).catch(() => {})
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: discordSessionRef.current }),
-      }).catch(() => {})
-    }
-    send()
-    const id = window.setInterval(send, 60000)
-    return () => window.clearInterval(id)
-  }, [detail, activeChapter])
+  const { toggle, bookmarkedIds } = useToggleMangaBookmark()
+  const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
 
   useEffect(() => {
     if (queryInput !== query) setQueryInput(query)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
+
+  if (legacyId) {
+    const params = new URLSearchParams()
+    if (showMature && rating !== 'safe') params.set('rating', rating)
+    const legacyChapter = searchParams.get('chapter') || ''
+    if (legacyChapter) params.set('chapter', legacyChapter)
+    const querySuffix = params.toString() ? `?${params.toString()}` : ''
+    const target = `/manga/${provider}/${encodeURIComponent(legacyId)}${legacyChapter ? `/read${querySuffix}` : querySuffix}`
+    return <Navigate to={target} replace />
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -216,34 +176,10 @@ export default function Manga() {
   }
 
   const handleSelect = (item: MangaCardType) => {
-    const next = new URLSearchParams(searchParams)
-    if (item.provider !== provider) next.set('provider', item.provider)
-    next.set('id', item.id)
-    next.delete('chapter')
-    setSearchParams(next)
-  }
-
-  const handleBackToBrowse = () => {
-    const next = new URLSearchParams(searchParams)
-    next.delete('id')
-    next.delete('chapter')
-    setSearchParams(next)
-  }
-
-  const handleBackToDetail = () => {
-    const next = new URLSearchParams(searchParams)
-    next.delete('chapter')
-    setSearchParams(next)
-  }
-
-  const handleOpenChapter = (ch: MangaChapter) => {
-    if (ch.externalUrl) {
-      window.open(ch.externalUrl, '_blank', 'noopener,noreferrer')
-      return
-    }
-    const next = new URLSearchParams(searchParams)
-    next.set('chapter', ch.id)
-    setSearchParams(next)
+    const params = new URLSearchParams()
+    if (showMature && rating !== 'safe') params.set('rating', rating)
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    return `/manga/${item.provider}/${encodeURIComponent(item.id)}${suffix}`
   }
 
   const statusOptions = provider === 'mangapill' ? PILL_STATUS : DEX_STATUS
@@ -308,106 +244,76 @@ export default function Manga() {
         )}
       </div>
 
-      {!mangaId && (
-        <div className={styles.filterRow}>
-          {provider === 'mangadex' && (
-            <select
-              className={styles.select}
-              value={sort}
-              onChange={(e) => update({ sort: e.target.value }, true)}
-              aria-label="Sort manga"
-            >
-              {DEX_SORTS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
+      <div className={styles.filterRow}>
+        {provider === 'mangadex' && (
           <select
             className={styles.select}
-            value={status}
-            onChange={(e) => update({ status: e.target.value }, true)}
-            aria-label="Filter by status"
+            value={sort}
+            onChange={(e) => update({ sort: e.target.value }, true)}
+            aria-label="Sort manga"
           >
-            {statusOptions.map((o) => (
-              <option key={o.label} value={o.value}>
+            {DEX_SORTS.map((o) => (
+              <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
-          {showTypeSelect && (
-            <select
-              className={styles.select}
-              value={type}
-              onChange={(e) => update({ type: e.target.value }, true)}
-              aria-label="Filter by type"
-            >
-              {PILL_TYPES.filter((o) => o.value !== 'doujinshi' || showMature).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
-          {showRatingSelect && (
-            <select
-              className={styles.select}
-              value={activeRating}
-              onChange={(e) => update({ rating: e.target.value }, true)}
-              aria-label="Content rating"
-            >
-              {ratingOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
-          {!hasConsent && (
-            <div className={styles.matureToggleWrap}>
-              <label className={styles.matureLabel} htmlFor="manga-mature-toggle">
-                Mature
-              </label>
-              <ToggleSwitch
-                id="manga-mature-toggle"
-                isChecked={false}
-                onChange={handleMatureToggle}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {mangaId && chapterId && detail && activeChapter ? (
-        <MangaReader
-          provider={provider}
-          mangaTitle={detail.title}
-          chapter={activeChapter}
-          chapters={detail.chapters}
-          onBack={handleBackToDetail}
-          onOpenChapter={handleOpenChapter}
-        />
-      ) : mangaId ? (
-        detailQuery.isLoading ? (
-          <div aria-hidden>
-            <div
-              className={`${styles.skeletonThumb} ${styles.shimmer}`}
-              style={{ maxWidth: '12rem' }}
+        )}
+        <select
+          className={styles.select}
+          value={status}
+          onChange={(e) => update({ status: e.target.value }, true)}
+          aria-label="Filter by status"
+        >
+          {statusOptions.map((o) => (
+            <option key={o.label} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {showTypeSelect && (
+          <select
+            className={styles.select}
+            value={type}
+            onChange={(e) => update({ type: e.target.value }, true)}
+            aria-label="Filter by type"
+          >
+            {PILL_TYPES.filter((o) => o.value !== 'doujinshi' || showMature).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {showRatingSelect && (
+          <select
+            className={styles.select}
+            value={activeRating}
+            onChange={(e) => update({ rating: e.target.value }, true)}
+            aria-label="Content rating"
+          >
+            {ratingOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {!hasConsent && (
+          <div className={styles.matureToggleWrap}>
+            <label className={styles.matureLabel} htmlFor="manga-mature-toggle">
+              Mature
+            </label>
+            <ToggleSwitch
+              id="manga-mature-toggle"
+              isChecked={false}
+              onChange={handleMatureToggle}
             />
-            <div className={`${styles.skeletonLine} ${styles.shimmer}`} style={{ width: '40%' }} />
-            <div className={`${styles.skeletonLine} ${styles.shimmer}`} style={{ width: '70%' }} />
           </div>
-        ) : detailQuery.isError || !detail ? (
-          <ErrorMessage message="Failed to load this title. Please try again." />
-        ) : (
-          <MangaDetail
-            detail={detail}
-            onBack={handleBackToBrowse}
-            onOpenChapter={handleOpenChapter}
-          />
-        )
-      ) : browse.isError ? (
+        )}
+      </div>
+
+      {browse.isError ? (
         <ErrorMessage message="Failed to load manga. Please try again." />
       ) : browse.isLoading && items.length === 0 ? (
         <div className={styles.grid} aria-hidden>
@@ -430,9 +336,46 @@ export default function Manga() {
       ) : (
         <>
           <div className={`${styles.grid} ${browse.isFetching ? styles.fetching : ''}`}>
-            {items.map((item) => (
-              <MangaCard key={`${item.provider}-${item.id}`} item={item} onSelect={handleSelect} />
-            ))}
+            {items.map((item) => {
+              const libId = mangaLibraryId(item.provider, item.id)
+              return (
+                <MediaCard
+                  key={`${item.provider}-${item.id}`}
+                  item={{
+                    id: libId,
+                    title: item.title,
+                    ...mangaNameVariants(item),
+                    thumbnail: mangaCoverSrc(item.provider, item.cover),
+                    typeBadge: item.type || undefined,
+                    chapterBadge: item.latestChapter ? `Ch. ${item.latestChapter}` : null,
+                    isAdult: isMangaAdult(item),
+                  }}
+                  linkTo={handleSelect(item)}
+                  hoverIcon="info"
+                  display={{
+                    elements: {
+                      poster: { typeBadge: true, chapterBadge: true, adultBadge: true },
+                      info: { title: true, mobileBadges: true, progress: false, meta: false },
+                    },
+                  }}
+                  onOpenDetails={(rect) =>
+                    openPopup(rect, {
+                      provider: item.provider,
+                      mangaId: item.id,
+                      title: item.title,
+                      altTitle: item.altTitle,
+                      cover: item.cover,
+                      contentRating: item.contentRating,
+                      readTarget: handleSelect(item),
+                      rating: activeRating,
+                      mature: showMature,
+                    })
+                  }
+                  onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
+                  rawThumbnail
+                />
+              )
+            })}
           </div>
           <nav className={styles.pagination}>
             <button
@@ -452,6 +395,27 @@ export default function Manga() {
             </button>
           </nav>
         </>
+      )}
+
+      {popup && (
+        <MangaPopup
+          data={popup.data}
+          anchorRect={popup.rect}
+          bookmarked={bookmarkedIds.has(mangaLibraryId(popup.data.provider, popup.data.mangaId))}
+          onToggleBookmark={() =>
+            toggle({
+              id: popup.data.mangaId,
+              provider: popup.data.provider,
+              title: popup.data.title,
+              cover: popup.data.cover,
+              altTitle: popup.data.altTitle ?? undefined,
+              contentRating: popup.data.contentRating,
+            })
+          }
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          onRequestClose={closePopup}
+        />
       )}
 
       {showMatureModal && (

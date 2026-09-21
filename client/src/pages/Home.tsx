@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback, useRef, useState, useLayoutEffect } from 'react'
+import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import Icon from '../components/common/Icon'
 import { Button } from '../components/common/Button'
@@ -23,10 +23,20 @@ import {
   useThisWeekSchedule,
 } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useContentType, type ContentType } from '../contexts/ContentTypeContext'
+import OptionTabs from '../components/common/OptionTabs'
+import MangaHome from '../components/manga/MangaHome'
 import { fetchApi } from '../lib/fetchApi'
 import styles from './Home.module.css'
 
 type ActiveTab = 'latest' | 'season' | 'popular' | 'week'
+
+const CONTENT_OPTIONS: { value: ContentType; label: string }[] = [
+  { value: 'anime', label: 'Anime' },
+  { value: 'manga', label: 'Manga' },
+  { value: 'tv', label: 'TV & Movies' },
+  { value: 'asmr', label: 'ASMR' },
+]
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
@@ -46,6 +56,7 @@ const Home: React.FC = () => {
   )
 
   const { titlePreference } = useTitlePreference()
+  const { contentType, setContentType } = useContentType()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
   const [alsoRemoveFromWatchlist, setAlsoRemoveFromWatchlist] = React.useState(false)
   const removeWatchlistMutation = useRemoveFromWatchlist()
@@ -154,52 +165,6 @@ const Home: React.FC = () => {
     : tabs
 
   const displayTab = activeTab === 'week' && !hasThisWeek ? 'latest' : activeTab
-
-  const tabBarRef = useRef<HTMLDivElement>(null)
-  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
-  const [indicator, setIndicator] = useState({ left: 0, width: 0 })
-
-  const updateIndicator = useCallback((activeKey: string) => {
-    const el = tabRefs.current.get(activeKey)
-    const bar = tabBarRef.current
-    if (el && bar) {
-      const barRect = bar.getBoundingClientRect()
-      const elRect = el.getBoundingClientRect()
-      setIndicator({
-        left: elRect.left - barRect.left + bar.scrollLeft,
-        width: elRect.width,
-      })
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    updateIndicator(displayTab)
-  }, [displayTab, tabsWithWeek.length, updateIndicator])
-
-  useEffect(() => {
-    updateIndicator(displayTab)
-    if (typeof ResizeObserver === 'undefined') return
-    let raf = 0
-    const bar = tabBarRef.current
-    if (!bar) return
-    const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => updateIndicator(displayTab))
-    })
-    ro.observe(bar)
-    let cancelled = false
-    if (document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        if (!cancelled) updateIndicator(displayTab)
-      })
-    }
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(raf)
-      ro.disconnect()
-    }
-  }, [displayTab, tabsWithWeek.length, updateIndicator])
 
   const renderTabContent = () => {
     switch (displayTab) {
@@ -325,142 +290,168 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      {loadingSpotlight && !spotlightAnime?.length ? (
-        <div
-          className="skeleton"
-          style={{
-            width: '100vw',
-            maxWidth: '100vw',
-            position: 'relative',
-            left: '50%',
-            right: '50%',
-            marginLeft: '-50vw',
-            marginRight: '-50vw',
-            height: 'clamp(480px, 72vh, 660px)',
-            marginTop: 'calc(-1 * var(--header-height))',
-            marginBottom: '2.5rem',
-          }}
-        />
-      ) : (
-        <SpotlightBanner animeList={spotlightAnime || []} />
-      )}
-      <AnimeSection
-        title="Continue Watching"
-        eyebrow="Pick up where you left off"
-        titleLink="/watchlist/Continue Watching"
-        animeList={cwList}
-        continueWatching
-        carousel
-        collapsible
-        defaultExpanded={cwList.length > 0}
-        onRemove={handleRemove}
-        loading={loadingContinueWatching}
-        onReachThreshold={handleReachContinueWatchingThreshold}
-        scrollThreshold={0.7}
-        isFetchingNextPage={fetchingMoreContinueWatching}
-        emptyState={
-          <div className={styles.emptyState}>
-            <Icon name="history" size={48} className={styles.emptyStateIcon} />
-            <div>
-              <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
-              <p className={styles.emptyStateText}>
-                You haven&apos;t watched anything yet. Start exploring and watch something first!
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setActiveTab('popular')}
-              style={{ marginTop: '1rem' }}
-            >
-              Explore Trending
-            </Button>
-          </div>
-        }
-      />
-
-      <QueueRail
-        title="Queue"
-        eyebrow="Up next"
-        items={queueData}
-        onRemove={(item) =>
-          removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
-        }
-        showClearAll
-        onClear={() => clearQueue.mutate()}
-        onReorder={(items) =>
-          reorderQueue.mutate(
-            items.map((item) => ({
-              id: item.id,
-              showId: item.showId,
-              episodeNumber: item.episodeNumber,
-            }))
-          )
-        }
-      />
-
-      <div className={styles.tabBar} ref={tabBarRef}>
-        <div
-          className={styles.tabIndicator}
-          style={{ left: indicator.left, width: indicator.width }}
-        />
-        {tabsWithWeek.map((tab) => (
-          <Button
-            key={tab.key}
-            ref={(el) => {
-              if (el) tabRefs.current.set(tab.key, el)
+      {contentType === 'anime' &&
+        (loadingSpotlight && !spotlightAnime?.length ? (
+          <div
+            className="skeleton"
+            style={{
+              width: '100vw',
+              maxWidth: '100vw',
+              position: 'relative',
+              left: '50%',
+              right: '50%',
+              marginLeft: '-50vw',
+              marginRight: '-50vw',
+              height: 'clamp(480px, 72vh, 660px)',
+              marginTop: 'calc(-1 * var(--header-height))',
+              marginBottom: '2.5rem',
             }}
-            variant="secondary"
-            size="sm"
-            className={`${styles.tabButton} ${displayTab === tab.key ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </Button>
+          />
+        ) : (
+          <SpotlightBanner animeList={spotlightAnime || []} />
         ))}
-      </div>
 
-      <div className={styles.tabContent}>{renderTabContent()}</div>
+      <OptionTabs
+        ariaLabel="Content type"
+        options={CONTENT_OPTIONS}
+        value={contentType}
+        onChange={setContentType}
+      />
 
-      <Schedule eyebrow="Never miss an episode" />
-
-      <Modal
-        isOpen={!!itemToRemove}
-        onClose={() => {
-          setItemToRemove(null)
-          setAlsoRemoveFromWatchlist(false)
-        }}
-        title="Reset Progress"
-      >
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove your watch progress for &quot;{itemToRemove?.name}
-            &quot;?
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={alsoRemoveFromWatchlist}
-              onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
-            />
-            Also remove from my watchlist
-          </label>
-        </Modal.Body>
-        <Modal.Actions>
+      {contentType === 'manga' ? (
+        <MangaHome />
+      ) : contentType === 'tv' || contentType === 'asmr' ? (
+        <div className={styles.emptyState} style={{ marginTop: '2rem' }}>
+          <Icon
+            name={contentType === 'tv' ? 'tv' : 'headphones'}
+            size={48}
+            className={styles.emptyStateIcon}
+          />
+          <div>
+            <h3 className={styles.emptyStateTitle}>
+              {contentType === 'tv' ? 'TV & Movies' : 'ASMR'} tracking is coming soon
+            </h3>
+            <p className={styles.emptyStateText}>
+              Library, progress, and sync for this section will follow the same pattern as manga.
+            </p>
+          </div>
           <Button
-            variant="secondary"
-            onClick={() => {
+            variant="primary"
+            size="sm"
+            onClick={() => setContentType('anime')}
+            style={{ marginTop: '1rem' }}
+          >
+            Back to Anime
+          </Button>
+        </div>
+      ) : (
+        <>
+          <AnimeSection
+            title="Continue Watching"
+            eyebrow="Pick up where you left off"
+            titleLink="/watchlist/Continue Watching"
+            animeList={cwList}
+            continueWatching
+            carousel
+            collapsible
+            defaultExpanded={cwList.length > 0}
+            onRemove={handleRemove}
+            loading={loadingContinueWatching}
+            onReachThreshold={handleReachContinueWatchingThreshold}
+            scrollThreshold={0.7}
+            isFetchingNextPage={fetchingMoreContinueWatching}
+            emptyState={
+              <div className={styles.emptyState}>
+                <Icon name="history" size={48} className={styles.emptyStateIcon} />
+                <div>
+                  <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
+                  <p className={styles.emptyStateText}>
+                    You haven&apos;t watched anything yet. Start exploring and watch something
+                    first!
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setActiveTab('popular')}
+                  style={{ marginTop: '1rem' }}
+                >
+                  Explore Trending
+                </Button>
+              </div>
+            }
+          />
+
+          <QueueRail
+            title="Queue"
+            eyebrow="Up next"
+            items={queueData}
+            onRemove={(item) =>
+              removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
+            }
+            showClearAll
+            onClear={() => clearQueue.mutate()}
+            onReorder={(items) =>
+              reorderQueue.mutate(
+                items.map((item) => ({
+                  id: item.id,
+                  showId: item.showId,
+                  episodeNumber: item.episodeNumber,
+                }))
+              )
+            }
+          />
+
+          <OptionTabs
+            ariaLabel="Browse anime"
+            options={tabsWithWeek.map((tab) => ({ value: tab.key, label: tab.label }))}
+            value={displayTab}
+            onChange={setActiveTab}
+          />
+
+          <div className={styles.tabContent}>{renderTabContent()}</div>
+
+          <Schedule eyebrow="Never miss an episode" />
+
+          <Modal
+            isOpen={!!itemToRemove}
+            onClose={() => {
               setItemToRemove(null)
               setAlsoRemoveFromWatchlist(false)
             }}
+            title="Reset Progress"
           >
-            No
-          </Button>
-          <Button variant="danger" onClick={handleConfirmRemove}>
-            Yes
-          </Button>
-        </Modal.Actions>
-      </Modal>
+            <Modal.Body>
+              <p>
+                Are you sure you want to remove your watch progress for &quot;{itemToRemove?.name}
+                &quot;?
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={alsoRemoveFromWatchlist}
+                  onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
+                />
+                Also remove from my watchlist
+              </label>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setItemToRemove(null)
+                  setAlsoRemoveFromWatchlist(false)
+                }}
+              >
+                No
+              </Button>
+              <Button variant="danger" onClick={handleConfirmRemove}>
+                Yes
+              </Button>
+            </Modal.Actions>
+          </Modal>
+        </>
+      )}
     </div>
   )
 }
