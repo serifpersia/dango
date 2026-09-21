@@ -149,9 +149,7 @@ export const useAsmrSpotlight = (enabled = true) => {
     }),
   })
 
-  const monthLists = month.map(
-    (q) => (q.data as AsmrBrowseResult | undefined)?.shows ?? []
-  )
+  const monthLists = month.map((q) => (q.data as AsmrBrowseResult | undefined)?.shows ?? [])
   const merged = mergeSpotlightShows(monthLists, SPOTLIGHT_NEED)
 
   const settled = month.every((q) => q.isFetched)
@@ -177,8 +175,7 @@ export const useAsmrSpotlight = (enabled = true) => {
 
   const isLoading =
     enabled && (month.some((q) => q.isLoading) || (needFallback && fallback.isLoading))
-  const isError =
-    enabled && settled && works.length === 0 && month.some((q) => q.isError)
+  const isError = enabled && settled && works.length === 0 && month.some((q) => q.isError)
 
   return { data: works, isLoading, isError }
 }

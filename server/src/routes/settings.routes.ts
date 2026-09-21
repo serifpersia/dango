@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { SettingsController } from '../controllers/settings.controller.js'
 import multer from 'multer'
-import { CONFIG } from '../config.js'
 import { DatabaseWrapper } from '../db.js'
 
 export function createSettingsRouter(
@@ -22,10 +21,8 @@ export function createSettingsRouter(
   router.post('/settings/offline-db/auto-update', controller.setAutoUpdateOfflineDb)
 
   const restoreStorage = multer({
-    storage: multer.diskStorage({
-      destination: (_req, _f, cb) => cb(null, CONFIG.ROOT),
-      filename: (_r, _f, cb) => cb(null, `restore_temp.db`),
-    }),
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 256 * 1024 * 1024 },
   })
 
   router.post('/restore-db', restoreStorage.single('dbfile'), (req, res) =>

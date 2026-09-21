@@ -210,25 +210,25 @@ const Settings: React.FC = () => {
   }, [activeTab, updateIndicator])
 
   const handleBackup = () => {
-    setStatusMessage('Exporting database...')
+    setStatusMessage('Exporting databases...')
     const bridge = (
       window as unknown as { DangoBridge?: { downloadFile: (url: string, name: string) => void } }
     ).DangoBridge
     if (bridge?.downloadFile) {
-      bridge.downloadFile('/api/backup-db', 'dango-backup.db')
+      bridge.downloadFile('/api/backup-db', 'dango-backup.json')
       setTimeout(() => {
-        setStatusMessage('Database exported successfully!')
+        setStatusMessage('Databases exported successfully!')
       }, 1500)
       return
     }
     const a = document.createElement('a')
     a.href = '/api/backup-db'
-    a.download = 'dango-backup.db'
+    a.download = 'dango-backup.json'
     document.body.appendChild(a)
     a.click()
     a.remove()
     setTimeout(() => {
-      setStatusMessage('Database exported successfully!')
+      setStatusMessage('Databases exported successfully!')
     }, 1500)
   }
 
@@ -236,7 +236,7 @@ const Settings: React.FC = () => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    setStatusMessage('Importing database...')
+    setStatusMessage('Importing databases...')
     const formData = new FormData()
     formData.append('dbfile', file)
 
@@ -249,7 +249,12 @@ const Settings: React.FC = () => {
       const result = await response.json()
 
       if (response.ok) {
-        setStatusMessage('Database imported successfully!')
+        const restored = Array.isArray(result.restored) ? result.restored.join(', ') : null
+        setStatusMessage(
+          restored
+            ? `Databases imported successfully (${restored})!`
+            : 'Database imported successfully!'
+        )
         setTimeout(() => window.location.reload(), 2000)
       } else {
         setStatusMessage(`Import failed: ${result.error}`)
@@ -610,7 +615,10 @@ const Settings: React.FC = () => {
           <div className={styles.tabContent}>
             <div className={styles.sectionCard}>
               <h3>Database Management</h3>
-              <p>Download a backup of your current database or restore from an existing file.</p>
+              <p>
+                Download a backup of all databases (anime, manga, TV and ASMR) or restore from a
+                backup file. Legacy single-file anime (.db) backups can still be restored.
+              </p>
               <div className={styles.controls}>
                 <Button onClick={handleBackup}>Backup Database</Button>
                 <Button variant="secondary" onClick={triggerFileSelect}>
@@ -628,7 +636,7 @@ const Settings: React.FC = () => {
                   opacity: 0,
                   overflow: 'hidden',
                 }}
-                accept=".db,application/octet-stream"
+                accept=".json,.db,application/octet-stream"
               />
               {statusMessage && <p className={styles.status}>{statusMessage}</p>}
             </div>

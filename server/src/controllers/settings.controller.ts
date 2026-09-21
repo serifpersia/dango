@@ -4,7 +4,22 @@ import {
   performMangaWriteTransaction,
   performTvWriteTransaction,
   performWriteTransaction,
+  setLocalAsmrManifestVersion,
+  setLocalMangaManifestVersion,
+  setLocalManifestVersion,
+  setLocalTvManifestVersion,
 } from '../sync.js'
+import {
+  ANIME_SYNC_TABLES,
+  ASMR_SYNC_TABLES,
+  MANGA_SYNC_TABLES,
+  TV_SYNC_TABLES,
+  exportTables,
+  importTables,
+  normalizePayload,
+  readPayloadVersion,
+  type SyncPayload,
+} from '../sync-payload.js'
 import { searchAnilistByTitle, isAnilistRateLimited, getShowMetaById } from '../lib/anilist.js'
 import { kitsuSearchAnime } from '../lib/kitsu.js'
 import { offlineDb } from '../lib/offline-db.js'
@@ -152,26 +167,26 @@ export class SettingsController {
   }
 
   backupDatabase = (req: Request, res: Response) => {
-    const backupPath = path.join(CONFIG.ROOT, 'dango-backup.db')
-
     try {
-      req.db.backup(backupPath)
-      res.download(backupPath, 'dango-backup.db', (err) => {
-        if (err) {
-          logger.error({ err }, 'res.download failed during database backup')
-          if (!res.headersSent) {
-            res.status(500).json({ error: 'Download failed' })
-          }
-        }
-        fs.unlink(backupPath, () => {})
-      })
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        databases: {
+          anime: exportTables(req.db, ANIME_SYNC_TABLES),
+          manga: exportTables(req.mangaDb, MANGA_SYNC_TABLES),
+          tv: exportTables(req.tvDb, TV_SYNC_TABLES),
+          asmr: exportTables(req.asmrDb, ASMR_SYNC_TABLES),
+        },
+      }
+      res.setHeader('Content-Disposition', 'attachment; filename="dango-backup.json"')
+      res.json(payload)
     } catch (err) {
-      logger.error({ err }, 'Manual backup failed')
+      logger.error({ err }, 'Multi-database backup failed')
       return res.status(500).json({ error: 'Backup failed' })
     }
   }
 
-  restoreDatabase = (
+  restoreDatabase = async (
     req: Request,
     res: Response,
     db: DatabaseWrapper,
@@ -180,9 +195,27 @@ export class SettingsController {
   ) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 
+    const buffer = req.file.buffer as Buffer | undefined
+    const originalName = req.file.originalname || ''
+    const head = buffer ? buffer.slice(0, 16).toString('utf-8').trimStart() : ''
+    if (buffer && (originalName.endsWith('.json') || head.startsWith('{'))) {
+      return this.restoreMultiDatabaseBackup(req, res, buffer)
+    }
+
     const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
     const tempPath = path.join(CONFIG.ROOT, `restore_temp.db`)
     const dbPath = path.join(CONFIG.ROOT, dbName)
+
+    try {
+      if (buffer) {
+        fs.writeFileSync(tempPath, buffer)
+      } else if (!fs.existsSync(tempPath)) {
+        return res.status(400).json({ error: 'No file uploaded.' })
+      }
+    } catch (err) {
+      logger.error({ err }, 'Failed to stage legacy database restore file')
+      return res.status(500).json({ error: 'Failed to stage restore file.' })
+    }
 
     db.close((closeErr: Error | null) => {
       if (closeErr) return res.status(500).json({ error: 'Failed to close database.' })
@@ -222,6 +255,100 @@ export class SettingsController {
         }
       })
     })
+  }
+
+  private restoreMultiDatabaseBackup = async (req: Request, res: Response, buffer: Buffer) => {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(buffer.toString('utf-8'))
+    } catch {
+      return res.status(400).json({ error: 'Invalid backup file.' })
+    }
+
+    const databases = (parsed as { databases?: Record<string, unknown> })?.databases
+    if (!databases || typeof databases !== 'object') {
+      return res.status(400).json({ error: 'Invalid backup file: missing databases.' })
+    }
+
+    const targets: Array<{
+      key: string
+      db: DatabaseWrapper
+      tables: readonly string[]
+      libraryTables: readonly string[]
+      backupName: string
+      setVersion: (version: number) => Promise<void>
+    }> = [
+      {
+        key: 'anime',
+        db: req.db,
+        tables: ANIME_SYNC_TABLES,
+        libraryTables: ['watchlist', 'watched_episodes'],
+        backupName: 'pre-sync-backup.db',
+        setVersion: setLocalManifestVersion,
+      },
+      {
+        key: 'manga',
+        db: req.mangaDb,
+        tables: MANGA_SYNC_TABLES,
+        libraryTables: ['manga_library', 'manga_progress'],
+        backupName: 'pre-sync-manga-backup.db',
+        setVersion: setLocalMangaManifestVersion,
+      },
+      {
+        key: 'tv',
+        db: req.tvDb,
+        tables: TV_SYNC_TABLES,
+        libraryTables: ['tv_library', 'tv_progress'],
+        backupName: 'pre-sync-tv-backup.db',
+        setVersion: setLocalTvManifestVersion,
+      },
+      {
+        key: 'asmr',
+        db: req.asmrDb,
+        tables: ASMR_SYNC_TABLES,
+        libraryTables: ['asmr_library', 'asmr_progress'],
+        backupName: 'pre-sync-asmr-backup.db',
+        setVersion: setLocalAsmrManifestVersion,
+      },
+    ]
+
+    const present = targets.filter((t) => databases[t.key] !== undefined)
+    if (present.length === 0) {
+      return res.status(400).json({ error: 'Invalid backup file: no databases found.' })
+    }
+
+    // Validate every section before mutating any database.
+    const sections = new Map<string, SyncPayload<string>>()
+    try {
+      for (const target of present) {
+        sections.set(
+          target.key,
+          normalizePayload(databases[target.key], target.tables, `backup ${target.key}`)
+        )
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Multi-database restore rejected: invalid payload')
+      return res.status(400).json({ error: 'Invalid backup file.' })
+    }
+
+    const restored: string[] = []
+    try {
+      for (const target of present) {
+        const section = sections.get(target.key)!
+        importTables(target.db, target.tables, section, {
+          libraryTables: target.libraryTables,
+          backupName: target.backupName,
+        })
+        await target.setVersion(readPayloadVersion(section))
+        restored.push(target.key)
+      }
+    } catch (err) {
+      logger.error({ err, restored }, 'Multi-database restore failed partway')
+      return res.status(500).json({ error: 'Restore failed partway.', restored })
+    }
+
+    logger.warn({ restored }, 'Databases restored from backup file by user request')
+    res.json({ success: true, message: 'Databases restored.', restored })
   }
 
   getOfflineDbInfo = (req: Request, res: Response) => {
