@@ -7,8 +7,7 @@ import MediaCard from '../common/MediaCard'
 import MangaPopup from './MangaPopup'
 import MangaResetProgressModal from './MangaResetProgressModal'
 import MangaDiscover from './MangaDiscover'
-import MangaSpotlightBanner from './MangaSpotlightBanner'
-import { mangaCoverSrc, useMangaTrending } from '../../hooks/useManga'
+import { mangaCoverSrc } from '../../hooks/useManga'
 import { isMangaAdult, mangaNameVariants } from '../../lib/manga'
 import {
   useMangaContinueReading,
@@ -21,7 +20,6 @@ import styles from '../../pages/Home.module.css'
 const MangaHome: React.FC = () => {
   const navigate = useNavigate()
   const { data, isLoading } = useMangaContinueReading(24)
-  const { data: trending } = useMangaTrending()
   const { toggle, bookmarkedIds } = useToggleMangaBookmark()
   const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
   const [resetTarget, setResetTarget] = useState<{
@@ -53,7 +51,6 @@ const MangaHome: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      {trending && trending.length > 0 && <MangaSpotlightBanner mangaList={trending} />}
       <MediaSection
         title="Continue Reading"
         eyebrow="Pick up where you left off"

@@ -28,7 +28,9 @@ import OptionTabs from '../components/common/OptionTabs'
 import MangaHome from '../components/manga/MangaHome'
 import TvHome from '../components/tv/TvHome'
 import TvSpotlightBanner from '../components/tv/TvSpotlightBanner'
+import MangaSpotlightBanner from '../components/manga/MangaSpotlightBanner'
 import { useTvTrending } from '../hooks/useTv'
+import { useMangaTrending } from '../hooks/useManga'
 import { fetchApi } from '../lib/fetchApi'
 import styles from './Home.module.css'
 
@@ -111,6 +113,7 @@ const Home: React.FC = () => {
 
   const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
   const { data: tvTrending } = useTvTrending('all', 'week', 1, contentType === 'tv')
+  const { data: mangaTrending } = useMangaTrending()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
@@ -317,6 +320,10 @@ const Home: React.FC = () => {
 
       {contentType === 'tv' && tvTrending?.results && tvTrending.results.length > 0 && (
         <TvSpotlightBanner items={tvTrending.results} />
+      )}
+
+      {contentType === 'manga' && mangaTrending && mangaTrending.length > 0 && (
+        <MangaSpotlightBanner mangaList={mangaTrending} />
       )}
 
       <OptionTabs
