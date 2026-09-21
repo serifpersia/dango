@@ -5,15 +5,11 @@ import MangaReader from '../components/manga/MangaReader'
 import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
 import { resolveMangaTitle } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
-import {
-  mangaLibraryId,
-  useAddMangaBookmark,
-  useMangaProgress,
-  useSaveMangaProgress,
-} from '../hooks/useMangaLibrary'
+import { mangaLibraryId, useMangaProgress, useSaveMangaProgress } from '../hooks/useMangaLibrary'
 import styles from '../components/manga/Manga.module.css'
 
-const SAVE_DEBOUNCE_MS = 1200
+const SAVE_DEBOUNCE_MS = 800
+const SAVE_CHECKPOINT_MS = 5000
 
 export default function MangaReadPage() {
   const { provider = '', id = '' } = useParams<{ provider: string; id: string }>()
@@ -32,7 +28,6 @@ export default function MangaReadPage() {
   const displayTitle = detail ? resolveMangaTitle(detail, titlePreference) : 'Manga'
   const progressQuery = useMangaProgress(libId || undefined)
   const saveProgress = useSaveMangaProgress()
-  const addBookmark = useAddMangaBookmark()
 
   const activeChapter: MangaChapter | null =
     detail && chapterId ? (detail.chapters.find((c) => c.id === chapterId) ?? null) : null
@@ -43,22 +38,6 @@ export default function MangaReadPage() {
   }, [progressQuery.data, chapterId])
 
   const savedPageIndex = savedPage > 1 ? savedPage - 1 : 0
-
-  const ensuredBookmark = useRef('')
-  useEffect(() => {
-    if (!detail || !libId || ensuredBookmark.current === libId) return
-    ensuredBookmark.current = libId
-    addBookmark.mutate({
-      provider,
-      mangaId: id,
-      title: detail.title,
-      cover: detail.cover,
-      author: detail.author,
-      altTitle: detail.altTitle,
-      contentRating: detail.contentRating,
-      silent: true,
-    })
-  }, [detail, libId, addBookmark, provider, id])
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSave = useRef<{
@@ -82,9 +61,22 @@ export default function MangaReadPage() {
         chapterNumber: pending.chapterNumber,
         page: pending.page,
         pageCount: pending.pageCount,
+        title: detail?.title ?? null,
+        cover: detail?.cover ?? null,
+        provider: provider || null,
+        altTitle: detail?.altTitle ?? null,
+        contentRating: detail?.contentRating ?? null,
       })
     }
-  }, [libId, saveProgress])
+  }, [
+    libId,
+    saveProgress,
+    detail?.title,
+    detail?.cover,
+    detail?.altTitle,
+    detail?.contentRating,
+    provider,
+  ])
 
   const handleProgress = useCallback(
     (page: number, pageCount: number) => {
@@ -106,6 +98,13 @@ export default function MangaReadPage() {
   }, [chapterId, flushSave])
 
   useEffect(() => () => flushSave(), [flushSave])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (pendingSave.current) flushSave()
+    }, SAVE_CHECKPOINT_MS)
+    return () => window.clearInterval(timer)
+  }, [flushSave])
 
   useEffect(() => {
     const onVisibility = () => {

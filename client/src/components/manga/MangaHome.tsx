@@ -14,40 +14,20 @@ import {
   useToggleMangaBookmark,
   mangaLibraryId,
 } from '../../hooks/useMangaLibrary'
-import { useMangaPopup, type MangaPopupData } from '../../hooks/useMangaPopup'
+import { useMangaPopup } from '../../hooks/useMangaPopup'
 import styles from '../../pages/Home.module.css'
 
 const MangaHome: React.FC = () => {
   const navigate = useNavigate()
   const { data, isLoading } = useMangaContinueReading(24)
-  const { toggle, bookmarkedIds } = useToggleMangaBookmark()
-  const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
   const [resetTarget, setResetTarget] = useState<{
     libId: string
     title: string
   } | null>(null)
+  const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
+  const { toggle, bookmarkedIds } = useToggleMangaBookmark()
 
   const items = data?.data ?? []
-
-  const toPopupData = (libId: string): MangaPopupData | null => {
-    const item = items.find((d) => d.id === libId)
-    if (!item) return null
-    return {
-      provider: item.provider,
-      mangaId: item.mangaId,
-      title: item.title,
-      altTitle: item.altTitle,
-      cover: item.cover || '',
-      contentRating: item.contentRating || undefined,
-      readTarget: item.chapterId
-        ? `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}/read?chapter=${encodeURIComponent(item.chapterId)}`
-        : `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}`,
-      progressLabel:
-        item.chapterNumber && Number(item.pageCount) > 0
-          ? `Ch. ${item.chapterNumber} · p. ${item.page ?? 0}/${item.pageCount}`
-          : undefined,
-    }
-  }
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -87,9 +67,12 @@ const MangaHome: React.FC = () => {
         {items.map((item) => {
           const page = item.page ?? 0
           const pageCount = item.pageCount ?? 0
-          const readTarget = item.chapterId
-            ? `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}/read?chapter=${encodeURIComponent(item.chapterId)}`
-            : `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}`
+          const readTarget =
+            item.chapterId && item.provider
+              ? `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}/read?chapter=${encodeURIComponent(item.chapterId)}`
+              : item.provider
+                ? `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}`
+                : '#'
           return (
             <MediaCard
               key={item.id}
@@ -97,7 +80,9 @@ const MangaHome: React.FC = () => {
                 id: item.id,
                 title: item.title,
                 ...mangaNameVariants({ title: item.title, altTitle: item.altTitle }),
-                thumbnail: mangaCoverSrc(item.provider, item.cover || ''),
+                thumbnail: item.provider
+                  ? mangaCoverSrc(item.provider, item.cover || '')
+                  : item.cover || '',
                 chapterBadge: item.chapterNumber ? `Ch. ${item.chapterNumber}` : null,
                 isAdult: isMangaAdult(item),
               }}
@@ -124,17 +109,29 @@ const MangaHome: React.FC = () => {
                 },
               }}
               onRemove={() => setResetTarget({ libId: item.id, title: item.title })}
-              onOpenDetails={(rect) => {
-                const popupData = toPopupData(item.id)
-                if (popupData) openPopup(rect, popupData)
-              }}
+              onOpenDetails={(rect) =>
+                openPopup(rect, {
+                  provider: item.provider || '',
+                  mangaId: item.mangaId || '',
+                  title: item.title || '',
+                  altTitle: item.altTitle,
+                  cover: item.cover || '',
+                  contentRating: item.contentRating || undefined,
+                  readTarget: readTarget,
+                })
+              }
               onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
               rawThumbnail
             />
           )
         })}
       </MediaSection>
-      {popup && (
+      <MangaResetProgressModal
+        mangaId={resetTarget ? resetTarget.libId : null}
+        title={resetTarget?.title}
+        onClose={() => setResetTarget(null)}
+      />
+      {popup && popup.data.provider && (
         <MangaPopup
           data={popup.data}
           anchorRect={popup.rect}
@@ -154,11 +151,6 @@ const MangaHome: React.FC = () => {
           onRequestClose={closePopup}
         />
       )}
-      <MangaResetProgressModal
-        mangaId={resetTarget ? resetTarget.libId : null}
-        title={resetTarget?.title}
-        onClose={() => setResetTarget(null)}
-      />
       <MangaDiscover />
     </div>
   )

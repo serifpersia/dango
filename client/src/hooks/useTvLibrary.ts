@@ -197,6 +197,14 @@ export const useSaveTvProgress = () => {
       episode: number
       currentTime: number
       duration?: number
+      title?: string
+      poster?: string
+      backdrop?: string
+      year?: string
+      overview?: string
+      tmdbId?: number
+      mediaType?: string
+      adult?: number
     }) => {
       await fetchApi('/api/tv/progress', {
         method: 'POST',

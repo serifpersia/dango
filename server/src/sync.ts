@@ -747,6 +747,23 @@ export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseW
       db.run(`ALTER TABLE manga_library ADD COLUMN altTitle TEXT`)
     }
 
+    const mangaProgressColumns = db.all<{ name: string }>(`PRAGMA table_info(manga_progress)`)
+    if (!mangaProgressColumns.some((c) => c.name === 'title')) {
+      db.run(`ALTER TABLE manga_progress ADD COLUMN title TEXT`)
+    }
+    if (!mangaProgressColumns.some((c) => c.name === 'cover')) {
+      db.run(`ALTER TABLE manga_progress ADD COLUMN cover TEXT`)
+    }
+    if (!mangaProgressColumns.some((c) => c.name === 'provider')) {
+      db.run(`ALTER TABLE manga_progress ADD COLUMN provider TEXT`)
+    }
+    if (!mangaProgressColumns.some((c) => c.name === 'altTitle')) {
+      db.run(`ALTER TABLE manga_progress ADD COLUMN altTitle TEXT`)
+    }
+    if (!mangaProgressColumns.some((c) => c.name === 'contentRating')) {
+      db.run(`ALTER TABLE manga_progress ADD COLUMN contentRating TEXT`)
+    }
+
     return db
   } catch (err) {
     log.error({ err }, 'Manga database opening error')
@@ -892,6 +909,32 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
     db.run(`CREATE INDEX IF NOT EXISTS idx_tv_library_status ON tv_library(status)`)
     db.run(`CREATE INDEX IF NOT EXISTS idx_tv_library_tmdb ON tv_library(tmdbId, mediaType)`)
     db.run(`CREATE INDEX IF NOT EXISTS idx_tv_progress_media ON tv_progress(mediaId, updatedAt)`)
+
+    const tvProgressColumns = db.all<{ name: string }>(`PRAGMA table_info(tv_progress)`)
+    if (!tvProgressColumns.some((c) => c.name === 'title')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN title TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'poster')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN poster TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'backdrop')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN backdrop TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'year')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN year TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'overview')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN overview TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'tmdbId')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN tmdbId INTEGER`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'mediaType')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN mediaType TEXT`)
+    }
+    if (!tvProgressColumns.some((c) => c.name === 'adult')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN adult INTEGER`)
+    }
 
     return db
   } catch (err) {

@@ -6,6 +6,7 @@ import ErrorMessage from '../components/common/ErrorMessage'
 import MediaCard from '../components/common/MediaCard'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
+import TvPopup from '../components/tv/TvPopup'
 import { formatTime } from '../lib/utils'
 import { isTvAdult, tvWatchPath } from '../lib/tv'
 import {
@@ -215,6 +216,21 @@ export default function TvWatchlist() {
                   entry.year ? <span style={{ opacity: 0.75 }}>{entry.year}</span> : undefined
                 }
                 onRemove={isCW ? () => setResetTarget(entry) : undefined}
+                renderPopup={(anchorRect, helpers) => (
+                  <TvPopup
+                    item={{
+                      id: entry.tmdbId ?? 0,
+                      title: entry.title || '',
+                      year: entry.year || '',
+                      type: entry.mediaType || 'tv',
+                      image: entry.poster || '',
+                    }}
+                    anchorRect={anchorRect}
+                    onMouseEnter={helpers.onMouseEnter}
+                    onMouseLeave={helpers.onMouseLeave}
+                    onRequestClose={helpers.close}
+                  />
+                )}
               />
               {!isCW && (
                 <div className={styles.cardActions}>

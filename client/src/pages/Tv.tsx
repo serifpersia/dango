@@ -6,6 +6,9 @@ import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useProviders } from '../hooks/useProviders'
+import { useSaveTvProgress, useTvLatestProgress, useToggleTvBookmark } from '../hooks/useTvLibrary'
+import { useTvLibraryCheck } from '../hooks/useTvLibrary'
+import { buildTvId } from '../lib/tv'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
 import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
@@ -181,6 +184,155 @@ const Tv: React.FC = () => {
   }
 
   const isMovie = typeParam === 'movie'
+
+  const mediaId = id ? `${typeParam || 'tv'}-${id}` : ''
+  const libraryId = id ? buildTvId(typeParam || 'tv', id) : ''
+  const saveProgress = useSaveTvProgress()
+  const {
+    toggle: toggleTvWatchlist,
+    bookmarkedIds,
+    pending: bookmarkPending,
+  } = useToggleTvBookmark()
+  const { data: libraryCheck } = useTvLibraryCheck(details ? libraryId : undefined)
+  const inTvLibrary = libraryCheck
+    ? !!libraryCheck.inLibrary
+    : libraryId
+      ? bookmarkedIds.has(libraryId)
+      : false
+  const handleToggleWatchlist = useCallback(() => {
+    if (!details || !id) return
+    toggleTvWatchlist({
+      tmdbId: Number(id),
+      mediaType: typeParam || 'tv',
+      title: details.title,
+      poster: details.poster,
+      year: details.year,
+      adult: details.adult,
+    })
+  }, [details, id, typeParam, toggleTvWatchlist])
+  const { data: savedProgress } = useTvLatestProgress(mediaId || undefined, season, episode)
+  const [showResumeModal, setShowResumeModal] = useState(false)
+  const [resumeTime, setResumeTime] = useState(0)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [completeTitle, setCompleteTitle] = useState('')
+  const hasResumedRef = useRef(false)
+  const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedTimeRef = useRef(0)
+  const videoEndedRef = useRef(false)
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = Math.floor(seconds % 60)
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  const saveVideoProgress = useCallback(
+    (currentTime: number, duration: number) => {
+      if (!mediaId || !duration || duration < 30) return
+      if (Math.abs(currentTime - lastSavedTimeRef.current) < 10) return
+      lastSavedTimeRef.current = currentTime
+      saveProgress.mutate({
+        mediaId,
+        season,
+        episode,
+        currentTime: Math.floor(currentTime),
+        duration: Math.floor(duration),
+        title: details?.title ?? null,
+        poster: details?.poster ?? null,
+        backdrop: details?.backdrop ?? null,
+        year: details?.year ?? null,
+        overview: details?.overview ?? null,
+        tmdbId: details?.id ?? null,
+        mediaType: typeParam || 'tv',
+        adult: details?.adult ? 1 : 0,
+      })
+    },
+    [mediaId, season, episode, saveProgress, details, typeParam]
+  )
+
+  const updateUrlEpisode = useCallback(
+    (nextSeason: number, nextEpisode: number) => {
+      const params = new URLSearchParams(searchParams)
+      params.set('type', searchParams.get('type') || 'tv')
+      params.set('s', String(nextSeason))
+      params.set('e', String(nextEpisode))
+      navigate(`${location.pathname}?${params.toString()}`)
+    },
+    [searchParams, navigate]
+  )
+
+  const handleVideoTimeUpdate = useCallback(() => {
+    const video = videoRef.current
+    if (!video || video.paused || video.ended) return
+    if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+    progressSaveTimerRef.current = setTimeout(() => {
+      saveVideoProgress(video.currentTime, video.duration || 0)
+    }, 5000)
+  }, [saveVideoProgress])
+
+  const handleVideoEnded = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+    saveVideoProgress(video.currentTime, video.duration || 0)
+    videoEndedRef.current = true
+    if (isMovie && details) {
+      setCompleteTitle(details.title)
+      setShowCompleteModal(true)
+    } else if (details) {
+      const nextEpisode = episode + 1
+      const currentEpisodes = episodes
+      const hasNextEpisode = currentEpisodes.some((ep) => ep.episode_number === nextEpisode)
+      if (hasNextEpisode) {
+        setEpisode(nextEpisode)
+        updateUrlEpisode(season, nextEpisode)
+      } else {
+        setCompleteTitle(`${details.title} — Season ${season}`)
+        setShowCompleteModal(true)
+      }
+    }
+  }, [isMovie, details, episode, season, episodes, saveVideoProgress, updateUrlEpisode])
+
+  const handleVideoPlay = useCallback(() => {
+    videoEndedRef.current = false
+  }, [])
+
+  const handleResume = useCallback(() => {
+    const video = videoRef.current
+    if (video && resumeTime > 0) {
+      video.currentTime = resumeTime
+      video.play().catch(() => {})
+    }
+    setShowResumeModal(false)
+    hasResumedRef.current = true
+  }, [resumeTime])
+
+  const handleSkipResume = useCallback(() => {
+    setShowResumeModal(false)
+    hasResumedRef.current = true
+  }, [])
+
+  useEffect(() => {
+    if (!savedProgress || hasResumedRef.current) return
+    const ct = 'currentTime' in savedProgress ? savedProgress.currentTime : 0
+    const dur = 'duration' in savedProgress ? savedProgress.duration : 0
+    if (ct > 10 && dur > 30 && ct < dur * 0.95) {
+      setResumeTime(ct)
+      setShowResumeModal(true)
+    }
+  }, [savedProgress])
+
+  useEffect(() => {
+    const video = videoRef.current
+    return () => {
+      if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+      if (video && !video.paused && !video.ended) {
+        saveVideoProgress(video.currentTime, video.duration || 0)
+      }
+    }
+  }, [saveVideoProgress])
 
   const pickDefaultSubtitle = useCallback((subs: SubtitleTrack[]): number => {
     let lastKey: string | null = null
@@ -899,14 +1051,6 @@ const Tv: React.FC = () => {
     navigate(`${location.pathname}?${params.toString()}`, { replace: true })
   }, [details, isMovie, season, episode, searchParams, navigate])
 
-  const updateUrlEpisode = (nextSeason: number, nextEpisode: number) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('type', searchParams.get('type') || 'tv')
-    params.set('s', String(nextSeason))
-    params.set('e', String(nextEpisode))
-    navigate(`${location.pathname}?${params.toString()}`)
-  }
-
   return (
     <div className={styles.page}>
       {details && (
@@ -919,21 +1063,24 @@ const Tv: React.FC = () => {
             <span className={styles.year}>{details.year}</span>
             {details.vote_average != null && (
               <span className={styles.rating}>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  style={{ marginRight: 4 }}
-                >
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
+                <Icon name="star" size={12} />
                 {Number(details.vote_average).toFixed(1)}
               </span>
             )}
             <span className={`${styles.typeBadge} ${styles[isMovie ? 'movie' : 'tv']}`}>
               {isMovie ? 'Movie' : 'TV Show'}
             </span>
+          </div>
+          <div className={styles.headerActions}>
+            <button
+              className={`${styles.watchlistBtn} ${inTvLibrary ? styles.active : ''}`}
+              onClick={handleToggleWatchlist}
+              disabled={bookmarkPending}
+              type="button"
+            >
+              {inTvLibrary ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
+              {inTvLibrary ? 'In Watchlist' : 'Add to Watchlist'}
+            </button>
           </div>
           {details.overview && <p className={styles.overview}>{details.overview}</p>}
         </div>
@@ -1174,6 +1321,9 @@ const Tv: React.FC = () => {
                   playsInline
                   disablePictureInPicture
                   className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  onEnded={handleVideoEnded}
+                  onPlay={handleVideoPlay}
                   onError={() => {
                     setStreamError('Video failed to load. Try another server or reload.')
                     setStreamLoading(false)
@@ -1280,6 +1430,65 @@ const Tv: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Watching">
+        <div style={{ padding: '1rem', textAlign: 'center' }}>
+          <p>
+            You were at <strong>{formatTime(resumeTime)}</strong>
+          </p>
+          <div
+            style={{
+              marginTop: '1rem',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+            }}
+          >
+            <Button variant="secondary" onClick={handleSkipResume}>
+              Start from Beginning
+            </Button>
+            <Button onClick={handleResume}>Resume</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        title="Finished!"
+      >
+        <div style={{ padding: '1rem', textAlign: 'center' }}>
+          <Icon
+            name="check-circle"
+            size={48}
+            style={{ color: 'var(--accent-lighter)', marginBottom: '0.5rem' }}
+          />
+          <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{completeTitle}</p>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isMovie ? 'You finished this movie!' : 'You finished this season!'}
+          </p>
+          <div
+            style={{
+              marginTop: '1rem',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+            }}
+          >
+            <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCompleteModal(false)
+                handleBack()
+              }}
+            >
+              Back to Details
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {!details && (
         <div className={styles.statusMsg}>

@@ -150,7 +150,18 @@ export class MangaLibraryController {
   }
 
   saveProgress = async (req: Request, res: Response) => {
-    const { mangaId, chapterId, chapterNumber, page, pageCount } = req.body ?? {}
+    const {
+      mangaId,
+      chapterId,
+      chapterNumber,
+      page,
+      pageCount,
+      title,
+      cover,
+      provider,
+      altTitle,
+      contentRating,
+    } = req.body ?? {}
     if (!mangaId || !chapterId) {
       return res.status(400).json({ error: 'mangaId and chapterId are required' })
     }
@@ -164,6 +175,11 @@ export class MangaLibraryController {
           chapterNumber: String(chapterNumber || ''),
           page: pageNum,
           pageCount: pageCountNum,
+          title: title ?? null,
+          cover: cover ?? null,
+          provider: provider ?? null,
+          altTitle: altTitle ?? null,
+          contentRating: contentRating ?? null,
         })
         MangaLibraryRepository.touchProgress(tx, String(mangaId), {
           chapterId: String(chapterId),

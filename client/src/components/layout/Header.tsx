@@ -5,6 +5,7 @@ import Icon from '../common/Icon'
 import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
+import { useContentType } from '../../contexts/ContentTypeContext'
 import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
 import styles from './Header.module.css'
 
@@ -56,6 +57,7 @@ const fetchSyncProfile = async (): Promise<UserProfile | null> => {
 
 const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar()
+  const { contentType } = useContentType()
   const [query, setQuery] = useState('')
   const [visible, setVisible] = useState(true)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -145,11 +147,24 @@ const Header: React.FC = () => {
     }
   }
 
+  const searchPlaceholder =
+    contentType === 'manga'
+      ? 'Search manga...'
+      : contentType === 'tv'
+        ? 'Search TV & movies...'
+        : 'Search anime...'
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     hideVirtualKeyboard()
-    if (query.trim()) {
-      navigate(`/search?query=${encodeURIComponent(query.trim())}`)
+    const trimmed = query.trim()
+    if (!trimmed) return
+    if (contentType === 'manga') {
+      navigate(`/manga?q=${encodeURIComponent(trimmed)}`)
+    } else if (contentType === 'tv') {
+      navigate(`/tv-search?q=${encodeURIComponent(trimmed)}`)
+    } else {
+      navigate(`/search?query=${encodeURIComponent(trimmed)}`)
     }
   }
 
@@ -201,7 +216,7 @@ const Header: React.FC = () => {
                 type="text"
                 data-virtual-keyboard="true"
                 className={styles.searchInput}
-                placeholder="Search anime..."
+                placeholder={searchPlaceholder}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
@@ -256,7 +271,7 @@ const Header: React.FC = () => {
               type="text"
               data-virtual-keyboard="true"
               className={styles.mobileSearchInput}
-              placeholder="Search anime..."
+              placeholder={searchPlaceholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {

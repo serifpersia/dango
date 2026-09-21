@@ -338,8 +338,8 @@ const TvHome: React.FC = () => {
               renderPopup={(anchorRect, helpers) => (
                 <TvPopup
                   item={{
-                    id: item.tmdbId,
-                    title: item.title,
+                    id: item.tmdbId ?? 0,
+                    title: item.title || '',
                     year: item.year || '',
                     type: item.mediaType || 'tv',
                     image: item.poster || '',

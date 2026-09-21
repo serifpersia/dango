@@ -177,6 +177,41 @@
   flex-wrap: wrap;
 }
 
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  flex-wrap: wrap;
+}
+
+.watchlistBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.watchlistBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.watchlistBtn.active {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.watchlistBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .year {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -185,7 +220,8 @@
 .rating {
   display: inline-flex;
   align-items: center;
-  color: #fbbf24;
+  gap: 4px;
+  color: var(--accent-lighter);
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -199,23 +235,23 @@
 }
 
 .typeBadge.tv {
-  background: color-mix(in srgb, var(--color-info) 20%, transparent);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
 }
 
 .typeBadge.movie {
-  background: color-mix(in srgb, var(--color-success) 20%, transparent);
-  color: #34d399;
+  background: color-mix(in srgb, var(--accent-lighter) 20%, transparent);
+  color: var(--accent-lighter);
 }
 
 .typeBadge.tvSeries {
-  background: color-mix(in srgb, var(--color-info) 20%, transparent);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
 }
 
 .typeBadge.tvMiniSeries {
-  background: color-mix(in srgb, var(--color-info) 20%, transparent);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
 }
 
 .overview {

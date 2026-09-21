@@ -35,6 +35,11 @@ export interface MangaProgressRow {
   page: number
   pageCount: number
   updatedAt: number
+  title?: string | null
+  cover?: string | null
+  provider?: string | null
+  altTitle?: string | null
+  contentRating?: string | null
 }
 
 export function buildMangaId(provider: string, mangaId: string): string {
@@ -187,18 +192,39 @@ export const MangaProgressRepository = {
       chapterNumber: string
       page: number
       pageCount: number
+      title?: string | null
+      cover?: string | null
+      provider?: string | null
+      altTitle?: string | null
+      contentRating?: string | null
     }
   ) =>
     dbRun(
       db,
-      `INSERT INTO manga_progress (mangaId, chapterId, chapterNumber, page, pageCount, updatedAt)
-       VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      `INSERT INTO manga_progress (mangaId, chapterId, chapterNumber, page, pageCount, title, cover, provider, altTitle, contentRating, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
        ON CONFLICT(mangaId, chapterId) DO UPDATE SET
           chapterNumber = COALESCE(NULLIF(EXCLUDED.chapterNumber, ''), manga_progress.chapterNumber),
           page = EXCLUDED.page,
           pageCount = EXCLUDED.pageCount,
+          title = COALESCE(EXCLUDED.title, manga_progress.title),
+          cover = COALESCE(EXCLUDED.cover, manga_progress.cover),
+          provider = COALESCE(EXCLUDED.provider, manga_progress.provider),
+          altTitle = COALESCE(EXCLUDED.altTitle, manga_progress.altTitle),
+          contentRating = COALESCE(EXCLUDED.contentRating, manga_progress.contentRating),
           updatedAt = strftime('%s', 'now')`,
-      [data.mangaId, data.chapterId, data.chapterNumber, data.page, data.pageCount]
+      [
+        data.mangaId,
+        data.chapterId,
+        data.chapterNumber,
+        data.page,
+        data.pageCount,
+        data.title ?? null,
+        data.cover ?? null,
+        data.provider ?? null,
+        data.altTitle ?? null,
+        data.contentRating ?? null,
+      ]
     ),
 
   deleteByManga: (db: DatabaseWrapper, mangaId: string) =>
@@ -214,14 +240,22 @@ export const MangaProgressRepository = {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
     return dbAll<MangaLibraryRow & Partial<MangaProgressRow>>(
       db,
-      `SELECT l.*, p.chapterId, p.chapterNumber, p.page, p.pageCount, p.updatedAt as progressAt
-       FROM manga_library l
-       LEFT JOIN (
+      `SELECT p.mangaId as id,
+              COALESCE(l.mangaId, SUBSTR(p.mangaId, INSTR(p.mangaId, ':') + 1)) as mangaId,
+              COALESCE(l.provider, p.provider) as provider,
+              COALESCE(l.title, p.title) as title, COALESCE(l.cover, p.cover) as cover,
+              COALESCE(l.author, '') as author, COALESCE(l.altTitle, p.altTitle) as altTitle,
+              COALESCE(l.contentRating, p.contentRating) as contentRating,
+              l.status as watchlistStatus,
+              p.chapterId, p.chapterNumber, p.page, p.pageCount, p.updatedAt as progressAt
+       FROM (
          SELECT *, ROW_NUMBER() OVER (PARTITION BY mangaId ORDER BY updatedAt DESC) as rn
          FROM manga_progress
-       ) p ON p.mangaId = l.id AND p.rn = 1
-       WHERE l.status = 'Reading'
-       ORDER BY COALESCE(p.updatedAt, l.updatedAt) DESC
+       ) p
+       LEFT JOIN manga_library l ON p.mangaId = l.id
+       WHERE p.rn = 1
+         AND (l.status IS NULL OR l.status = 'Reading')
+       ORDER BY p.updatedAt DESC
        ${limitClause}`
     )
   },

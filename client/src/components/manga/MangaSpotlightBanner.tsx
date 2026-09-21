@@ -259,10 +259,9 @@ const MangaSpotlightBanner: React.FC<MangaSpotlightBannerProps> = ({ mangaList }
           <div className={styles.track} style={{ transform: `translateX(-${safeIndex * 100}%)` }}>
             {top6.map((manga, index) => {
               const synopsis = manga.description?.slice(0, 200) || ''
-              const metadata = [
-                manga.year ? String(manga.year) : undefined,
-                manga.status,
-              ].filter(Boolean)
+              const metadata = [manga.year ? String(manga.year) : undefined, manga.status].filter(
+                Boolean
+              )
               return (
                 <div
                   key={manga.id}

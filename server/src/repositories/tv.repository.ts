@@ -29,6 +29,14 @@ export interface TvProgressRow {
   currentTime: number
   duration: number
   updatedAt: number
+  title?: string | null
+  poster?: string | null
+  backdrop?: string | null
+  year?: string | null
+  overview?: string | null
+  tmdbId?: number | null
+  mediaType?: string | null
+  adult?: number | null
 }
 
 export function buildTvId(mediaType: string, tmdbId: number | string): string {
@@ -175,17 +183,47 @@ export const TvProgressRepository = {
       episode: number
       currentTime: number
       duration: number
+      title?: string | null
+      poster?: string | null
+      backdrop?: string | null
+      year?: string | null
+      overview?: string | null
+      tmdbId?: number | null
+      mediaType?: string | null
+      adult?: number | null
     }
   ) =>
     dbRun(
       db,
-      `INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, updatedAt)
-       VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      `INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, title, poster, backdrop, year, overview, tmdbId, mediaType, adult, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
        ON CONFLICT(mediaId, season, episode) DO UPDATE SET
           currentTime = EXCLUDED.currentTime,
           duration = EXCLUDED.duration,
+          title = COALESCE(EXCLUDED.title, tv_progress.title),
+          poster = COALESCE(EXCLUDED.poster, tv_progress.poster),
+          backdrop = COALESCE(EXCLUDED.backdrop, tv_progress.backdrop),
+          year = COALESCE(EXCLUDED.year, tv_progress.year),
+          overview = COALESCE(EXCLUDED.overview, tv_progress.overview),
+          tmdbId = COALESCE(EXCLUDED.tmdbId, tv_progress.tmdbId),
+          mediaType = COALESCE(EXCLUDED.mediaType, tv_progress.mediaType),
+          adult = COALESCE(EXCLUDED.adult, tv_progress.adult),
           updatedAt = strftime('%s', 'now')`,
-      [data.mediaId, data.season, data.episode, data.currentTime, data.duration]
+      [
+        data.mediaId,
+        data.season,
+        data.episode,
+        data.currentTime,
+        data.duration,
+        data.title ?? null,
+        data.poster ?? null,
+        data.backdrop ?? null,
+        data.year ?? null,
+        data.overview ?? null,
+        data.tmdbId ?? null,
+        data.mediaType ?? null,
+        data.adult ?? null,
+      ]
     ),
 
   deleteByMedia: (db: DatabaseWrapper, mediaId: string) =>
@@ -202,14 +240,21 @@ export const TvProgressRepository = {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
     return dbAll<TvLibraryRow & Partial<TvProgressRow>>(
       db,
-      `SELECT l.*, p.season, p.episode, p.currentTime, p.duration, p.updatedAt as progressAt
-       FROM tv_library l
-       LEFT JOIN (
+      `SELECT p.mediaId as id,
+              COALESCE(l.tmdbId, p.tmdbId, CAST(SUBSTR(p.mediaId, INSTR(p.mediaId, '-') + 1) AS INTEGER)) as tmdbId,
+              COALESCE(l.mediaType, p.mediaType, SUBSTR(p.mediaId, 1, INSTR(p.mediaId, '-') - 1)) as mediaType,
+              COALESCE(l.title, p.title) as title, COALESCE(l.poster, p.poster) as poster, COALESCE(l.backdrop, p.backdrop) as backdrop,
+              COALESCE(l.year, p.year) as year, COALESCE(l.overview, p.overview) as overview,
+              l.status as watchlistStatus, COALESCE(l.adult, p.adult) as adult,
+              p.season, p.episode, p.currentTime, p.duration, p.updatedAt as progressAt
+       FROM (
          SELECT *, ROW_NUMBER() OVER (PARTITION BY mediaId ORDER BY updatedAt DESC) as rn
          FROM tv_progress
-       ) p ON p.mediaId = l.id AND p.rn = 1
-       WHERE l.status = 'Watching'
-       ORDER BY COALESCE(p.updatedAt, l.updatedAt) DESC
+       ) p
+       LEFT JOIN tv_library l ON p.mediaId = l.id
+       WHERE p.rn = 1
+         AND (l.status IS NULL OR l.status = 'Watching')
+       ORDER BY p.updatedAt DESC
        ${limitClause}`
     )
   },

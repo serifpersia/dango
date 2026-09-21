@@ -187,6 +187,11 @@ export const useSaveMangaProgress = () => {
       chapterNumber?: string
       page: number
       pageCount?: number
+      title?: string
+      cover?: string
+      provider?: string
+      altTitle?: string
+      contentRating?: string
     }) => {
       await fetchApi('/api/manga/progress', {
         method: 'POST',

@@ -176,9 +176,7 @@ export function createMangaRouter(
         const results = (data.data || []).map((m) => {
           const title = m.attributes?.title?.en || Object.values(m.attributes?.title || {})[0] || ''
           const desc = m.attributes?.description?.en || ''
-          const tags = (m.attributes?.tags || [])
-            .map((t) => t.attributes?.name?.en)
-            .filter(Boolean)
+          const tags = (m.attributes?.tags || []).map((t) => t.attributes?.name?.en).filter(Boolean)
           const coverArt = m.relationships?.find((r) => r.type === 'cover_art')
           const fileName = coverArt?.attributes?.fileName
           const cover = fileName

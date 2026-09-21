@@ -279,7 +279,7 @@ export default function ReadingList() {
         </div>
       )}
 
-      {popup && (
+      {popup && popup.data.provider && (
         <MangaPopup
           data={popup.data}
           anchorRect={popup.rect}

@@ -191,32 +191,6 @@ const MangaReader: React.FC<MangaReaderProps> = ({
     return () => observer.disconnect()
   }, [mode, pages.length, data])
 
-  useEffect(() => {
-    if (mode !== 'strip' || pages.length === 0) return
-    let idleTimer: ReturnType<typeof setTimeout> | null = null
-    const reportSettled = () => {
-      idleTimer = null
-      const count = pageCountRef.current
-      if (count === 0) return
-      onProgressRef.current?.(Math.min(pageIndexRef.current + 1, count), count)
-    }
-    const pokeActivity = () => {
-      if (idleTimer) clearTimeout(idleTimer)
-      idleTimer = setTimeout(reportSettled, 1200)
-    }
-    window.addEventListener('scroll', pokeActivity, { passive: true })
-    window.addEventListener('touchmove', pokeActivity, { passive: true })
-    window.addEventListener('touchend', pokeActivity)
-    window.addEventListener('wheel', pokeActivity, { passive: true })
-    return () => {
-      if (idleTimer) clearTimeout(idleTimer)
-      window.removeEventListener('scroll', pokeActivity)
-      window.removeEventListener('touchmove', pokeActivity)
-      window.removeEventListener('touchend', pokeActivity)
-      window.removeEventListener('wheel', pokeActivity)
-    }
-  }, [mode, pages.length])
-
   const onTouchStart = (e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX
   }

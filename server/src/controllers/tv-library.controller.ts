@@ -150,7 +150,21 @@ export class TvLibraryController {
   }
 
   saveProgress = async (req: Request, res: Response) => {
-    const { mediaId, season, episode, currentTime, duration } = req.body ?? {}
+    const {
+      mediaId,
+      season,
+      episode,
+      currentTime,
+      duration,
+      title,
+      poster,
+      backdrop,
+      year,
+      overview,
+      tmdbId,
+      mediaType,
+      adult,
+    } = req.body ?? {}
     if (!mediaId) {
       return res.status(400).json({ error: 'mediaId is required' })
     }
@@ -166,6 +180,14 @@ export class TvLibraryController {
           episode: Math.round(episodeNum),
           currentTime: timeNum,
           duration: durationNum,
+          title: title ?? null,
+          poster: poster ?? null,
+          backdrop: backdrop ?? null,
+          year: year ?? null,
+          overview: overview ?? null,
+          tmdbId: tmdbId != null ? Number(tmdbId) : null,
+          mediaType: mediaType ?? null,
+          adult: adult != null ? Number(adult) : null,
         })
         TvLibraryRepository.touchProgress(tx, String(mediaId), {
           season: Math.round(seasonNum),

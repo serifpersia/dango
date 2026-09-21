@@ -138,8 +138,8 @@ export default function Manga() {
   const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
 
   useEffect(() => {
-    if (queryInput !== query) setQueryInput(query)
-  }, [query, queryInput, setQueryInput])
+    setQueryInput(query)
+  }, [query])
 
   if (legacyId) {
     const params = new URLSearchParams()
