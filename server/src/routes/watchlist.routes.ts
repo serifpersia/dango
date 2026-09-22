@@ -233,34 +233,6 @@ export function createWatchlistRouter(getDb: () => DatabaseWrapper): {
     res.json({ success: true })
   })
 
-  router.post('/discord/music', (req, res) => {
-    const { title, artistLabel, isPlaying, thumbnail, currentTime, duration, sessionId } =
-      req.body ?? {}
-    if (!discordRPCService.isServiceEnabled) return res.json({ success: true })
-    if (typeof sessionId === 'string') discordRPCService.heartbeat(sessionId)
-    let thumb = String(thumbnail || '')
-    if (thumb.includes('/api/image-proxy')) {
-      const match = thumb.match(/url=([^&]+)/)
-      if (match) thumb = decodeURIComponent(match[1])
-    }
-    if (thumb && !thumb.startsWith('https://')) thumb = ''
-    if (thumb.includes('localhost') || thumb.includes('127.0.0.1')) thumb = ''
-    discordRPCService.updatePresence({
-      title: String(title || 'Music').slice(0, 128),
-      episode: String(artistLabel || '').slice(0, 64),
-      totalEpisodes: '',
-      stateLine: String(artistLabel || 'Music').slice(0, 64),
-      currentTime: Number(currentTime) || 0,
-      duration: Number(duration) || 0,
-      thumbnail: thumb,
-      isPlaying: !!isPlaying,
-      providerName: 'Music',
-      sessionId: typeof sessionId === 'string' ? sessionId : undefined,
-      isAdult: false,
-    })
-    res.json({ success: true })
-  })
-
   router.post('/discord/manga', async (req, res) => {
     const { title, chapterLabel, isPlaying, thumbnail, thumbnails, sessionId, isAdult } =
       req.body ?? {}

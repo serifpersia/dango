@@ -51,7 +51,6 @@ const Sidebar: React.FC = () => {
     { to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' },
     { to: '/trackers', icon: <Icon name="sync-alt" />, label: 'Trackers' },
     { to: '/radio', icon: <Icon name="broadcast-tower" />, label: 'Radio' },
-    { to: '/music', icon: <Icon name="headphones" />, label: 'Music' },
     ...(hasMatureConsent
       ? [{ to: '/mature', icon: <Icon name="pepper-hot" />, label: 'Mature' }]
       : []),

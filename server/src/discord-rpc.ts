@@ -350,12 +350,7 @@ class DiscordRPCService {
           largeImageKey: imageKey,
           largeImageText: data.title,
           ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
-          type:
-            data.providerName === 'ASMR' ||
-            data.providerName === 'Radio' ||
-            data.providerName === 'Music'
-              ? 2
-              : 3,
+          type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
           statusDisplayType: StatusDisplayType.DETAILS,
           buttons: [
             {
@@ -390,12 +385,7 @@ class DiscordRPCService {
         largeImageKey: imageKey,
         largeImageText: data.title,
         ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
-        type:
-          data.providerName === 'ASMR' ||
-          data.providerName === 'Radio' ||
-          data.providerName === 'Music'
-            ? 2
-            : 3,
+        type: data.providerName === 'ASMR' || data.providerName === 'Radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {
@@ -444,7 +434,6 @@ class DiscordRPCService {
       map: { details: 'Map', state: 'Exploring the global user map' },
       asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
       radio: { details: 'Radio', state: 'Browsing radio stations' },
-      music: { details: 'Music', state: 'Browsing music' },
       tv: { details: 'TV', state: 'Browsing movies & shows' },
       manga: { details: 'Manga', state: 'Browsing manga' },
     }
@@ -461,7 +450,7 @@ class DiscordRPCService {
         state: label.state,
         largeImageKey: 'logo',
         largeImageText: 'dango',
-        type: page === 'asmr' || page === 'radio' || page === 'music' ? 2 : 3,
+        type: page === 'asmr' || page === 'radio' ? 2 : 3,
         statusDisplayType: StatusDisplayType.DETAILS,
         buttons: [
           {

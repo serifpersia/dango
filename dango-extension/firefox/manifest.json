@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "Dango Helper",
   "version": "0.2.1",
-  "description": "Supplies cf_clearance (AnimePahe, JapaneseASMR) and YouTube Music cookies to Dango.",
+  "description": "Supplies cf_clearance (AnimePahe, JapaneseASMR) to Dango.",
   "permissions": [
     "cookies",
     "webRequest",
@@ -10,10 +10,7 @@
     "http://127.0.0.1/*",
     "https://animepahe.pw/*",
     "https://japaneseasmr.com/*",
-    "https://*.japaneseasmr.com/*",
-    "https://music.youtube.com/*",
-    "https://*.youtube.com/*",
-    "https://youtube.com/*"
+    "https://*.japaneseasmr.com/*"
   ],
   "content_scripts": [
     {

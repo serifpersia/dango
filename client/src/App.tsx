@@ -25,7 +25,6 @@ const MangaInfoPage = lazy(() => import('./pages/MangaInfoPage'))
 const MangaReadPage = lazy(() => import('./pages/MangaReadPage'))
 const ReadingList = lazy(() => import('./pages/ReadingList'))
 const Radio = lazy(() => import('./pages/Radio'))
-const Music = lazy(() => import('./pages/Music'))
 const TvSearch = lazy(() => import('./pages/TvSearch'))
 const TvInfo = lazy(() => import('./pages/TvInfo'))
 const Tv = lazy(() => import('./pages/Tv'))
@@ -190,7 +189,6 @@ function App() {
               <Route path="/manga/:provider/:id" element={<MangaInfoPage />} />
               <Route path="/manga/:provider/:id/read" element={<MangaReadPage />} />
               <Route path="/radio" element={<Radio />} />
-              <Route path="/music" element={<Music />} />
               <Route path="/tv" element={<TvSearch />} />
               <Route path="/tv/:id" element={<TvInfo />} />
               <Route path="/tv/:id/watch" element={<Tv />} />
