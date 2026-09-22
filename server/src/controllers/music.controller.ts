@@ -352,12 +352,15 @@ export class MusicController {
 
   startAuth = async (req: Request, res: Response) => {
     try {
-      const cookie = String(req.body?.cookie || '').trim()
+      let cookie = String(req.body?.cookie || '').trim()
       if (!cookie) return res.status(400).json({ error: 'Cookie is required' })
+      cookie = cookie
+        .replace(/^cookie\s*:\s*/i, '')
+        .replace(/^["']+|["']+$/g, '')
+        .trim()
       if (cookie.includes('…') || cookie.includes('...')) {
         return res.status(400).json({
-          error:
-            'Cookie looks truncated. In DevTools, right-click the Cookie header → Copy value (do not copy from the wrapped preview).',
+          error: `Cookie looks truncated (${cookie.length} chars). In DevTools, right-click the Cookie header → Copy value (do not copy from the wrapped preview).`,
         })
       }
       if (!cookie.includes('SID') && !cookie.includes('SAPISID')) {

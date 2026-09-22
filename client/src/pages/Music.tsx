@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import MusicPlayer from '../components/music/MusicPlayer'
 import MusicCookieHelp from '../components/music/MusicCookieHelp'
@@ -30,6 +31,9 @@ function extractVideoId(input: string): string | null {
   return null
 }
 
+const EXTENSION_ZIP_URL =
+  'https://github.com/serifpersia/dango/releases/latest/download/dango-extension.zip'
+
 const Music: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const paramId = extractVideoId(searchParams.get('v') ?? '')
@@ -37,6 +41,7 @@ const Music: React.FC = () => {
   const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('')
   const [cookieInput, setCookieInput] = useState('')
+  const [extracting, setExtracting] = useState(false)
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [queue, setQueue] = useState<MusicTrack[]>([])
   const [openPlaylist, setOpenPlaylist] = useState<MusicPlaylist | null>(null)
@@ -44,6 +49,61 @@ const Music: React.FC = () => {
   const { data: auth } = useMusicAuthStatus()
   const saveCookie = useMusicSaveCookie()
   const signOut = useMusicSignOut()
+
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  const isAndroid = /android/i.test(ua)
+  const isFirefoxDesktop = /firefox|fxios/i.test(ua) && !isAndroid
+  const isChromeDesktop = !isFirefoxDesktop && !isAndroid && /chrome|chromium|edg|brave/i.test(ua)
+  const showHelper = isFirefoxDesktop || isChromeDesktop
+
+  const handleExtractYtMusic = () => {
+    if (extracting) return
+    setExtracting(true)
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('dango:ytmusic-cookie', onReply)
+      setExtracting(false)
+      toast.error('Helper not detected — install the Dango Helper extension first.')
+    }, 3000)
+    const onReply = (e: Event) => {
+      window.clearTimeout(timer)
+      window.removeEventListener('dango:ytmusic-cookie', onReply)
+      setExtracting(false)
+      try {
+        const detail = JSON.parse((e as CustomEvent<string>).detail) as {
+          ok?: boolean
+          cookie?: string
+          error?: string
+          storeId?: string
+          count?: number
+          names?: string[]
+          dropped?: string[]
+        }
+        if (detail?.ok && detail.cookie) {
+          const raw = detail.cookie
+            .replace(/^cookie\s*:\s*/i, '')
+            .replace(/^["']+|["']+$/g, '')
+            .trim()
+          if (raw.includes('…') || raw.includes('...')) {
+            toast.error(
+              `Helper returned a truncated cookie (${raw.length} chars) — reload music.youtube.com and Extract again.`
+            )
+            return
+          }
+          setCookieInput(raw)
+          toast.success('Cookie extracted from helper — signing in…')
+          saveCookie.mutate(raw)
+        } else if (detail?.error === 'NO_COOKIE') {
+          toast.error('Helper found no YouTube login — log in on a music.youtube.com tab first.')
+        } else {
+          toast.error('Helper request failed — try again.')
+        }
+      } catch {
+        toast.error('Helper request failed — try again.')
+      }
+    }
+    window.addEventListener('dango:ytmusic-cookie', onReply)
+    window.dispatchEvent(new CustomEvent('dango:get-ytmusic-cookie'))
+  }
   const { data: searchData, isLoading: searchLoading } = useMusicSearch(query)
   const { data: libraryData, isLoading: libraryLoading } = useMusicLibrary(
     auth?.authenticated === true
@@ -238,7 +298,19 @@ const Music: React.FC = () => {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                if (cookieInput.trim()) saveCookie.mutate(cookieInput.trim())
+                const raw = cookieInput
+                  .replace(/^cookie\s*:\s*/i, '')
+                  .replace(/^["']+|["']+$/g, '')
+                  .trim()
+                if (!raw) return
+                if (raw.includes('…') || raw.includes('...')) {
+                  toast.error(
+                    'That cookie is truncated (contains …). Right-click the Cookie header → Copy value, not the wrapped preview.'
+                  )
+                  return
+                }
+                if (raw !== cookieInput) setCookieInput(raw)
+                saveCookie.mutate(raw)
               }}
               className={musicStyles.cookieForm}
             >
@@ -257,7 +329,45 @@ const Music: React.FC = () => {
               >
                 {saveCookie.isPending ? 'Checking…' : 'Sign in'}
               </button>
+              {showHelper && (
+                <button
+                  className={musicStyles.btnGhost}
+                  type="button"
+                  onClick={handleExtractYtMusic}
+                  disabled={extracting || saveCookie.isPending}
+                  title="Read the YouTube Music cookie via the Dango Helper extension (same zip as AnimePahe/JapaneseASMR)"
+                >
+                  {extracting ? 'Extracting…' : 'Extract from helper'}
+                </button>
+              )}
             </form>
+            {showHelper && (
+              <p className={asmrStyles.statusMsg}>
+                Two ways to sign in: paste the Cookie header manually (steps below), or download{' '}
+                <a
+                  href={EXTENSION_ZIP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={musicStyles.link}
+                >
+                  dango-extension.zip
+                </a>{' '}
+                then{' '}
+                {isFirefoxDesktop ? (
+                  <>
+                    <code>about:debugging</code> → <strong>This Firefox</strong> →{' '}
+                    <strong>Load Temporary Add-on</strong> →{' '}
+                    <code>dango-extension/firefox/manifest.json</code>
+                  </>
+                ) : (
+                  <>
+                    <code>chrome://extensions</code> → <strong>Developer mode</strong> →{' '}
+                    <strong>Load unpacked</strong> → <code>dango-extension/chrome</code>
+                  </>
+                )}
+                , log in on a music.youtube.com tab, and click Extract.
+              </p>
+            )}
             <MusicCookieHelp />
           </>
         )}

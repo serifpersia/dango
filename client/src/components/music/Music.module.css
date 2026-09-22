@@ -95,3 +95,13 @@
 .cookieInput:focus {
   border-color: var(--accent);
 }
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.link:hover {
+  opacity: 0.85;
+}
