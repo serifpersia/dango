@@ -272,7 +272,13 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
       <div className={styles.playerControls}>{transportRow}</div>
 
       <div className={styles.playerRight}>
-        <Icon name="volume-up" className={styles.volumeIcon} />
+        {volume === 0 ? (
+          <Icon name="volume-mute" className={styles.volumeIcon} />
+        ) : volume < 0.5 ? (
+          <Icon name="volume-down" className={styles.volumeIcon} />
+        ) : (
+          <Icon name="volume-up" className={styles.volumeIcon} />
+        )}
         <input
           className={styles.volumeBar}
           type="range"

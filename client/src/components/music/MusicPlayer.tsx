@@ -8,6 +8,8 @@ import radioStyles from '../radio/Radio.module.css'
 interface MusicPlayerProps {
   track: MusicTrack
   queue: MusicTrack[]
+  shuffle: boolean
+  onToggleShuffle: () => void
   onTrackStep: (delta: number) => void
   onClose: () => void
 }
@@ -19,7 +21,13 @@ function formatTime(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const MusicPlayer: React.FC<MusicPlayerProps> = ({ track, onTrackStep, onClose }) => {
+const MusicPlayer: React.FC<MusicPlayerProps> = ({
+  track,
+  shuffle,
+  onToggleShuffle,
+  onTrackStep,
+  onClose,
+}) => {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const seekingRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -325,7 +333,13 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ track, onTrackStep, onClose }
       <div className={styles.playerControls}>{transportRow}</div>
 
       <div className={styles.playerRight}>
-        <Icon name="volume-up" className={styles.volumeIcon} />
+        {volume === 0 ? (
+          <Icon name="volume-mute" className={styles.volumeIcon} />
+        ) : volume < 0.5 ? (
+          <Icon name="volume-down" className={styles.volumeIcon} />
+        ) : (
+          <Icon name="volume-up" className={styles.volumeIcon} />
+        )}
         <input
           className={styles.volumeBar}
           type="range"
@@ -344,6 +358,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ track, onTrackStep, onClose }
       </div>
 
       <div className={styles.playerActions}>
+        <button
+          className={`${styles.playerBtn} ${shuffle ? styles.playerBtnActive : ''}`}
+          onClick={onToggleShuffle}
+          title={shuffle ? 'Shuffle on' : 'Shuffle off'}
+          aria-label="Toggle shuffle"
+          aria-pressed={shuffle}
+        >
+          <Icon name="shuffle" />
+        </button>
         <button
           className={`${styles.playerBtn} ${autoplay ? styles.playerBtnActive : ''}`}
           onClick={() => {

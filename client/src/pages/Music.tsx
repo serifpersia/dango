@@ -42,6 +42,7 @@ const Music: React.FC = () => {
   const [query, setQuery] = useState('')
   const [cookieInput, setCookieInput] = useState('')
   const [extracting, setExtracting] = useState(false)
+  const [shuffle, setShuffle] = useState(() => localStorage.getItem('musicShuffle') === 'true')
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [queue, setQueue] = useState<MusicTrack[]>([])
   const [openPlaylist, setOpenPlaylist] = useState<MusicPlaylist | null>(null)
@@ -163,9 +164,23 @@ const Music: React.FC = () => {
   const stepTrack = (delta: number) => {
     if (!selected || queue.length === 0) return
     const idx = queue.findIndex((t) => t.id === selected.id)
-    const next = queue[(idx < 0 ? 0 : idx + delta + queue.length) % queue.length]
+    let next: MusicTrack
+    if (shuffle && queue.length > 1) {
+      let j = Math.floor(Math.random() * queue.length)
+      while (j === idx) j = Math.floor(Math.random() * queue.length)
+      next = queue[j]
+    } else {
+      next = queue[(idx < 0 ? 0 : idx + delta + queue.length) % queue.length]
+    }
     setSelected(next)
     setSearchParams({ v: next.id })
+  }
+
+  const toggleShuffle = () => {
+    setShuffle((v) => {
+      localStorage.setItem('musicShuffle', String(!v))
+      return !v
+    })
   }
 
   const renderPlaylist = (p: MusicPlaylist) => (
@@ -451,6 +466,8 @@ const Music: React.FC = () => {
         <MusicPlayer
           track={selected}
           queue={queue}
+          shuffle={shuffle}
+          onToggleShuffle={toggleShuffle}
           onTrackStep={stepTrack}
           onClose={() => {
             setSelected(null)
