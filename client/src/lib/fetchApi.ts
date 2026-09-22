@@ -1,5 +1,7 @@
 import { emitAuthRequired } from './auth-bus'
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 export const fetchApi = async (url: string, init?: RequestInit) => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -19,10 +21,18 @@ export const fetchApi = async (url: string, init?: RequestInit) => {
     if (jasmrCookie) headers['x-jasmr-cookie'] = jasmrCookie
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   })
+
+  for (let attempt = 0; response.status === 503 && attempt < 8; attempt++) {
+    await sleep(Math.min(500 * 2 ** attempt, 4000))
+    response = await fetch(url, {
+      ...init,
+      headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
+    })
+  }
 
   if (!response.ok) {
     const text = await response.text().catch(() => '')

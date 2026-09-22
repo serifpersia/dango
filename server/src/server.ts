@@ -169,6 +169,7 @@ let mangaDb: DatabaseWrapper
 let tvDb: DatabaseWrapper
 let asmrDb: DatabaseWrapper
 let isShuttingDown = false
+let bootSyncing = true
 
 async function runSyncSequence(
   database: DatabaseWrapper,
@@ -256,6 +257,9 @@ app.use((req, res, next) => {
   }
   if (!db || !mangaDb || !tvDb || !asmrDb) {
     return res.status(503).send('Database initializing...')
+  }
+  if (bootSyncing && req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    return res.status(503).send('Sync in progress...')
   }
   req.db = db
   req.mangaDb = mangaDb
@@ -421,9 +425,6 @@ async function main() {
   checkAnilistStatus().catch(() => {})
   initDiscordRolesSync(db)
 
-  await runSyncSequence(db, mangaDb)
-
-  await refreshRemoteProviders()
   if (CONFIG.PROVIDER_REPO_URL.trim()) {
     setInterval(() => {
       refreshRemoteProviders().catch((err) =>
@@ -477,6 +478,15 @@ async function main() {
   const expressServer = app.listen(CONFIG.PORT, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
   })
+
+  runSyncSequence(db, mangaDb)
+    .catch((err) => logger.error({ err }, 'background boot sync failed'))
+    .finally(() => {
+      bootSyncing = false
+    })
+  refreshRemoteProviders().catch((err) =>
+    logger.error({ err }, 'background providers refresh failed')
+  )
 
   const syncInterval = setInterval(async () => {
     if (hasUnsyncedChanges) {
