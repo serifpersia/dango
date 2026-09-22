@@ -45,6 +45,7 @@ import { createMangaLibraryRouter } from './routes/manga-library.routes.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
 import type { TvProvider } from './providers/tv.types.js'
 import { createRadioRouter } from './routes/radio.routes.js'
+import { createMusicRouter } from './routes/music.routes.js'
 import { createTvRouter } from './routes/tv.routes.js'
 import { createTvLibraryRouter } from './routes/tv-library.routes.js'
 import { createProxyRouter } from './routes/proxy.routes.js'
@@ -311,6 +312,7 @@ app.use(
 )
 app.use('/api', createMangaLibraryRouter())
 app.use('/api', createRadioRouter(apiCache))
+app.use('/api', createMusicRouter(apiCache))
 app.use(
   '/api',
   createTvRouter(apiCache, (name) => tvProviders[name])

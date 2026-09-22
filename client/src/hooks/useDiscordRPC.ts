@@ -60,6 +60,7 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/asmr')) page = 'asmr'
     else if (path.startsWith('/manga')) page = 'manga'
     else if (path.startsWith('/radio')) page = 'radio'
+    else if (path.startsWith('/music')) page = 'music'
     else if (path.startsWith('/tv')) page = 'tv'
 
     fetch('/api/discord/status', {
