@@ -1,5 +1,6 @@
 import type { AnilistMedia } from './anilist.js'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 const KITSU_BASE = 'https://kitsu.app/api/edge'
 const KITSU_HEADERS = { Accept: 'application/vnd.api+json', 'User-Agent': 'dango' }
@@ -43,7 +44,7 @@ async function kitsuFetch(path: string): Promise<KitsuResponse | null> {
           logger.warn({ status: res.status, path }, 'Kitsu request failed')
           return null
         }
-        return (await res.json()) as KitsuResponse
+        return parseJsonBody<KitsuResponse>(res)
       } finally {
         clearTimeout(timer)
       }

@@ -2,17 +2,17 @@ import crypto from 'crypto'
 import { DatabaseWrapper } from '../db.js'
 import logger from '../logger.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
+import { decodeMaybeGzip } from '../utils/http.utils.js'
 
 const log = logger.child({ module: 'OfflineDb' })
 
 const OFFLINE_DB_URLS = [
   'https://github.com/cedya77/anime-offline-database/releases/latest/download/anime-offline-database-minified.json',
-  'https://raw.githubusercontent.com/cedya77/anime-offline-database/master/anime-offline-database-minified.json',
   'https://github.com/manami-project/anime-offline-database/releases/latest/download/anime-offline-database-minified.json',
-  'https://raw.githubusercontent.com/manami-project/anime-offline-database/master/anime-offline-database-minified.json',
 ]
 
-const FETCH_TIMEOUT_MS = 60000
+const FETCH_IDLE_TIMEOUT_MS = 60000
+const FETCH_OVERALL_TIMEOUT_MS = 30 * 60 * 1000
 const MAX_BODY_BYTES = 100 * 1024 * 1024
 const CHUNK_SIZE = 1000
 const INTERRUPTED_RETRY_COOLDOWN_MS = 60 * 60 * 1000
@@ -108,7 +108,12 @@ function latestSaturdayUtc(): Date {
 
 async function fetchText(url: string): Promise<string> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  const overall = setTimeout(() => controller.abort(), FETCH_OVERALL_TIMEOUT_MS)
+  let idle: ReturnType<typeof setTimeout> | undefined
+  const touchIdle = (): void => {
+    if (idle) clearTimeout(idle)
+    idle = setTimeout(() => controller.abort(), FETCH_IDLE_TIMEOUT_MS)
+  }
   try {
     const res = await fetch(url, {
       signal: controller.signal,
@@ -117,11 +122,29 @@ async function fetchText(url: string): Promise<string> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const length = res.headers.get('content-length')
     if (length && Number(length) > MAX_BODY_BYTES) throw new Error('Response too large')
-    const text = await res.text()
+    if (!res.body) throw new Error('Empty response body')
+    touchIdle()
+    const chunks: Buffer[] = []
+    let total = 0
+    const reader = res.body.getReader()
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        touchIdle()
+        total += value.byteLength
+        if (total > MAX_BODY_BYTES) throw new Error('Response too large')
+        chunks.push(Buffer.from(value))
+      }
+    } finally {
+      reader.releaseLock()
+    }
+    const text = decodeMaybeGzip(Buffer.concat(chunks)).toString('utf8')
     if (text.length > MAX_BODY_BYTES) throw new Error('Response too large')
     return text
   } finally {
-    clearTimeout(timer)
+    if (idle) clearTimeout(idle)
+    clearTimeout(overall)
   }
 }
 

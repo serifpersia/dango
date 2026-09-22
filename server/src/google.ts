@@ -7,7 +7,7 @@ import { CONFIG } from './config.js'
 import { DatabaseWrapper } from './db.js'
 import { dbAll, dbGet } from './utils/db-utils.js'
 import { isTempSyncRow } from './lib/temp-ids.js'
-import { fetchWithRetry, HttpError } from './utils/http.utils.js'
+import { fetchWithRetry, HttpError, decodeMaybeGzip, parseJsonBody } from './utils/http.utils.js'
 import {
   exportTables,
   importTables,
@@ -109,7 +109,7 @@ export class GoogleDriveService {
       { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS }
     )
     if (!response.ok) throw new HttpError(response.status)
-    return (await response.json()) as T
+    return parseJsonBody<T>(response)
   }
 
   private async postForm<T>(url: string, params: URLSearchParams): Promise<T> {
@@ -123,7 +123,7 @@ export class GoogleDriveService {
       { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS }
     )
     if (!response.ok) throw new HttpError(response.status)
-    return (await response.json()) as T
+    return parseJsonBody<T>(response)
   }
 
   private async refreshViaWorker(): Promise<boolean> {
@@ -250,7 +250,7 @@ export class GoogleDriveService {
           headers: response.headers,
         }
       }
-      const text = await response.text()
+      const text = decodeMaybeGzip(Buffer.from(await response.arrayBuffer())).toString('utf8')
       return {
         data: (text ? JSON.parse(text) : undefined) as T,
         status: response.status,
@@ -277,7 +277,7 @@ export class GoogleDriveService {
         url.searchParams.set('redirect_uri', CONFIG.GOOGLE_REDIRECT_URI)
         const response = await fetchWithRetry(url, {}, { timeoutMs: GOOGLE_REQUEST_TIMEOUT_MS })
         if (!response.ok) throw new HttpError(response.status)
-        const data = (await response.json()) as { url?: string }
+        const data = await parseJsonBody<{ url?: string }>(response)
         if (data?.url) return data.url
       } catch (error) {
         logger.error({ err: error }, 'Worker /auth-url failed, falling back to local')

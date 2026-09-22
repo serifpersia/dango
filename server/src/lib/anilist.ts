@@ -1,5 +1,6 @@
 import { Show } from '../providers/provider.interface.js'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 import { findTmdbDefaultBackdrop } from './tmdb.js'
 import {
   getScheduleFromAniSchedule,
@@ -445,7 +446,7 @@ async function performAnilistRequest<T>(
       anilistRateLimited = false
     }
 
-    const json = (await response.json()) as {
+    const json = (await parseJsonBody(response)) as {
       data?: T | null
       errors?: { message: string }[]
     }

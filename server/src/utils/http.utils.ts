@@ -8,6 +8,31 @@ export class HttpError extends Error {
   }
 }
 
+export function decodeMaybeGzip(bytes: Buffer): Buffer {
+  if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) return gunzipSync(bytes)
+  return bytes
+}
+
+export async function parseJsonBody<T = unknown>(res: Response): Promise<T> {
+  const buf = Buffer.from(await res.arrayBuffer())
+  const text = decodeMaybeGzip(buf).toString('utf8')
+  try {
+    return JSON.parse(text) as T
+  } catch (err) {
+    const attempts: Array<() => Buffer> = [() => brotliDecompressSync(buf), () => inflateSync(buf)]
+    for (const attempt of attempts) {
+      try {
+        return JSON.parse(attempt().toString('utf8')) as T
+      } catch {
+        // ignore
+      }
+    }
+    throw err
+  }
+}
+
+import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib'
+
 export function isAbortError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
   const name = (err as { name?: string }).name

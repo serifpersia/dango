@@ -1,5 +1,6 @@
 import { Show } from '../providers/provider.interface.js'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 const SUB_SCHEDULE_URL =
   'https://raw.githubusercontent.com/RockinChaos/AniSchedule/master/raw/sub-schedule.json'
@@ -60,7 +61,7 @@ async function fetchJson<T>(url: string): Promise<T> {
     if (!response.ok) {
       throw new Error(`AniSchedule fetch failed with status ${response.status}`)
     }
-    const json = (await response.json()) as T
+    const json = await parseJsonBody<T>(response)
     if (Array.isArray(json) && json.length === 0) {
       throw new Error('AniSchedule returned an empty payload')
     }

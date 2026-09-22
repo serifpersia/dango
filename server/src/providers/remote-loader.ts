@@ -10,6 +10,7 @@ import logger from '../logger.js'
 import { CONFIG } from '../config.js'
 import { requestContext } from '../utils/request-context.js'
 import { sanitizeCfClearance, buildCfClearanceCookie } from '../utils/cookie.utils.js'
+import { decodeMaybeGzip, parseJsonBody } from '../utils/http.utils.js'
 import { buildQueryVariants, pickBestMatch } from './title-matching.js'
 import { anilistRequest, parseMalId, searchAnilistByTitle } from '../lib/anilist.js'
 import type { AnilistResponse } from '../lib/anilist.js'
@@ -78,7 +79,7 @@ async function readManifestBytes(registryUrl: string): Promise<Buffer> {
       'registry fetch'
     )
     if (!res.ok) throw new Error(`registry HTTP ${res.status}: ${registryUrl}`)
-    return Buffer.from(await res.arrayBuffer())
+    return decodeMaybeGzip(Buffer.from(await res.arrayBuffer()))
   }
   const filePath = path.resolve(stripFilePrefix(registryUrl))
   return await fs.promises.readFile(filePath)
@@ -92,7 +93,7 @@ async function readModuleBytes(entryUrl: string): Promise<Buffer> {
       'provider fetch'
     )
     if (!res.ok) throw new Error(`provider HTTP ${res.status}: ${entryUrl}`)
-    return Buffer.from(await res.arrayBuffer())
+    return decodeMaybeGzip(Buffer.from(await res.arrayBuffer()))
   }
   const filePath = path.resolve(stripFilePrefix(entryUrl))
   return await fs.promises.readFile(filePath)
@@ -208,7 +209,7 @@ function createCtx(cache: AppCache) {
     fetchJson: async <T>(url: string, init?: RequestInit): Promise<T> => {
       const res = await fetchWithTimeout(url, init)
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`)
-      return (await res.json()) as T
+      return parseJsonBody<T>(res)
     },
     proxyUrl: (rawUrl: string, referer: string): string => {
       return `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(referer)}`
@@ -236,7 +237,7 @@ function createCtx(cache: AppCache) {
           const sep = path.includes('?') ? '&' : '?'
           const res = await fetchWithTimeout(`${TMDB_BASE}${path}${sep}api_key=${key}`)
           if (!res.ok) return null
-          return (await res.json()) as T
+          return parseJsonBody<T>(res)
         } catch {
           return null
         }

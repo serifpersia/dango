@@ -1,5 +1,6 @@
 import type { AnilistMedia, AnilistSearchOptions } from './anilist.js'
 import { kitsuTitlesByMalIds, KitsuTitles } from './kitsu.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 export interface MalCacheStore {
   get(key: string): { payload: string; fresh: boolean } | null
@@ -1034,7 +1035,7 @@ export async function fetchMalUserList(username: string): Promise<MalUserListEnt
       throw new Error(`MAL list for "${user}" is private or unavailable`)
     }
     if (!res.ok) throw new Error(`MAL list fetch failed (HTTP ${res.status})`)
-    const data: unknown = await res.json()
+    const data: unknown = await parseJsonBody(res)
     if (!Array.isArray(data) || data.length === 0) break
     for (const item of data) {
       const rec = item as Record<string, unknown>

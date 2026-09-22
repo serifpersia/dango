@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller.js'
 import { discordRPCService } from '../discord-rpc.js'
 import { DatabaseWrapper } from '../db.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 import { pickBestMatch } from '../providers/title-matching.js'
 
 const dlsitePosterCache = new Map<string, { url: string; ts: number }>()
@@ -27,7 +28,7 @@ async function getMangadexCover(title: string): Promise<string | null> {
       signal: AbortSignal.timeout(10000),
     })
     if (!res.ok) return null
-    const data = (await res.json()) as {
+    const data = (await parseJsonBody(res)) as {
       data?: Array<{
         id: string
         attributes?: { title?: Record<string, string>; altTitles?: Record<string, string>[] }
@@ -67,7 +68,7 @@ async function getDlsitePoster(rjCode: string): Promise<string | null> {
       signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) return null
-    const raw = (await res.json()) as unknown
+    const raw = (await parseJsonBody(res)) as unknown
     const data = raw as Record<string, unknown>
     const entryRaw = (data[key] ?? data) as unknown
     const entry = entryRaw as { work_image?: unknown }

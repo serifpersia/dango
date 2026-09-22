@@ -1,3 +1,5 @@
+import { parseJsonBody } from '../utils/http.utils.js'
+
 const TMDB_BASE = 'https://api.themoviedb.org/3'
 const TMDB_IMAGE = 'https://image.tmdb.org/t/p'
 
@@ -55,7 +57,7 @@ export async function tmdbSearch(query: string): Promise<TmdbSearchResult[] | nu
   const url = `${TMDB_BASE}/search/multi?api_key=${key}&query=${encodeURIComponent(query)}&include_adult=false`
   const res = await fetch(url)
   if (!res.ok) return null
-  const json = (await res.json()) as { results?: TmdbSearchResult[] }
+  const json = await parseJsonBody<{ results?: TmdbSearchResult[] }>(res)
   return json.results ?? null
 }
 
@@ -64,7 +66,7 @@ export async function tmdbTvDetails(tmdbId: number): Promise<TmdbTvDetails | nul
   const url = `${TMDB_BASE}/tv/${tmdbId}?api_key=${key}`
   const res = await fetch(url)
   if (!res.ok) return null
-  const json = (await res.json()) as TmdbTvDetails | null
+  const json = await parseJsonBody<TmdbTvDetails | null>(res)
   return json
 }
 

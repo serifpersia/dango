@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 export interface RadioStation {
   id: string
@@ -88,7 +89,7 @@ async function rbFetch(path: string): Promise<unknown[]> {
         signal: AbortSignal.timeout(10000),
       })
       if (!res.ok) throw new Error(`radio-browser ${res.status}`)
-      return (await res.json()) as unknown[]
+      return parseJsonBody<unknown[]>(res)
     } catch (err) {
       lastErr = err
     }

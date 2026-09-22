@@ -4,6 +4,7 @@ import type { WebPoSignalOutput } from 'bgutils-js/shared-types'
 import { WebPoMinter } from 'bgutils-js/webpo'
 import { buildURL, getHeaders, USER_AGENT } from 'bgutils-js/utils'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 import { getInnertube } from './ytmusic.js'
 
 interface BgChallengeResponse {
@@ -88,7 +89,7 @@ async function buildMinter(): Promise<WebPoMinter> {
     body: JSON.stringify([REQUEST_KEY, botguardResponse]),
   })
   const [integrityToken, estimatedTtlSecs, mintRefreshThreshold, websafeFallbackToken] =
-    (await itResponse.json()) as [string, number, number, string]
+    await parseJsonBody<[string, number, number, string]>(itResponse)
   if (!integrityToken) throw new Error('Integrity token request failed')
   logger.info('[pot] minter ready (integrity ttl %ss)', estimatedTtlSecs)
   return WebPoMinter.create(

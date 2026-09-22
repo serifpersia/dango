@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { AppCache } from '../utils/cache.utils.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 const cache = new AppCache({
   ttlSeconds: 7 * 24 * 60 * 60,
@@ -61,7 +62,7 @@ export function createTranslateRouter(): Router {
             signal: AbortSignal.timeout(5000),
           })
           if (!r.ok) throw new Error(`translate ${r.status}`)
-          const data = (await r.json()) as unknown
+          const data = (await parseJsonBody(r)) as unknown
           let translated = ''
           if (Array.isArray(data) && typeof (data as unknown[])[0] === 'string') {
             translated = (data as string[])[0] as string

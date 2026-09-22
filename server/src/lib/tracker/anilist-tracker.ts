@@ -1,5 +1,6 @@
 import logger from '../../logger.js'
 import { waitForAnilistSlot, applyRateLimitHeaders } from '../anilist.js'
+import { parseJsonBody } from '../../utils/http.utils.js'
 
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 
@@ -104,10 +105,10 @@ export class AniListTracker {
       throw new Error(`AniList request failed with status ${response.status}`)
     }
 
-    const json = (await response.json()) as {
+    const json = await parseJsonBody<{
       data?: T | null
       errors?: { message: string }[]
-    }
+    }>(response)
 
     if (json.errors && !json.data) {
       throw new Error(json.errors.map((e) => e.message).join(', '))

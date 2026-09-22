@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 import type {
   MangaContentRating,
   MangaProviderName,
@@ -157,7 +158,7 @@ export function createMangaRouter(
           headers: { 'User-Agent': 'dango/3.1.9' },
         })
         if (!upstream.ok) return res.json([])
-        const data = (await upstream.json()) as {
+        const data = (await parseJsonBody(upstream)) as {
           data?: Array<{
             id: string
             attributes?: {

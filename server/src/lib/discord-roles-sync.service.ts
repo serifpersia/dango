@@ -3,6 +3,7 @@ import logger from '../logger.js'
 import { CONFIG } from '../config.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import { InsightsRepository } from '../repositories/insights.repository.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 
 export interface LinkedDiscordUser {
   id: string
@@ -131,7 +132,7 @@ export async function syncDiscordRoles(
       }),
     })
 
-    const data = (await res.json().catch(() => ({}))) as {
+    const data = (await parseJsonBody(res).catch(() => ({}))) as {
       error?: string
       message?: string
       rank?: string

@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface.js'
 import type { BrowseCaps } from '../providers/remote-types.js'
 import type { ProviderCatalogItem } from '../providers/remote-types.js'
+import { parseJsonBody } from '../utils/http.utils.js'
 import { pickBestMatch } from '../providers/title-matching.js'
 import {
   getTrending,
@@ -161,7 +162,7 @@ export class DataController {
           `https://api.aniskip.com/v1/skip-times/${showId}/${episodeNumber}?types=op&types=ed`
         )
         if (skipRes.ok) {
-          const data = await skipRes.json()
+          const data = await parseJsonBody(skipRes)
           return res.json(data)
         }
       }
