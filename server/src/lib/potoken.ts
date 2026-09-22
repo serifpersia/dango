@@ -1,11 +1,8 @@
-import { JSDOM } from 'jsdom'
-import { BotGuardClient } from 'bgutils-js/botguard'
-import type { WebPoSignalOutput } from 'bgutils-js/shared-types'
-import { WebPoMinter } from 'bgutils-js/webpo'
-import { buildURL, getHeaders, USER_AGENT } from 'bgutils-js/utils'
 import logger from '../logger.js'
 import { parseJsonBody } from '../utils/http.utils.js'
 import { getInnertube } from './ytmusic.js'
+import type { WebPoSignalOutput } from 'bgutils-js/shared-types'
+import type { WebPoMinter } from 'bgutils-js/webpo'
 
 interface BgChallengeResponse {
   bg_challenge?: {
@@ -25,29 +22,49 @@ const POT_CACHE_MS = 6 * 60 * 60 * 1000
 let minter: WebPoMinter | null = null
 let minterFetchedAt = 0
 let bootstrapPromise: Promise<WebPoMinter> | null = null
+let bootstrapFailedAt = 0
+const BOOTSTRAP_FAIL_COOLDOWN_MS = 60 * 1000
 const potCache = new Map<string, { pot: string; fetchedAt: number }>()
 
-function setupDom() {
-  if ('navigator' in globalThis && (globalThis as { yt?: unknown }).yt) return
+// BotGuard needs browser globals to execute. They are installed once and kept
+// for the process lifetime: the minter's callbacks read them lazily at mint
+// time, long after bootstrap completes, so scoping them to bootstrap breaks
+// minting with `window is not defined`.
+async function setupDom(): Promise<void> {
+  const g = globalThis as Record<string, unknown>
+  if ('navigator' in g && (g as { yt?: unknown }).yt) return
+  const { JSDOM, VirtualConsole } = await import('jsdom')
+  const virtualConsole = new VirtualConsole()
   const dom = new JSDOM(
     '<!DOCTYPE html><html lang="en"><head><title></title></head><body></body></html>',
     {
       url: 'https://www.youtube.com',
       referrer: 'https://www.youtube.com/',
+      virtualConsole,
     }
   )
-  Object.assign(globalThis, {
+  Object.assign(g, {
     window: dom.window,
     document: dom.window.document,
     location: dom.window.location,
     origin: dom.window.origin,
   })
-  if (!('navigator' in globalThis)) {
-    Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator })
+  if (!('navigator' in g)) {
+    Object.defineProperty(g, 'navigator', {
+      value: dom.window.navigator,
+      writable: true,
+      configurable: true,
+    })
   }
 }
 
 async function buildMinter(): Promise<WebPoMinter> {
+  const [{ BotGuardClient }, { WebPoMinter }, { buildURL, getHeaders, USER_AGENT }] =
+    await Promise.all([
+      import('bgutils-js/botguard'),
+      import('bgutils-js/webpo'),
+      import('bgutils-js/utils'),
+    ])
   const yt = await getInnertube()
   const pageResponse = await fetch('https://www.youtube.com', {
     headers: {
@@ -105,18 +122,21 @@ async function buildMinter(): Promise<WebPoMinter> {
 
 async function getMinter(): Promise<WebPoMinter> {
   if (minter && Date.now() - minterFetchedAt < INTEGRITY_TTL_MS) return minter
+  if (Date.now() - bootstrapFailedAt < BOOTSTRAP_FAIL_COOLDOWN_MS) {
+    throw new Error('PoToken bootstrap cooling down')
+  }
   if (!bootstrapPromise) {
-    setupDom()
-    bootstrapPromise = buildMinter()
-      .then((m) => {
-        minter = m
-        minterFetchedAt = Date.now()
-        return m
-      })
-      .catch((err) => {
-        bootstrapPromise = null
-        throw err
-      })
+    bootstrapPromise = (async () => {
+      await setupDom()
+      const m = await buildMinter()
+      minter = m
+      minterFetchedAt = Date.now()
+      return m
+    })().catch((err) => {
+      bootstrapPromise = null
+      bootstrapFailedAt = Date.now()
+      throw err
+    })
   }
   return bootstrapPromise
 }

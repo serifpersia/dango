@@ -75,6 +75,8 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_ENV: development
 
       - name: Generate Shipped Defaults
         run: node server/scripts/generate-shipped-defaults.cjs
@@ -85,7 +87,13 @@ jobs:
           DISCORD_ROLES_WORKER_URL: ${{ secrets.DISCORD_ROLES_WORKER_URL }}
 
       - name: Build Application
-        run: pnpm run build
+        # Direct exec calls: `pnpm run build` triggers pnpm's
+        # verify-deps-before-run, which re-prunes devDependencies in this
+        # runner env (vite/tsc vanish). exec runs the binaries as-is.
+        run: |
+          pnpm --filter dango-client exec tsc
+          pnpm --filter dango-client exec vite build
+          pnpm --filter dango-server exec tsc
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
@@ -119,15 +127,15 @@ jobs:
           chmod +x release-package/run.sh
 
       - name: Install packaged dependencies
-        # Flat npm tree (no symlinks, zip-safe on Windows) installed here in
-        # CI, so users skip `npm install` entirely. npm always installs the
-        # complete tree, including transitive deps like youtubei.js/fflate.
+        # Pinned flat tree: pnpm resolves from pnpm-lock (unlike bare npm
+        # install, which re-resolves latest-minor with no lockfile) and
+        # node-linker=hoisted lays it out flat with zero symlinks, so the
+        # zip extracts cleanly on Windows. .bin/.pnpm are install metadata,
+        # unneeded at runtime.
         run: |
-          cd release-package
-          npm install --omit=dev --workspaces=false --no-audit --no-fund
-          test -f node_modules/youtubei.js/package.json || (echo "missing youtubei.js" && exit 1)
-          test -f node_modules/fflate/package.json || (echo "missing fflate" && exit 1)
-          test -f node_modules/express/package.json || (echo "missing express" && exit 1)
+          pnpm install --prod --frozen-lockfile --config.node-linker=hoisted --modules-dir "$GITHUB_WORKSPACE/release-package/node_modules"
+          rm -rf release-package/node_modules/.bin release-package/node_modules/.pnpm
+          node -e "for (const p of ['express','youtubei.js','fflate','cheerio','got-scraping']) require('./release-package/node_modules/' + p + '/package.json'); console.log('packaged deps OK')"
 
       - name: Zip Release Archive
         run: |
@@ -183,7 +191,9 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Publish to NPM
-        run: npm publish --access public
+        # --ignore-scripts: prepublishOnly would rebuild via `pnpm run build`,
+        # hitting the same verify-deps prune. dist is already fresh from Build.
+        run: npm publish --access public --ignore-scripts
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}

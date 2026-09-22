@@ -8,7 +8,9 @@ const log = logger.child({ module: 'OfflineDb' })
 
 const OFFLINE_DB_URLS = [
   'https://github.com/cedya77/anime-offline-database/releases/latest/download/anime-offline-database-minified.json',
+  'https://raw.githubusercontent.com/cedya77/anime-offline-database/master/anime-offline-database-minified.json',
   'https://github.com/manami-project/anime-offline-database/releases/latest/download/anime-offline-database-minified.json',
+  'https://raw.githubusercontent.com/manami-project/anime-offline-database/master/anime-offline-database-minified.json',
 ]
 
 const FETCH_IDLE_TIMEOUT_MS = 60000

@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "3.2.7",
+  "version": "3.2.9",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
@@ -70,7 +70,7 @@
     "multer": "^2.0.2",
     "pino": "^10.3.1",
     "ws": "^8.18.0",
-    "youtubei.js": "^18.0.0"
+    "youtubei.js": "^18.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -83,5 +83,5 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "versionDate": "2026-09-22T19:39:39.084Z"
+  "versionDate": "2026-09-22T20:44:41.549Z"
 }

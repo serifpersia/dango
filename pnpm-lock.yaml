@@ -56,8 +56,8 @@ importers:
         specifier: ^8.18.0
         version: 8.21.3
       youtubei.js:
-        specifier: ^18.0.0
-        version: 18.0.0
+        specifier: ^18.1.0
+        version: 18.1.0
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -178,8 +178,8 @@ importers:
         specifier: ^8.18.0
         version: 8.21.3
       youtubei.js:
-        specifier: ^18.0.0
-        version: 18.0.0
+        specifier: ^18.1.0
+        version: 18.1.0
     devDependencies:
       '@types/compression':
         specifier: ^1.8.1
@@ -4254,10 +4254,10 @@ packages:
       }
     engines: { node: '>=10' }
 
-  youtubei.js@18.0.0:
+  youtubei.js@18.1.0:
     resolution:
       {
-        integrity: sha512-7Tztl5QzNL4nIhiAxa4P/0C8cDDsUe0j4iaUeNiaA+ZfSe/l+HkHxXyoWlQXNW7IPi2n6AW23ysVMJLDh+AwWQ==,
+        integrity: sha512-4Goo3ZeO6/kE8Mq67eC8Z9K1rijeqRwyKxf/YM4lqf8bB4r/s8JC0V3YFx7+l/AJR3LnAsulTsiIj+AFe0cduA==,
       }
 
   zimmerframe@1.1.5:
@@ -5902,7 +5902,7 @@ snapshots:
       decimal.js: 10.6.0
       html-encoding-sniffer: 6.0.0
       is-potential-custom-element-name: 1.0.1
-      lru-cache: 11.5.2
+      lru-cache: 11.5.3
       parse5: 8.0.1
       saxes: 6.0.0
       tough-cookie: 6.0.2
@@ -6616,7 +6616,7 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  youtubei.js@18.0.0:
+  youtubei.js@18.1.0:
     dependencies:
       '@bufbuild/protobuf': 2.15.0
       fflate: 0.8.3

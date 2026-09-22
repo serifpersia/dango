@@ -517,17 +517,17 @@ export class MusicController {
         entry.lastStart = rangeStart
         await reportPlayback(videoId, entry, rangeStart)
         const session = getUmpSession(videoId)
-        let pot: string
+        let pot = ''
         try {
           pot = await mintPoToken(videoId)
         } catch (err) {
-          logger.error({ err }, '[music] PoToken mint failed')
-          return res.status(502).json({ error: 'Stream attestation failed' })
+          logger.warn({ err }, '[music] PoToken mint failed, trying without attestation')
         }
         const upstreamUrl =
           `${entry.url}&cpn=${session.cpn}&cver=${UMP_CVER}` +
           `&range=${rangeStart}-${rangeEnd}&rn=${session.rn}&rbuf=0` +
-          `&pot=${encodeURIComponent(pot)}&ump=1&srfvp=1`
+          (pot ? `&pot=${encodeURIComponent(pot)}` : '') +
+          `&ump=1&srfvp=1`
         session.rn += 1
         let raw: Buffer
         try {
@@ -654,7 +654,10 @@ export class MusicController {
     try {
       res.json(await readLibrary(yt))
     } catch (err) {
-      logger.error({ err }, '[music] library failed')
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err) },
+        '[music] library parse failed, serving empty result'
+      )
       res.json({ tracks: [], playlists: [] })
     }
   }

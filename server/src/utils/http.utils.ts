@@ -1,3 +1,5 @@
+import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib'
+
 export class HttpError extends Error {
   status: number
 
@@ -30,8 +32,6 @@ export async function parseJsonBody<T = unknown>(res: Response): Promise<T> {
     throw err
   }
 }
-
-import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib'
 
 export function isAbortError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
