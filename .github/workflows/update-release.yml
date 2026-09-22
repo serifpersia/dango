@@ -44,7 +44,7 @@ jobs:
           echo "### Manual Setup" >> release_notes.md
           echo "1. Download and extract 'dango.zip'" >> release_notes.md
           echo "2. Install Node.js 22.12 or newer ('node --version' to check)" >> release_notes.md
-          echo "3. Run 'npm install --omit=dev --workspaces=false' inside the folder (minimal prod deps, client is prebuilt)" >> release_notes.md
+          echo "3. No install needed — production dependencies are included, client is prebuilt" >> release_notes.md
           echo "4. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android APK" >> release_notes.md
@@ -90,18 +90,14 @@ jobs:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
 
-      - name: Generate package-lock for zip installs
-        # --ignore-scripts bypasses the source-only pnpm guard (preinstall) since
-        # this step intentionally uses npm to emit a lockfile for the zip channel.
-        # node_modules is pnpm's symlinked layout here, which crashes npm's
-        # arborist ("Cannot read properties of null (reading 'matches')"), so
-        # move it aside while npm resolves purely from the registry.
-        # --omit=dev matches the shipped install command and shrinks the tree.
+      - name: Verify build artifacts
+        # Fail fast if dist doesn't match src before it ships.
         run: |
-          mv node_modules node_modules.pnpm
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --omit=dev
-          rm -rf node_modules
-          mv node_modules.pnpm node_modules
+          test -f client/dist/index.html || (echo "missing client/dist/index.html" && exit 1)
+          test -f server/dist/server.js || (echo "missing server/dist/server.js" && exit 1)
+          test -f server/dist/shipped-defaults.js || (echo "missing shipped defaults" && exit 1)
+          grep -q "dango-providers" server/dist/shipped-defaults.js || (echo "shipped defaults missing provider URL" && exit 1)
+          node --input-type=module -e "await import('./server/dist/shipped-defaults.js'); await import('./server/dist/config.js'); console.log('server entry imports OK')"
 
       - name: Create Release Archive
         run: |
@@ -111,8 +107,7 @@ jobs:
           cp -r server/dist release-package/server/
           cp client/package.json release-package/client/
           cp server/package.json release-package/server/
-          cp package.json package-lock.json release-package/
-          cp LICENSE README.md release-package/
+          cp package.json LICENSE README.md release-package/
           cp orchestrator.js release-package/
 
           echo "#!/bin/bash" > release-package/run.sh
@@ -123,6 +118,19 @@ jobs:
 
           chmod +x release-package/run.sh
 
+      - name: Install packaged dependencies
+        # Flat npm tree (no symlinks, zip-safe on Windows) installed here in
+        # CI, so users skip `npm install` entirely. npm always installs the
+        # complete tree, including transitive deps like youtubei.js/fflate.
+        run: |
+          cd release-package
+          npm install --omit=dev --workspaces=false --no-audit --no-fund
+          test -f node_modules/youtubei.js/package.json || (echo "missing youtubei.js" && exit 1)
+          test -f node_modules/fflate/package.json || (echo "missing fflate" && exit 1)
+          test -f node_modules/express/package.json || (echo "missing express" && exit 1)
+
+      - name: Zip Release Archive
+        run: |
           cd release-package
           zip -r ../dango.zip .
 

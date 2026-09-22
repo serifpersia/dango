@@ -5,6 +5,10 @@ node_modules/
 /client/dist
 /server/dist
 
+/release-package/
+dango.zip
+package-lock.json
+
 # Databases
 *.db
 server/.env

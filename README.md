@@ -6,7 +6,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-897cff?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
-[![App version](https://img.shields.io/badge/dango-3.2.4-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-3.2.6-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 ![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
 
@@ -40,7 +40,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 | Requirement | Supported Version      | Notes                                                       |
 | :---------- | :--------------------- | :---------------------------------------------------------- |
 | **Node.js** | `>= 22.12.0`           | Required runtime ([Download](https://nodejs.org/))          |
-| **npm**     | Bundled with Node      | Global install (`npm install -g @serifpersia/dango`) + zips |
+| **npm**     | Bundled with Node      | Global install (`npm install -g @serifpersia/dango`)        |
 | **pnpm**    | `11` (`npm i -g pnpm`) | Only needed for source development (`run.bat` / `run.sh`)   |
 
 ---
@@ -61,6 +61,16 @@ dango
 
 > [!IMPORTANT]
 > Once the server initializes, navigate to `http://localhost:3000` in your browser. The background process runs locally until terminated (`Ctrl + C or q key press as well as window X button closing action`).
+
+---
+
+### Release Zip (no install)
+
+No `npm install` needed — dependencies ship inside the zip, client is prebuilt:
+
+1. Download and extract `dango.zip` from [Releases](https://github.com/serifpersia/dango/releases).
+2. Install Node.js 22.12+ (`node --version` to check).
+3. Launch using `run.bat` (Windows) or `./run.sh` (Linux/macOS), then open `http://localhost:3000`.
 
 ---
 
