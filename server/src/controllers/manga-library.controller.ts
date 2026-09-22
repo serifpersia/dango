@@ -1,12 +1,20 @@
 import { Request, Response } from 'express'
 import logger from '../logger.js'
+import type { DatabaseWrapper } from '../db.js'
 import { performMangaWriteTransaction } from '../sync.js'
+import { dbAll } from '../utils/db-utils.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
   buildMangaId,
   MANGA_STATUSES,
   MangaLibraryRepository,
   MangaProgressRepository,
 } from '../repositories/manga.repository.js'
+
+const MANGA_ADULT_RATINGS = ['erotica', 'pornographic']
+
+const isMangaContinueAdult = (row: { contentRating?: string | null }) =>
+  !!row.contentRating && MANGA_ADULT_RATINGS.includes(row.contentRating)
 
 function mangaDb(req: Request) {
   const db = req.mangaDb
@@ -197,10 +205,56 @@ export class MangaLibraryController {
   getContinueReading = async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 24, 1), 100)
-      const rows = MangaProgressRepository.getContinueReading(mangaDb(req), limit)
+      const ignoreAdultRow = await SettingsRepository.getByKey(req.db, 'mangaIgnoreAdultContent')
+      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
+      const listOnlyRow = await SettingsRepository.getByKey(req.db, 'mangaCwWatchlistOnly')
+      const listOnly = listOnlyRow
+        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
+        : false
+      const rows = MangaProgressRepository.getContinueReading(mangaDb(req), limit).filter((row) => {
+        if (ignoreAdult && isMangaContinueAdult(row)) return false
+        if (listOnly && row.watchlistStatus !== 'Reading') return false
+        return true
+      })
       res.json({ data: rows, total: rows.length })
     } catch {
       res.json({ data: [], total: 0 })
+    }
+  }
+
+  private async getAdultNonListMangaIds(db: DatabaseWrapper): Promise<string[]> {
+    const rows = await dbAll<{ mangaId: string }>(
+      db,
+      `SELECT DISTINCT p.mangaId as mangaId
+       FROM manga_progress p
+       LEFT JOIN manga_library l ON l.id = p.mangaId
+       WHERE COALESCE(l.contentRating, p.contentRating) IN ('erotica', 'pornographic')
+         AND l.id IS NULL`
+    )
+    return rows.map((r) => r.mangaId)
+  }
+
+  getAdultContinueReadingCount = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListMangaIds(mangaDb(req))
+      res.json({ count: ids.length })
+    } catch {
+      res.json({ count: 0 })
+    }
+  }
+
+  purgeAdultContinueReading = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListMangaIds(mangaDb(req))
+      if (ids.length > 0) {
+        await performMangaWriteTransaction(mangaDb(req), (tx) => {
+          MangaProgressRepository.deleteMany(tx, ids)
+        })
+      }
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to purge adult manga progress')
+      res.status(500).json({ error: 'Failed to purge adult entries' })
     }
   }
 

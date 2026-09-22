@@ -120,27 +120,6 @@
   min-height: 320px;
 }
 
-.emptyStateIcon {
-  color: var(--accent);
-  opacity: 0.4;
-  margin-bottom: var(--space-2);
-  filter: drop-shadow(0 0 20px var(--accent-glow));
-}
-
-.emptyStateTitle {
-  font-size: 1.5rem;
-  font-weight: 800;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.emptyStateText {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  max-width: 340px;
-  line-height: 1.6;
-}
-
 .quickQueue {
   margin: 0 0 2.5rem;
   border: 1px solid var(--border-secondary);

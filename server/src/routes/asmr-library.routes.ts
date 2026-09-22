@@ -19,6 +19,8 @@ export function createAsmrLibraryRouter(): Router {
   router.post('/asmr/progress', controller.saveProgress)
   router.post('/asmr/progress/remove', controller.removeProgress)
   router.get('/asmr/continue-listening', controller.getContinueListening)
+  router.get('/asmr/continue-listening/adult-count', controller.getAdultContinueListeningCount)
+  router.post('/asmr/continue-listening/purge-adult', controller.purgeAdultContinueListening)
 
   return router
 }

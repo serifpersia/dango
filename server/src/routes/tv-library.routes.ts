@@ -19,6 +19,8 @@ export function createTvLibraryRouter(): Router {
   router.post('/tv/progress', controller.saveProgress)
   router.post('/tv/progress/remove', controller.removeProgress)
   router.get('/tv/continue-watching', controller.getContinueWatching)
+  router.get('/tv/continue-watching/adult-count', controller.getAdultContinueWatchingCount)
+  router.post('/tv/continue-watching/purge-adult', controller.purgeAdultContinueWatching)
 
   return router
 }

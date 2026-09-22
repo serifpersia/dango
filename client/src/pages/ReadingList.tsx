@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
-import Icon from '../components/common/Icon'
-import SkeletonGrid from '../components/common/SkeletonGrid'
-import ErrorMessage from '../components/common/ErrorMessage'
+import { useParams } from 'react-router'
 import MediaCard from '../components/common/MediaCard'
+import LibraryListPage from '../components/common/LibraryListPage'
 import MangaPopup from '../components/manga/MangaPopup'
 import MangaResetProgressModal from '../components/manga/MangaResetProgressModal'
 import { mangaCoverSrc } from '../hooks/useManga'
@@ -23,7 +21,6 @@ import {
   type MangaLibraryItem,
 } from '../hooks/useMangaLibrary'
 import { useMangaPopup, type MangaPopupData } from '../hooks/useMangaPopup'
-import styles from './Watchlist.module.css'
 
 const FILTERS = ['All', 'Continue Reading', ...MANGA_LIBRARY_STATUSES]
 
@@ -31,6 +28,7 @@ const PAGE_SIZE = 24
 
 type GridEntry = {
   key: string
+  libId: string
   provider: string
   mangaId: string
   title: string
@@ -43,7 +41,6 @@ type GridEntry = {
   progressPercent?: number
   progressLabel?: string
   detailTarget: string
-  libId: string
 }
 
 const entryPopupData = (entry: GridEntry): MangaPopupData => ({
@@ -59,10 +56,8 @@ const entryPopupData = (entry: GridEntry): MangaPopupData => ({
 
 export default function ReadingList() {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
-  const navigate = useNavigate()
   const [page, setPage] = useState(1)
-  const [manageMode, setManageMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
 
   useEffect(() => {
     document.title = 'Reading List - dango'
@@ -70,7 +65,6 @@ export default function ReadingList() {
 
   useEffect(() => {
     setPage(1)
-    setSelectedIds(new Set())
   }, [filterBy])
 
   const isCR = filterBy === 'Continue Reading'
@@ -80,26 +74,9 @@ export default function ReadingList() {
   const updateStatus = useUpdateMangaStatus()
   const { toggle, bookmarkedIds } = useToggleMangaBookmark()
   const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useMangaPopup()
-  const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
   const bulkUpdateStatus = useBatchUpdateMangaStatus()
   const bulkRemove = useBatchRemoveManga()
   const bulkResetProgress = useBatchRemoveMangaProgress()
-
-  const toggleManageMode = () => {
-    setManageMode((prev) => {
-      if (prev) setSelectedIds(new Set())
-      return !prev
-    })
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
 
   const entries: GridEntry[] = useMemo(() => {
     if (isCR) {
@@ -108,6 +85,7 @@ export default function ReadingList() {
         const pageCount = item.pageCount ?? 0
         return {
           key: item.id,
+          libId: item.id,
           provider: item.provider,
           mangaId: item.mangaId,
           title: item.title,
@@ -125,12 +103,12 @@ export default function ReadingList() {
             item.chapterId && item.provider && item.mangaId
               ? `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}/read?chapter=${encodeURIComponent(item.chapterId)}`
               : `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}`,
-          libId: item.id,
         }
       })
     }
     return ((libraryQuery.data?.data ?? []) as MangaLibraryItem[]).map((item) => ({
       key: item.id,
+      libId: item.id,
       provider: item.provider,
       mangaId: item.mangaId,
       title: item.title,
@@ -142,7 +120,6 @@ export default function ReadingList() {
       progressPercent: undefined,
       progressLabel: undefined,
       detailTarget: `/manga/${item.provider}/${encodeURIComponent(item.mangaId)}`,
-      libId: item.id,
     }))
   }, [isCR, crQuery.data, libraryQuery.data])
 
@@ -150,281 +127,98 @@ export default function ReadingList() {
   const isLoading = isCR ? crQuery.isLoading : libraryQuery.isLoading
   const error = isCR ? crQuery.error : libraryQuery.error
 
-  const pageIds = entries.map((entry) => entry.libId)
-  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
-
-  const handleSelectAll = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (allSelected) {
-        for (const id of pageIds) next.delete(id)
-      } else {
-        for (const id of pageIds) next.add(id)
-      }
-      return next
-    })
-  }
-
-  const handleBulkStatus = (status: string) => {
-    if (selectedIds.size === 0) return
-    bulkUpdateStatus.mutate({ ids: [...selectedIds], status })
-    setSelectedIds(new Set())
-  }
-
-  const handleBulkAction = () => {
-    if (selectedIds.size === 0) return
-    if (isCR) {
-      bulkResetProgress.mutate([...selectedIds])
-    } else {
-      bulkRemove.mutate([...selectedIds])
-    }
-    setSelectedIds(new Set())
-  }
-
   return (
-    <div className="page-container">
-      <header className={styles.header}>
-        <h2 className={styles.title}>My Reading List</h2>
-        <p className={styles.subtitle}>Track and manage your manga collection</p>
-      </header>
-
-      <div className={styles.controls}>
-        <div className={styles.filters}>
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
-              onClick={() => navigate(`/reading-list/${f === 'All' ? '' : f}`)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.resultsHeader}>
-        <h3 className={styles.resultsTitle}>
-          {filterBy}
-          <span className={styles.itemCount}>({total} items)</span>
-        </h3>
-        <div className={styles.headerActions}>
-          <button
-            className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
-            onClick={toggleManageMode}
-          >
-            <Icon name="pencil-alt" size={13} />
-            <span>Bulk Manage</span>
-          </button>
-          {total > 0 && (
-            <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1 || isLoading}
-                aria-label="Previous page"
-              >
-                <Icon name="chevron-left" size={14} />
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                onClick={() => setPage((p) => p + 1)}
-                disabled={entries.length < PAGE_SIZE || isLoading}
-                aria-label="Next page"
-              >
-                <Icon name="chevron-right" size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {manageMode && (
-        <div className={styles.manageBar}>
-          <button className={styles.selectAllBtn} onClick={handleSelectAll}>
-            <span
-              className={`${styles.selectAllBox} ${allSelected ? styles.selectAllBoxChecked : ''}`}
-              aria-hidden="true"
-            />
-            <span>{allSelected ? 'Clear Page' : 'Select All'}</span>
-          </button>
-          <span className={styles.manageCount}>{selectedIds.size} selected</span>
-          <div className={styles.manageSpacer} />
-          {!isCR && (
-            <select
-              className={styles.manageStatusSelect}
-              value=""
-              onChange={(e) => {
-                if (e.currentTarget.value) {
-                  handleBulkStatus(e.currentTarget.value)
-                }
-              }}
-              disabled={selectedIds.size === 0}
-              title="Set status for selected items"
-            >
-              <option value="">Set status…</option>
-              {MANGA_LIBRARY_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            className={styles.manageRemoveBtn}
-            onClick={handleBulkAction}
-            disabled={selectedIds.size === 0}
-          >
-            <Icon name="trash" size={13} />
-            <span>{isCR ? 'Reset Selected' : 'Remove Selected'}</span>
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <SkeletonGrid />
-      ) : error ? (
-        <ErrorMessage message={(error as Error).message} />
-      ) : entries.length === 0 ? (
-        <div className={styles.emptyState}>
-          <h3 className={styles.emptyTitle}>Your reading list is looking a bit lonely</h3>
-          <p className={styles.emptyText}>
-            {filterBy !== 'All' ? 'No titles match this filter.' : "Let's find something to read!"}
-          </p>
-          <button className={styles.emptyBtn} onClick={() => navigate('/manga')}>
-            <Icon name="search" size={14} />
-            <span>Browse Manga</span>
-          </button>
-        </div>
-      ) : (
-        <div className={styles.grid}>
-          {entries.map((entry) => (
-            <div
-              key={entry.key}
-              className={`${styles.itemWrapper} ${selectedIds.has(entry.libId) ? styles.selected : ''}`}
-            >
-              {manageMode && (
-                <div
-                  className={styles.selectOverlay}
-                  onClick={() => toggleSelect(entry.libId)}
-                  title={selectedIds.has(entry.libId) ? 'Deselect' : 'Select'}
-                >
-                  <span className={styles.selectBadge}>
-                    {selectedIds.has(entry.libId) ? <Icon name="check" size={12} /> : null}
-                  </span>
-                </div>
-              )}
-              <MediaCard
-                item={{
-                  id: entry.libId,
-                  title: entry.title,
-                  ...mangaNameVariants({ title: entry.title, altTitle: entry.altTitle }),
-                  thumbnail: mangaCoverSrc(entry.provider, entry.cover),
-                  chapterBadge: entry.chapterLabel ?? null,
-                  isAdult: isMangaAdult(entry),
-                }}
-                linkTo={entry.detailTarget}
-                hoverIcon="book"
-                progress={
-                  entry.progressPercent !== undefined && entry.progressLabel
-                    ? { percent: entry.progressPercent, label: entry.progressLabel }
-                    : undefined
-                }
-                showProgress={isCR}
-                display={{
-                  elements: {
-                    poster: { typeBadge: false, chapterBadge: true, adultBadge: true },
-                    info: { title: true, mobileBadges: true, progress: true, meta: false },
-                  },
-                }}
-                onRemove={isCR ? () => setResetTarget(entry) : undefined}
-                onOpenDetails={(rect) => openPopup(rect, entryPopupData(entry))}
-                onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
-                rawThumbnail
-              />
-              {!isCR && !manageMode && (
-                <div className={styles.cardActions}>
-                  <select
-                    className={styles.statusSelect}
-                    value={entry.status}
-                    onChange={(e) =>
-                      updateStatus.mutate({ id: entry.libId, status: e.currentTarget.value })
-                    }
-                  >
-                    {MANGA_LIBRARY_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className={styles.removeBtn}
-                    onClick={() => removeBookmark.mutate(entry.libId)}
-                    title="Remove from Reading List"
-                    aria-label="Remove from Reading List"
-                  >
-                    <Icon name="trash" size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {total > 0 && (
-        <div className={styles.bottomPagination}>
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || isLoading}
-            >
-              <Icon name="chevron-left" size={14} />
-              <span>Previous</span>
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => p + 1)}
-              disabled={entries.length < PAGE_SIZE || isLoading}
-            >
-              <span>Next</span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {popup && popup.data.provider && (
-        <MangaPopup
-          data={popup.data}
-          anchorRect={popup.rect}
-          bookmarked={bookmarkedIds.has(mangaLibraryId(popup.data.provider, popup.data.mangaId))}
-          onToggleBookmark={() =>
-            toggle({
-              id: popup.data.mangaId,
-              provider: popup.data.provider,
-              title: popup.data.title,
-              cover: popup.data.cover,
-              altTitle: popup.data.altTitle ?? undefined,
-              contentRating: popup.data.contentRating,
-            })
+    <LibraryListPage
+      headerTitle="My Reading List"
+      headerSubtitle="Track and manage your manga collection"
+      filters={FILTERS}
+      filterBy={filterBy}
+      filterBasePath="/reading-list"
+      continueFilter="Continue Reading"
+      statusOptions={[...MANGA_LIBRARY_STATUSES]}
+      entries={entries}
+      total={total}
+      isLoading={isLoading}
+      error={error}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyTitle="Your reading list is looking a bit lonely"
+      emptyFilteredText="No titles match this filter."
+      emptyAllText="Let's find something to read!"
+      browseLabel="Browse Manga"
+      browseTarget="/manga"
+      removeListLabel="Remove from Reading List"
+      listNoun="reading list"
+      skipConfirmKey="mangaSkipRemoveConfirmation"
+      onBulkStatus={(ids, status) => bulkUpdateStatus.mutate({ ids, status })}
+      onBulkRemove={(ids) => {
+        if (isCR) bulkResetProgress.mutate(ids)
+        else bulkRemove.mutate(ids)
+      }}
+      onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+      onRemoveItem={(libId) => removeBookmark.mutate(libId)}
+      renderCard={(entry) => (
+        <MediaCard
+          item={{
+            id: entry.libId,
+            title: entry.title,
+            ...mangaNameVariants({ title: entry.title, altTitle: entry.altTitle }),
+            thumbnail: mangaCoverSrc(entry.provider, entry.cover),
+            chapterBadge: entry.chapterLabel ?? null,
+            isAdult: isMangaAdult(entry),
+          }}
+          linkTo={entry.detailTarget}
+          hoverIcon="book"
+          progress={
+            entry.progressPercent !== undefined && entry.progressLabel
+              ? { percent: entry.progressPercent, label: entry.progressLabel }
+              : undefined
           }
-          onMouseEnter={cancelClose}
-          onMouseLeave={scheduleClose}
-          onRequestClose={closePopup}
+          showProgress={isCR}
+          display={{
+            elements: {
+              poster: { typeBadge: false, chapterBadge: true, adultBadge: true },
+              info: { title: true, mobileBadges: true, progress: true, meta: false },
+            },
+          }}
+          onRemove={isCR ? () => setResetTarget(entry) : undefined}
+          onOpenDetails={(rect) => openPopup(rect, entryPopupData(entry))}
+          onPopupHoverIntent={(inside) => (inside ? cancelClose() : scheduleClose())}
+          rawThumbnail
         />
       )}
-      <MangaResetProgressModal
-        mangaId={resetTarget ? resetTarget.libId : null}
-        title={resetTarget?.title}
-        onClose={() => setResetTarget(null)}
-      />
-    </div>
+      modals={
+        <>
+          {popup && popup.data.provider && (
+            <MangaPopup
+              data={popup.data}
+              anchorRect={popup.rect}
+              bookmarked={bookmarkedIds.has(
+                mangaLibraryId(popup.data.provider, popup.data.mangaId)
+              )}
+              onToggleBookmark={() =>
+                toggle({
+                  id: popup.data.mangaId,
+                  provider: popup.data.provider,
+                  title: popup.data.title,
+                  cover: popup.data.cover,
+                  altTitle: popup.data.altTitle ?? undefined,
+                  contentRating: popup.data.contentRating,
+                })
+              }
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
+              onRequestClose={closePopup}
+            />
+          )}
+          <MangaResetProgressModal
+            mangaId={resetTarget ? resetTarget.libId : null}
+            title={resetTarget?.title}
+            onClose={() => setResetTarget(null)}
+          />
+        </>
+      }
+    />
   )
 }

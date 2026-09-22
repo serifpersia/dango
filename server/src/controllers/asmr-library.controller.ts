@@ -1,6 +1,9 @@
 import { Request, Response } from 'express'
 import logger from '../logger.js'
+import type { DatabaseWrapper } from '../db.js'
 import { performAsmrWriteTransaction } from '../sync.js'
+import { dbAll } from '../utils/db-utils.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
   buildAsmrId,
   ASMR_STATUSES,
@@ -175,10 +178,56 @@ export class AsmrLibraryController {
   getContinueListening = async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 24, 1), 100)
-      const rows = AsmrProgressRepository.getContinueListening(asmrDb(req), limit)
+      const ignoreAdultRow = await SettingsRepository.getByKey(req.db, 'asmrIgnoreAdultContent')
+      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
+      const listOnlyRow = await SettingsRepository.getByKey(req.db, 'asmrCwWatchlistOnly')
+      const listOnly = listOnlyRow
+        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
+        : false
+      const rows = AsmrProgressRepository.getContinueListening(asmrDb(req), limit).filter((row) => {
+        if (ignoreAdult && row.isAdult === 1) return false
+        if (listOnly && row.watchlistStatus !== 'Listening') return false
+        return true
+      })
       res.json({ data: rows, total: rows.length })
     } catch {
       res.json({ data: [], total: 0 })
+    }
+  }
+
+  private async getAdultNonListWorkIds(db: DatabaseWrapper): Promise<string[]> {
+    const rows = await dbAll<{ workId: string }>(
+      db,
+      `SELECT DISTINCT p.workId as workId
+       FROM asmr_progress p
+       LEFT JOIN asmr_library l ON l.id = p.workId
+       WHERE COALESCE(l.isAdult, p.isAdult) = 1
+         AND l.id IS NULL`
+    )
+    return rows.map((r) => r.workId)
+  }
+
+  getAdultContinueListeningCount = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListWorkIds(asmrDb(req))
+      res.json({ count: ids.length })
+    } catch {
+      res.json({ count: 0 })
+    }
+  }
+
+  purgeAdultContinueListening = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListWorkIds(asmrDb(req))
+      if (ids.length > 0) {
+        await performAsmrWriteTransaction(asmrDb(req), (tx) => {
+          for (const id of ids) AsmrProgressRepository.deleteByWork(tx, id)
+        })
+      }
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to purge adult ASMR progress')
+      res.status(500).json({ error: 'Failed to purge adult entries' })
     }
   }
 

@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import Icon from '../common/Icon'
-import { Button } from '../common/Button'
-import { Modal } from '../common/Modal'
+import HomeEmptyState from '../common/HomeEmptyState'
+import ResetProgressModal from '../common/ResetProgressModal'
+import SectionSelect from '../common/SectionSelect'
 import MediaSection from '../common/MediaSection'
 import MediaCard from '../common/MediaCard'
 import TvCard from './TvCard'
@@ -124,30 +124,15 @@ const TvHome: React.FC = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select
+                <SectionSelect
+                  ariaLabel="Latest type"
                   value={latestType}
-                  onChange={(e) => setLatestType(e.target.value as 'tv' | 'movie')}
-                  style={{
-                    height: '34px',
-                    padding: '0 8px',
-                    paddingRight: '1.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-primary)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    appearance: 'none',
-                    backgroundImage:
-                      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E\")",
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.5rem center',
-                  }}
-                >
-                  <option value="tv">TV Shows</option>
-                  <option value="movie">Movies</option>
-                </select>
+                  onChange={(v) => setLatestType(v as 'tv' | 'movie')}
+                  options={[
+                    { value: 'tv', label: 'TV Shows' },
+                    { value: 'movie', label: 'Movies' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -191,58 +176,25 @@ const TvHome: React.FC = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select
+                <SectionSelect
+                  ariaLabel="Trending sort"
                   value={trendingSort}
-                  onChange={(e) => setTrendingSort(e.target.value)}
-                  style={{
-                    height: '34px',
-                    padding: '0 8px',
-                    paddingRight: '1.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-primary)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    appearance: 'none',
-                    backgroundImage:
-                      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E\")",
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.5rem center',
-                  }}
-                >
-                  {TRENDING_SORT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onChange={setTrendingSort}
+                  options={TRENDING_SORT_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
+                />
+                <SectionSelect
+                  ariaLabel="Trending type"
                   value={trendingType}
-                  onChange={(e) => setTrendingType(e.target.value as 'multi' | 'tv' | 'movie')}
-                  style={{
-                    height: '34px',
-                    padding: '0 8px',
-                    paddingRight: '1.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-primary)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    appearance: 'none',
-                    backgroundImage:
-                      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E\")",
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.5rem center',
-                  }}
-                >
-                  <option value="multi">All</option>
-                  <option value="tv">TV Shows</option>
-                  <option value="movie">Movies</option>
-                </select>
+                  onChange={(v) => setTrendingType(v as 'multi' | 'tv' | 'movie')}
+                  options={[
+                    { value: 'multi', label: 'All' },
+                    { value: 'tv', label: 'TV Shows' },
+                    { value: 'movie', label: 'Movies' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -291,24 +243,12 @@ const TvHome: React.FC = () => {
         loadingSkeleton={<div className="skeleton" style={{ aspectRatio: '3 / 4' }} />}
         skeletonCount={7}
         emptyState={
-          <div className={styles.emptyState}>
-            <Icon name="tv" size={48} className={styles.emptyStateIcon} />
-            <div>
-              <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
-              <p className={styles.emptyStateText}>
-                You haven&apos;t watched anything yet. Search TV & Movies and start watching to
-                track progress.
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate('/tv-search')}
-              style={{ marginTop: '1rem' }}
-            >
-              Browse TV & Movies
-            </Button>
-          </div>
+          <HomeEmptyState
+            icon="tv"
+            text="You haven't watched anything yet. Search TV & Movies and start watching to track progress."
+            actionLabel="Browse TV & Movies"
+            onAction={() => navigate('/tv-search')}
+          />
         }
       >
         {items.map((item) => {
@@ -364,43 +304,19 @@ const TvHome: React.FC = () => {
 
       <div className={styles.tabContent}>{renderTabContent()}</div>
 
-      <Modal
+      <ResetProgressModal
         isOpen={!!resetTarget}
+        itemName={resetTarget?.title}
+        progressKind="watch"
+        listLabel="my TV watchlist"
+        alsoRemove={alsoRemoveFromWatchlist}
+        onAlsoRemoveChange={setAlsoRemoveFromWatchlist}
         onClose={() => {
           setResetTarget(null)
           setAlsoRemoveFromWatchlist(false)
         }}
-        title="Reset Progress"
-      >
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove your watch progress for &quot;{resetTarget?.title}
-            &quot;?
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={alsoRemoveFromWatchlist}
-              onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
-            />
-            Also remove from my TV watchlist
-          </label>
-        </Modal.Body>
-        <Modal.Actions>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setResetTarget(null)
-              setAlsoRemoveFromWatchlist(false)
-            }}
-          >
-            No
-          </Button>
-          <Button variant="danger" onClick={handleConfirmReset}>
-            Yes
-          </Button>
-        </Modal.Actions>
-      </Modal>
+        onConfirm={handleConfirmReset}
+      />
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import { Modal } from '../common/Modal'
-import { Button } from '../common/Button'
+import ResetProgressModal from '../common/ResetProgressModal'
 import { useRemoveMangaBookmark, useRemoveMangaProgress } from '../../hooks/useMangaLibrary'
 
 interface MangaResetProgressModalProps {
@@ -34,27 +33,16 @@ const MangaResetProgressModal: React.FC<MangaResetProgressModalProps> = ({
   }
 
   return (
-    <Modal isOpen={!!mangaId} onClose={handleClose} title="Reset Progress">
-      <Modal.Body>
-        <p>Are you sure you want to remove your reading progress for &quot;{title}&quot;?</p>
-        <label>
-          <input
-            type="checkbox"
-            checked={alsoRemoveFromList}
-            onChange={(e) => setAlsoRemoveFromList(e.target.checked)}
-          />
-          Also remove from my reading list
-        </label>
-      </Modal.Body>
-      <Modal.Actions>
-        <Button variant="secondary" onClick={handleClose}>
-          No
-        </Button>
-        <Button variant="danger" onClick={handleConfirm}>
-          Yes
-        </Button>
-      </Modal.Actions>
-    </Modal>
+    <ResetProgressModal
+      isOpen={!!mangaId}
+      itemName={title}
+      progressKind="reading"
+      listLabel="my reading list"
+      alsoRemove={alsoRemoveFromList}
+      onAlsoRemoveChange={setAlsoRemoveFromList}
+      onClose={handleClose}
+      onConfirm={handleConfirm}
+    />
   )
 }
 

@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
-import Icon from '../components/common/Icon'
-import SkeletonGrid from '../components/common/SkeletonGrid'
-import ErrorMessage from '../components/common/ErrorMessage'
+import { useParams } from 'react-router'
 import MediaCard from '../components/common/MediaCard'
-import { Modal } from '../components/common/Modal'
-import { Button } from '../components/common/Button'
+import LibraryListPage from '../components/common/LibraryListPage'
+import ResetProgressModal from '../components/common/ResetProgressModal'
 import TvPopup from '../components/tv/TvPopup'
 import { formatTime } from '../lib/utils'
 import { isTvAdult, tvWatchPath } from '../lib/tv'
@@ -22,7 +19,6 @@ import {
   type ContinueWatchingTvItem,
   type TvLibraryItem,
 } from '../hooks/useTvLibrary'
-import styles from './Watchlist.module.css'
 
 const FILTERS = ['All', 'Continue Watching', ...TV_LIBRARY_STATUSES]
 
@@ -46,10 +42,7 @@ type GridEntry = {
 
 export default function TvWatchlist() {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
-  const navigate = useNavigate()
   const [page, setPage] = useState(1)
-  const [manageMode, setManageMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [resetTarget, setResetTarget] = useState<GridEntry | null>(null)
   const [alsoRemoveFromWatchlist, setAlsoRemoveFromWatchlist] = useState(false)
 
@@ -59,7 +52,6 @@ export default function TvWatchlist() {
 
   useEffect(() => {
     setPage(1)
-    setSelectedIds(new Set())
   }, [filterBy])
 
   const isCW = filterBy === 'Continue Watching'
@@ -71,22 +63,6 @@ export default function TvWatchlist() {
   const bulkUpdateStatus = useBatchUpdateTvStatus()
   const bulkRemove = useBatchRemoveTv()
   const bulkResetProgress = useBatchRemoveTvProgress()
-
-  const toggleManageMode = () => {
-    setManageMode((prev) => {
-      if (prev) setSelectedIds(new Set())
-      return !prev
-    })
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
 
   const entries: GridEntry[] = useMemo(() => {
     if (isCW) {
@@ -142,37 +118,6 @@ export default function TvWatchlist() {
   const isLoading = isCW ? cwQuery.isLoading : libraryQuery.isLoading
   const error = isCW ? cwQuery.error : libraryQuery.error
 
-  const pageIds = entries.map((entry) => entry.libId)
-  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
-
-  const handleSelectAll = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (allSelected) {
-        for (const id of pageIds) next.delete(id)
-      } else {
-        for (const id of pageIds) next.add(id)
-      }
-      return next
-    })
-  }
-
-  const handleBulkStatus = (status: string) => {
-    if (selectedIds.size === 0) return
-    bulkUpdateStatus.mutate({ ids: [...selectedIds], status })
-    setSelectedIds(new Set())
-  }
-
-  const handleBulkAction = () => {
-    if (selectedIds.size === 0) return
-    if (isCW) {
-      bulkResetProgress.mutate([...selectedIds])
-    } else {
-      bulkRemove.mutate([...selectedIds])
-    }
-    setSelectedIds(new Set())
-  }
-
   const handleConfirmReset = () => {
     if (!resetTarget) return
     removeProgress.mutate({ mediaId: resetTarget.libId })
@@ -182,270 +127,88 @@ export default function TvWatchlist() {
   }
 
   return (
-    <div className="page-container">
-      <header className={styles.header}>
-        <h2 className={styles.title}>My TV Watchlist</h2>
-        <p className={styles.subtitle}>Track and manage your movies and shows</p>
-      </header>
-
-      <div className={styles.controls}>
-        <div className={styles.filters}>
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
-              onClick={() => navigate(`/tv-watchlist/${f === 'All' ? '' : f}`)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.resultsHeader}>
-        <h3 className={styles.resultsTitle}>
-          {filterBy}
-          <span className={styles.itemCount}>({total} items)</span>
-        </h3>
-        <div className={styles.headerActions}>
-          <button
-            className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
-            onClick={toggleManageMode}
-          >
-            <Icon name="pencil-alt" size={13} />
-            <span>Bulk Manage</span>
-          </button>
-          {total > 0 && (
-            <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1 || isLoading}
-                aria-label="Previous page"
-              >
-                <Icon name="chevron-left" size={14} />
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                onClick={() => setPage((p) => p + 1)}
-                disabled={entries.length < PAGE_SIZE || isLoading}
-                aria-label="Next page"
-              >
-                <Icon name="chevron-right" size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {manageMode && (
-        <div className={styles.manageBar}>
-          <button className={styles.selectAllBtn} onClick={handleSelectAll}>
-            <span
-              className={`${styles.selectAllBox} ${allSelected ? styles.selectAllBoxChecked : ''}`}
-              aria-hidden="true"
-            />
-            <span>{allSelected ? 'Clear Page' : 'Select All'}</span>
-          </button>
-          <span className={styles.manageCount}>{selectedIds.size} selected</span>
-          <div className={styles.manageSpacer} />
-          {!isCW && (
-            <select
-              className={styles.manageStatusSelect}
-              value=""
-              onChange={(e) => {
-                if (e.currentTarget.value) {
-                  handleBulkStatus(e.currentTarget.value)
-                }
+    <LibraryListPage
+      headerTitle="My TV Watchlist"
+      headerSubtitle="Track and manage your movies and shows"
+      filters={FILTERS}
+      filterBy={filterBy}
+      filterBasePath="/tv-watchlist"
+      continueFilter="Continue Watching"
+      statusOptions={[...TV_LIBRARY_STATUSES]}
+      entries={entries}
+      total={total}
+      isLoading={isLoading}
+      error={error}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyTitle="Your TV watchlist is looking a bit empty"
+      emptyFilteredText="No titles match this filter."
+      emptyAllText="Let's find something to watch!"
+      browseLabel="Browse TV & Movies"
+      browseTarget="/tv"
+      removeListLabel="Remove from TV Watchlist"
+      listNoun="TV watchlist"
+      skipConfirmKey="tvSkipRemoveConfirmation"
+      onBulkStatus={(ids, status) => bulkUpdateStatus.mutate({ ids, status })}
+      onBulkRemove={(ids) => {
+        if (isCW) bulkResetProgress.mutate(ids)
+        else bulkRemove.mutate(ids)
+      }}
+      onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+      onRemoveItem={(libId) => removeBookmark.mutate(libId)}
+      renderCard={(entry) => (
+        <MediaCard
+          item={{
+            id: entry.libId,
+            title: entry.title,
+            thumbnail: entry.poster,
+            typeBadge: entry.mediaType === 'movie' ? 'Movie' : 'TV',
+            chapterBadge: entry.badge ?? null,
+            isAdult: entry.adult,
+          }}
+          linkTo={entry.watchTarget}
+          hoverIcon="play"
+          progress={
+            entry.progressPercent !== undefined && entry.progressLabel
+              ? { percent: entry.progressPercent, label: entry.progressLabel }
+              : undefined
+          }
+          showProgress={isCW}
+          metaRow={entry.year ? <span style={{ opacity: 0.75 }}>{entry.year}</span> : undefined}
+          onRemove={isCW ? () => setResetTarget(entry) : undefined}
+          renderPopup={(anchorRect, helpers) => (
+            <TvPopup
+              item={{
+                id: entry.tmdbId ?? 0,
+                title: entry.title || '',
+                year: entry.year || '',
+                type: entry.mediaType || 'tv',
+                image: entry.poster || '',
               }}
-              disabled={selectedIds.size === 0}
-              title="Set status for selected items"
-            >
-              <option value="">Set status…</option>
-              {TV_LIBRARY_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            className={styles.manageRemoveBtn}
-            onClick={handleBulkAction}
-            disabled={selectedIds.size === 0}
-          >
-            <Icon name="trash" size={13} />
-            <span>{isCW ? 'Reset Selected' : 'Remove Selected'}</span>
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <SkeletonGrid />
-      ) : error ? (
-        <ErrorMessage message={(error as Error).message} />
-      ) : entries.length === 0 ? (
-        <div className={styles.emptyState}>
-          <h3 className={styles.emptyTitle}>Your TV watchlist is looking a bit empty</h3>
-          <p className={styles.emptyText}>
-            {filterBy !== 'All' ? 'No titles match this filter.' : "Let's find something to watch!"}
-          </p>
-          <button className={styles.emptyBtn} onClick={() => navigate('/tv')}>
-            <Icon name="search" size={14} />
-            <span>Browse TV & Movies</span>
-          </button>
-        </div>
-      ) : (
-        <div className={styles.grid}>
-          {entries.map((entry) => (
-            <div
-              key={entry.key}
-              className={`${styles.itemWrapper} ${selectedIds.has(entry.libId) ? styles.selected : ''}`}
-            >
-              {manageMode && (
-                <div
-                  className={styles.selectOverlay}
-                  onClick={() => toggleSelect(entry.libId)}
-                  title={selectedIds.has(entry.libId) ? 'Deselect' : 'Select'}
-                >
-                  <span className={styles.selectBadge}>
-                    {selectedIds.has(entry.libId) ? <Icon name="check" size={12} /> : null}
-                  </span>
-                </div>
-              )}
-              <MediaCard
-                item={{
-                  id: entry.libId,
-                  title: entry.title,
-                  thumbnail: entry.poster,
-                  typeBadge: entry.mediaType === 'movie' ? 'Movie' : 'TV',
-                  chapterBadge: entry.badge ?? null,
-                  isAdult: entry.adult,
-                }}
-                linkTo={entry.watchTarget}
-                hoverIcon="play"
-                progress={
-                  entry.progressPercent !== undefined && entry.progressLabel
-                    ? { percent: entry.progressPercent, label: entry.progressLabel }
-                    : undefined
-                }
-                showProgress={isCW}
-                metaRow={
-                  entry.year ? <span style={{ opacity: 0.75 }}>{entry.year}</span> : undefined
-                }
-                onRemove={isCW ? () => setResetTarget(entry) : undefined}
-                renderPopup={(anchorRect, helpers) => (
-                  <TvPopup
-                    item={{
-                      id: entry.tmdbId ?? 0,
-                      title: entry.title || '',
-                      year: entry.year || '',
-                      type: entry.mediaType || 'tv',
-                      image: entry.poster || '',
-                    }}
-                    anchorRect={anchorRect}
-                    onMouseEnter={helpers.onMouseEnter}
-                    onMouseLeave={helpers.onMouseLeave}
-                    onRequestClose={helpers.close}
-                  />
-                )}
-              />
-              {!isCW && !manageMode && (
-                <div className={styles.cardActions}>
-                  <select
-                    className={styles.statusSelect}
-                    value={entry.status}
-                    onChange={(e) =>
-                      updateStatus.mutate({ id: entry.libId, status: e.currentTarget.value })
-                    }
-                  >
-                    {TV_LIBRARY_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className={styles.removeBtn}
-                    onClick={() => removeBookmark.mutate(entry.libId)}
-                    title="Remove from TV Watchlist"
-                    aria-label="Remove from TV Watchlist"
-                  >
-                    <Icon name="trash" size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {total > 0 && (
-        <div className={styles.bottomPagination}>
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || isLoading}
-            >
-              <Icon name="chevron-left" size={14} />
-              <span>Previous</span>
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setPage((p) => p + 1)}
-              disabled={entries.length < PAGE_SIZE || isLoading}
-            >
-              <span>Next</span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <Modal
-        isOpen={!!resetTarget}
-        onClose={() => {
-          setResetTarget(null)
-          setAlsoRemoveFromWatchlist(false)
-        }}
-        title="Reset Progress"
-      >
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove your watch progress for &quot;{resetTarget?.title}
-            &quot;?
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={alsoRemoveFromWatchlist}
-              onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
+              anchorRect={anchorRect}
+              onMouseEnter={helpers.onMouseEnter}
+              onMouseLeave={helpers.onMouseLeave}
+              onRequestClose={helpers.close}
             />
-            Also remove from my TV watchlist
-          </label>
-        </Modal.Body>
-        <Modal.Actions>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setResetTarget(null)
-              setAlsoRemoveFromWatchlist(false)
-            }}
-          >
-            No
-          </Button>
-          <Button variant="danger" onClick={handleConfirmReset}>
-            Yes
-          </Button>
-        </Modal.Actions>
-      </Modal>
-    </div>
+          )}
+        />
+      )}
+      modals={
+        <ResetProgressModal
+          isOpen={!!resetTarget}
+          itemName={resetTarget?.title}
+          progressKind="watch"
+          listLabel="my TV watchlist"
+          alsoRemove={alsoRemoveFromWatchlist}
+          onAlsoRemoveChange={setAlsoRemoveFromWatchlist}
+          onClose={() => {
+            setResetTarget(null)
+            setAlsoRemoveFromWatchlist(false)
+          }}
+          onConfirm={handleConfirmReset}
+        />
+      }
+    />
   )
 }

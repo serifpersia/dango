@@ -19,6 +19,8 @@ export function createMangaLibraryRouter(): Router {
   router.post('/manga/progress', controller.saveProgress)
   router.post('/manga/progress/remove', controller.removeProgress)
   router.get('/manga/continue-reading', controller.getContinueReading)
+  router.get('/manga/continue-reading/adult-count', controller.getAdultContinueReadingCount)
+  router.post('/manga/continue-reading/purge-adult', controller.purgeAdultContinueReading)
 
   return router
 }

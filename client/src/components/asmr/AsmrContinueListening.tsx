@@ -1,13 +1,11 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router'
-import Icon from '../common/Icon'
-import { Button } from '../common/Button'
+import HomeEmptyState from '../common/HomeEmptyState'
 import MediaSection from '../common/MediaSection'
 import MediaCard from '../common/MediaCard'
 import AsmrResetProgressModal from './AsmrResetProgressModal'
 import { formatTime } from '../../lib/utils'
 import { useAsmrContinueListening, type ContinueListeningItem } from '../../hooks/useAsmrLibrary'
-import styles from '../../pages/Home.module.css'
 
 function progressLabel(item: ContinueListeningItem): string | undefined {
   const current = item.currentTime ?? 0
@@ -49,24 +47,12 @@ const AsmrContinueListening: React.FC<{
         skeletonCount={7}
         emptyState={
           showEmptyState ? (
-            <div className={styles.emptyState}>
-              <Icon name="headphones" size={48} className={styles.emptyStateIcon} />
-              <div>
-                <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
-                <p className={styles.emptyStateText}>
-                  You haven&apos;t listened to anything yet. Browse ASMR and play a track to start
-                  tracking.
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => navigate('/asmr')}
-                style={{ marginTop: '1rem' }}
-              >
-                Browse ASMR
-              </Button>
-            </div>
+            <HomeEmptyState
+              icon="headphones"
+              text="You haven't listened to anything yet. Browse ASMR and play a track to start tracking."
+              actionLabel="Browse ASMR"
+              onAction={() => navigate('/asmr')}
+            />
           ) : undefined
         }
       >

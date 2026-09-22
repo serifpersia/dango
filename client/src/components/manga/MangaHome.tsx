@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router'
-import Icon from '../common/Icon'
-import { Button } from '../common/Button'
+import HomeEmptyState from '../common/HomeEmptyState'
 import MediaSection from '../common/MediaSection'
 import MediaCard from '../common/MediaCard'
 import MangaPopup from './MangaPopup'
@@ -15,7 +14,6 @@ import {
   mangaLibraryId,
 } from '../../hooks/useMangaLibrary'
 import { useMangaPopup } from '../../hooks/useMangaPopup'
-import styles from '../../pages/Home.module.css'
 
 const MangaHome: React.FC = () => {
   const navigate = useNavigate()
@@ -44,24 +42,12 @@ const MangaHome: React.FC = () => {
         loadingSkeleton={<div className="skeleton" style={{ aspectRatio: '3 / 4' }} />}
         skeletonCount={7}
         emptyState={
-          <div className={styles.emptyState}>
-            <Icon name="book" size={48} className={styles.emptyStateIcon} />
-            <div>
-              <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
-              <p className={styles.emptyStateText}>
-                You haven&apos;t read anything yet. Browse manga and open a chapter to start
-                tracking.
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate('/manga')}
-              style={{ marginTop: '1rem' }}
-            >
-              Browse Manga
-            </Button>
-          </div>
+          <HomeEmptyState
+            icon="book"
+            text="You haven't read anything yet. Browse manga and open a chapter to start tracking."
+            actionLabel="Browse Manga"
+            onAction={() => navigate('/manga')}
+          />
         }
       >
         {items.map((item) => {

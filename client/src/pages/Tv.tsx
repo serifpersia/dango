@@ -391,6 +391,14 @@ const Tv: React.FC = () => {
     player.actions.onPlay()
   }, [player.actions])
 
+  const handleVideoPause = useCallback(() => {
+    player.actions.onPause()
+    const video = videoRef.current
+    if (video && !video.ended) {
+      saveVideoProgress(video.currentTime, video.duration || 0)
+    }
+  }, [player.actions, saveVideoProgress, videoRef])
+
   const handleVideoLoadedMetadata = useCallback(() => {
     player.actions.onLoadedMetadata()
     const video = videoRef.current
@@ -425,14 +433,22 @@ const Tv: React.FC = () => {
   }, [videoRef])
 
   useEffect(() => {
+    hasResumedRef.current = false
+    setShowResumeModal(false)
+    setResumeTime(0)
+    lastSavedTimeRef.current = 0
+  }, [mediaId, season, episode])
+
+  useEffect(() => {
     if (!savedProgress || hasResumedRef.current) return
-    const ct = 'currentTime' in savedProgress ? savedProgress.currentTime : 0
-    const dur = 'duration' in savedProgress ? savedProgress.duration : 0
+    const c = savedProgress as { currentTime?: number; duration?: number }
+    const ct = c.currentTime ?? 0
+    const dur = c.duration ?? 0
     if (ct > 10 && dur > 30 && ct < dur * 0.95) {
       setResumeTime(ct)
       setShowResumeModal(true)
     }
-  }, [savedProgress])
+  }, [savedProgress, mediaId, season, episode])
 
   useEffect(() => {
     if (showResumeModal && videoRef.current) {
@@ -444,7 +460,7 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     return () => {
       if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
-      if (video && !video.paused && !video.ended) {
+      if (video && !video.ended) {
         saveVideoProgress(video.currentTime, video.duration || 0)
       }
     }
@@ -1492,7 +1508,7 @@ const Tv: React.FC = () => {
                       if (!testClipActive) handleVideoEnded()
                     }}
                     onPlay={handleVideoPlay}
-                    onPause={player.actions.onPause}
+                    onPause={handleVideoPause}
                     onLoadedMetadata={handleVideoLoadedMetadata}
                     onVolumeChange={player.actions.onVolumeChange}
                     onError={() => {

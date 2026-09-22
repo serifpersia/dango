@@ -55,59 +55,83 @@
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(5, 5, 8, 0.7) 0%, rgba(5, 5, 8, 0.35) 45%, rgba(5, 5, 8, 0.08) 75%),
-    linear-gradient(0deg, rgba(5, 5, 8, 0.85) 0%, transparent 42%),
-    linear-gradient(180deg, rgba(5, 5, 8, 0.5) 0%, transparent 26%);
+    linear-gradient(
+      90deg,
+      rgba(5, 5, 8, 0.78) 0%,
+      rgba(5, 5, 8, 0.42) 42%,
+      rgba(5, 5, 8, 0.06) 70%
+    ),
+    linear-gradient(0deg, var(--bg-main) 0%, rgba(12, 13, 18, 0.82) 16%, transparent 46%),
+    linear-gradient(180deg, transparent 0%, transparent 72px, rgba(5, 5, 8, 0.22) 100%);
 }
 
-/* Story-style segment navigation, doubles as autoplay timer */
-.segments {
+/* Autoplay progress fused to the hero bottom edge */
+.progressLine {
   position: absolute;
-  bottom: 1.2rem;
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: min(calc(var(--max-width) - var(--space-8) * 2), calc(100% - 3rem));
-  z-index: 5;
-  display: flex;
-  gap: 0.45rem;
-  padding: 10px 0;
-}
-
-.segments i {
-  flex: 1;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.22);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  z-index: 6;
+  background: rgba(255, 255, 255, 0.1);
   overflow: hidden;
-  position: relative;
-  cursor: pointer;
 }
 
-.segments .done {
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.segments .live::after {
+.progressLine::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--accent-light);
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
   transform-origin: left;
-  animation: segmentFill 8s linear forwards;
+  animation: progressFill 8s linear forwards;
 }
 
-.paused .segments .live::after {
+.paused .progressLine::after {
   animation-play-state: paused;
 }
 
-@keyframes segmentFill {
+@keyframes progressFill {
   from {
     transform: scaleX(0);
   }
   to {
     transform: scaleX(1);
   }
+}
+
+/* Simple centered dot navigation */
+.dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0.6rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 10px 16px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.dot:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.dotActive {
+  background: var(--accent-light);
+  transform: scale(1.25);
 }
 
 /* Direction-aware slide track */
@@ -504,14 +528,6 @@
   .navArrow {
     display: none;
   }
-
-  .segments {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: calc(100% - 2rem);
-    bottom: 0.9rem;
-  }
 }
 
 @media (max-width: 1024px) {
@@ -552,13 +568,5 @@
 
   .summary {
     display: none;
-  }
-
-  .segments {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: min(300px, calc(100% - 2.5rem));
-    bottom: 0.8rem;
   }
 }

@@ -1,12 +1,18 @@
 import { Request, Response } from 'express'
 import logger from '../logger.js'
+import type { DatabaseWrapper } from '../db.js'
 import { performTvWriteTransaction } from '../sync.js'
+import { dbAll } from '../utils/db-utils.js'
+import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
   buildTvId,
   TV_STATUSES,
   TvLibraryRepository,
   TvProgressRepository,
 } from '../repositories/tv.repository.js'
+
+const isTvContinueAdult = (row: { adult?: boolean | number | null }) =>
+  row.adult === true || row.adult === 1
 
 function tvDb(req: Request) {
   const db = req.tvDb
@@ -142,7 +148,20 @@ export class TvLibraryController {
 
   getLatestProgress = async (req: Request, res: Response) => {
     try {
-      const row = TvProgressRepository.getLatest(tvDb(req), req.params.mediaId as string)
+      const db = tvDb(req)
+      const season = parseInt(req.query.season as string, 10)
+      const episode = parseInt(req.query.episode as string, 10)
+      if (Number.isFinite(season) && Number.isFinite(episode)) {
+        const row = TvProgressRepository.getEpisode(
+          db,
+          req.params.mediaId as string,
+          season,
+          episode
+        )
+        res.json(row || { currentTime: 0, duration: 0 })
+        return
+      }
+      const row = TvProgressRepository.getLatest(db, req.params.mediaId as string)
       res.json(row || { currentTime: 0, duration: 0 })
     } catch {
       res.json({ currentTime: 0, duration: 0 })
@@ -204,10 +223,56 @@ export class TvLibraryController {
   getContinueWatching = async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 24, 1), 100)
-      const rows = TvProgressRepository.getContinueWatching(tvDb(req), limit)
+      const ignoreAdultRow = await SettingsRepository.getByKey(req.db, 'tvIgnoreAdultContent')
+      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
+      const listOnlyRow = await SettingsRepository.getByKey(req.db, 'tvCwWatchlistOnly')
+      const listOnly = listOnlyRow
+        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
+        : false
+      const rows = TvProgressRepository.getContinueWatching(tvDb(req), limit).filter((row) => {
+        if (ignoreAdult && isTvContinueAdult(row)) return false
+        if (listOnly && row.watchlistStatus !== 'Watching') return false
+        return true
+      })
       res.json({ data: rows, total: rows.length })
     } catch {
       res.json({ data: [], total: 0 })
+    }
+  }
+
+  private async getAdultNonListMediaIds(db: DatabaseWrapper): Promise<string[]> {
+    const rows = await dbAll<{ mediaId: string }>(
+      db,
+      `SELECT DISTINCT p.mediaId as mediaId
+       FROM tv_progress p
+       LEFT JOIN tv_library l ON l.id = p.mediaId
+       WHERE COALESCE(l.adult, p.adult) = 1
+         AND l.id IS NULL`
+    )
+    return rows.map((r) => r.mediaId)
+  }
+
+  getAdultContinueWatchingCount = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListMediaIds(tvDb(req))
+      res.json({ count: ids.length })
+    } catch {
+      res.json({ count: 0 })
+    }
+  }
+
+  purgeAdultContinueWatching = async (req: Request, res: Response) => {
+    try {
+      const ids = await this.getAdultNonListMediaIds(tvDb(req))
+      if (ids.length > 0) {
+        await performTvWriteTransaction(tvDb(req), (tx) => {
+          for (const id of ids) TvProgressRepository.deleteByMedia(tx, id)
+        })
+      }
+      res.json({ success: true, removed: ids.length })
+    } catch (err) {
+      logger.error({ err }, 'Failed to purge adult TV progress')
+      res.status(500).json({ error: 'Failed to purge adult entries' })
     }
   }
 

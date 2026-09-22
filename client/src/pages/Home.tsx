@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import Icon from '../components/common/Icon'
-import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
 import LatestReleasesList from '../components/anime/LatestReleasesList'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import { Modal } from '../components/common/Modal'
 import SpotlightBanner from '../components/anime/SpotlightBanner'
+import { SpotlightSkeleton } from '../components/common/SpotlightBanner'
+import HomeEmptyState from '../components/common/HomeEmptyState'
+import ResetProgressModal from '../components/common/ResetProgressModal'
+import SectionSelect from '../components/common/SectionSelect'
 import QueueRail from '../components/player/QueueRail'
 import {
   usePaginatedCurrentSeason,
@@ -115,9 +117,16 @@ const Home: React.FC = () => {
   ])
 
   const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
-  const { data: tvTrending } = useTvTrending('all', 'week', 1, contentType === 'tv')
-  const { data: asmrSpotlight } = useAsmrSpotlight(contentType === 'asmr')
-  const { data: mangaTrending } = useMangaTrending()
+  const { data: tvTrending, isLoading: loadingTvSpotlight } = useTvTrending(
+    'all',
+    'week',
+    1,
+    contentType === 'tv'
+  )
+  const { data: asmrSpotlight, isLoading: loadingAsmrSpotlight } = useAsmrSpotlight(
+    contentType === 'asmr'
+  )
+  const { data: mangaTrending, isLoading: loadingMangaSpotlight } = useMangaTrending()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
@@ -194,36 +203,20 @@ const Home: React.FC = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select
-                  style={{
-                    width: '90px',
-                    height: '34px',
-                    padding: '0 8px',
-                    paddingRight: '1.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-primary)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    appearance: 'none',
-                    WebkitAppearance: 'none',
-                    backgroundImage:
-                      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E\")",
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.5rem center',
-                  }}
+                <SectionSelect
+                  ariaLabel="Season format"
+                  width={90}
                   value={seasonFormat}
-                  onChange={(e) => setSeasonFormat(e.currentTarget.value)}
-                >
-                  <option value="TV">TV</option>
-                  <option value="ONA">ONA</option>
-                  <option value="OVA">OVA</option>
-                  <option value="MOVIE">Movie</option>
-                  <option value="ALL">All</option>
-                  <option value="ADULT">Mature</option>
-                </select>
+                  onChange={setSeasonFormat}
+                  options={[
+                    { value: 'TV', label: 'TV' },
+                    { value: 'ONA', label: 'ONA' },
+                    { value: 'OVA', label: 'OVA' },
+                    { value: 'MOVIE', label: 'Movie' },
+                    { value: 'ALL', label: 'All' },
+                    { value: 'ADULT', label: 'Mature' },
+                  ]}
+                />
                 <div className={styles['pagination-controls']}>
                   <button
                     className={styles['nav-button']}
@@ -303,36 +296,33 @@ const Home: React.FC = () => {
     <div style={{ paddingBottom: '2rem' }}>
       {contentType === 'anime' &&
         (loadingSpotlight && !spotlightAnime?.length ? (
-          <div
-            className="skeleton"
-            style={{
-              width: '100vw',
-              maxWidth: '100vw',
-              position: 'relative',
-              left: '50%',
-              right: '50%',
-              marginLeft: '-50vw',
-              marginRight: '-50vw',
-              height: 'clamp(480px, 72vh, 660px)',
-              marginTop: 'calc(-1 * var(--header-height))',
-              marginBottom: '2.5rem',
-            }}
-          />
+          <SpotlightSkeleton />
         ) : (
           <SpotlightBanner animeList={spotlightAnime || []} />
         ))}
 
-      {contentType === 'tv' && tvTrending?.results && tvTrending.results.length > 0 && (
-        <TvSpotlightBanner items={tvTrending.results} />
-      )}
+      {contentType === 'tv' &&
+        (loadingTvSpotlight && !tvTrending?.results?.length ? (
+          <SpotlightSkeleton />
+        ) : (
+          tvTrending?.results &&
+          tvTrending.results.length > 0 && <TvSpotlightBanner items={tvTrending.results} />
+        ))}
 
-      {contentType === 'manga' && mangaTrending && mangaTrending.length > 0 && (
-        <MangaSpotlightBanner mangaList={mangaTrending} />
-      )}
+      {contentType === 'manga' &&
+        (loadingMangaSpotlight && !mangaTrending?.length ? (
+          <SpotlightSkeleton />
+        ) : (
+          mangaTrending &&
+          mangaTrending.length > 0 && <MangaSpotlightBanner mangaList={mangaTrending} />
+        ))}
 
-      {contentType === 'asmr' && asmrSpotlight && asmrSpotlight.length > 0 && (
-        <AsmrSpotlightBanner works={asmrSpotlight} />
-      )}
+      {contentType === 'asmr' &&
+        (loadingAsmrSpotlight && !asmrSpotlight?.length ? (
+          <SpotlightSkeleton />
+        ) : (
+          asmrSpotlight && asmrSpotlight.length > 0 && <AsmrSpotlightBanner works={asmrSpotlight} />
+        ))}
 
       <OptionTabs
         ariaLabel="Content type"
@@ -364,24 +354,12 @@ const Home: React.FC = () => {
             scrollThreshold={0.7}
             isFetchingNextPage={fetchingMoreContinueWatching}
             emptyState={
-              <div className={styles.emptyState}>
-                <Icon name="history" size={48} className={styles.emptyStateIcon} />
-                <div>
-                  <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
-                  <p className={styles.emptyStateText}>
-                    You haven&apos;t watched anything yet. Start exploring and watch something
-                    first!
-                  </p>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setActiveTab('popular')}
-                  style={{ marginTop: '1rem' }}
-                >
-                  Explore Trending
-                </Button>
-              </div>
+              <HomeEmptyState
+                icon="history"
+                text="You haven't watched anything yet. Start exploring and watch something first!"
+                actionLabel="Explore Trending"
+                onAction={() => setActiveTab('popular')}
+              />
             }
           />
 
@@ -416,43 +394,19 @@ const Home: React.FC = () => {
 
           <Schedule eyebrow="Never miss an episode" />
 
-          <Modal
+          <ResetProgressModal
             isOpen={!!itemToRemove}
+            itemName={itemToRemove?.name}
+            progressKind="watch"
+            listLabel="my watchlist"
+            alsoRemove={alsoRemoveFromWatchlist}
+            onAlsoRemoveChange={setAlsoRemoveFromWatchlist}
             onClose={() => {
               setItemToRemove(null)
               setAlsoRemoveFromWatchlist(false)
             }}
-            title="Reset Progress"
-          >
-            <Modal.Body>
-              <p>
-                Are you sure you want to remove your watch progress for &quot;{itemToRemove?.name}
-                &quot;?
-              </p>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={alsoRemoveFromWatchlist}
-                  onChange={(e) => setAlsoRemoveFromWatchlist(e.target.checked)}
-                />
-                Also remove from my watchlist
-              </label>
-            </Modal.Body>
-            <Modal.Actions>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setItemToRemove(null)
-                  setAlsoRemoveFromWatchlist(false)
-                }}
-              >
-                No
-              </Button>
-              <Button variant="danger" onClick={handleConfirmRemove}>
-                Yes
-              </Button>
-            </Modal.Actions>
-          </Modal>
+            onConfirm={handleConfirmRemove}
+          />
         </>
       )}
     </div>

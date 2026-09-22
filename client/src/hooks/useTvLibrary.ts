@@ -105,7 +105,15 @@ export const useTvProgress = (mediaId?: string) => {
 export const useTvLatestProgress = (mediaId?: string, season?: number, episode?: number) => {
   return useQuery<TvProgressItem | { currentTime: number; duration: number }>({
     queryKey: ['tv-progress-latest', mediaId, season, episode],
-    queryFn: () => fetchApi(`/api/tv/progress/${encodeURIComponent(mediaId || '')}/latest`),
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (season !== undefined) params.set('season', String(season))
+      if (episode !== undefined) params.set('episode', String(episode))
+      const qs = params.toString()
+      return fetchApi(
+        `/api/tv/progress/${encodeURIComponent(mediaId || '')}/latest${qs ? `?${qs}` : ''}`
+      )
+    },
     enabled: !!mediaId,
     staleTime: 0,
   })
