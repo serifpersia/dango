@@ -864,43 +864,77 @@ async function fetchAnilistMedia(
 
 export async function getSpotlightBanners(page: number = 1, perPage: number = 20): Promise<Show[]> {
   const media = await fetchAnilistMedia(page, perPage)
-  let source = media ?? null
 
-  if (!source) {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
-    const currentSeason =
-      month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
-    source = await tryFallback<AnilistMedia>(
-      () => malTop(malCacheStore(), 'airing', 1),
-      () => kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
-    )
-    if (!source || source.length === 0) {
-      return []
+  if (media) {
+    const withBanner: Show[] = []
+    const rest: Show[] = []
+    for (const m of media) {
+      if (withBanner.length >= 6 && rest.length >= 6) break
+      const show = fromAnilistMedia(m)
+      if (show.bannerImage) {
+        if (withBanner.length < 6) withBanner.push(show)
+      } else if (rest.length < 6) {
+        rest.push(show)
+      }
     }
-    source = [...source].sort(() => Math.random() - 0.5)
+    const results = [...withBanner]
+    for (const show of rest) {
+      if (results.length >= 6) break
+      if (show.thumbnail) results.push({ ...show, bannerImage: show.thumbnail })
+    }
+    return results
   }
 
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const currentSeason =
+    month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
+  const source = await tryFallback<AnilistMedia>(
+    () => malTop(malCacheStore(), 'airing', 1),
+    () => kitsuSeasonal(currentSeason, year, 'TV', 1, 20)
+  )
+  if (!source || source.length === 0) {
+    return []
+  }
+
+  const withTimeout = <T>(p: Promise<T>, ms = 4000): Promise<T | null> =>
+    Promise.race([
+      p,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+    ]) as Promise<T | null>
+
+  const shuffled = [...source].sort(() => Math.random() - 0.5)
+  const enriched = await Promise.allSettled(
+    shuffled.slice(0, 10).map((m) =>
+      withTimeout(
+        findTmdbDefaultBackdrop({
+          english: m.title?.english,
+          romaji: m.title?.romaji,
+          native: m.title?.native,
+        })
+      ).then((artwork) => ({ m, artwork }))
+    )
+  )
   const results: Show[] = []
-  for (const m of source) {
+  for (const r of enriched) {
     if (results.length >= 6) break
-    const show = fromAnilistMedia(m)
-    if (show.bannerImage) {
-      results.push(show)
-      continue
-    }
-    const artwork = await findTmdbDefaultBackdrop({
-      english: m.title?.english,
-      romaji: m.title?.romaji,
-      native: m.title?.native,
+    if (r.status !== 'fulfilled' || !r.value?.artwork) continue
+    const show = fromAnilistMedia(r.value.m)
+    results.push({
+      ...show,
+      bannerImage: r.value.artwork.backdrop,
+      description: show.description || r.value.artwork.overview || '',
     })
-    if (artwork) {
-      results.push({
-        ...show,
-        bannerImage: artwork.backdrop,
-        description: show.description || artwork.overview || '',
-      })
+  }
+  if (results.length < 6) {
+    const seen = new Set(results.map((s) => s._id))
+    for (const m of shuffled) {
+      if (results.length >= 6) break
+      const show = fromAnilistMedia(m)
+      if (seen.has(show._id) || !show.thumbnail) continue
+      seen.add(show._id)
+      results.push({ ...show, bannerImage: show.thumbnail })
     }
   }
   return results

@@ -298,7 +298,8 @@ const Home: React.FC = () => {
         (loadingSpotlight && !spotlightAnime?.length ? (
           <SpotlightSkeleton />
         ) : (
-          <SpotlightBanner animeList={spotlightAnime || []} />
+          spotlightAnime &&
+          spotlightAnime.length > 0 && <SpotlightBanner animeList={spotlightAnime} />
         ))}
 
       {contentType === 'tv' &&
