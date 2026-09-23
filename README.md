@@ -28,7 +28,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 - **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
 - **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
 - **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
-- **Expanded Media Hub:** Dedicated interfaces for Manga, ASMR, Internet Radio and TV/Movies.
+- **Expanded Media Hub:** Dedicated interfaces for Manga, ASMR, Youtube Music, Internet Radio and TV/Movies.
 - **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
 
 ---

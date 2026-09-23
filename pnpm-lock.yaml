@@ -49,6 +49,9 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.21.3
+      youtubei.js:
+        specifier: ^18.1.0
+        version: 18.1.0
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -162,6 +165,9 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.21.3
+      youtubei.js:
+        specifier: ^18.1.0
+        version: 18.1.0
     devDependencies:
       '@types/compression':
         specifier: ^1.8.1
@@ -368,6 +374,12 @@ packages:
         integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==,
       }
     hasBin: true
+
+  '@bufbuild/protobuf@2.15.0':
+    resolution:
+      {
+        integrity: sha512-DAheWUkVr/SJTWCc+lg9dhY0eN4SaWlf4+bG1KzHeXbnqt0AfB/NX0Z+VunGlM1ki1B4zVvye27MpKh/svySUA==,
+      }
 
   '@cacheable/memory@2.2.0':
     resolution:
@@ -2491,6 +2503,12 @@ packages:
       picomatch:
         optional: true
 
+  fflate@0.8.3:
+    resolution:
+      {
+        integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==,
+      }
+
   file-entry-cache@11.1.5:
     resolution:
       {
@@ -3027,6 +3045,13 @@ packages:
         integrity: sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g==,
       }
     engines: { node: '>=18' }
+
+  meriyah@7.3.3:
+    resolution:
+      {
+        integrity: sha512-uE5cnoNj+UYhoMdZDuymCzr5TzEuE3ZF2C4kn6Z76rLhkwnvZ/+6dUZnM41T3fifyuhW0+n8vK7eq6DKJxUfPA==,
+      }
+    engines: { node: '>=20.0.0' }
 
   mime-db@1.52.0:
     resolution:
@@ -4190,6 +4215,12 @@ packages:
       }
     engines: { node: '>=10' }
 
+  youtubei.js@18.1.0:
+    resolution:
+      {
+        integrity: sha512-4Goo3ZeO6/kE8Mq67eC8Z9K1rijeqRwyKxf/YM4lqf8bB4r/s8JC0V3YFx7+l/AJR3LnAsulTsiIj+AFe0cduA==,
+      }
+
   zimmerframe@1.1.5:
     resolution:
       {
@@ -4362,6 +4393,8 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
     optional: true
+
+  '@bufbuild/protobuf@2.15.0': {}
 
   '@cacheable/memory@2.2.0':
     dependencies:
@@ -5612,6 +5645,8 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.7
 
+  fflate@0.8.3: {}
+
   file-entry-cache@11.1.5:
     dependencies:
       flat-cache: 6.1.23
@@ -5912,6 +5947,8 @@ snapshots:
   media-typer@1.1.1: {}
 
   merge-descriptors@2.0.0: {}
+
+  meriyah@7.3.3: {}
 
   mime-db@1.52.0: {}
 
@@ -6561,6 +6598,12 @@ snapshots:
   yallist@3.1.1: {}
 
   yocto-queue@0.1.0: {}
+
+  youtubei.js@18.1.0:
+    dependencies:
+      '@bufbuild/protobuf': 2.15.0
+      fflate: 0.8.3
+      meriyah: 7.3.3
 
   zimmerframe@1.1.5: {}
 

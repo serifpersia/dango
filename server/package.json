@@ -27,7 +27,8 @@
     "lru-cache": "^11.5.2",
     "multer": "^2.0.2",
     "pino": "^10.3.1",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "youtubei.js": "^18.1.0"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",

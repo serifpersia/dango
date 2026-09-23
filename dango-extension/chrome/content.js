@@ -17,3 +17,4 @@ const bridge = (getEvent, replyEvent, type) => {
 
 bridge('dango:get-pahe-cookie', 'dango:pahe-cookie', 'GET_PAHE_COOKIE')
 bridge('dango:get-jasmr-cookie', 'dango:jasmr-cookie', 'GET_JASMR_COOKIE')
+bridge('dango:get-ytmusic-cookie', 'dango:ytmusic-cookie', 'GET_YTMUSIC_COOKIE')
