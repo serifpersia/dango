@@ -44,6 +44,13 @@ export function buildTvId(mediaType: string, tmdbId: number | string): string {
   return `${t}:${tmdbId}`
 }
 
+export function normalizeTvMediaId(raw: unknown): string {
+  const s = String(raw ?? '').trim()
+  const m = /^(movie|tv)[:-](\d+)$/i.exec(s)
+  if (m) return `${m[1].toLowerCase()}:${m[2]}`
+  return s
+}
+
 export const TvLibraryRepository = {
   getById: (db: DatabaseWrapper, id: string) =>
     dbGet<TvLibraryRow>(db, 'SELECT * FROM tv_library WHERE id = ?', [id]),
@@ -263,8 +270,8 @@ export const TvProgressRepository = {
     return dbAll<TvLibraryRow & Partial<TvProgressRow>>(
       db,
       `SELECT p.mediaId as id,
-              COALESCE(l.tmdbId, p.tmdbId, CAST(SUBSTR(p.mediaId, INSTR(p.mediaId, '-') + 1) AS INTEGER)) as tmdbId,
-              COALESCE(l.mediaType, p.mediaType, SUBSTR(p.mediaId, 1, INSTR(p.mediaId, '-') - 1)) as mediaType,
+              COALESCE(l.tmdbId, p.tmdbId, CAST(SUBSTR(REPLACE(p.mediaId, '-', ':'), INSTR(REPLACE(p.mediaId, '-', ':'), ':') + 1) AS INTEGER)) as tmdbId,
+              COALESCE(l.mediaType, p.mediaType, SUBSTR(REPLACE(p.mediaId, '-', ':'), 1, INSTR(REPLACE(p.mediaId, '-', ':'), ':') - 1)) as mediaType,
               COALESCE(l.title, p.title) as title, COALESCE(l.poster, p.poster) as poster, COALESCE(l.backdrop, p.backdrop) as backdrop,
               COALESCE(l.year, p.year) as year, COALESCE(l.overview, p.overview) as overview,
               l.status as watchlistStatus, COALESCE(l.adult, p.adult) as adult,

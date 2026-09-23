@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Icon from '../common/Icon'
 import styles from './TvPlayerControls.module.css'
 import CenterControls from '../player/CenterControls'
+import UnifiedVideoShell from '../player/UnifiedVideoShell'
+import UnifiedVolumeControl from '../player/UnifiedVolumeControl'
 import { formatTime } from '../../lib/utils'
 import { pickSubtitleIndex } from '../../lib/subtitles'
 import SeekBar from '../player/SeekBar'
-import VolumeControl from '../player/VolumeControl'
 import SettingsShell from '../player/SettingsShell'
 import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
 import AvSyncMenu from '../player/AvSyncMenu'
 import AudioTrackMenu from '../player/AudioTrackMenu'
 import OptionListMenu from '../player/OptionListMenu'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
-import { buildCueCss, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
+import { buildCueCss, fitSubtitleSize, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
 
 type SettingsView =
   'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
@@ -81,6 +82,17 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   } = state
   const [settingsView, setSettingsView] = useState<SettingsView>(null)
   const timeLabelRef = useRef<HTMLSpanElement>(null)
+  const [videoBoxH, setVideoBoxH] = useState(0)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const update = () => setVideoBoxH(video.clientHeight || 0)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [videoRef, streams])
   const persistSubtitleSetting = (key: string, value: string | number | boolean) => {
     try {
       localStorage.setItem(key, String(value))
@@ -134,10 +146,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         break
     }
   }
-  const lastInteractionTimeRef = useRef(0)
-  const rafIdRef = useRef<number | null>(null)
-  const controlsRef = useRef<HTMLDivElement>(null)
-  const containerRef = refs.playerContainerRef
 
   useEffect(() => {
     const styleId = 'tv-player-subtitle-style'
@@ -157,9 +165,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       edge: subtitleEdge,
       bold: subtitleBold,
     }
-    styleTag.textContent = buildCueCss(subtitleStyle)
-
     const video = videoRef.current
+    const fittedSize = fitSubtitleSize(subtitleFontSize, videoBoxH || video?.clientHeight || 720)
+    styleTag.textContent = buildCueCss({ ...subtitleStyle, fontSize: fittedSize })
+
     if (video) {
       const getLift = () => {
         const raw = Number(subtitlePosition)
@@ -177,7 +186,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       }
 
       const cueMetrics = () => {
-        const px = (isNaN(subtitleFontSize) ? 1.8 : subtitleFontSize) * 16
+        const px = fittedSize * 16
         const h = video.videoHeight || video.clientHeight || 720
         const w = video.videoWidth || video.clientWidth || 1280
         return { step: ((px * 1.3) / h) * 100, chars: Math.max(20, Math.floor(w / (px * 0.55))) }
@@ -250,97 +259,8 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     selectedSubtitle,
     subtitles,
     videoRef,
+    videoBoxH,
   ])
-
-  const handleUserActivity = useCallback(
-    (e: MouseEvent | TouchEvent) => {
-      const container = containerRef.current
-      if (!container) return
-
-      const interactionDelay = e.type === 'touchstart' ? 800 : 500
-      if (Date.now() - lastInteractionTimeRef.current < interactionDelay) return
-
-      if (rafIdRef.current === null) {
-        rafIdRef.current = requestAnimationFrame(() => {
-          actions.setShowControls(true)
-          container.style.cursor = 'default'
-
-          if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
-
-          if (state.isPlaying && !settingsView && !state.isScrubbing) {
-            actions.inactivityTimer.current = window.setTimeout(() => {
-              actions.setShowControls(false)
-              if (state.isFullscreen) {
-                container.style.cursor = 'none'
-              }
-            }, 3000)
-          }
-          rafIdRef.current = null
-        })
-      }
-    },
-    [state.isPlaying, state.isFullscreen, state.isScrubbing, settingsView, actions, containerRef]
-  )
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    container.addEventListener('mousemove', handleUserActivity)
-    const handleTouch = (e: TouchEvent) => handleUserActivity(e)
-    container.addEventListener('touchstart', handleTouch, { passive: true })
-
-    const handleMouseLeave = () => {
-      actions.setShowControls(false)
-    }
-    container.addEventListener('mouseleave', handleMouseLeave)
-
-    return () => {
-      container.removeEventListener('mousemove', handleUserActivity)
-      container.removeEventListener('touchstart', handleTouch)
-      container.removeEventListener('mouseleave', handleMouseLeave)
-    }
-  }, [handleUserActivity, actions, containerRef])
-
-  useEffect(() => {
-    if (state.isScrubbing || settingsView) {
-      actions.setShowControls(true)
-      if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
-    }
-  }, [state.isScrubbing, settingsView, actions])
-
-  useEffect(() => {
-    return () => {
-      if (actions.inactivityTimer.current) clearTimeout(actions.inactivityTimer.current)
-      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
-    }
-  }, [actions])
-
-  const isOverUi = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    return !!target.closest(
-      `.${styles.topControls}, .${styles.bottomControls}, .${styles.settingsPanel}`
-    )
-  }
-
-  const handleContainerClick = (e: React.MouseEvent) => {
-    if (isOverUi(e)) return
-
-    const isHiding = state.showControls
-    actions.setShowControls(!state.showControls)
-    if (isHiding) lastInteractionTimeRef.current = Date.now()
-  }
-
-  const handleStageDoubleClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (
-      target.closest(
-        `button, input, select, textarea, a, [role="button"], .${styles.topControls}, .${styles.bottomControls}, .${styles.settingsPanel}`
-      )
-    )
-      return
-    actions.toggleFullscreen()
-  }
 
   const handleSeek = (percent: number) => {
     const video = videoRef.current
@@ -536,164 +456,179 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     />
   )
 
-  return (
-    <div
-      ref={containerRef}
-      className={`${styles.container} ${state.isFullscreen ? styles.fullscreenFlat : ''}`}
-      onClick={handleContainerClick}
-      onDoubleClick={handleStageDoubleClick}
-    >
-      {children}
-      {state.isSpeedBoostActive && (
-        <div className={styles.speedBoostBadge} aria-hidden="true">
-          <span>2x</span>
-          <Icon name="forward" size={12} />
-        </div>
-      )}
-      <div
-        ref={controlsRef}
-        className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
-        data-speed-boost-ignore="true"
-      >
-        <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
-          <button className={styles.backBtn} onClick={onBack} title="Back" aria-label="Back">
-            <Icon name="chevron-left" />
-          </button>
-          <div className={styles.videoTitleInfo}>
-            <span className={styles.animeTitle}>{title}</span>
-            {episodeLabel && <span className={styles.episodeLabel}>{episodeLabel}</span>}
-          </div>
-        </div>
+  const volumeIcon = state.isMuted ? (
+    <Icon name="volume-mute" />
+  ) : state.volume < 0.5 ? (
+    <Icon name="volume-down" />
+  ) : (
+    <Icon name="volume-up" />
+  )
 
-        <CenterControls
-          isPlaying={state.isPlaying}
-          onTogglePlay={actions.togglePlay}
-          onSkipBack={() => actions.seek(-10)}
-          onSkipForward={() => actions.seek(10)}
+  const topBar = (
+    <div
+      className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
+      data-speed-boost-ignore="true"
+      style={{ pointerEvents: 'none', background: 'none' }}
+    >
+      <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
+        <button className={styles.backBtn} onClick={onBack} title="Back" aria-label="Back">
+          <Icon name="chevron-left" />
+        </button>
+        <div className={styles.videoTitleInfo}>
+          <span className={styles.animeTitle}>{title}</span>
+          {episodeLabel && <span className={styles.episodeLabel}>{episodeLabel}</span>}
+        </div>
+      </div>
+    </div>
+  )
+
+  const center = (
+    <CenterControls
+      isPlaying={state.isPlaying}
+      onTogglePlay={actions.togglePlay}
+      onSkipBack={() => actions.seek(-10)}
+      onSkipForward={() => actions.seek(10)}
+    />
+  )
+
+  const bottomBar = (
+    <div
+      className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
+      data-speed-boost-ignore="true"
+      style={{ pointerEvents: 'none', background: 'none', justifyContent: 'flex-end' }}
+    >
+      <div className={styles.bottomControls} onClick={(e) => e.stopPropagation()}>
+        <SeekBar
+          classes={{
+            container: styles.progressBarContainer,
+            scrubbing: styles.scrubbing,
+            timeBubble: styles.timeBubble,
+            bar: styles.progressBar,
+            buffered: styles.bufferedBar,
+            watched: styles.watchedBar,
+            thumb: styles.thumb,
+          }}
+          videoRef={videoRef}
+          duration={state.duration}
+          formatTime={formatTime}
+          isScrubbing={state.isScrubbing}
+          buffered="full"
+          onSeek={handleSeek}
+          onScrubStart={handleScrubStart}
+          onScrubMove={handleScrubMove}
+          onScrubEnd={handleScrubEnd}
+          timeLabelRef={timeLabelRef}
         />
 
-        <div className={styles.bottomControls} onClick={(e) => e.stopPropagation()}>
-          <SeekBar
-            classes={{
-              container: styles.progressBarContainer,
-              scrubbing: styles.scrubbing,
-              timeBubble: styles.timeBubble,
-              bar: styles.progressBar,
-              buffered: styles.bufferedBar,
-              watched: styles.watchedBar,
-              thumb: styles.thumb,
-            }}
-            videoRef={videoRef}
-            duration={state.duration}
-            formatTime={formatTime}
-            isScrubbing={state.isScrubbing}
-            buffered="full"
-            onSeek={handleSeek}
-            onScrubStart={handleScrubStart}
-            onScrubMove={handleScrubMove}
-            onScrubEnd={handleScrubEnd}
-            timeLabelRef={timeLabelRef}
-          />
+        <div className={styles.bottomControlsRow}>
+          <div className={styles.leftControls}>
+            <button
+              className={styles.controlBtn}
+              onClick={actions.togglePlay}
+              aria-label={state.isPlaying ? 'Pause' : 'Play'}
+            >
+              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
+            </button>
+            <UnifiedVolumeControl
+              muted={state.isMuted}
+              volume={state.volume}
+              volumeIcon={volumeIcon}
+              buttonClassName={styles.controlBtn}
+              onToggleMute={toggleMute}
+              onVolumeChange={handleVolumeChange}
+              onExpandedChange={(v) => actions.setShowVolumeSlider(v)}
+            />
+            <span className={styles.timeDisplay} ref={timeLabelRef}>
+              {formatTime(0)} / {formatTime(state.duration)}
+            </span>
+          </div>
 
-          <div className={styles.bottomControlsRow}>
-            <div className={styles.leftControls}>
+          <div className={styles.rightControls}>
+            {hasSubtitles && (
               <button
-                className={styles.controlBtn}
-                onClick={actions.togglePlay}
-                aria-label={state.isPlaying ? 'Pause' : 'Play'}
+                className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
+                onClick={toggleSubtitles}
+                aria-label={isSubtitleActive ? 'Turn subtitles off' : 'Turn subtitles on'}
               >
-                {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
+                <Icon name="closed-captioning" />
               </button>
-              <VolumeControl
-                classes={{
-                  container: styles.volumeContainer,
-                  button: styles.controlBtn,
-                  slider: styles.volumeSlider,
-                }}
-                muted={state.isMuted}
-                volume={state.volume}
-                volumeIcon={
-                  state.isMuted ? (
-                    <Icon name="volume-mute" />
-                  ) : state.volume < 0.5 ? (
-                    <Icon name="volume-down" />
-                  ) : (
-                    <Icon name="volume-up" />
-                  )
-                }
-                onToggleMute={toggleMute}
-                onVolumeChange={handleVolumeChange}
-              />
-              <span className={styles.timeDisplay} ref={timeLabelRef}>
-                {formatTime(0)} / {formatTime(state.duration)}
-              </span>
-            </div>
-
-            <div className={styles.rightControls}>
-              {hasSubtitles && (
-                <button
-                  className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
-                  onClick={toggleSubtitles}
-                  aria-label={isSubtitleActive ? 'Turn subtitles off' : 'Turn subtitles on'}
-                >
-                  <Icon name="closed-captioning" />
-                </button>
-              )}
-              <button
-                className={`${styles.controlBtn} ${settingsView ? styles.active : ''}`}
-                onClick={() => (settingsView ? closeSettings() : openSettings())}
-                aria-label="Settings"
-              >
-                <Icon name="cog" />
-              </button>
-              <button
-                className={styles.controlBtn}
-                onClick={actions.toggleFullscreen}
-                aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              >
-                {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
-              </button>
-            </div>
+            )}
+            <button
+              className={`${styles.controlBtn} ${settingsView ? styles.active : ''}`}
+              onClick={() => (settingsView ? closeSettings() : openSettings())}
+              aria-label="Settings"
+            >
+              <Icon name="cog" />
+            </button>
+            <button
+              className={styles.controlBtn}
+              onClick={actions.toggleFullscreen}
+              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
+            </button>
           </div>
         </div>
       </div>
-
-      {settingsView && (
-        <div data-speed-boost-ignore="true" onClick={(e) => e.stopPropagation()}>
-          <SettingsShell
-            classes={{
-              panel: styles.settingsPanel,
-              header: styles.settingsHeader,
-              backBtn: styles.settingsBackBtn,
-              title: styles.settingsTitle,
-              content: styles.settingsContent,
-            }}
-            title={
-              settingsView === 'main'
-                ? 'Settings'
-                : settingsView === 'subtitle-style'
-                  ? 'Subtitle Style'
-                  : settingsView === 'audio'
-                    ? 'Audio Track'
-                    : settingsView === 'server'
-                      ? 'Movy Server'
-                      : settingsView === 'av-sync'
-                        ? 'A/V Sync'
-                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
-            }
-            onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
-          >
-            {settingsView === 'main' && renderMainSettings()}
-            {settingsView === 'quality' && renderQualitySettings()}
-            {settingsView === 'subtitles' && renderSubtitleSettings()}
-            {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
-            {settingsView === 'audio' && renderAudioSettings()}
-            {settingsView === 'server' && renderServerSettings()}
-            {settingsView === 'av-sync' && renderAvSyncSettings()}
-          </SettingsShell>
-        </div>
-      )}
     </div>
+  )
+
+  const settingsNode = settingsView ? (
+    <div data-speed-boost-ignore="true" onClick={(e) => e.stopPropagation()}>
+      <SettingsShell
+        classes={{
+          panel: styles.settingsPanel,
+          header: styles.settingsHeader,
+          backBtn: styles.settingsBackBtn,
+          title: styles.settingsTitle,
+          content: styles.settingsContent,
+        }}
+        title={
+          settingsView === 'main'
+            ? 'Settings'
+            : settingsView === 'subtitle-style'
+              ? 'Subtitle Style'
+              : settingsView === 'audio'
+                ? 'Audio Track'
+                : settingsView === 'server'
+                  ? 'Movy Server'
+                  : settingsView === 'av-sync'
+                    ? 'A/V Sync'
+                    : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
+        }
+        onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
+      >
+        {settingsView === 'main' && renderMainSettings()}
+        {settingsView === 'quality' && renderQualitySettings()}
+        {settingsView === 'subtitles' && renderSubtitleSettings()}
+        {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
+        {settingsView === 'audio' && renderAudioSettings()}
+        {settingsView === 'server' && renderServerSettings()}
+        {settingsView === 'av-sync' && renderAvSyncSettings()}
+      </SettingsShell>
+    </div>
+  ) : null
+
+  const overlays = state.isSpeedBoostActive ? (
+    <div className={styles.speedBoostBadge} aria-hidden="true">
+      <span>2x</span>
+      <Icon name="forward" size={12} />
+    </div>
+  ) : null
+
+  return (
+    <UnifiedVideoShell
+      player={player}
+      topBar={topBar}
+      centerControls={center}
+      bottomBar={bottomBar}
+      settingsPanel={settingsNode}
+      overlays={overlays}
+      isInteracting={!!settingsView}
+      className={state.isFullscreen ? styles.fullscreenFlat : ''}
+    >
+      {children}
+    </UnifiedVideoShell>
   )
 }
 

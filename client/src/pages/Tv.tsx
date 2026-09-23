@@ -20,13 +20,16 @@ import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
 import {
   buildOverlayCss,
+  fitSubtitleSize,
   renderCueHtml,
   stripCueTags,
+  subtitleBottomPx,
   type SubtitleStyleSettings,
 } from '../lib/subtitleStyle'
 import useDelayCanvas from '../hooks/useDelayCanvas'
 import useIsMobile from '../hooks/useIsMobile'
 import useVideoPlayer from '../hooks/useVideoPlayer'
+import useAutoRotateFullscreen from '../hooks/useAutoRotateFullscreen'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import EpisodeList, { type EpisodeListItem } from '../components/player/EpisodeList'
 import EpisodeListSkeleton from '../components/player/EpisodeListSkeleton'
@@ -172,6 +175,7 @@ const Tv: React.FC = () => {
   }, [selectedSubtitle])
   const player = useVideoPlayer({ skipIntervals: [] })
   const videoRef = player.refs.videoRef
+  useAutoRotateFullscreen(player, streams.length > 0 || iframeUrl !== '')
   const hlsRef = useRef<Hls | null>(null)
   const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -266,8 +270,8 @@ const Tv: React.FC = () => {
 
   const isMovie = typeParam === 'movie'
 
-  const mediaId = id ? `${typeParam || 'tv'}-${id}` : ''
   const libraryId = id ? buildTvId(typeParam || 'tv', id) : ''
+  const mediaId = libraryId
   const saveProgress = useSaveTvProgress()
   const {
     toggle: toggleTvWatchlist,
@@ -291,9 +295,14 @@ const Tv: React.FC = () => {
       adult: details.adult,
     })
   }, [details, id, typeParam, toggleTvWatchlist])
-  const { data: savedProgress } = useTvLatestProgress(mediaId || undefined, season, episode)
+  const { data: savedProgress, isFetched: resumeFetched } = useTvLatestProgress(
+    mediaId || undefined,
+    season,
+    episode
+  )
   const [showResumeModal, setShowResumeModal] = useState(false)
   const [resumeTime, setResumeTime] = useState(0)
+  const [resumeChecked, setResumeChecked] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
   const [completeTitle, setCompleteTitle] = useState('')
   const [showDetails, setShowDetails] = useState(false)
@@ -303,10 +312,16 @@ const Tv: React.FC = () => {
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedTimeRef = useRef(0)
   const videoEndedRef = useRef(false)
+  const pendingSeekRef = useRef<number | null>(null)
+  const streamKeyRef = useRef('')
   const showResumeModalRef = useRef(false)
   useEffect(() => {
     showResumeModalRef.current = showResumeModal
   }, [showResumeModal])
+  const resumeCheckedRef = useRef(false)
+  useEffect(() => {
+    resumeCheckedRef.current = resumeChecked
+  }, [resumeChecked])
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
@@ -348,7 +363,7 @@ const Tv: React.FC = () => {
       params.set('type', searchParams.get('type') || 'tv')
       params.set('s', String(nextSeason))
       params.set('e', String(nextEpisode))
-      navigate(`${location.pathname}?${params.toString()}`)
+      navigate(`${window.location.pathname}?${params.toString()}`)
     },
     [searchParams, navigate]
   )
@@ -410,12 +425,38 @@ const Tv: React.FC = () => {
     } catch {
       // ignore
     }
+    if (pendingSeekRef.current != null && pendingSeekRef.current > 0) {
+      try {
+        video.currentTime = pendingSeekRef.current
+      } catch {
+        // ignore
+      }
+      pendingSeekRef.current = null
+    }
   }, [player.actions, videoRef])
 
+  const applyPendingSeek = useCallback(() => {
+    const video = videoRef.current
+    if (video && pendingSeekRef.current != null && pendingSeekRef.current > 0) {
+      try {
+        video.currentTime = pendingSeekRef.current
+      } catch {
+        // ignore
+      }
+      pendingSeekRef.current = null
+    }
+  }, [videoRef])
+
   const handleResume = useCallback(() => {
+    if (resumeTime > 0) pendingSeekRef.current = resumeTime
     const video = videoRef.current
     if (video && resumeTime > 0) {
-      video.currentTime = resumeTime
+      try {
+        video.currentTime = resumeTime
+        pendingSeekRef.current = null
+      } catch {
+        // ignore
+      }
       video.play().catch(() => {})
     }
     setShowResumeModal(false)
@@ -423,6 +464,7 @@ const Tv: React.FC = () => {
   }, [resumeTime, videoRef])
 
   const handleSkipResume = useCallback(() => {
+    pendingSeekRef.current = null
     const video = videoRef.current
     if (video) {
       video.currentTime = 0
@@ -436,15 +478,26 @@ const Tv: React.FC = () => {
     hasResumedRef.current = false
     setShowResumeModal(false)
     setResumeTime(0)
+    setResumeChecked(false)
+    resumeCheckedRef.current = false
+    pendingSeekRef.current = null
+    streamKeyRef.current = `${mediaId}:${season}:${episode}`
     lastSavedTimeRef.current = 0
   }, [mediaId, season, episode])
+
+  useEffect(() => {
+    if (resumeFetched) {
+      setResumeChecked(true)
+      resumeCheckedRef.current = true
+    }
+  }, [resumeFetched, mediaId, season, episode])
 
   useEffect(() => {
     if (!savedProgress || hasResumedRef.current) return
     const c = savedProgress as { currentTime?: number; duration?: number }
     const ct = c.currentTime ?? 0
     const dur = c.duration ?? 0
-    if (ct > 10 && dur > 30 && ct < dur * 0.95) {
+    if (ct > 5 && (dur <= 0 || ct < dur * 0.8)) {
       setResumeTime(ct)
       setShowResumeModal(true)
     }
@@ -833,6 +886,16 @@ const Tv: React.FC = () => {
     if (!currentUrl) return
 
     const video = videoRef.current
+    if (
+      streamKeyRef.current === `${mediaId}:${season}:${episode}` &&
+      pendingSeekRef.current == null
+    ) {
+      try {
+        if (!video.ended && video.currentTime > 1) pendingSeekRef.current = video.currentTime
+      } catch {
+        // ignore
+      }
+    }
     video.pause()
     video.removeAttribute('src')
     video.load()
@@ -898,7 +961,10 @@ const Tv: React.FC = () => {
               video.currentTime = calibReturnRef.current
               calibReturnRef.current = null
             }
-            if (!showResumeModalRef.current) video.play().catch(() => {})
+            applyPendingSeek()
+            if (!showResumeModalRef.current && resumeCheckedRef.current) {
+              video.play().catch(() => {})
+            }
           })
           hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
             applySubtitlePreference()
@@ -932,7 +998,8 @@ const Tv: React.FC = () => {
             video.currentTime = calibReturnRef.current
             calibReturnRef.current = null
           }
-          if (!showResumeModalRef.current) {
+          applyPendingSeek()
+          if (!showResumeModalRef.current && resumeCheckedRef.current) {
             video.play().catch(() => {
               setStreamError('Failed to play stream. Try another source.')
             })
@@ -945,7 +1012,8 @@ const Tv: React.FC = () => {
         video.currentTime = calibReturnRef.current
         calibReturnRef.current = null
       }
-      if (!showResumeModalRef.current) {
+      applyPendingSeek()
+      if (!showResumeModalRef.current && resumeCheckedRef.current) {
         video.play().catch(() => {
           setStreamError('Failed to play stream. Try another source.')
         })
@@ -976,7 +1044,19 @@ const Tv: React.FC = () => {
     isEmbedProvider,
     videoRef,
     testClipActive,
+    mediaId,
+    season,
+    episode,
+    applyPendingSeek,
   ])
+
+  useEffect(() => {
+    if (!resumeChecked || showResumeModal || isEmbedProvider || testClipActive) return
+    const video = videoRef.current
+    if (!video || !video.paused || video.ended || video.readyState < 1) return
+    applyPendingSeek()
+    video.play().catch(() => {})
+  }, [resumeChecked, showResumeModal, isEmbedProvider, testClipActive, applyPendingSeek, videoRef])
 
   useEffect(() => {
     const hls = hlsRef.current
@@ -1088,7 +1168,7 @@ const Tv: React.FC = () => {
       }
       if (cues.length === 0) return
       const subtitleStyle: SubtitleStyleSettings = {
-        fontSize: player.state.subtitleFontSize,
+        fontSize: fitSubtitleSize(player.state.subtitleFontSize, video.clientHeight || 0),
         position: player.state.subtitlePosition,
         bgOpacity: player.state.subtitleBgOpacity,
         bgColor: player.state.subtitleBgColor,
@@ -1097,14 +1177,14 @@ const Tv: React.FC = () => {
         bold: player.state.subtitleBold,
       }
       const baseCss = buildOverlayCss(subtitleStyle)
-      const baseBottom = subtitleStyle.position
+      const baseBottomPx = subtitleBottomPx(video, subtitleStyle.position)
       const cueArray = Array.from(cues)
       cueArray.forEach((cue, index) => {
         const raw = String((cue as { text?: unknown }).text ?? '')
         if (!stripCueTags(raw).trim()) return
         const div = document.createElement('div')
         const stackOffset = (cueArray.length - 1 - index) * 1.7
-        div.style.cssText = `${baseCss}\nbottom: calc(${baseBottom}% + ${stackOffset}em);`
+        div.style.cssText = `${baseCss}\nbottom: calc(${baseBottomPx}px + ${stackOffset}em);`
         div.innerHTML = renderCueHtml(raw)
         overlay.appendChild(div)
       })
@@ -1152,6 +1232,24 @@ const Tv: React.FC = () => {
     },
     [updateUrlEpisode]
   )
+
+  const seasonSelectNode =
+    !isMovie && details?.seasons && details.seasons.length > 1 ? (
+      <label className={styles.sidebarSeason}>
+        <span>Season</span>
+        <select
+          value={season}
+          onChange={(e) => handleSeasonSelect(parseInt(e.target.value, 10) || 1)}
+          className={styles.select}
+        >
+          {details.seasons.map((s) => (
+            <option key={s.season_number} value={s.season_number}>
+              Season {s.season_number} ({s.episode_count} ep)
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null
 
   const handleTvEpisodeClick = useCallback(
     (epId: string) => {
@@ -1341,7 +1439,7 @@ const Tv: React.FC = () => {
     params.set('type', searchParams.get('type') || 'tv')
     params.set('s', expectedS)
     params.set('e', expectedE)
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true })
+    navigate(`${window.location.pathname}?${params.toString()}`, { replace: true })
   }, [details, isMovie, season, episode, searchParams, navigate])
 
   return (
@@ -1369,22 +1467,7 @@ const Tv: React.FC = () => {
               currentEpisode={String(episode)}
               watchedEpisodes={watchedEpisodeIds}
               onEpisodeClick={handleTvEpisodeClick}
-              header={
-                <label className={styles.sidebarSeason}>
-                  <span>Season</span>
-                  <select
-                    value={season}
-                    onChange={(e) => handleSeasonSelect(parseInt(e.target.value, 10) || 1)}
-                    className={styles.select}
-                  >
-                    {details.seasons?.map((s) => (
-                      <option key={s.season_number} value={s.season_number}>
-                        Season {s.season_number} ({s.episode_count} ep)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              }
+              header={seasonSelectNode}
             />
           )
         ) : isMovie ? (
@@ -1400,6 +1483,7 @@ const Tv: React.FC = () => {
         {details && (
           <div
             className={styles.playerSection}
+            onContextMenu={(e) => e.preventDefault()}
             style={
               details.adult && !hasMatureConsent
                 ? { filter: 'blur(14px)', pointerEvents: 'none', userSelect: 'none' }
@@ -1499,7 +1583,7 @@ const Tv: React.FC = () => {
                 >
                   <video
                     ref={videoRef}
-                    autoPlay={!showResumeModal}
+                    autoPlay={resumeChecked && !showResumeModal}
                     playsInline
                     disablePictureInPicture
                     className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
@@ -1511,6 +1595,7 @@ const Tv: React.FC = () => {
                     onPause={handleVideoPause}
                     onLoadedMetadata={handleVideoLoadedMetadata}
                     onVolumeChange={player.actions.onVolumeChange}
+                    onContextMenu={(e) => e.preventDefault()}
                     onError={() => {
                       setStreamError('Video failed to load. Try another server or reload.')
                       setStreamLoading(false)
@@ -1582,6 +1667,8 @@ const Tv: React.FC = () => {
         )}
 
         {details && <PlayerStatusArea showTheater={false} />}
+
+        {seasonSelectNode && <div className={styles.mobileSeasonRow}>{seasonSelectNode}</div>}
 
         {details && (
           <div className={styles.providerSelectWrap}>
@@ -1796,6 +1883,7 @@ const Tv: React.FC = () => {
             currentEpisode={String(episode)}
             watchedEpisodes={watchedEpisodeIds}
             onEpisodeClick={handleTvEpisodeClick}
+            header={seasonSelectNode}
           />
         )}
 

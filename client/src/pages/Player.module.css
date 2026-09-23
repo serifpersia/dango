@@ -401,8 +401,6 @@
   top: 0;
   left: 0;
   object-fit: cover;
-  /* Inherit the wrapper radius: Firefox does not always clip replaced elements
-     (video/iframe/canvas) to an ancestor's border-radius, so round them directly. */
   border-radius: inherit;
 }
 
@@ -963,11 +961,11 @@
   }
 
   .volumeSlider {
-    display: none;
+    width: 0;
   }
 
   .volumeContainer {
-    display: none;
+    display: flex;
   }
 
   .skipBubble {
@@ -1413,6 +1411,14 @@
 .videoContainer:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
+  border-radius: 0;
+}
+
+.videoContainer:fullscreen video,
+.videoContainer:fullscreen canvas,
+.videoContainer:-webkit-full-screen video,
+.videoContainer:-webkit-full-screen canvas {
+  border-radius: 0;
 }
 
 .skipIndicatorContainer {

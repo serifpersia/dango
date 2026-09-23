@@ -142,3 +142,23 @@ export function stripCueTags(raw: string): string {
 
 export const TEXT_COLOR_PRESETS = ['#ffffff', '#ffff00', '#7CFC00', '#00e5ff', '#ff9ff3', '#ffa502']
 export const BG_COLOR_PRESETS = ['#000000', '#1e272e', '#2f3542', '#3d0c02', '#0c3d2e', '#ffffff']
+
+export function fitSubtitleSize(userRem: number, videoH: number): number {
+  const userPx = Number.isFinite(userRem) ? userRem * 16 : DEFAULT_SUBTITLE_STYLE.fontSize * 16
+  if (!Number.isFinite(videoH) || videoH <= 0) return userPx / 16
+  return Math.min(userPx, Math.max(13, videoH * 0.07)) / 16
+}
+
+export function subtitleBottomPx(video: HTMLVideoElement, positionPct: number): number {
+  const vw = video.clientWidth || 0
+  const vh = video.clientHeight || 0
+  const vr =
+    video.videoWidth > 0 && video.videoHeight > 0 ? video.videoWidth / video.videoHeight : 0
+  let vidH = vh
+  if (vr > 0 && vw > 0 && vh > 0) {
+    vidH = vw / vh > vr ? vh : vw / vr
+  }
+  const band = Math.max(0, (vh - vidH) / 2)
+  const lift = (Math.max(0, Math.min(100, Number(positionPct) || 0)) / 100) * vidH
+  return band + lift
+}

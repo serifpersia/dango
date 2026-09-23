@@ -1146,6 +1146,11 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
       db.run(`ALTER TABLE tv_progress ADD COLUMN adult INTEGER`)
     }
 
+    db.run(
+      `UPDATE OR IGNORE tv_progress SET mediaId = REPLACE(mediaId, '-', ':') WHERE mediaId LIKE 'tv-%' OR mediaId LIKE 'movie-%'`
+    )
+    db.run(`DELETE FROM tv_progress WHERE mediaId LIKE 'tv-%' OR mediaId LIKE 'movie-%'`)
+
     return db
   } catch (err) {
     log.error({ err }, 'TV database opening error')

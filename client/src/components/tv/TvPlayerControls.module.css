@@ -1,30 +1,3 @@
-.container {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: black;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  container-type: inline-size;
-}
-
-.container:fullscreen,
-.container:-webkit-full-screen {
-  width: 100vw;
-  height: 100vh;
-  aspect-ratio: auto;
-  border-radius: 0;
-}
-
-.container:fullscreen .video,
-.container:fullscreen .delayCanvas,
-.container:fullscreen .subtitleOverlay,
-.container:-webkit-full-screen .video,
-.container:-webkit-full-screen .delayCanvas,
-.container:-webkit-full-screen .subtitleOverlay {
-  border-radius: 0;
-}
-
 .fullscreenFlat,
 .fullscreenFlat .video,
 .fullscreenFlat .delayCanvas,
@@ -33,23 +6,8 @@
 }
 
 @media (max-width: 900px) and (orientation: landscape) {
-  .container {
-    aspect-ratio: auto;
-    height: 100vh;
+  .fullscreenFlat {
     border-radius: 0;
-  }
-}
-
-@media (max-width: 900px) {
-  .settingsPanel {
-    right: 12px;
-    bottom: 70px;
-  }
-}
-
-@media (pointer: coarse) {
-  .menuItem {
-    min-height: 2.75rem;
   }
 }
 
@@ -439,8 +397,8 @@
 
 .settingsPanel {
   position: absolute;
-  bottom: clamp(4rem, 12vh, 6.25rem);
-  right: clamp(0.5rem, 4vw, 2.5rem);
+  bottom: clamp(6rem, 15vh, 8rem);
+  right: clamp(1rem, 3vw, 2rem);
   background: rgba(20, 20, 24, 0.95);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-md);
@@ -569,5 +527,69 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (pointer: coarse) {
+  .settingsPanel {
+    font-size: 0.9rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .menuItem {
+    min-height: 2.75rem;
+  }
+
+  .settingsContent {
+    max-height: 52vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .settingsPanel {
+    min-width: 9rem;
+    max-width: calc(100vw - 2rem);
+    font-size: 0.75rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
+  }
+
+  .settingsHeader {
+    padding: 0.4rem 0.625rem;
+  }
+
+  .settingsTitle {
+    font-size: 0.64rem;
+  }
+
+  .menuItem {
+    min-height: 2.25rem;
+    padding: 0.45rem 0.625rem;
+    font-size: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .settingsContent {
+    max-height: min(40vh, 15rem);
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .settingsPanel {
+    bottom: 7.25rem;
+    right: 2rem;
+    min-width: 10rem;
+    max-width: min(15rem, calc(100vw - 1.5rem));
+    font-size: 0.8rem;
+  }
+
+  .menuItem {
+    min-height: 2.5rem;
+    font-size: 0.8rem;
+  }
+
+  .settingsContent {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 }

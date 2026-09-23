@@ -292,11 +292,11 @@
 
 .playerSection {
   margin: 1.5rem 0;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
   /* See PlayerPageLayout .videoPlayerWrapper: isolation + clip keep Firefox
-     (esp. mobile compositor surfaces) from painting video/canvas square over
-     the rounded corners. */
+     (esp. mobile compositor surfaces) from painting video/canvas outside
+     the box. */
   overflow: clip;
   isolation: isolate;
   background: black;
@@ -394,6 +394,20 @@
 
 .sidebarSeason .select {
   width: 100%;
+}
+
+.mobileSeasonRow {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobileSeasonRow {
+    display: block;
+  }
+
+  .mobileSeasonRow .sidebarSeason {
+    margin-bottom: 0;
+  }
 }
 
 .sidebarPosterCard {

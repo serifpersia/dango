@@ -1,0 +1,200 @@
+.shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: clip;
+  isolation: isolate;
+  border-radius: 0;
+  container-type: inline-size;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .shell {
+    aspect-ratio: 1 / 1;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) and (orientation: portrait) {
+  .shell {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+.shell:fullscreen,
+.shell:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.shell:fullscreen,
+.shell:fullscreen .stage,
+.shell:fullscreen .stage > video,
+.shell:fullscreen .stage > canvas,
+.shell:fullscreen .stage > iframe,
+.shell:-webkit-full-screen,
+.shell:-webkit-full-screen .stage,
+.shell:-webkit-full-screen .stage > video,
+.shell:-webkit-full-screen .stage > canvas,
+.shell:-webkit-full-screen .stage > iframe {
+  border-radius: 0 !important;
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .shell {
+    aspect-ratio: auto;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.stage > video,
+.stage > canvas,
+.stage > iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+  border: none;
+  border-radius: inherit;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.shellFill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.shellFullscreen,
+.shellFullscreen .stage,
+.shellFullscreen .stage > video,
+.shellFullscreen .stage > canvas,
+.shellFullscreen .stage > iframe {
+  border-radius: 0 !important;
+}
+
+.shellFullscreen {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+}
+
+.uiLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.uiLayer > * {
+  pointer-events: auto;
+}
+
+.volumeWrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.volumeSlider {
+  width: 0;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    width 0.25s ease,
+    opacity 0.25s ease,
+    transform 0.25s ease;
+  cursor: pointer;
+  margin-left: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 24px;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.volumeWrap[data-expanded='true'] .volumeSlider {
+  width: 84px;
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .volumeWrap:hover .volumeSlider,
+  .volumeSlider:focus-visible {
+    width: 84px;
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.volumeSlider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--volume-percent, 0%),
+    rgba(255, 255, 255, 0.2) var(--volume-percent, 0%),
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  border-radius: 4px;
+}
+
+.volumeSlider::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.volumeSlider::-moz-range-progress {
+  height: 4px;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #fff;
+  margin-top: -4px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+@media (pointer: coarse) {
+  .volumeWrap[data-expanded='true'] .volumeSlider {
+    width: 96px;
+    height: 32px;
+  }
+}

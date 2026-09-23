@@ -6,6 +6,7 @@ import { dbAll } from '../utils/db-utils.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
   buildTvId,
+  normalizeTvMediaId,
   TV_STATUSES,
   TvLibraryRepository,
   TvProgressRepository,
@@ -139,7 +140,10 @@ export class TvLibraryController {
 
   getProgress = async (req: Request, res: Response) => {
     try {
-      const rows = TvProgressRepository.getByMedia(tvDb(req), req.params.mediaId as string)
+      const rows = TvProgressRepository.getByMedia(
+        tvDb(req),
+        normalizeTvMediaId(req.params.mediaId)
+      )
       res.json({ progress: rows })
     } catch {
       res.json({ progress: [] })
@@ -149,19 +153,15 @@ export class TvLibraryController {
   getLatestProgress = async (req: Request, res: Response) => {
     try {
       const db = tvDb(req)
+      const mediaId = normalizeTvMediaId(req.params.mediaId)
       const season = parseInt(req.query.season as string, 10)
       const episode = parseInt(req.query.episode as string, 10)
       if (Number.isFinite(season) && Number.isFinite(episode)) {
-        const row = TvProgressRepository.getEpisode(
-          db,
-          req.params.mediaId as string,
-          season,
-          episode
-        )
+        const row = TvProgressRepository.getEpisode(db, mediaId, season, episode)
         res.json(row || { currentTime: 0, duration: 0 })
         return
       }
-      const row = TvProgressRepository.getLatest(db, req.params.mediaId as string)
+      const row = TvProgressRepository.getLatest(db, mediaId)
       res.json(row || { currentTime: 0, duration: 0 })
     } catch {
       res.json({ currentTime: 0, duration: 0 })
@@ -170,7 +170,7 @@ export class TvLibraryController {
 
   saveProgress = async (req: Request, res: Response) => {
     const {
-      mediaId,
+      mediaId: mediaIdRaw,
       season,
       episode,
       currentTime,
@@ -184,6 +184,7 @@ export class TvLibraryController {
       mediaType,
       adult,
     } = req.body ?? {}
+    const mediaId = normalizeTvMediaId(mediaIdRaw)
     if (!mediaId) {
       return res.status(400).json({ error: 'mediaId is required' })
     }
@@ -277,7 +278,8 @@ export class TvLibraryController {
   }
 
   removeProgress = async (req: Request, res: Response) => {
-    const { mediaId, season, episode } = req.body ?? {}
+    const { mediaId: mediaIdRaw, season, episode } = req.body ?? {}
+    const mediaId = normalizeTvMediaId(mediaIdRaw)
     if (!mediaId) return res.status(400).json({ error: 'mediaId is required' })
     try {
       await performTvWriteTransaction(tvDb(req), (tx) => {
@@ -337,7 +339,7 @@ export class TvLibraryController {
     if (!Array.isArray(idsRaw) || idsRaw.length === 0) {
       return res.status(400).json({ error: 'ids must be a non-empty array' })
     }
-    const ids = idsRaw.map((id) => String(id))
+    const ids = idsRaw.map((id) => normalizeTvMediaId(id))
     try {
       await performTvWriteTransaction(tvDb(req), (tx) => {
         TvProgressRepository.deleteMany(tx, ids)

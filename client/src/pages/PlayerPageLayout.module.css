@@ -37,20 +37,16 @@
   width: 100%;
   padding-top: 56.25%; /* 16:9 Aspect Ratio */
   background-color: #000;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  /* overflow: clip keeps the radius strict without creating a scroll container.
+  border-radius: 0;
+  /* overflow: clip keeps children square without creating a scroll container.
      isolation forces a stacking context so Firefox (esp. mobile, where <video> /
      <canvas> / <iframe> decode to their own compositor surface) clips children
-     to the rounded corners instead of painting square over them. */
+     to the box instead of painting over it. */
   overflow: clip;
   isolation: isolate;
   position: relative;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   border: 1px solid var(--glass-border);
-  /* Belt & braces for engines that refuse to clip replaced elements to an
-     ancestor's radius: children inherit the radius themselves (see
-     Player.module.css video / iframe / canvas rules). */
 }
 
 .playerInfoHeader {
@@ -188,7 +184,7 @@
   }
 
   .videoPlayerWrapper {
-    border-radius: var(--radius-lg);
+    border-radius: 0;
   }
 
   .playerInfoContainer {
@@ -225,6 +221,20 @@
 
   .playerAnimeCard {
     width: 120px;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .videoPlayerWrapper {
+    padding-top: 100%;
+    position: relative;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) and (orientation: portrait) {
+  .videoPlayerWrapper {
+    padding-top: 75%;
+    position: relative;
   }
 }
 
@@ -299,7 +309,7 @@
   width: 100% !important;
   height: 100% !important;
   padding-top: 0 !important;
-  border-radius: var(--radius-2xl) !important;
+  border-radius: 0 !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow:
     0 20px 60px color-mix(in srgb, var(--accent) 15%, transparent),

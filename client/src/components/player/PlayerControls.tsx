@@ -3,7 +3,8 @@ import styles from './PlayerControls.module.css'
 import Icon from '../common/Icon'
 import CenterControls from './CenterControls'
 import SeekBar from './SeekBar'
-import VolumeControl from './VolumeControl'
+import UnifiedVideoShell from './UnifiedVideoShell'
+import UnifiedVolumeControl from './UnifiedVolumeControl'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
@@ -42,6 +43,11 @@ interface PlayerControlsProps {
   onCalibrateAvSync: () => void
   fallbackChoice: FallbackChoice
   onFallbackChoiceChange: (value: FallbackChoice) => void
+  children?: React.ReactNode
+  overlays?: React.ReactNode
+  isInteractingExtra?: boolean
+  className?: string
+  hideChrome?: boolean
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -73,14 +79,18 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onCalibrateAvSync,
   fallbackChoice,
   onFallbackChoiceChange,
+  children,
+  overlays,
+  isInteractingExtra = false,
+  className,
+  hideChrome = false,
 }) => {
   const { state, refs, actions } = player
-  const { showSettings, showVolumeSlider } = state
+  const { showSettings } = state
   const { setShowSettings, setShowVolumeSlider } = actions
 
   const settingsRef = React.useRef<HTMLDivElement>(null)
   const settingsBtnRef = React.useRef<HTMLButtonElement>(null)
-  const volumeRef = React.useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,24 +103,16 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       ) {
         setShowSettings(false)
       }
-
-      if (
-        volumeRef.current &&
-        !volumeRef.current.contains(event.target as Node) &&
-        showVolumeSlider
-      ) {
-        setShowVolumeSlider(false)
-      }
     }
 
-    if (showSettings || showVolumeSlider) {
+    if (showSettings) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSettings, showVolumeSlider, setShowSettings, setShowVolumeSlider])
+  }, [showSettings, setShowSettings])
 
   const timeDisplayRef = React.useRef<HTMLSpanElement>(null)
 
@@ -202,11 +204,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     return <Icon name="volume-up" />
   }
 
-  return (
+  const topBar = (
     <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !showVolumeSlider && !state.isScrubbing ? styles.hidden : ''} `}
+      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !state.isScrubbing ? styles.hidden : ''} `}
       data-speed-boost-ignore="true"
-      onDoubleClick={(e) => e.stopPropagation()}
+      style={{ pointerEvents: 'none', background: 'none' }}
     >
       <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
         <button
@@ -225,14 +227,24 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           {episodeNumber && <span className={styles.episodeNumber}>Episode {episodeNumber}</span>}
         </div>
       </div>
+    </div>
+  )
 
-      <CenterControls
-        isPlaying={state.isPlaying}
-        onTogglePlay={actions.togglePlay}
-        onSkipBack={() => actions.seek(-10)}
-        onSkipForward={() => actions.seek(10)}
-      />
+  const center = (
+    <CenterControls
+      isPlaying={state.isPlaying}
+      onTogglePlay={actions.togglePlay}
+      onSkipBack={() => actions.seek(-10)}
+      onSkipForward={() => actions.seek(10)}
+    />
+  )
 
+  const bottomBar = (
+    <div
+      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !state.isScrubbing ? styles.hidden : ''} `}
+      data-speed-boost-ignore="true"
+      style={{ pointerEvents: 'none', background: 'none', justifyContent: 'flex-end' }}
+    >
       <div
         className={styles.bottomControls}
         data-speed-boost-ignore="true"
@@ -291,27 +303,14 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
             </button>
 
-            <VolumeControl
-              classes={{
-                container: styles.volumeContainer,
-                visible: styles.visible,
-                button: styles.controlBtn,
-                slider: styles.volumeSlider,
-              }}
+            <UnifiedVolumeControl
               muted={state.isMuted}
               volume={state.volume}
               volumeIcon={renderVolumeIcon()}
-              sliderVisible={showVolumeSlider}
-              containerRef={volumeRef}
-              onToggleMute={(e) => {
-                e.stopPropagation()
-                if (window.innerWidth <= 768) {
-                  setShowVolumeSlider(!showVolumeSlider)
-                } else {
-                  actions.toggleMute()
-                }
-              }}
+              buttonClassName={styles.controlBtn}
+              onToggleMute={actions.toggleMute}
               onVolumeChange={handleVolumeChange}
+              onExpandedChange={(v) => setShowVolumeSlider(v)}
             />
 
             <span className={styles.timeDisplay} ref={timeDisplayRef}>
@@ -386,97 +385,115 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           </div>
         </div>
       </div>
+    </div>
+  )
 
-      <Suspense fallback={null}>
-        <PlayerSettings
-          ref={settingsRef}
-          isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
-          videoSources={videoSources}
-          currentSource={selectedSource}
-          currentLink={selectedLink}
-          onSourceChange={onSourceChange}
-          subtitles={state.availableSubtitles}
-          activeSubtitleTrack={state.activeSubtitleTrack}
-          onSubtitleChange={handleSubtitleSelection}
-          subtitleSettings={{
-            fontSize: state.subtitleFontSize,
-            position: state.subtitlePosition,
-            bgOpacity: state.subtitleBgOpacity,
-            bgColor: state.subtitleBgColor,
-            textColor: state.subtitleTextColor,
-            edge: state.subtitleEdge,
-            bold: state.subtitleBold,
-          }}
-          onSubtitleSettingsChange={(key, value) => {
-            const persist = (storageKey: string, v: string | number | boolean) => {
-              try {
-                localStorage.setItem(storageKey, String(v))
-              } catch {
-                // ignore
-              }
-            }
-            switch (key) {
-              case 'fontSize':
-                actions.setSubtitleFontSize(value as number)
-                persist('subtitleFontSize', value as number)
-                break
-              case 'position':
-                actions.setSubtitlePosition(value as number)
-                persist('subtitlePosition', value as number)
-                break
-              case 'bgOpacity':
-                actions.setSubtitleBgOpacity(value as number)
-                persist('subtitleBgOpacity', value as number)
-                break
-              case 'bgColor':
-                actions.setSubtitleBgColor(value as string)
-                persist('subtitleBgColor', value as string)
-                break
-              case 'textColor':
-                actions.setSubtitleTextColor(value as string)
-                persist('subtitleTextColor', value as string)
-                break
-              case 'edge':
-                actions.setSubtitleEdge(value as 'shadow' | 'outline' | 'none')
-                persist('subtitleEdge', value as string)
-                break
-              case 'bold':
-                actions.setSubtitleBold(value as boolean)
-                persist('subtitleBold', value as boolean)
-                break
-            }
-          }}
-          useNativeControls={state.useNativeControls}
-          onNativeControlsToggle={actions.setUseNativeControls}
-          anime4kEnabled={anime4kEnabled}
-          onAnime4kToggle={onAnime4kToggle}
-          anime4kSupported={anime4kSupported}
-          anime4kProfile={anime4kProfile}
-          onAnime4kProfileChange={onAnime4kProfileChange}
-          anime4kInitializing={anime4kInitializing}
-          anime4kError={anime4kError}
-          videoDelayEnabled={videoDelayEnabled}
-          onVideoDelayToggle={onVideoDelayToggle}
-          videoDelayMs={videoDelayMs}
-          onVideoDelayChange={onVideoDelayChange}
-          onCalibrateAvSync={onCalibrateAvSync}
-          isAutoSkipEnabled={state.isAutoSkipEnabled}
-          onAutoSkipChange={(value) => {
-            actions.setIsAutoSkipEnabled(value)
+  const settingsNode = (
+    <Suspense fallback={null}>
+      <PlayerSettings
+        ref={settingsRef}
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        videoSources={videoSources}
+        currentSource={selectedSource}
+        currentLink={selectedLink}
+        onSourceChange={onSourceChange}
+        subtitles={state.availableSubtitles}
+        activeSubtitleTrack={state.activeSubtitleTrack}
+        onSubtitleChange={handleSubtitleSelection}
+        subtitleSettings={{
+          fontSize: state.subtitleFontSize,
+          position: state.subtitlePosition,
+          bgOpacity: state.subtitleBgOpacity,
+          bgColor: state.subtitleBgColor,
+          textColor: state.subtitleTextColor,
+          edge: state.subtitleEdge,
+          bold: state.subtitleBold,
+        }}
+        onSubtitleSettingsChange={(key, value) => {
+          const persist = (storageKey: string, v: string | number | boolean) => {
             try {
-              localStorage.setItem('autoSkipEnabled', value.toString())
+              localStorage.setItem(storageKey, String(v))
             } catch {
               // ignore
             }
-          }}
-          isAutoplayEnabled={isAutoplayEnabled}
-          onAutoplayChange={onAutoplayChange}
-          fallbackChoice={fallbackChoice}
-          onFallbackChoiceChange={onFallbackChoiceChange}
-        />
-      </Suspense>
-    </div>
+          }
+          switch (key) {
+            case 'fontSize':
+              actions.setSubtitleFontSize(value as number)
+              persist('subtitleFontSize', value as number)
+              break
+            case 'position':
+              actions.setSubtitlePosition(value as number)
+              persist('subtitlePosition', value as number)
+              break
+            case 'bgOpacity':
+              actions.setSubtitleBgOpacity(value as number)
+              persist('subtitleBgOpacity', value as number)
+              break
+            case 'bgColor':
+              actions.setSubtitleBgColor(value as string)
+              persist('subtitleBgColor', value as string)
+              break
+            case 'textColor':
+              actions.setSubtitleTextColor(value as string)
+              persist('subtitleTextColor', value as string)
+              break
+            case 'edge':
+              actions.setSubtitleEdge(value as 'shadow' | 'outline' | 'none')
+              persist('subtitleEdge', value as string)
+              break
+            case 'bold':
+              actions.setSubtitleBold(value as boolean)
+              persist('subtitleBold', value as boolean)
+              break
+          }
+        }}
+        useNativeControls={state.useNativeControls}
+        onNativeControlsToggle={actions.setUseNativeControls}
+        anime4kEnabled={anime4kEnabled}
+        onAnime4kToggle={onAnime4kToggle}
+        anime4kSupported={anime4kSupported}
+        anime4kProfile={anime4kProfile}
+        onAnime4kProfileChange={onAnime4kProfileChange}
+        anime4kInitializing={anime4kInitializing}
+        anime4kError={anime4kError}
+        videoDelayEnabled={videoDelayEnabled}
+        onVideoDelayToggle={onVideoDelayToggle}
+        videoDelayMs={videoDelayMs}
+        onVideoDelayChange={onVideoDelayChange}
+        onCalibrateAvSync={onCalibrateAvSync}
+        isAutoSkipEnabled={state.isAutoSkipEnabled}
+        onAutoSkipChange={(value) => {
+          actions.setIsAutoSkipEnabled(value)
+          try {
+            localStorage.setItem('autoSkipEnabled', value.toString())
+          } catch {
+            // ignore
+          }
+        }}
+        isAutoplayEnabled={isAutoplayEnabled}
+        onAutoplayChange={onAutoplayChange}
+        fallbackChoice={fallbackChoice}
+        onFallbackChoiceChange={onFallbackChoiceChange}
+      />
+    </Suspense>
+  )
+
+  return (
+    <UnifiedVideoShell
+      player={player}
+      topBar={topBar}
+      centerControls={center}
+      bottomBar={bottomBar}
+      settingsPanel={settingsNode}
+      overlays={overlays}
+      isInteracting={isInteractingExtra}
+      className={className}
+      chromeDisabled={hideChrome}
+    >
+      {children}
+    </UnifiedVideoShell>
   )
 }
 
