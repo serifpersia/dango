@@ -8,6 +8,7 @@ export interface MusicTrack {
   album?: string
   duration?: string
   thumbnails: { url: string; width?: number; height?: number }[]
+  liked?: boolean | null
 }
 
 export interface MusicPlaylist {
@@ -99,5 +100,50 @@ export const useMusicPlaylist = (playlistId: string | null) => {
     enabled: !!playlistId,
     staleTime: STALE_5_MIN,
     retry: 1,
+  })
+}
+
+export const useMusicUpNext = (trackId: string | null) => {
+  return useQuery<{ tracks: MusicTrack[]; playlistId?: string | null }>({
+    queryKey: ['music-upnext', trackId],
+    queryFn: () => fetchApi(`/api/music/upnext?id=${encodeURIComponent(trackId || '')}`),
+    enabled: !!trackId,
+    staleTime: STALE_5_MIN,
+    retry: 1,
+  })
+}
+
+export const useMusicLikedIds = (enabled: boolean) => {
+  return useQuery<{ likedIds: string[] }>({
+    queryKey: ['music-likes'],
+    queryFn: () => fetchApi('/api/music/likes'),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+export const useMusicRate = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      like,
+    }: {
+      id: string
+      like: boolean
+    }): Promise<{
+      success: boolean
+      liked: boolean
+    }> =>
+      fetchApi('/api/music/like', {
+        method: 'POST',
+        body: JSON.stringify({ id, like }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['music-likes'] })
+      qc.invalidateQueries({ queryKey: ['music-library'] })
+      qc.invalidateQueries({ queryKey: ['music-upnext'] })
+    },
   })
 }

@@ -11,7 +11,12 @@ interface MusicPlayerProps {
   shuffle: boolean
   onToggleShuffle: () => void
   onTrackStep: (delta: number) => void
+  onTrackFailed?: (track: MusicTrack) => void
   onClose: () => void
+  liked?: boolean
+  likeVisible?: boolean
+  likePending?: boolean
+  onToggleLike?: () => void
 }
 
 function formatTime(sec: number): string {
@@ -26,15 +31,18 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   shuffle,
   onToggleShuffle,
   onTrackStep,
+  onTrackFailed,
   onClose,
+  liked,
+  likeVisible,
+  likePending,
+  onToggleLike,
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const seekingRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const [expanded, setExpanded] = useState(true)
-  const [showControls, setShowControls] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(() => {
@@ -94,6 +102,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const giveUp = () => {
     setLoading(false)
     setFailed(true)
+    onTrackFailed?.(track)
     if (autoplayRef.current) onTrackStep(1)
   }
 
@@ -169,7 +178,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   useEffect(() => {
     sendMusicPresence(isPlaying)
-  }, [sendMusicPresence, isPlaying, track.id, expanded])
+  }, [sendMusicPresence, isPlaying, track.id])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -223,15 +232,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
   }, [])
 
-  useEffect(() => {
-    if (!expanded) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExpanded(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [expanded])
-
   const togglePlay = () => {
     const audio = audioRef.current
     if (!audio) return
@@ -243,7 +243,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   useEffect(() => {
     setArtFailed(false)
   }, [cover])
-  const effectiveCover = artFailed ? null : cover
   const headline = `${track.title} — ${track.artists}`
 
   const transportRow = (
@@ -314,14 +313,16 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const barContent = (
     <>
-      <button
-        className={`${styles.playerBtn} ${styles.playerToggle}`}
-        onClick={() => setExpanded(!expanded)}
-        aria-label={expanded ? 'Minimize player' : 'Expand player'}
-        title={expanded ? 'Minimize to browse' : 'Expand'}
-      >
-        {expanded ? <Icon name="chevron-down" /> : <Icon name="chevron-up" />}
-      </button>
+      {track.thumbnails?.[0]?.url && !artFailed && (
+        <img
+          src={track.thumbnails[0].url}
+          alt=""
+          className={radioStyles.stationThumb}
+          loading="lazy"
+          decoding="async"
+          onError={() => setArtFailed(true)}
+        />
+      )}
 
       <div className={styles.playerInfo}>
         <p className={styles.playerTitle} title={headline}>
@@ -358,6 +359,18 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
       </div>
 
       <div className={styles.playerActions}>
+        {likeVisible && onToggleLike && (
+          <button
+            className={`${styles.playerBtn} ${liked ? styles.playerBtnActive : ''}`}
+            onClick={onToggleLike}
+            disabled={likePending}
+            title={liked ? 'Remove from Liked Music' : 'Add to Liked Music'}
+            aria-label={liked ? 'Remove from Liked Music' : 'Add to Liked Music'}
+            aria-pressed={!!liked}
+          >
+            <Icon name="heart" />
+          </button>
+        )}
         <button
           className={`${styles.playerBtn} ${shuffle ? styles.playerBtnActive : ''}`}
           onClick={onToggleShuffle}
@@ -445,46 +458,10 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     />
   )
 
-  if (!expanded) {
-    return createPortal(
-      <>
-        {audioEl}
-        <div className={styles.playerBar}>{barContent}</div>
-      </>,
-      document.body
-    )
-  }
-
   return createPortal(
     <>
       {audioEl}
-      <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
-        <div
-          className={`${styles.npStage} ${!effectiveCover ? styles.npStageBlank : ''}`}
-          onClick={() => setShowControls((v) => !v)}
-        >
-          {effectiveCover && (
-            <div className={radioStyles.coverWrap}>
-              <img
-                src={effectiveCover}
-                alt={headline}
-                loading="lazy"
-                decoding="async"
-                draggable={false}
-                className={radioStyles.cover}
-                onError={() => setArtFailed(true)}
-              />
-            </div>
-          )}
-        </div>
-
-        <div
-          className={`${styles.playerBar} ${styles.playerBarDocked} ${!showControls ? styles.playerBarDockedHidden : ''}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {barContent}
-        </div>
-      </div>
+      <div className={styles.playerBar}>{barContent}</div>
     </>,
     document.body
   )

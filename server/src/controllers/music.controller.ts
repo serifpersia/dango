@@ -18,6 +18,8 @@ interface MusicTrack {
   album?: string
   duration?: string
   thumbnails: { url: string; width?: number; height?: number }[]
+  /** Present only on up-next results when signed in (from YTM's own toggle). */
+  liked?: boolean | null
 }
 
 const NAME_SUFFIXES = [
@@ -108,6 +110,113 @@ function thumbsOf(value: unknown): MusicTrack['thumbnails'] {
   const obj = value as { thumbnails?: unknown }
   if (Array.isArray(obj.thumbnails)) return thumbsOf(obj.thumbnails)
   return []
+}
+
+function nodeType(node: unknown): string {
+  const n = node as { type?: unknown; constructor?: { name?: string } }
+  if (typeof n?.type === 'string') return n.type
+  return n?.constructor?.name ?? ''
+}
+
+/** Map a PlaylistPanel up-next entry (video or wrapper) to a MusicTrack.
+ *  When trustLike is set (signed-in session), also read the current like
+ *  state from YTM's own toggle (UNFAVORITE icon = currently liked). */
+function upnextToTrack(node: unknown, trustLike = false): MusicTrack | null {
+  const kind = nodeType(node)
+  if (kind === 'AutomixPreviewVideo') return null
+  const n = node as Record<string, unknown>
+  const video =
+    kind === 'PlaylistPanelVideoWrapper'
+      ? ((n['primary'] as Record<string, unknown> | null) ?? null)
+      : n
+  if (!video || typeof video !== 'object') return null
+  const id = video['video_id']
+  if (typeof id !== 'string' || !id) return null
+  const artistsRaw = video['artists']
+  let artists = ''
+  if (Array.isArray(artistsRaw)) {
+    artists = artistsRaw
+      .map((a) => (a as { name?: string })?.name || '')
+      .filter(Boolean)
+      .join(', ')
+  }
+  if (!artists && typeof video['author'] === 'string') artists = video['author']
+  const albumRaw = video['album'] as { name?: string } | undefined
+  const durationRaw = video['duration'] as { text?: string } | string | undefined
+  const durationText = typeof durationRaw === 'string' ? durationRaw : (durationRaw?.text ?? '')
+  let liked: boolean | null = null
+  if (trustLike) {
+    for (const menu of [video['menu'], (node as Record<string, unknown>)['menu']]) {
+      let found: boolean | null = null
+      for (const entry of asMenuItems(menu)) {
+        if (nodeType(entry) !== 'ToggleMenuServiceItem') continue
+        const icon = entry['icon_type']
+        if (icon !== 'FAVORITE' && icon !== 'UNFAVORITE') continue
+        found = icon === 'UNFAVORITE'
+        break
+      }
+      if (found !== null) {
+        liked = found
+        break
+      }
+    }
+  }
+  return {
+    id,
+    title: cleanupMusicName(textOf(video['title']) || 'Unknown title'),
+    artists: cleanupMusicName(artists || 'Unknown artist'),
+    album: albumRaw?.name ? cleanupMusicName(albumRaw.name) : undefined,
+    duration: durationText || undefined,
+    thumbnails: thumbsOf(video['thumbnail'] ?? video['thumbnails']),
+    ...(liked !== null ? { liked } : {}),
+  }
+}
+
+interface MenuEndpoint {
+  call: (actions: unknown) => Promise<unknown>
+}
+
+function asMenuItems(menu: unknown): Record<string, unknown>[] {
+  if (!menu || typeof menu !== 'object') return []
+  const items = (menu as { items?: unknown }).items
+  return Array.isArray(items) ? (items as Record<string, unknown>[]) : []
+}
+
+/** Find the YTM "liked songs" toggle for a track from its up-next menu.
+ *  NOTE: default/toggled swap roles with the current state — when the song is
+ *  already liked, default removes (status INDIFFERENT) and toggled re-adds
+ *  (status LIKE). The payload `status` is the only reliable signal. */
+function findLikeToggle(
+  item: unknown,
+  videoId: string
+): { like: MenuEndpoint | null; unlike: MenuEndpoint | null } {
+  const result = { like: null as MenuEndpoint | null, unlike: null as MenuEndpoint | null }
+  const kind = nodeType(item)
+  const n = item as Record<string, unknown>
+  const video =
+    kind === 'PlaylistPanelVideoWrapper'
+      ? ((n['primary'] as Record<string, unknown> | null) ?? null)
+      : n
+  if (!video || video['video_id'] !== videoId) return result
+  const menus = [video['menu'], n['menu']]
+  for (const menu of menus) {
+    for (const entry of asMenuItems(menu)) {
+      if (nodeType(entry) !== 'ToggleMenuServiceItem') continue
+      const icon = entry['icon_type']
+      if (icon !== 'FAVORITE' && icon !== 'UNFAVORITE') continue
+      for (const key of ['default_endpoint', 'toggled_endpoint'] as const) {
+        const ep = entry[key] as Partial<MenuEndpoint> & {
+          payload?: { status?: string }
+        }
+        if (typeof ep?.call !== 'function') continue
+        const status = ep.payload?.status
+        if (status === 'LIKE' && !result.like) result.like = ep as MenuEndpoint
+        else if (status === 'INDIFFERENT' && !result.unlike) result.unlike = ep as MenuEndpoint
+      }
+      if (result.like && result.unlike) return result
+    }
+  }
+  return result
 }
 
 interface PlaylistPage {
@@ -508,6 +617,107 @@ export class MusicController {
     } catch (err) {
       logger.error({ err }, '[music] home feed failed')
       res.json({ contents: [] })
+    }
+  }
+
+  upnext = async (req: Request, res: Response) => {
+    const id = String(req.query.id || '').trim()
+    if (!id) return res.status(400).json({ error: 'id is required', tracks: [] })
+    // Signed-in sessions get fresh results with per-track like state; public
+    // results are cacheable and carry no like state.
+    const authed = await getAuthedInnertube().catch(() => null)
+    if (!authed) {
+      const cacheKey = `music-upnext-${id.toLowerCase()}`
+      const cached = this.cache.get<{ tracks: MusicTrack[]; playlistId: string | null }>(cacheKey)
+      if (cached) return res.json(cached)
+      try {
+        const yt = await getInnertube()
+        const panel = await yt.music.getUpNext(id)
+        const tracks: MusicTrack[] = []
+        const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+        for (const item of contents) {
+          const track = upnextToTrack(item)
+          if (track) tracks.push(track)
+          if (tracks.length >= 50) break
+        }
+        const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
+        const payload = { tracks, playlistId }
+        this.cache.set(cacheKey, payload, 300)
+        return res.json(payload)
+      } catch (err) {
+        logger.error({ err }, '[music] upnext failed')
+        return res.json({ tracks: [], playlistId: null })
+      }
+    }
+    try {
+      const panel = await authed.music.getUpNext(id)
+      const tracks: MusicTrack[] = []
+      const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+      for (const item of contents) {
+        const track = upnextToTrack(item, true)
+        if (track) tracks.push(track)
+        if (tracks.length >= 50) break
+      }
+      const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
+      res.json({ tracks, playlistId })
+    } catch (err) {
+      logger.error({ err }, '[music] upnext failed')
+      res.json({ tracks: [], playlistId: null })
+    }
+  }
+
+  likedIds = async (_req: Request, res: Response) => {
+    const yt = await getAuthedInnertube().catch(() => null)
+    if (!yt) {
+      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', likedIds: [] })
+    }
+    const cacheKey = 'music-liked-ids'
+    const cached = this.cache.get<string[]>(cacheKey)
+    if (cached) return res.json({ likedIds: cached })
+    try {
+      const tracks = await fetchPlaylistTracks(yt, 'LM', 500)
+      const likedIds = tracks.map((t) => t.id)
+      this.cache.set(cacheKey, likedIds, 120)
+      res.json({ likedIds })
+    } catch (err) {
+      logger.warn({ err }, '[music] liked ids failed, returning empty')
+      res.json({ likedIds: [] })
+    }
+  }
+
+  rate = async (req: Request, res: Response) => {
+    const id = String(req.body?.id ?? req.query.id ?? '').trim()
+    const like = req.body?.like === true || req.body?.like === 'true'
+    if (!id) return res.status(400).json({ error: 'id is required' })
+    const yt = await getAuthedInnertube().catch(() => null)
+    if (!yt) {
+      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED' })
+    }
+    try {
+      const actions =
+        (yt as unknown as { actions?: unknown; session?: { actions?: unknown } }).actions ??
+        (yt as unknown as { session?: { actions?: unknown } }).session?.actions
+      if (!actions) throw new Error('Actions unavailable')
+      // Only ever call the toggle endpoints YouTube Music itself returns for
+      // this track (payload status LIKE/INDIFFERENT). No hand-built endpoints:
+      // raw video ids can differ from the canonical song id and a direct
+      // /like call would orphan entries in Liked Music.
+      const panel = await yt.music.getUpNext(id)
+      const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+      let endpoint: MenuEndpoint | null = null
+      for (const item of contents) {
+        const toggle = findLikeToggle(item, id)
+        endpoint = like ? toggle.like : toggle.unlike
+        if (endpoint) break
+      }
+      if (!endpoint) throw new Error('Like toggle not found for track')
+      await endpoint.call(actions)
+      this.cache.delete('music-liked-ids')
+      logger.info(`[music] rate id=${id} liked=${like} via=toggle`)
+      res.json({ success: true, liked: like })
+    } catch (err) {
+      logger.error({ err }, '[music] rate failed')
+      res.status(502).json({ error: 'Like action failed' })
     }
   }
 }

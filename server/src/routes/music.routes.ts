@@ -16,6 +16,9 @@ export function createMusicRouter(apiCache: AppCache): Router {
   router.get('/music/library', controller.library)
   router.get('/music/playlist', controller.playlist)
   router.get('/music/home', controller.home)
+  router.get('/music/upnext', controller.upnext)
+  router.get('/music/likes', controller.likedIds)
+  router.post('/music/like', controller.rate)
 
   return router
 }

@@ -68,6 +68,7 @@
 }
 
 .stationName {
+  display: block;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -75,6 +76,7 @@
 }
 
 .stationSub {
+  display: block;
   font-size: 12px;
   opacity: 0.65;
   white-space: nowrap;

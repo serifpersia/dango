@@ -27,4 +27,8 @@ export class AppCache {
       this.cache.set(key, entry, { ttl: ttlSeconds * 1000 })
     }
   }
+
+  delete(key: string): void {
+    this.cache.delete(key)
+  }
 }
