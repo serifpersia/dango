@@ -156,6 +156,15 @@ const Header: React.FC = () => {
           ? 'Search ASMR...'
           : 'Search anime...'
 
+  const listLink =
+    contentType === 'manga'
+      ? { to: '/reading-list', label: 'Reading List' }
+      : contentType === 'tv'
+        ? { to: '/tv-watchlist', label: 'TV Watchlist' }
+        : contentType === 'asmr'
+          ? { to: '/listening-list', label: 'Listening List' }
+          : { to: '/watchlist', label: 'Watchlist' }
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     hideVirtualKeyboard()
@@ -193,10 +202,10 @@ const Header: React.FC = () => {
                 Home
               </Link>
               <Link
-                to="/watchlist"
-                className={`${styles.navLink} ${location.pathname === '/watchlist' ? styles.navLinkActive : ''}`}
+                to={listLink.to}
+                className={`${styles.navLink} ${location.pathname.startsWith(listLink.to) ? styles.navLinkActive : ''}`}
               >
-                Watchlist
+                {listLink.label}
               </Link>
               <Link
                 to="/insights"
