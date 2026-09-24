@@ -1111,7 +1111,7 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
       `CREATE TABLE IF NOT EXISTS tv_library (id TEXT PRIMARY KEY, tmdbId INTEGER NOT NULL, mediaType TEXT NOT NULL, title TEXT, poster TEXT, backdrop TEXT, year TEXT, overview TEXT, status TEXT DEFAULT 'Watching', adult INTEGER DEFAULT 0, lastSeason INTEGER, lastEpisode INTEGER, updatedAt INTEGER)`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS tv_progress (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mediaId, season, episode))`
+      `CREATE TABLE IF NOT EXISTS tv_progress (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mediaId, season, episode))`
     )
     db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
     db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
@@ -1145,6 +1145,30 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
     if (!tvProgressColumns.some((c) => c.name === 'adult')) {
       db.run(`ALTER TABLE tv_progress ADD COLUMN adult INTEGER`)
     }
+    if (!tvProgressColumns.some((c) => c.name === 'completed')) {
+      db.run(`ALTER TABLE tv_progress ADD COLUMN completed INTEGER NOT NULL DEFAULT 0`)
+    }
+    db.run(
+      `UPDATE tv_progress SET completed = 1 WHERE completed = 0 AND duration > 0 AND currentTime >= duration * 0.8`
+    )
+    db.run(
+      `CREATE TRIGGER IF NOT EXISTS trg_tv_progress_completed_insert
+       AFTER INSERT ON tv_progress
+       WHEN NEW.duration > 0 AND NEW.currentTime >= NEW.duration * 0.8
+       BEGIN
+         UPDATE tv_progress SET completed = 1
+         WHERE mediaId = NEW.mediaId AND season = NEW.season AND episode = NEW.episode;
+       END`
+    )
+    db.run(
+      `CREATE TRIGGER IF NOT EXISTS trg_tv_progress_completed_update
+       AFTER UPDATE OF currentTime, duration ON tv_progress
+       WHEN OLD.completed = 1 OR (NEW.duration > 0 AND NEW.currentTime >= NEW.duration * 0.8)
+       BEGIN
+         UPDATE tv_progress SET completed = 1
+         WHERE mediaId = NEW.mediaId AND season = NEW.season AND episode = NEW.episode;
+       END`
+    )
 
     db.run(
       `UPDATE OR IGNORE tv_progress SET mediaId = REPLACE(mediaId, '-', ':') WHERE mediaId LIKE 'tv-%' OR mediaId LIKE 'movie-%'`

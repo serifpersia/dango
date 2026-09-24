@@ -40,6 +40,7 @@ export const MenuSlider: React.FC<MenuSliderProps> = ({
       aria-label={label}
       onInput={(e) => onChange(Number((e.target as HTMLInputElement).value))}
       onPointerUp={onCommit}
+      onPointerCancel={onCommit}
       onTouchEnd={onCommit}
       onKeyUp={onCommit}
       onBlur={onCommit}

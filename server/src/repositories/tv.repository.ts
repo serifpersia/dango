@@ -28,6 +28,7 @@ export interface TvProgressRow {
   episode: number
   currentTime: number
   duration: number
+  completed: number
   updatedAt: number
   title?: string | null
   poster?: string | null
@@ -180,21 +181,21 @@ export const TvProgressRepository = {
   getByMedia: (db: DatabaseWrapper, mediaId: string) =>
     dbAll<TvProgressRow>(
       db,
-      'SELECT mediaId, season, episode, currentTime, duration, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC',
+      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC, rowid DESC',
       [mediaId]
     ),
 
   getEpisode: (db: DatabaseWrapper, mediaId: string, season: number, episode: number) =>
     dbGet<TvProgressRow>(
       db,
-      'SELECT mediaId, season, episode, currentTime, duration, updatedAt FROM tv_progress WHERE mediaId = ? AND season = ? AND episode = ?',
+      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? AND season = ? AND episode = ?',
       [mediaId, season, episode]
     ),
 
   getLatest: (db: DatabaseWrapper, mediaId: string) =>
     dbGet<TvProgressRow>(
       db,
-      'SELECT mediaId, season, episode, currentTime, duration, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC LIMIT 1',
+      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC, rowid DESC LIMIT 1',
       [mediaId]
     ),
 
@@ -206,6 +207,7 @@ export const TvProgressRepository = {
       episode: number
       currentTime: number
       duration: number
+      completed: number
       title?: string | null
       poster?: string | null
       backdrop?: string | null
@@ -218,11 +220,12 @@ export const TvProgressRepository = {
   ) =>
     dbRun(
       db,
-      `INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, title, poster, backdrop, year, overview, tmdbId, mediaType, adult, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+      `INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, completed, title, poster, backdrop, year, overview, tmdbId, mediaType, adult, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
        ON CONFLICT(mediaId, season, episode) DO UPDATE SET
           currentTime = EXCLUDED.currentTime,
           duration = EXCLUDED.duration,
+          completed = CASE WHEN tv_progress.completed = 1 OR EXCLUDED.completed = 1 THEN 1 ELSE 0 END,
           title = COALESCE(EXCLUDED.title, tv_progress.title),
           poster = COALESCE(EXCLUDED.poster, tv_progress.poster),
           backdrop = COALESCE(EXCLUDED.backdrop, tv_progress.backdrop),
@@ -238,6 +241,7 @@ export const TvProgressRepository = {
         data.episode,
         data.currentTime,
         data.duration,
+        data.completed,
         data.title ?? null,
         data.poster ?? null,
         data.backdrop ?? null,
@@ -275,15 +279,15 @@ export const TvProgressRepository = {
               COALESCE(l.title, p.title) as title, COALESCE(l.poster, p.poster) as poster, COALESCE(l.backdrop, p.backdrop) as backdrop,
               COALESCE(l.year, p.year) as year, COALESCE(l.overview, p.overview) as overview,
               l.status as watchlistStatus, COALESCE(l.adult, p.adult) as adult,
-              p.season, p.episode, p.currentTime, p.duration, p.updatedAt as progressAt
+              p.season, p.episode, p.currentTime, p.duration, p.completed, p.updatedAt as progressAt
        FROM (
-         SELECT *, ROW_NUMBER() OVER (PARTITION BY mediaId ORDER BY updatedAt DESC) as rn
+         SELECT *, rowid AS progressRowid, ROW_NUMBER() OVER (PARTITION BY mediaId ORDER BY updatedAt DESC, rowid DESC) as rn
          FROM tv_progress
        ) p
        LEFT JOIN tv_library l ON p.mediaId = l.id
        WHERE p.rn = 1
          AND (l.status IS NULL OR l.status = 'Watching')
-       ORDER BY p.updatedAt DESC
+       ORDER BY p.updatedAt DESC, p.progressRowid DESC
        ${limitClause}`
     )
   },

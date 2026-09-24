@@ -158,13 +158,13 @@ export class TvLibraryController {
       const episode = parseInt(req.query.episode as string, 10)
       if (Number.isFinite(season) && Number.isFinite(episode)) {
         const row = TvProgressRepository.getEpisode(db, mediaId, season, episode)
-        res.json(row || { currentTime: 0, duration: 0 })
+        res.json(row || { currentTime: 0, duration: 0, completed: 0 })
         return
       }
       const row = TvProgressRepository.getLatest(db, mediaId)
-      res.json(row || { currentTime: 0, duration: 0 })
+      res.json(row || { currentTime: 0, duration: 0, completed: 0 })
     } catch {
-      res.json({ currentTime: 0, duration: 0 })
+      res.json({ currentTime: 0, duration: 0, completed: 0 })
     }
   }
 
@@ -175,6 +175,7 @@ export class TvLibraryController {
       episode,
       currentTime,
       duration,
+      completed,
       title,
       poster,
       backdrop,
@@ -192,14 +193,20 @@ export class TvLibraryController {
     const episodeNum = Math.max(Number(episode) || 1, 1)
     const timeNum = Math.max(Number(currentTime) || 0, 0)
     const durationNum = Math.max(Number(duration) || 0, 0)
+    const clampedTime = durationNum > 0 ? Math.min(timeNum, durationNum) : timeNum
+    const storedTime =
+      durationNum > 0 && clampedTime >= durationNum * 0.8 ? durationNum : clampedTime
+    const completedNow =
+      Number(completed) === 1 || (durationNum > 0 && storedTime >= durationNum * 0.8) ? 1 : 0
     try {
       await performTvWriteTransaction(tvDb(req), (tx) => {
         TvProgressRepository.upsert(tx, {
           mediaId: String(mediaId),
           season: Math.round(seasonNum),
           episode: Math.round(episodeNum),
-          currentTime: timeNum,
+          currentTime: storedTime,
           duration: durationNum,
+          completed: completedNow,
           title: title ?? null,
           poster: poster ?? null,
           backdrop: backdrop ?? null,

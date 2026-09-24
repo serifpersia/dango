@@ -1,4 +1,5 @@
 import type { PlayerState, VideoSource, VideoLink } from '../types/player'
+import { loadAutoplayEnabled } from '../lib/playbackCompletion'
 
 export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
@@ -33,7 +34,7 @@ export const createInitialState = (): PlayerState => ({
   selectedSource: null,
   selectedLink: null,
   forceNativePlayer: localStorage.getItem('forceNativePlayer') === 'true',
-  isAutoplayEnabled: localStorage.getItem('autoplayEnabled') === 'true',
+  isAutoplayEnabled: loadAutoplayEnabled(),
   showResumeModal: true,
   resumeTime: 0,
   resumeDuration: 0,

@@ -7,6 +7,7 @@ import layoutStyles from './PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
 import { fixThumbnailUrl } from '../lib/utils'
+import { isProgressCompleted, storeAutoplayEnabled } from '../lib/playbackCompletion'
 import { loadHls } from '../lib/hls'
 import { fetchApi } from '../lib/fetchApi'
 import { pickSubtitleIndex } from '../lib/subtitles'
@@ -380,13 +381,17 @@ const Player: React.FC = () => {
   const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
     normalizedShowStatus.includes(status)
   )
-  const isCompleted =
-    state.resumeTime > 0 &&
-    state.resumeDuration > 0 &&
-    state.resumeTime >= state.resumeDuration * 0.8
+  const isCompleted = isProgressCompleted(state.resumeTime, state.resumeDuration)
   const effectiveIsCompleted = isCompleted || hasReachedEpisodeEnd
   const isShowCompleted = isLastEpisode && isFinishedShow && effectiveIsCompleted
   const shouldShowModal = state.showResumeModal && (isShowCompleted || !effectiveIsCompleted)
+  const isEpisodeCompleted = effectiveIsCompleted && !isShowCompleted
+  const shouldShowNextEpisodeModal =
+    isEpisodeCompleted &&
+    queue.length === 0 &&
+    !pendingQueueTransition &&
+    (state.showResumeModal || hasReachedEpisodeEnd)
+  const shouldPauseForModal = shouldShowModal || shouldShowNextEpisodeModal
 
   useEffect(() => {
     const videoElement = refs.videoRef.current
@@ -838,6 +843,7 @@ const Player: React.FC = () => {
   const handleNextEpisode = useCallback(() => {
     if (nextEpisode) {
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      setHasReachedEpisodeEnd(false)
       navigate(`/watch/${showId}/${nextEpisode}`)
     }
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
@@ -918,16 +924,16 @@ const Player: React.FC = () => {
   }, [pendingQueueTransition, queueCountdown, navigate, dispatch])
 
   useEffect(() => {
-    if (shouldShowModal && player.state.isFullscreen) {
+    if (shouldPauseForModal && player.state.isFullscreen) {
       player.actions.toggleFullscreen()
     }
-  }, [shouldShowModal, player.state.isFullscreen, player.actions])
+  }, [shouldPauseForModal, player.state.isFullscreen, player.actions])
 
   useEffect(() => {
-    if (shouldShowModal && refs.videoRef.current) {
+    if (shouldPauseForModal && refs.videoRef.current) {
       refs.videoRef.current.pause()
     }
-  }, [shouldShowModal, refs.videoRef])
+  }, [shouldPauseForModal, refs.videoRef])
 
   const { titlePreference } = useTitlePreference()
   const displayTitle = useMemo(() => {
@@ -1319,8 +1325,24 @@ const Player: React.FC = () => {
     if (isShowCompleted) {
       hasDismissedShowCompletedRef.current = true
     }
+    if (shouldShowNextEpisodeModal) {
+      setHasReachedEpisodeEnd(false)
+    }
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
-  }, [dispatch, isShowCompleted])
+  }, [dispatch, isShowCompleted, shouldShowNextEpisodeModal])
+
+  const handleReplayCompleted = useCallback(() => {
+    setHasReachedEpisodeEnd(false)
+    if (refs.videoRef.current) {
+      try {
+        refs.videoRef.current.currentTime = 0
+        void refs.videoRef.current.play().catch(() => {})
+      } catch {
+        // ignore
+      }
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
+  }, [dispatch, refs])
 
   const handleMoveToCompletedAndNavigate = useCallback(async () => {
     try {
@@ -1385,7 +1407,7 @@ const Player: React.FC = () => {
 
   const handleAutoplayChange = (checked: boolean) => {
     dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } })
-    localStorage.setItem('autoplayEnabled', checked.toString())
+    storeAutoplayEnabled(checked)
   }
 
   const isCurrentEpisodeWatched = !!(
@@ -1584,6 +1606,26 @@ const Player: React.FC = () => {
       </Modal>
 
       <Modal
+        isOpen={shouldShowNextEpisodeModal}
+        onClose={handleCloseModal}
+        title="Episode Completed"
+        width="sm"
+      >
+        <Modal.Body>
+          <p>
+            You&apos;ve already watched Episode <strong>{state.currentEpisode}</strong>.
+            {nextEpisode ? ' Would you like to watch the next episode?' : ''}
+          </p>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="secondary" onClick={handleReplayCompleted}>
+            Replay
+          </Button>
+          {nextEpisode && <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>}
+        </Modal.Actions>
+      </Modal>
+
+      <Modal
         isOpen={!!fallbackPrompt}
         onClose={dismissFallbackPrompt}
         title="Direct stream failed"
@@ -1662,7 +1704,7 @@ const Player: React.FC = () => {
         <div
           className={`${styles.videoContainer} ${!player.state.isFullscreen ? layoutStyles.videoPlayerWrapper : ''} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
           style={{
-            ...(shouldShowModal ? { visibility: 'hidden' } : {}),
+            ...(shouldPauseForModal ? { visibility: 'hidden' } : {}),
           }}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -1672,7 +1714,9 @@ const Player: React.FC = () => {
             onAutoplayChange={handleAutoplayChange}
             fallbackChoice={fallbackChoice}
             onFallbackChoiceChange={updateFallbackChoice}
-            showNextEpisodeButton={!shouldShowModal && showNextEpisodePrompt && queue.length === 0}
+            showNextEpisodeButton={
+              !shouldPauseForModal && showNextEpisodePrompt && queue.length === 0
+            }
             onNextEpisode={handleNextEpisode}
             videoSources={state.videoSources}
             selectedSource={state.selectedSource}

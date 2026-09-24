@@ -36,6 +36,7 @@ export interface TvProgressItem {
   episode: number
   currentTime: number
   duration: number
+  completed?: number | boolean
   updatedAt: number
 }
 
@@ -44,6 +45,7 @@ export interface ContinueWatchingTvItem extends TvLibraryItem {
   episode?: number | null
   currentTime?: number | null
   duration?: number | null
+  completed?: number | boolean | null
   progressAt?: number | null
 }
 
@@ -103,7 +105,7 @@ export const useTvProgress = (mediaId?: string) => {
 }
 
 export const useTvLatestProgress = (mediaId?: string, season?: number, episode?: number) => {
-  return useQuery<TvProgressItem | { currentTime: number; duration: number }>({
+  return useQuery<TvProgressItem | { currentTime: number; duration: number; completed: number }>({
     queryKey: ['tv-progress-latest', mediaId, season, episode],
     queryFn: () => {
       const params = new URLSearchParams()
@@ -205,6 +207,7 @@ export const useSaveTvProgress = () => {
       episode: number
       currentTime: number
       duration?: number
+      completed?: boolean | number
       title?: string
       poster?: string
       backdrop?: string

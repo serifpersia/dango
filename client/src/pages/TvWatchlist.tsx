@@ -71,6 +71,10 @@ export default function TvWatchlist() {
         const dur = item.duration ?? 0
         const s = item.season ?? item.lastSeason ?? 1
         const e = item.episode ?? item.lastEpisode ?? 1
+        const isMovieItem = item.mediaType === 'movie'
+        const episodeLabel = isMovieItem ? 'Movie' : `S${s} E${e}`
+        const isWatched =
+          item.completed === true || item.completed === 1 || (dur > 0 && ct >= dur * 0.8)
         return {
           key: item.id,
           libId: item.id,
@@ -81,11 +85,22 @@ export default function TvWatchlist() {
           year: item.year,
           adult: isTvAdult({ adult: item.adult === 1 }),
           status: item.status,
-          badge: `S${s} E${e}`,
-          progressPercent: dur > 0 ? (ct / dur) * 100 : 0,
+          badge: episodeLabel,
+          progressPercent: isWatched ? 100 : dur > 0 ? (ct / dur) * 100 : 0,
           progressLabel:
-            dur > 0 ? `S${s} E${e} · ${formatTime(ct)} / ${formatTime(dur)}` : `S${s} E${e}`,
-          watchTarget: tvWatchPath(item.mediaType, item.tmdbId, s, e),
+            dur > 0
+              ? isWatched
+                ? 'Watched'
+                : isMovieItem
+                  ? `${formatTime(ct)} / ${formatTime(dur)}`
+                  : `${episodeLabel} · ${formatTime(ct)} / ${formatTime(dur)}`
+              : episodeLabel,
+          watchTarget: tvWatchPath(
+            item.mediaType,
+            item.tmdbId,
+            isMovieItem ? undefined : s,
+            isMovieItem ? undefined : e
+          ),
         }
       })
     }

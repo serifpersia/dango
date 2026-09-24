@@ -256,8 +256,18 @@ const TvHome: React.FC = () => {
           const dur = item.duration ?? 0
           const s = item.season ?? item.lastSeason ?? 1
           const e = item.episode ?? item.lastEpisode ?? 1
-          const label =
-            dur > 0 ? `S${s} E${e} · ${formatTime(ct)} / ${formatTime(dur)}` : `S${s} E${e}`
+          const isMovieItem = item.mediaType === 'movie'
+          const episodeLabel = isMovieItem ? 'Movie' : `S${s} E${e}`
+          const isWatched =
+            item.completed === true || item.completed === 1 || (dur > 0 && ct >= dur * 0.8)
+          const percent = isWatched ? 100 : dur > 0 && ct > 0 ? (ct / dur) * 100 : 0
+          const label = isWatched
+            ? 'Watched'
+            : dur > 0
+              ? isMovieItem
+                ? `${formatTime(ct)} / ${formatTime(dur)}`
+                : `${episodeLabel} · ${formatTime(ct)} / ${formatTime(dur)}`
+              : episodeLabel
           return (
             <MediaCard
               key={item.id}
@@ -265,13 +275,18 @@ const TvHome: React.FC = () => {
                 id: item.id,
                 title: item.title,
                 thumbnail: item.poster || '',
-                typeBadge: item.mediaType === 'movie' ? 'Movie' : 'TV',
-                chapterBadge: `S${s} E${e}`,
+                typeBadge: isMovieItem ? 'Movie' : 'TV',
+                chapterBadge: episodeLabel,
                 isAdult: isTvAdult({ adult: item.adult === 1 }),
               }}
-              linkTo={tvWatchPath(item.mediaType, item.tmdbId, s, e)}
+              linkTo={tvWatchPath(
+                item.mediaType,
+                item.tmdbId,
+                isMovieItem ? undefined : s,
+                isMovieItem ? undefined : e
+              )}
               hoverIcon="play"
-              progress={dur > 0 ? { percent: (ct / dur) * 100, label } : undefined}
+              progress={(dur > 0 || isWatched) && percent > 0 ? { percent, label } : undefined}
               showProgress
               metaRow={item.year ? <span style={{ opacity: 0.75 }}>{item.year}</span> : undefined}
               onRemove={() => setResetTarget({ libId: item.id, title: item.title })}

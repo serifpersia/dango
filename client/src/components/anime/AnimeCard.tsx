@@ -63,8 +63,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
   ({ anime, continueWatching = false, onRemove, config, layout = 'vertical' }) => {
     const ct = anime.currentTime || 0
     const dur = anime.duration || 0
-    const hasProgress = ct > 5 && dur > 5 && ct < dur * 0.95
-    const showFullBar = ct > 0 && (dur <= 5 || ct >= dur * 0.95)
+    const WATCHED_THRESHOLD = 0.8
+    const hasProgress = ct > 5 && dur > 5 && ct < dur * WATCHED_THRESHOLD
+    const showFullBar = ct > 0 && (dur <= 5 || ct >= dur * WATCHED_THRESHOLD)
 
     const episodeToPlay = anime.episodeNumber
 
