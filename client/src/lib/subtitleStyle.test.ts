@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fitSubtitleSize, subtitleBottomPx } from './subtitleStyle'
+import { fitSubtitleSize, formatSubtitleDelay, subtitleBottomPx } from './subtitleStyle'
 
 describe('fitSubtitleSize', () => {
   it('keeps the user size on large video surfaces', () => {
@@ -18,6 +18,14 @@ describe('fitSubtitleSize', () => {
 
   it('floors at a readable minimum', () => {
     expect(fitSubtitleSize(1.8, 40) * 16).toBeGreaterThanOrEqual(13)
+  })
+})
+
+describe('formatSubtitleDelay', () => {
+  it('keeps zero neutral and shows the sign for adjusted timings', () => {
+    expect(formatSubtitleDelay(0)).toBe('0.0s')
+    expect(formatSubtitleDelay(500)).toBe('+0.5s')
+    expect(formatSubtitleDelay(-1500)).toBe('-1.5s')
   })
 })
 

@@ -9,14 +9,28 @@ import { pickSubtitleIndex } from '../../lib/subtitles'
 import SeekBar from '../player/SeekBar'
 import SettingsShell from '../player/SettingsShell'
 import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
+import SubtitleDelayMenu from '../player/SubtitleDelayMenu'
 import AvSyncMenu from '../player/AvSyncMenu'
 import AudioTrackMenu from '../player/AudioTrackMenu'
 import OptionListMenu from '../player/OptionListMenu'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
-import { buildCueCss, fitSubtitleSize, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
+import {
+  buildCueCss,
+  fitSubtitleSize,
+  formatSubtitleDelay,
+  type SubtitleStyleSettings,
+} from '../../lib/subtitleStyle'
 
 type SettingsView =
-  'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'audio' | 'server' | 'av-sync' | null
+  | 'main'
+  | 'quality'
+  | 'subtitles'
+  | 'subtitle-style'
+  | 'subtitle-timing'
+  | 'audio'
+  | 'server'
+  | 'av-sync'
+  | null
 
 interface TvPlayerControlsProps {
   player: ReturnType<typeof useVideoPlayer>
@@ -42,6 +56,8 @@ interface TvPlayerControlsProps {
   videoDelayMs?: number
   onVideoDelayChange?: (ms: number) => void
   onCalibrateAvSync?: () => void
+  subtitleDelayMs?: number
+  onSubtitleDelayChange?: (ms: number) => void
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -68,6 +84,8 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   videoDelayMs = 0,
   onVideoDelayChange,
   onCalibrateAvSync,
+  subtitleDelayMs = 0,
+  onSubtitleDelayChange,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -361,6 +379,12 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           </span>
         </button>
       )}
+      {hasSubtitles && (
+        <button className={styles.menuItem} onClick={() => setSettingsView('subtitle-timing')}>
+          <span>Subtitle Timing</span>
+          <span className={styles.currentValue}>{formatSubtitleDelay(subtitleDelayMs)}</span>
+        </button>
+      )}
       {audioTracks.length > 0 && (
         <button className={styles.menuItem} onClick={() => setSettingsView('audio')}>
           <span>Audio Track</span>
@@ -418,6 +442,14 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         bold: subtitleBold,
       }}
       onChange={handleSubtitleStyleChange}
+    />
+  )
+
+  const renderSubtitleTimingSettings = () => (
+    <SubtitleDelayMenu
+      classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
+      delayMs={subtitleDelayMs}
+      onDelayChange={(ms) => onSubtitleDelayChange?.(ms)}
     />
   )
 
@@ -588,13 +620,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
             ? 'Settings'
             : settingsView === 'subtitle-style'
               ? 'Subtitle Style'
-              : settingsView === 'audio'
-                ? 'Audio Track'
-                : settingsView === 'server'
-                  ? 'Movy Server'
-                  : settingsView === 'av-sync'
-                    ? 'A/V Sync'
-                    : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
+              : settingsView === 'subtitle-timing'
+                ? 'Subtitle Timing'
+                : settingsView === 'audio'
+                  ? 'Audio Track'
+                  : settingsView === 'server'
+                    ? 'Movy Server'
+                    : settingsView === 'av-sync'
+                      ? 'A/V Sync'
+                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
         }
         onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
       >
@@ -602,6 +636,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         {settingsView === 'quality' && renderQualitySettings()}
         {settingsView === 'subtitles' && renderSubtitleSettings()}
         {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
+        {settingsView === 'subtitle-timing' && renderSubtitleTimingSettings()}
         {settingsView === 'audio' && renderAudioSettings()}
         {settingsView === 'server' && renderServerSettings()}
         {settingsView === 'av-sync' && renderAvSyncSettings()}

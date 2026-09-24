@@ -149,6 +149,13 @@ export function fitSubtitleSize(userRem: number, videoH: number): number {
   return Math.min(userPx, Math.max(13, videoH * 0.07)) / 16
 }
 
+export function formatSubtitleDelay(delayMs: number): string {
+  const seconds = Math.abs(delayMs / 1000).toFixed(1)
+  if (delayMs > 0) return `+${seconds}s`
+  if (delayMs < 0) return `-${seconds}s`
+  return '0.0s'
+}
+
 export function subtitleBottomPx(video: HTMLVideoElement, positionPct: number): number {
   const vw = video.clientWidth || 0
   const vh = video.clientHeight || 0
