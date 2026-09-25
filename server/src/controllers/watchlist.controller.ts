@@ -26,6 +26,7 @@ import {
 } from '../lib/anilist.js'
 import { kitsuSearchAnime } from '../lib/kitsu.js'
 import { getMigratedId } from '../lib/migration.js'
+import { offlineDb } from '../lib/offline-db.js'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -645,6 +646,47 @@ export class WatchlistController {
       })
     )
     db.scheduleSave()
+    await this.sweepOfflinePosters(db)
+  }
+
+  private async sweepOfflinePosters(db: DatabaseWrapper): Promise<void> {
+    const [wlMissing, metaMissing] = await Promise.all([
+      WatchlistRepository.getMissingThumbnails(db),
+      ShowsMetaRepository.getShowIdsMissingMeta(db),
+    ])
+    const ids = [...new Set([...wlMissing.map((r) => r.id), ...metaMissing.map((r) => r.id)])].slice(0, 500)
+    if (ids.length === 0) return
+    for (const id of ids) {
+      const poster = this.resolveOfflinePoster(id)
+      if (poster) await this.applyPoster(db, id, poster)
+    }
+    db.scheduleSave()
+  }
+
+  private resolveOfflinePoster(id: string): string | null {
+    if (/^\d+$/.test(id)) {
+      return offlineDb.getByAnilistId(Number(id))?.thumbnail?.trim() || null
+    }
+    const mal = /^mal-(\d+)$/i.exec(id)?.[1]
+    if (mal) return offlineDb.getByMalId(Number(mal))?.thumbnail?.trim() || null
+    return null
+  }
+
+  private async applyPoster(
+    db: DatabaseWrapper,
+    id: string,
+    poster: string
+  ): Promise<void> {
+    try {
+      ShowsMetaRepository.upsert(db, { id, thumbnail: poster })
+    } catch {
+      // ignore
+    }
+    try {
+      await WatchlistRepository.updateThumbnail(db, id, poster)
+    } catch {
+      // ignore
+    }
   }
 
   private async getContinueWatchingData(

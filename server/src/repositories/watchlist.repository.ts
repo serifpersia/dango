@@ -127,4 +127,10 @@ export const WatchlistRepository = {
       db,
       "SELECT id, name, thumbnail, nativeName, englishName FROM watchlist WHERE status = 'Watching'"
     ),
+
+  getMissingThumbnails: (db: DatabaseWrapper) =>
+    dbAll<{ id: string; name: string }>(
+      db,
+      "SELECT id, name FROM watchlist WHERE thumbnail IS NULL OR TRIM(thumbnail) = ''"
+    ),
 }

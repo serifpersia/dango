@@ -1,5 +1,5 @@
 import { DatabaseWrapper } from '../db.js'
-import { dbGet, dbRun } from '../utils/db-utils.js'
+import { dbAll, dbGet, dbRun } from '../utils/db-utils.js'
 
 export const ShowsMetaRepository = {
   getById: (db: DatabaseWrapper, id: string) =>
@@ -74,5 +74,13 @@ export const ShowsMetaRepository = {
     dbRun(
       db,
       'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
+    ),
+
+  getShowIdsMissingMeta: (db: DatabaseWrapper) =>
+    dbAll<{ id: string }>(
+      db,
+      `SELECT DISTINCT we.showId as id FROM watched_episodes we
+       LEFT JOIN shows_meta sm ON sm.id = we.showId
+       WHERE sm.thumbnail IS NULL OR TRIM(sm.thumbnail) = ''`
     ),
 }
