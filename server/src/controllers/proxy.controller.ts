@@ -128,6 +128,38 @@ export class ProxyController {
     'vibeplayer.site',
     'aniwatchtv.site',
   ]
+  private static readonly NEXABLOOM_FAMILY_SUFFIXES = [
+    '.quavex.top',
+    '.nexabloom.top',
+    '.hiddenvertex.top',
+    '.ironhorizon.top',
+    '.solarhaven.top',
+  ]
+  private static readonly NEXABLOOM_FALLBACK_HOSTS = ['fetch.nexabloom.top']
+
+  private static nexabloomFallbackUrls(urlStr: string): string[] {
+    let host = ''
+    try {
+      host = new URL(urlStr).hostname.toLowerCase()
+    } catch {
+      return [urlStr]
+    }
+    if (!ProxyController.NEXABLOOM_FAMILY_SUFFIXES.some((s) => host.endsWith(s))) {
+      return [urlStr]
+    }
+    const urls = [urlStr]
+    for (const fallback of ProxyController.NEXABLOOM_FALLBACK_HOSTS) {
+      if (fallback === host) continue
+      try {
+        const candidate = new URL(urlStr)
+        candidate.hostname = fallback
+        urls.push(candidate.href)
+      } catch {
+        // ignore
+      }
+    }
+    return urls
+  }
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
@@ -261,18 +293,26 @@ export class ProxyController {
             .send(cached)
         }
 
-        const resp = await gotScraping({
-          url: isNexabloomMasterUrl(urlStr) ? signNexabloomMasterUrl(urlStr) : urlStr,
-          method: 'GET',
-          headers,
-          responseType: 'text',
-          timeout: { request: 30000 },
-          followRedirect: true,
-          throwHttpErrors: false,
-        })
+        const resp = await (async () => {
+          let last = null
+          for (const candidate of ProxyController.nexabloomFallbackUrls(urlStr)) {
+            const attempt = await gotScraping({
+              url: isNexabloomMasterUrl(candidate) ? signNexabloomMasterUrl(candidate) : candidate,
+              method: 'GET',
+              headers,
+              responseType: 'text',
+              timeout: { request: 30000 },
+              followRedirect: true,
+              throwHttpErrors: false,
+            })
+            last = attempt
+            if (attempt.statusCode === 200 || attempt.statusCode === 206) return attempt
+          }
+          return last
+        })()
 
-        if (resp.statusCode !== 200 && resp.statusCode !== 206) {
-          return res.status(resp.statusCode ?? 502).send('Upstream error')
+        if (!resp || (resp.statusCode !== 200 && resp.statusCode !== 206)) {
+          return res.status(resp?.statusCode ?? 502).send('Upstream error')
         }
 
         const finalUrl = resp.url || urlStr
