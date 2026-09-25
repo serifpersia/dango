@@ -67,7 +67,13 @@ export default function useAnime4K({
   delayMs = 0,
 }: UseAnime4KOptions) {
   const [isWebGPUSupported, setIsWebGPUSupported] = useState(false)
-  const [isEnabled, setIsEnabled] = useState(false)
+  const [isEnabled, setIsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('anime4kEnabled') === 'true'
+    } catch {
+      return false
+    }
+  })
   const [isInitializing, setIsInitializing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rebuildKey, setRebuildKey] = useState(0)
@@ -631,7 +637,15 @@ export default function useAnime4K({
   }, [isEnabled, isWebGPUSupported, videoRef, canvasRef, profile, rebuildKey])
 
   const toggle = useCallback(() => {
-    setIsEnabled((prev) => !prev)
+    setIsEnabled((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('anime4kEnabled', String(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
   }, [])
 
   return {
