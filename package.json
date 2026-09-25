@@ -1,6 +1,6 @@
 {
   "name": "@serifpersia/dango",
-  "version": "3.3.8",
+  "version": "3.3.9",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "repository": {
@@ -81,5 +81,5 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "versionDate": "2026-09-25T15:25:53.574Z"
+  "versionDate": "2026-09-25T20:56:51.174Z"
 }
