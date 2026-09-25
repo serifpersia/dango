@@ -1,0 +1,168 @@
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pageBtn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  min-width: 28px;
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.pageBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pageBtn span {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.pageInfo {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pageInfo strong {
+  color: var(--text-primary);
+}
+
+.pagePicker {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  width: 210px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  touch-action: manipulation;
+}
+
+.dropdown.flipDown {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.jumpRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.jumpInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.jumpGo {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jumpGo:hover {
+  border-color: var(--accent);
+}
+
+.optionList {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.optionBtn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 6px 0;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.optionBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.optionBtn:disabled {
+  cursor: default;
+}
+
+.optionBtn.current {
+  font-weight: 800;
+  background: var(--bg-tertiary);
+}
+
+@media (pointer: coarse) {
+  .dropdown {
+    width: 240px;
+    padding: 12px;
+  }
+
+  .jumpInput {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .jumpGo {
+    min-height: 44px;
+    padding: 6px 16px;
+  }
+
+  .optionList {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    max-height: 220px;
+  }
+
+  .optionBtn {
+    min-height: 44px;
+    font-size: 0.9rem;
+  }
+
+  .pageBtn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}

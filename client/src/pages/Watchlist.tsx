@@ -28,6 +28,7 @@ import {
   addPageToSelection,
   removePageFromSelection,
 } from '../lib/watchlistSelection'
+import Pagination from '../components/common/Pagination'
 import styles from './Watchlist.module.css'
 
 const FILTERS = [
@@ -386,6 +387,8 @@ const Watchlist: React.FC = () => {
 
   const canGoNext = list.length >= 14 && nextPageData && nextPageData.data.length > 0
 
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / 14)), [total])
+
   return (
     <div className="page-container">
       <header className={styles.header}>
@@ -540,27 +543,13 @@ const Watchlist: React.FC = () => {
             <span>Bulk Manage</span>
           </button>
           {total > 0 && (
-            <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page === 1 || isLoading}
-                aria-label="Previous page"
-              >
-                <Icon name="chevron-left" size={14} />
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                onClick={() => handlePageChange(page + 1)}
-                disabled={!canGoNext || isLoading}
-                aria-label="Next page"
-              >
-                <Icon name="chevron-right" size={14} />
-              </button>
-            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              canGoNext={canGoNext}
+              onChange={handlePageChange}
+              isLoading={isLoading}
+            />
           )}
         </div>
       </div>
@@ -842,27 +831,14 @@ const Watchlist: React.FC = () => {
 
       {total > 0 && (
         <div className={styles.bottomPagination}>
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1 || isLoading}
-            >
-              <Icon name="chevron-left" size={14} />
-              <span>Previous</span>
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page + 1)}
-              disabled={!canGoNext || isLoading}
-            >
-              <span>Next</span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            canGoNext={canGoNext}
+            onChange={handlePageChange}
+            isLoading={isLoading}
+            variant="labeled"
+          />
         </div>
       )}
 

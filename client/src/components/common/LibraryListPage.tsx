@@ -1,6 +1,7 @@
 import React, { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import Icon from './Icon'
+import Pagination from './Pagination'
 import SkeletonGrid from './SkeletonGrid'
 import ErrorMessage from './ErrorMessage'
 import { Modal } from './Modal'
@@ -202,27 +203,13 @@ function LibraryListPage<T extends LibraryListEntry>({
             <span>Bulk Manage</span>
           </button>
           {total > 0 && (
-            <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                onClick={() => onPageChange(Math.max(1, page - 1))}
-                disabled={page === 1 || isLoading}
-                aria-label="Previous page"
-              >
-                <Icon name="chevron-left" size={14} />
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                onClick={() => onPageChange(page + 1)}
-                disabled={entries.length < pageSize || isLoading}
-                aria-label="Next page"
-              >
-                <Icon name="chevron-right" size={14} />
-              </button>
-            </div>
+            <Pagination
+              page={page}
+              totalPages={Math.max(1, Math.ceil(total / pageSize))}
+              canGoNext={entries.length >= pageSize}
+              onChange={onPageChange}
+              isLoading={isLoading}
+            />
           )}
         </div>
       </div>
@@ -333,27 +320,14 @@ function LibraryListPage<T extends LibraryListEntry>({
 
       {total > 0 && (
         <div className={styles.bottomPagination}>
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => onPageChange(Math.max(1, page - 1))}
-              disabled={page === 1 || isLoading}
-            >
-              <Icon name="chevron-left" size={14} />
-              <span>Previous</span>
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => onPageChange(page + 1)}
-              disabled={entries.length < pageSize || isLoading}
-            >
-              <span>Next</span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, Math.ceil(total / pageSize))}
+            canGoNext={entries.length >= pageSize}
+            onChange={onPageChange}
+            isLoading={isLoading}
+            variant="labeled"
+          />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router'
 import Icon from '../components/common/Icon'
+import Pagination from '../components/common/Pagination'
 import TvCard from '../components/tv/TvCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
@@ -386,27 +387,13 @@ export default function TvSearch() {
         </h2>
 
         {results.length > 0 && (
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1 || isLoading}
-              aria-label="Previous page"
-            >
-              <Icon name="chevron-left" size={14} />
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page + 1)}
-              disabled={!canGoNext || isLoading}
-              aria-label="Next page"
-            >
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, Math.min(totalPages, 500))}
+            canGoNext={canGoNext}
+            onChange={handlePageChange}
+            isLoading={isLoading}
+          />
         )}
       </div>
 
@@ -441,27 +428,14 @@ export default function TvSearch() {
 
       {results.length > 0 && (
         <div className={styles.bottomPagination}>
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1 || isLoading}
-            >
-              <Icon name="chevron-left" size={14} />
-              <span>Previous</span>
-            </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page + 1)}
-              disabled={!canGoNext || isLoading}
-            >
-              <span>Next</span>
-              <Icon name="chevron-right" size={14} />
-            </button>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, Math.min(totalPages, 500))}
+            canGoNext={canGoNext}
+            onChange={handlePageChange}
+            isLoading={isLoading}
+            variant="labeled"
+          />
         </div>
       )}
     </div>

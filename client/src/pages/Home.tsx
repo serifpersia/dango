@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import Icon from '../components/common/Icon'
+import Pagination from '../components/common/Pagination'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
 import LatestReleasesList from '../components/anime/LatestReleasesList'
@@ -218,41 +219,19 @@ const Home: React.FC = () => {
                   ]}
                 />
                 <div className={styles['pagination-controls']}>
-                  <button
-                    className={styles['nav-button']}
-                    onClick={() => {
-                      if (page > 1) {
-                        setPage((p) => p - 1)
-                        if (seasonalRef.current) {
-                          const y =
-                            seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
-                          window.scrollTo({ top: y, behavior: 'smooth' })
-                        }
-                      }
-                    }}
-                    disabled={page === 1}
-                    style={{ opacity: page === 1 ? 0.3 : 1 }}
-                    aria-label="Previous page"
-                  >
-                    <Icon name="chevron-left" size={14} />
-                  </button>
-                  <span className={styles['page-info']}>{page}</span>
-                  <button
-                    className={styles['nav-button']}
-                    onClick={() => {
-                      setPage((p) => p + 1)
+                  <Pagination
+                    page={page}
+                    canGoNext={canGoNext}
+                    onChange={(p) => {
+                      setPage(p)
                       if (seasonalRef.current) {
                         const y =
                           seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
                         window.scrollTo({ top: y, behavior: 'smooth' })
                       }
                     }}
-                    disabled={!canGoNext}
-                    style={{ opacity: canGoNext ? 1 : 0.3 }}
-                    aria-label="Next page"
-                  >
-                    <Icon name="chevron-right" size={14} />
-                  </button>
+                    isLoading={loadingSeason}
+                  />
                 </div>
               </div>
             </div>

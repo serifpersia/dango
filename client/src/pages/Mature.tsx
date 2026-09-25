@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
+import Pagination from '../components/common/Pagination'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import MatureConsentModal from '../components/common/MatureConsentModal'
@@ -617,23 +618,13 @@ export default function Mature() {
               {(response?.total ?? results.length) === 1 ? '' : 's'}
             </h2>
             <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                disabled={page <= 1}
-                onClick={() => handlePageChange(page - 1)}
-              >
-                <Icon name="chevron-left" /> <span>Prev</span>
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                disabled={!hasMore}
-                onClick={() => handlePageChange(page + 1)}
-              >
-                <span>Next</span> <Icon name="chevron-right" />
-              </button>
+              <Pagination
+                page={page}
+                totalPages={Math.max(1, Math.ceil((response?.total ?? 0) / limit))}
+                canGoNext={hasMore}
+                onChange={handlePageChange}
+                variant="labeled"
+              />
             </div>
           </div>
           <div className={styles.resultsGrid}>
@@ -645,23 +636,13 @@ export default function Mature() {
           </div>
           <div className={styles.bottomPagination}>
             <div className={styles.pagination}>
-              <button
-                className={styles.pageBtn}
-                disabled={page <= 1}
-                onClick={() => handlePageChange(page - 1)}
-              >
-                <Icon name="chevron-left" /> <span>Prev</span>
-              </button>
-              <span className={styles.pageInfo}>
-                Page <strong>{page}</strong>
-              </span>
-              <button
-                className={styles.pageBtn}
-                disabled={!hasMore}
-                onClick={() => handlePageChange(page + 1)}
-              >
-                <span>Next</span> <Icon name="chevron-right" />
-              </button>
+              <Pagination
+                page={page}
+                totalPages={Math.max(1, Math.ceil((response?.total ?? 0) / limit))}
+                canGoNext={hasMore}
+                onChange={handlePageChange}
+                variant="labeled"
+              />
             </div>
           </div>
         </>
