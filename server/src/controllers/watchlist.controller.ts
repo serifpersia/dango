@@ -631,7 +631,12 @@ export class WatchlistController {
           const dual = row as { _id: string } & Record<string, unknown>
           if (dual._id !== undefined) dual._id = row.id
           try {
-            ShowsMetaRepository.upsert(db, { id: row.id, thumbnail: poster })
+            ShowsMetaRepository.upsert(db, {
+              id: row.id,
+              thumbnail: poster,
+              popularityScore:
+                meta?.score ?? (meta?.averageScore != null ? meta.averageScore / 10 : undefined),
+            })
           } catch {
             // ignore
           }
@@ -650,6 +655,15 @@ export class WatchlistController {
   }
 
   private async sweepOfflinePosters(db: DatabaseWrapper): Promise<void> {
+    try {
+      db.run(
+        `UPDATE shows_meta SET name = (SELECT w.name FROM watchlist w WHERE w.id = shows_meta.id)
+         WHERE (name IS NULL OR TRIM(name) = '')
+         AND EXISTS (SELECT 1 FROM watchlist w WHERE w.id = shows_meta.id AND w.name IS NOT NULL AND TRIM(w.name) != '')`
+      )
+    } catch {
+      // ignore
+    }
     const [wlMissing, metaMissing] = await Promise.all([
       WatchlistRepository.getMissingThumbnails(db),
       ShowsMetaRepository.getShowIdsMissingMeta(db),

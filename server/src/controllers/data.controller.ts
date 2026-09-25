@@ -741,6 +741,8 @@ export class DataController {
             thumbnail: poster,
             nativeName: meta.nativeName,
             englishName: meta.englishName,
+            popularityScore:
+              meta.score ?? (meta.averageScore != null ? meta.averageScore / 10 : undefined),
             genres: meta.genres
               ? JSON.stringify(
                   meta.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)

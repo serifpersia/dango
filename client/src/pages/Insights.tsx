@@ -125,13 +125,14 @@ const Insights: React.FC = () => {
   )
 
   const getShowTitle = (show: TopShow) => {
+    const fallback = show.name || show.englishName || show.nativeName || ''
     switch (titlePreference) {
       case 'nativeName':
-        return show.nativeName || show.name
+        return show.nativeName || fallback
       case 'englishName':
-        return show.englishName || show.name
+        return show.englishName || fallback
       default:
-        return show.name
+        return fallback
     }
   }
 
@@ -497,7 +498,7 @@ const Insights: React.FC = () => {
                 <h3 className={styles.genreTitle}>{card.name}</h3>
                 <div className={styles.genreStats}>
                   <span>{card.count} episodes</span>
-                  <span>{card.meanScore.toFixed(1)} avg score</span>
+                  <span>{card.meanScore > 0 ? `${card.meanScore.toFixed(1)} avg score` : '—'}</span>
                   <span>{card.timeWatched}</span>
                 </div>
                 <div className={styles.posterRow}>

@@ -116,7 +116,8 @@ export class InsightsController {
       for (let i = 1; i < allWatches.length; i++) {
         const prev = new Date(allWatches[i - 1].watchedAt).getTime()
         const curr = new Date(allWatches[i].watchedAt).getTime()
-        if (curr - prev < 3600000) {
+        const gap = curr - prev
+        if (Number.isFinite(gap) && gap > 0 && gap < 3600000) {
           currentSessionSeconds += allWatches[i].effectiveSeconds ?? allWatches[i].currentTime
         } else {
           sessions.push(currentSessionSeconds)
@@ -274,7 +275,7 @@ export class InsightsController {
         if (score > 0) genreData[genre].scores.push(score)
         genreData[genre].showWatches[row.showId] =
           (genreData[genre].showWatches[row.showId] || 0) + 1
-        if (row.name && row.thumbnail) {
+        if (row.name || row.thumbnail) {
           genreData[genre].showMeta[row.showId] = {
             name: row.name,
             nativeName: row.nativeName,
