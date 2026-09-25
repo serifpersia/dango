@@ -196,6 +196,11 @@ export default function useAnime4K({
       setError(null)
       errorCountRef.current = 0
       lastFrameRef.current = -1
+      lastTimeRef.current = -1
+      lastCapturedRef.current = -1
+      hasPrimedRef.current = false
+      primedDelayRef.current = 0
+      flushDelayQueue()
       inFlightRef.current = false
 
       try {
@@ -636,6 +641,15 @@ export default function useAnime4K({
     }
   }, [isEnabled, isWebGPUSupported, videoRef, canvasRef, profile, rebuildKey])
 
+  const setEnabled = useCallback((next: boolean) => {
+    setIsEnabled(next)
+    try {
+      localStorage.setItem('anime4kEnabled', String(next))
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const toggle = useCallback(() => {
     setIsEnabled((prev) => {
       const next = !prev
@@ -654,5 +668,6 @@ export default function useAnime4K({
     isInitializing,
     error,
     toggle,
+    setEnabled,
   }
 }

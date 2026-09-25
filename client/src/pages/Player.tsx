@@ -236,6 +236,66 @@ const Player: React.FC = () => {
   })
 
   const upscalerActive = upscaler.isEnabled && upscaler.isWebGPUSupported
+  const upscalerEpisodeKey = `${showId ?? ''}:${state.currentEpisode ?? ''}`
+  const prevUpscalerEpisodeKeyRef = useRef<string | null>(null)
+  const upscalerCyclePendingRef = useRef(false)
+  const upscalerDisableObservedRef = useRef(false)
+  const upscalerSetEnabledRef = useRef(upscaler.setEnabled)
+  upscalerSetEnabledRef.current = upscaler.setEnabled
+  useEffect(() => {
+    const prevKey = prevUpscalerEpisodeKeyRef.current
+    prevUpscalerEpisodeKeyRef.current = upscalerEpisodeKey
+    if (prevKey === null || prevKey === upscalerEpisodeKey) return
+    if (!upscaler.isEnabled || !upscaler.isWebGPUSupported) return
+    upscalerCyclePendingRef.current = true
+    upscalerDisableObservedRef.current = false
+    upscalerSetEnabledRef.current(false)
+  }, [upscalerEpisodeKey, upscaler.isEnabled, upscaler.isWebGPUSupported])
+  useEffect(() => {
+    if (!upscalerCyclePendingRef.current) return
+    if (upscaler.isEnabled) {
+      if (upscalerDisableObservedRef.current) upscalerCyclePendingRef.current = false
+      return
+    }
+    upscalerDisableObservedRef.current = true
+    if (state.loadingVideo || !state.selectedLink) return
+    if (state.selectedSource?.type === 'iframe') {
+      upscalerCyclePendingRef.current = false
+      upscalerSetEnabledRef.current(true)
+      return
+    }
+    const video = refs.videoRef.current
+    if (!video) return
+    let timer: number | undefined
+    let settled = false
+    const reenable = () => {
+      if (settled) return
+      settled = true
+      upscalerCyclePendingRef.current = false
+      upscalerSetEnabledRef.current(true)
+    }
+    if (video.readyState >= 2) {
+      timer = window.setTimeout(reenable, 500)
+      return () => window.clearTimeout(timer)
+    }
+    const onReady = () => {
+      window.setTimeout(reenable, 500)
+    }
+    video.addEventListener('canplay', onReady, { once: true })
+    video.addEventListener('playing', onReady, { once: true })
+    timer = window.setTimeout(reenable, 5000)
+    return () => {
+      window.clearTimeout(timer)
+      video.removeEventListener('canplay', onReady)
+      video.removeEventListener('playing', onReady)
+    }
+  }, [
+    upscaler.isEnabled,
+    state.loadingVideo,
+    state.selectedLink,
+    state.selectedSource?.type,
+    refs.videoRef,
+  ])
   useDelayCanvas({
     videoRef: refs.videoRef,
     canvasRef: delayCanvasRef,
