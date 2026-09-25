@@ -139,4 +139,31 @@ export const InsightsRepository = {
       FROM watched_episodes we
       JOIN shows_meta sm ON we.showId = sm.id`
     ),
+
+  getLibraryShowsWithGenres: (db: DatabaseWrapper) =>
+    dbAll<{
+      id: string
+      status: string
+      title: string
+      genres: string
+      episodesWatched: number
+      popularityScore: number
+    }>(
+      db,
+      `SELECT
+        w.id,
+        w.status,
+        COALESCE(NULLIF(sm.englishName, ''), sm.name, w.name) as title,
+        sm.genres,
+        (SELECT COUNT(*) FROM watched_episodes we WHERE we.showId = w.id) as episodesWatched,
+        COALESCE(sm.popularityScore, 0) as popularityScore
+      FROM watchlist w
+      LEFT JOIN shows_meta sm ON sm.id = w.id`
+    ),
+
+  getAllAnilistIds: (db: DatabaseWrapper) =>
+    dbAll<{ anilistId: number }>(
+      db,
+      'SELECT anilistId FROM shows_meta WHERE anilistId IS NOT NULL'
+    ),
 }
