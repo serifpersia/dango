@@ -44,7 +44,13 @@ const Music: React.FC = () => {
 
   const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('')
-  const [cookieInput, setCookieInput] = useState('')
+  const [cookieInput, setCookieInput] = useState(() => {
+    try {
+      return localStorage.getItem('ytmusic_cookie') ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [extracting, setExtracting] = useState(false)
   const [shuffle, setShuffle] = useState(() => localStorage.getItem('musicShuffle') === 'true')
   const [radio, setRadio] = useState(() => localStorage.getItem('musicRadio') !== 'false')
@@ -119,9 +125,13 @@ const Music: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dango:get-ytmusic-cookie'))
   }
   const { data: searchData, isLoading: searchLoading } = useMusicSearch(query)
-  const { data: libraryData, isLoading: libraryLoading } = useMusicLibrary(
-    auth?.authenticated === true
-  )
+  const {
+    data: libraryData,
+    isLoading: libraryLoading,
+    isFetching: libraryFetching,
+    error: libraryError,
+    refetch: refetchLibrary,
+  } = useMusicLibrary(auth?.authenticated === true)
   const { data: playlistData, isLoading: playlistLoading } = useMusicPlaylist(
     openPlaylist?.id ?? null
   )
@@ -598,6 +608,27 @@ const Music: React.FC = () => {
               <h2 className={radioStyles.sectionTitle}>Your library</h2>
               {libraryLoading ? (
                 <p className={asmrStyles.statusMsg}>Loading library…</p>
+              ) : libPlaylists.length === 0 && libraryTracks.length === 0 && !openPlaylist ? (
+                <>
+                  <p className={asmrStyles.statusMsg}>
+                    {libraryError
+                      ? 'Library failed to load.'
+                      : 'Your library came back empty — YouTube sometimes drops the saved session.'}
+                  </p>
+                  <div style={{ marginBottom: 8 }}>
+                    <button
+                      className={musicStyles.btnGhost}
+                      onClick={() => void refetchLibrary()}
+                      disabled={libraryFetching}
+                      aria-label="Retry loading library"
+                    >
+                      {libraryFetching ? 'Retrying…' : 'Retry'}
+                    </button>
+                  </div>
+                  <p className={asmrStyles.statusMsg}>
+                    If it keeps happening, sign out and paste a fresh cookie.
+                  </p>
+                </>
               ) : (
                 <>
                   {libPlaylists.length > 0 && !openPlaylist && (

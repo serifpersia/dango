@@ -44,7 +44,8 @@ export const useMusicSaveCookie = () => {
         method: 'POST',
         body: JSON.stringify({ cookie }),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, cookie) => {
+      localStorage.setItem('ytmusic_cookie', cookie)
       qc.invalidateQueries({ queryKey: ['music-auth'] })
       qc.invalidateQueries({ queryKey: ['music-library'] })
     },

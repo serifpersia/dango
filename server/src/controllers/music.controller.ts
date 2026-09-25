@@ -5,6 +5,7 @@ import logger from '../logger.js'
 import {
   getInnertube,
   getAuthedInnertube,
+  refreshAuthedInnertube,
   saveMusicCookie,
   getMusicAuthStatus,
   signOutMusic,
@@ -176,6 +177,21 @@ interface MenuEndpoint {
   call: (actions: unknown) => Promise<unknown>
 }
 
+function parseUpnext(
+  panel: unknown,
+  trustLike: boolean
+): { tracks: MusicTrack[]; playlistId: string | null } {
+  const tracks: MusicTrack[] = []
+  const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+  for (const item of contents) {
+    const track = upnextToTrack(item, trustLike)
+    if (track) tracks.push(track)
+    if (tracks.length >= 50) break
+  }
+  const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
+  return { tracks, playlistId }
+}
+
 function asMenuItems(menu: unknown): Record<string, unknown>[] {
   if (!menu || typeof menu !== 'object') return []
   const items = (menu as { items?: unknown }).items
@@ -319,11 +335,10 @@ const UPSTREAM_UA =
 const audioCache = new Map<string, DecipheredAudio>()
 const AUDIO_CACHE_MS = 5 * 60 * 1000
 
-async function decipherAudio(videoId: string): Promise<DecipheredAudio> {
-  const cached = audioCache.get(videoId)
-  if (cached && Date.now() - cached.fetchedAt < AUDIO_CACHE_MS) return cached
-  const authed = await getAuthedInnertube().catch(() => null)
-  const yt = authed ?? (await getInnertube())
+async function decipherWith(
+  yt: Awaited<ReturnType<typeof getInnertube>>,
+  videoId: string
+): Promise<DecipheredAudio> {
   const info = await yt.music.getInfo(videoId)
   const streaming = (
     info as unknown as {
@@ -356,6 +371,34 @@ async function decipherAudio(videoId: string): Promise<DecipheredAudio> {
     }
   }
   throw new Error('No stream available')
+}
+
+async function decipherAudio(videoId: string): Promise<DecipheredAudio> {
+  const cached = audioCache.get(videoId)
+  if (cached && Date.now() - cached.fetchedAt < AUDIO_CACHE_MS) return cached
+  const authed = await getAuthedInnertube().catch(() => null)
+  if (authed) {
+    try {
+      return await decipherWith(authed, videoId)
+    } catch (err) {
+      logger.warn(
+        { err },
+        '[music] authed stream lookup failed, retrying with a fresh saved-cookie session'
+      )
+      const fresh = await refreshAuthedInnertube()
+      if (fresh) {
+        try {
+          return await decipherWith(fresh, videoId)
+        } catch (retryErr) {
+          logger.warn(
+            { err: retryErr },
+            '[music] refreshed stream lookup failed, falling back to public session'
+          )
+        }
+      }
+    }
+  }
+  return decipherWith(await getInnertube(), videoId)
 }
 
 const PASSTHROUGH_HEADERS = ['content-type', 'content-length', 'content-range', 'accept-ranges']
@@ -584,27 +627,49 @@ export class MusicController {
   playlist = async (req: Request, res: Response) => {
     const id = String(req.query.id || '').trim()
     if (!id) return res.status(400).json({ error: 'id is required', tracks: [] })
-    const yt = await getAuthedInnertube()
+    const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
       return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [] })
     }
     try {
       res.json({ tracks: await fetchPlaylistTracks(yt, id) })
     } catch (err) {
-      logger.warn({ err }, '[music] playlist failed, returning empty')
-      res.json({ tracks: [] })
+      logger.warn(
+        { err },
+        '[music] playlist failed, retrying with a fresh saved-cookie session'
+      )
+      const fresh = await refreshAuthedInnertube()
+      if (!fresh) return res.json({ tracks: [] })
+      try {
+        res.json({ tracks: await fetchPlaylistTracks(fresh, id) })
+      } catch (retryErr) {
+        logger.warn({ err: retryErr }, '[music] playlist retry failed, returning empty')
+        res.json({ tracks: [] })
+      }
     }
   }
 
   library = async (_req: Request, res: Response) => {
-    const yt = await getAuthedInnertube()
+    const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
       return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [], playlists: [] })
     }
     try {
-      res.json(await readLibrary(yt))
+      const first = await readLibrary(yt)
+      if (first.tracks.length > 0 || first.playlists.length > 0) return res.json(first)
+      logger.warn('[music] library came back empty, retrying with a fresh saved-cookie session')
     } catch (err) {
-      logger.warn({ err }, '[music] library failed, returning empty')
+      logger.warn(
+        { err },
+        '[music] library failed, retrying with a fresh saved-cookie session'
+      )
+    }
+    const fresh = await refreshAuthedInnertube()
+    if (!fresh) return res.json({ tracks: [], playlists: [] })
+    try {
+      res.json(await readLibrary(fresh))
+    } catch (err) {
+      logger.warn({ err }, '[music] library retry failed, returning empty')
       res.json({ tracks: [], playlists: [] })
     }
   }
@@ -632,16 +697,7 @@ export class MusicController {
       if (cached) return res.json(cached)
       try {
         const yt = await getInnertube()
-        const panel = await yt.music.getUpNext(id)
-        const tracks: MusicTrack[] = []
-        const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
-        for (const item of contents) {
-          const track = upnextToTrack(item)
-          if (track) tracks.push(track)
-          if (tracks.length >= 50) break
-        }
-        const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
-        const payload = { tracks, playlistId }
+        const payload = parseUpnext(await yt.music.getUpNext(id), false)
         this.cache.set(cacheKey, payload, 300)
         return res.json(payload)
       } catch (err) {
@@ -650,19 +706,27 @@ export class MusicController {
       }
     }
     try {
-      const panel = await authed.music.getUpNext(id)
-      const tracks: MusicTrack[] = []
-      const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
-      for (const item of contents) {
-        const track = upnextToTrack(item, true)
-        if (track) tracks.push(track)
-        if (tracks.length >= 50) break
+      return res.json(parseUpnext(await authed.music.getUpNext(id), true))
+    } catch (err) {
+      logger.warn(
+        { err },
+        '[music] authed upnext failed, retrying with a fresh saved-cookie session'
+      )
+    }
+    const fresh = await refreshAuthedInnertube()
+    if (fresh) {
+      try {
+        return res.json(parseUpnext(await fresh.music.getUpNext(id), true))
+      } catch (retryErr) {
+        logger.warn({ err: retryErr }, '[music] upnext retry failed, falling back to public')
       }
-      const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
-      res.json({ tracks, playlistId })
+    }
+    try {
+      const yt = await getInnertube()
+      return res.json(parseUpnext(await yt.music.getUpNext(id), false))
     } catch (err) {
       logger.error({ err }, '[music] upnext failed')
-      res.json({ tracks: [], playlistId: null })
+      return res.json({ tracks: [], playlistId: null })
     }
   }
 
@@ -674,14 +738,31 @@ export class MusicController {
     const cacheKey = 'music-liked-ids'
     const cached = this.cache.get<string[]>(cacheKey)
     if (cached) return res.json({ likedIds: cached })
+    const fetchLikedIds = async (
+      session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
+    ): Promise<string[]> => {
+      const tracks = await fetchPlaylistTracks(session, 'LM', 500)
+      return tracks.map((t) => t.id)
+    }
     try {
-      const tracks = await fetchPlaylistTracks(yt, 'LM', 500)
-      const likedIds = tracks.map((t) => t.id)
+      const likedIds = await fetchLikedIds(yt)
       this.cache.set(cacheKey, likedIds, 120)
       res.json({ likedIds })
     } catch (err) {
-      logger.warn({ err }, '[music] liked ids failed, returning empty')
-      res.json({ likedIds: [] })
+      logger.warn(
+        { err },
+        '[music] liked ids failed, retrying with a fresh saved-cookie session'
+      )
+      const fresh = await refreshAuthedInnertube()
+      if (!fresh) return res.json({ likedIds: [] })
+      try {
+        const likedIds = await fetchLikedIds(fresh)
+        this.cache.set(cacheKey, likedIds, 120)
+        res.json({ likedIds })
+      } catch (retryErr) {
+        logger.warn({ err: retryErr }, '[music] liked ids retry failed, returning empty')
+        res.json({ likedIds: [] })
+      }
     }
   }
 
@@ -693,16 +774,18 @@ export class MusicController {
     if (!yt) {
       return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED' })
     }
-    try {
+    const attempt = async (
+      session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
+    ): Promise<void> => {
       const actions =
-        (yt as unknown as { actions?: unknown; session?: { actions?: unknown } }).actions ??
-        (yt as unknown as { session?: { actions?: unknown } }).session?.actions
+        (session as unknown as { actions?: unknown; session?: { actions?: unknown } }).actions ??
+        (session as unknown as { session?: { actions?: unknown } }).session?.actions
       if (!actions) throw new Error('Actions unavailable')
       // Only ever call the toggle endpoints YouTube Music itself returns for
       // this track (payload status LIKE/INDIFFERENT). No hand-built endpoints:
       // raw video ids can differ from the canonical song id and a direct
       // /like call would orphan entries in Liked Music.
-      const panel = await yt.music.getUpNext(id)
+      const panel = await session.music.getUpNext(id)
       const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
       let endpoint: MenuEndpoint | null = null
       for (const item of contents) {
@@ -712,12 +795,25 @@ export class MusicController {
       }
       if (!endpoint) throw new Error('Like toggle not found for track')
       await endpoint.call(actions)
-      this.cache.delete('music-liked-ids')
-      logger.info(`[music] rate id=${id} liked=${like} via=toggle`)
-      res.json({ success: true, liked: like })
-    } catch (err) {
-      logger.error({ err }, '[music] rate failed')
-      res.status(502).json({ error: 'Like action failed' })
     }
+    try {
+      await attempt(yt)
+    } catch (err) {
+      logger.warn(
+        { err },
+        '[music] rate failed, retrying with a fresh saved-cookie session'
+      )
+      const fresh = await refreshAuthedInnertube()
+      if (!fresh) return res.status(502).json({ error: 'Like action failed' })
+      try {
+        await attempt(fresh)
+      } catch (retryErr) {
+        logger.error({ err: retryErr }, '[music] rate retry failed')
+        return res.status(502).json({ error: 'Like action failed' })
+      }
+    }
+    this.cache.delete('music-liked-ids')
+    logger.info(`[music] rate id=${id} liked=${like} via=toggle`)
+    res.json({ success: true, liked: like })
   }
 }

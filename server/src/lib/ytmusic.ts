@@ -84,17 +84,31 @@ export function getInnertube(): Promise<Innertube> {
 }
 
 /** Authenticated session built from the saved cookie. Null when not signed in. */
-export async function getAuthedInnertube(): Promise<Innertube | null> {
+export async function getAuthedInnertube(forceRefresh = false): Promise<Innertube | null> {
   const cookie = readCookie()
   if (!cookie) {
     authedTube = null
     return null
   }
-  if (authedTube) return authedTube
+  if (authedTube && !forceRefresh) return authedTube
   await ensureShim()
   const { Innertube } = await loadYoutube()
   authedTube = await Innertube.create({ cookie })
   return authedTube
+}
+
+export function invalidateAuthedSession(): void {
+  authedTube = null
+}
+
+export async function refreshAuthedInnertube(): Promise<Innertube | null> {
+  invalidateAuthedSession()
+  try {
+    return await getAuthedInnertube()
+  } catch (err) {
+    logger.warn({ err }, '[ytmusic] saved-cookie session refresh failed')
+    return null
+  }
 }
 
 export function getMusicAuthStatus(): YTMusicAuthStatus {
