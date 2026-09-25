@@ -65,7 +65,10 @@ function parseGenres(raw: string): string[] {
       const arr = JSON.parse(raw)
       return Array.isArray(arr) ? arr.map(String) : []
     }
-    return raw.split(',').map((g: string) => g.trim()).filter(Boolean)
+    return raw
+      .split(',')
+      .map((g: string) => g.trim())
+      .filter(Boolean)
   } catch {
     return []
   }
@@ -129,7 +132,10 @@ export async function computeTasteProfile(db: DatabaseWrapper): Promise<TastePro
 
 const REC_FIELDS = `id title { romaji english } coverImage { large } averageScore popularity episodes seasonYear format genres isAdult status`
 
-function tasteWeights(genreComp: Record<string, number>, genreDrop: Record<string, number>): Record<string, number> {
+function tasteWeights(
+  genreComp: Record<string, number>,
+  genreDrop: Record<string, number>
+): Record<string, number> {
   const max = Math.max(1, ...Object.values(genreComp))
   const W: Record<string, number> = {}
   for (const [g, c] of Object.entries(genreComp)) {
@@ -213,9 +219,31 @@ export async function computeRecCandidates(taste: TasteProfile): Promise<RecCand
   scored.sort((a, b) => b.score - a.score)
   const top = scored.slice(0, 15)
 
-  const relMap = new Map<number, AnilistMedia & { relations?: { edges?: { relationType?: string; node?: { id?: number; title?: { romaji?: string; english?: string }; type?: string } }[] } }>()
+  const relMap = new Map<
+    number,
+    AnilistMedia & {
+      relations?: {
+        edges?: {
+          relationType?: string
+          node?: { id?: number; title?: { romaji?: string; english?: string }; type?: string }
+        }[]
+      }
+    }
+  >()
   try {
-    const res = await anilistRequest<{ Page: { media?: ({ id: number; relations?: { edges?: { relationType?: string; node?: { id?: number; title?: { romaji?: string; english?: string }; type?: string } }[] } })[] } }>(
+    const res = await anilistRequest<{
+      Page: {
+        media?: {
+          id: number
+          relations?: {
+            edges?: {
+              relationType?: string
+              node?: { id?: number; title?: { romaji?: string; english?: string }; type?: string }
+            }[]
+          }
+        }[]
+      }
+    }>(
       `query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids, type: ANIME) { id relations { edges { relationType node { id title { romaji english } type } } } } } }`,
       { ids: top.map((t) => t.m.id) }
     )
@@ -226,7 +254,9 @@ export async function computeRecCandidates(taste: TasteProfile): Promise<RecCand
 
   return top.map((t) => {
     const rel = relMap.get(t.m.id)
-    const pre = rel?.relations?.edges?.find((e) => e.relationType === 'PREQUEL' && e.node?.type === 'ANIME')?.node
+    const pre = rel?.relations?.edges?.find(
+      (e) => e.relationType === 'PREQUEL' && e.node?.type === 'ANIME'
+    )?.node
     let adj = t.score
     let kind: RecCandidate['kind'] = 'entry'
     let prequelTitle: string | null = null
@@ -265,7 +295,34 @@ const SYNC_INTERVAL_MS = 10 * 60 * 1000
 let syncTimer: NodeJS.Timeout | null = null
 let lastSyncedSeconds: number | null = null
 let lastSyncedTasteHash: string | null = null
-let lastCandidates: RecCandidate[] | null = null
+let recCache: { hash: string; candidates: RecCandidate[] } | null = null
+
+function tasteHashOf(taste: TasteProfile): string {
+  return JSON.stringify([taste.genreComp, taste.genreDrop, taste.knownIds.length])
+}
+
+async function refreshCandidatesIfNeeded(
+  taste: TasteProfile,
+  hash: string
+): Promise<RecCandidate[]> {
+  if (!recCache || recCache.hash !== hash) {
+    try {
+      const fresh = await computeRecCandidates(taste)
+      if (fresh.length > 0) recCache = { hash, candidates: fresh }
+    } catch (err) {
+      logger.warn(
+        { err: (err as Error)?.message },
+        'Recommendation candidates failed, reusing previous'
+      )
+    }
+  }
+  return recCache?.candidates || []
+}
+
+export async function getCachedRecommendations(db: DatabaseWrapper): Promise<RecCandidate[]> {
+  const taste = await computeTasteProfile(db)
+  return refreshCandidatesIfNeeded(taste, tasteHashOf(taste))
+}
 
 export async function getLinkedDiscordUser(db: DatabaseWrapper): Promise<LinkedDiscordUser | null> {
   const row = await SettingsRepository.getByKey(db, SETTING_KEY)
@@ -285,7 +342,7 @@ export async function setLinkedDiscordUser(
     await SettingsRepository.deleteByKey(db, SETTING_KEY)
     lastSyncedSeconds = null
     lastSyncedTasteHash = null
-    lastCandidates = null
+    recCache = null
   } else {
     await SettingsRepository.upsert(db, SETTING_KEY, JSON.stringify(user))
   }
@@ -335,8 +392,7 @@ export async function computeDiscordSyncStats(db: DatabaseWrapper): Promise<{
     totalEpisodes: core?.totalEpisodes || 0,
     totalAnime: core?.totalAnime || 0,
     completedCount,
-    completionRate:
-      totalWatchlist > 0 ? Math.round((completedCount / totalWatchlist) * 100) : 0,
+    completionRate: totalWatchlist > 0 ? Math.round((completedCount / totalWatchlist) * 100) : 0,
   }
 }
 
@@ -367,10 +423,17 @@ export async function syncDiscordRoles(
     return { success: false, message: 'No Discord user linked in database' }
   }
 
-  const { totalSeconds, topGenre, genres, totalEpisodes, totalAnime, completedCount, completionRate } =
-    await computeDiscordSyncStats(db)
+  const {
+    totalSeconds,
+    topGenre,
+    genres,
+    totalEpisodes,
+    totalAnime,
+    completedCount,
+    completionRate,
+  } = await computeDiscordSyncStats(db)
   const taste = await computeTasteProfile(db)
-  const tasteHash = JSON.stringify([taste.genreComp, taste.genreDrop, taste.knownIds.length])
+  const tasteHash = tasteHashOf(taste)
 
   if (
     !force &&
@@ -381,17 +444,7 @@ export async function syncDiscordRoles(
     return { success: true, message: 'Watch time unchanged, skipped sync', skipped: true }
   }
 
-  if (!lastCandidates || lastSyncedTasteHash !== tasteHash) {
-    try {
-      const fresh = await computeRecCandidates(taste)
-      if (fresh.length > 0) lastCandidates = fresh
-      else if (!lastCandidates) lastCandidates = []
-    } catch (err) {
-      logger.warn({ err: (err as Error)?.message }, 'Recommendation candidates failed, reusing previous')
-      if (!lastCandidates) lastCandidates = []
-    }
-  }
-  taste.candidates = lastCandidates || []
+  taste.candidates = await refreshCandidatesIfNeeded(taste, tasteHash)
 
   try {
     const res = await fetch(`${workerUrl}/api/sync`, {

@@ -1,7 +1,10 @@
 import { Request, Response } from 'express'
 import logger from '../logger.js'
 import { InsightsRepository } from '../repositories/insights.repository.js'
-import { computeDiscordSyncStats } from '../lib/discord-roles-sync.service.js'
+import {
+  computeDiscordSyncStats,
+  getCachedRecommendations,
+} from '../lib/discord-roles-sync.service.js'
 
 interface CoreStats {
   totalSeconds?: number
@@ -315,5 +318,9 @@ export class InsightsController {
   getDiscordSyncStats = async (req: Request, res: Response) => {
     const db = req.db
     res.json(await computeDiscordSyncStats(db))
+  }
+  getRecommendations = async (req: Request, res: Response) => {
+    const db = req.db
+    res.json({ candidates: await getCachedRecommendations(db) })
   }
 }

@@ -654,7 +654,9 @@ export class WatchlistController {
       WatchlistRepository.getMissingThumbnails(db),
       ShowsMetaRepository.getShowIdsMissingMeta(db),
     ])
-    const ids = [...new Set([...wlMissing.map((r) => r.id), ...metaMissing.map((r) => r.id)])].slice(0, 500)
+    const ids = [
+      ...new Set([...wlMissing.map((r) => r.id), ...metaMissing.map((r) => r.id)]),
+    ].slice(0, 500)
     if (ids.length === 0) return
     for (const id of ids) {
       const poster = this.resolveOfflinePoster(id)
@@ -672,11 +674,7 @@ export class WatchlistController {
     return null
   }
 
-  private async applyPoster(
-    db: DatabaseWrapper,
-    id: string,
-    poster: string
-  ): Promise<void> {
+  private async applyPoster(db: DatabaseWrapper, id: string, poster: string): Promise<void> {
     try {
       ShowsMetaRepository.upsert(db, { id, thumbnail: poster })
     } catch {

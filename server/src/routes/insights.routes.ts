@@ -13,6 +13,7 @@ export function createInsightsRouter(): Router {
 
   router.get('/insights', controller.getWatchInsights)
   router.get('/insights/genre-cards', controller.getGenreCards)
+  router.get('/insights/recommendations', controller.getRecommendations)
   router.get('/insights/discord-sync-stats', controller.getDiscordSyncStats)
 
   router.get('/discord-roles-config', (_req, res) => {

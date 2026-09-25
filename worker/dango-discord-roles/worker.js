@@ -139,7 +139,12 @@ async function getGuildRoleColor(env, roleId) {
 }
 
 async function getRankColor(env, rank) {
-  const roleId = env[`ROLE_${String(rank || '').replace('-', '_').toUpperCase()}`]
+  const roleId =
+    env[
+      `ROLE_${String(rank || '')
+        .replace('-', '_')
+        .toUpperCase()}`
+    ]
   const live = await getGuildRoleColor(env, roleId)
   if (live) return live
   return RANK_COLORS[rank] ?? 0x897cff
@@ -174,9 +179,7 @@ function buildProfileEmbed(row, color) {
   const completed = row.completed_count ?? null
   const rate = row.completion_rate ?? null
   const hasCounts = (episodes || 0) > 0 || (anime || 0) > 0 || (completed || 0) > 0
-  const fields = [
-    { name: 'Watch time', value: `${totalHours}h`, inline: true },
-  ]
+  const fields = [{ name: 'Watch time', value: `${totalHours}h`, inline: true }]
   if (hasCounts) {
     fields.push({ name: 'Episodes', value: `${episodes}`, inline: true })
     fields.push({ name: 'Anime', value: `${anime}`, inline: true })
@@ -204,7 +207,9 @@ function buildProfileEmbed(row, color) {
   return {
     title: `${row.username || 'Dango user'} — ${row.current_rank || 'F-Rank'}`,
     description:
-      dereList.length > 0 ? dereList.map((d) => `**${d}**`).join(' · ') : 'No dere yet — sync to earn one',
+      dereList.length > 0
+        ? dereList.map((d) => `**${d}**`).join(' · ')
+        : 'No dere yet — sync to earn one',
     color: color ?? RANK_COLORS[row.current_rank] ?? 0x897cff,
     fields,
     footer: { text: syncLabel },
@@ -325,7 +330,12 @@ function exemplarsForCandidate(taste, candidateGenres, n = 2) {
 
 function buildRecEmbed(pick, color) {
   const lines = []
-  const meta = [pick.year, pick.format, pick.episodes ? `${pick.episodes}ep` : null, pick.averageScore ? `score ${pick.averageScore}` : null]
+  const meta = [
+    pick.year,
+    pick.format,
+    pick.episodes ? `${pick.episodes}ep` : null,
+    pick.averageScore ? `score ${pick.averageScore}` : null,
+  ]
     .filter(Boolean)
     .join(' · ')
   if (meta) lines.push(meta)
@@ -333,7 +343,8 @@ function buildRecEmbed(pick, color) {
   if (pick.exemplars && pick.exemplars.length > 0) why.push(`like ${pick.exemplars.join(', ')}`)
   lines.push(why.join(' — '))
   if (pick.kind === 'continue') lines.push('Continue — you watched the earlier part.')
-  if (pick.kind === 'sequel' && pick.prequelTitle) lines.push(`Sequel — start with "${pick.prequelTitle}" first.`)
+  if (pick.kind === 'sequel' && pick.prequelTitle)
+    lines.push(`Sequel — start with "${pick.prequelTitle}" first.`)
   return {
     title: `${pick.title} — ${pick.matchPct}% match`,
     url: pick.url,
@@ -392,7 +403,9 @@ async function runRecommendAndFollowup(env, interaction, row, targetId, count, s
     const taste = JSON.parse(row.taste || '{}')
     const knownIds = new Set(taste.knownIds || [])
     if (knownIds.size === 0) {
-      await fail('No watch history synced yet. Sync roles in Dango Settings → Community first, then try again.')
+      await fail(
+        'No watch history synced yet. Sync roles in Dango Settings → Community first, then try again.'
+      )
       return
     }
     const W = tasteWeights(taste)
@@ -435,7 +448,9 @@ async function runRecommendAndFollowup(env, interaction, row, targetId, count, s
       }
     }
     if (seen.size === 0) {
-      await fail(`AniList unreachable right now (${comboErrors[0] || 'unknown error'}). Try again in a bit.`)
+      await fail(
+        `AniList unreachable right now (${comboErrors[0] || 'unknown error'}). Try again in a bit.`
+      )
       return
     }
 
@@ -453,7 +468,9 @@ async function runRecommendAndFollowup(env, interaction, row, targetId, count, s
     }
     scored.sort((a, b) => b.score - a.score)
     if (scored.length === 0) {
-      await fail('Everything good is already in your library (or was recommended recently). Sync again after watching more.')
+      await fail(
+        'Everything good is already in your library (or was recommended recently). Sync again after watching more.'
+      )
       return
     }
 
@@ -472,7 +489,9 @@ async function runRecommendAndFollowup(env, interaction, row, targetId, count, s
     const ranked = top.map((t) => {
       const rel = relMap.get(t.m.id)
       const pre = rel
-        ? (rel.relations.edges || []).find((e) => e.relationType === 'PREQUEL' && e.node.type === 'ANIME')
+        ? (rel.relations.edges || []).find(
+            (e) => e.relationType === 'PREQUEL' && e.node.type === 'ANIME'
+          )
         : null
       let adj = t.score
       let kind = 'entry'
@@ -546,7 +565,10 @@ async function handleRecommendCommand(env, interaction, execCtx, sender) {
   const targetId = (invoker && invoker.id) || null
   const count = Math.min(5, Math.max(1, Number(countOption?.value) || 1))
   if (!targetId) {
-    return { type: 4, data: { content: 'Could not determine which user to recommend for.', flags: 64 } }
+    return {
+      type: 4,
+      data: { content: 'Could not determine which user to recommend for.', flags: 64 },
+    }
   }
 
   let row = null
@@ -808,7 +830,8 @@ export default {
         }
 
         const tasteJson = taste ? JSON.stringify(taste).slice(0, 64000) : null
-        const hasV2 = body && ('totalEpisodes' in body || 'totalAnime' in body || 'completedCount' in body)
+        const hasV2 =
+          body && ('totalEpisodes' in body || 'totalAnime' in body || 'completedCount' in body)
         const hasTaste = !!tasteJson
 
         const fullUpsert = () =>
@@ -1066,7 +1089,12 @@ export default {
 
       let verified = false
       try {
-        verified = await verifyDiscordSignature(env.DISCORD_PUBLIC_KEY, signature, timestamp, rawBody)
+        verified = await verifyDiscordSignature(
+          env.DISCORD_PUBLIC_KEY,
+          signature,
+          timestamp,
+          rawBody
+        )
       } catch {
         verified = false
       }

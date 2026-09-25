@@ -1,8 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router'
+import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
+import { fetchApi } from '../lib/fetchApi'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import styles from './Insights.module.css'
 
@@ -50,6 +53,22 @@ interface InsightData {
   droppedShows: DroppedShow[]
 }
 
+interface RecCandidate {
+  id: number
+  title: string
+  url: string
+  cover: string | null
+  year: number | null
+  format: string
+  episodes: number | null
+  averageScore: number | null
+  matchPct: number
+  sharedGenres: string[]
+  exemplars: string[]
+  kind: 'entry' | 'continue' | 'sequel'
+  prequelTitle: string | null
+}
+
 const Insights: React.FC = () => {
   useEffect(() => {
     document.title = 'Insights - dango'
@@ -66,6 +85,44 @@ const Insights: React.FC = () => {
 
   const { data: genreCardsData, isLoading: isLoadingGenreCards } = useGenreCards()
   const { titlePreference } = useTitlePreference()
+  const queryClient = useQueryClient()
+
+  const { data: recsData } = useQuery<{ candidates: RecCandidate[] }>({
+    queryKey: ['insights-recommendations'],
+    queryFn: async () => {
+      const res = await fetch('/api/insights/recommendations')
+      if (!res.ok) throw new Error('Failed to fetch recommendations')
+      return res.json()
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+
+  const addToPlan = useMutation({
+    mutationFn: async (c: RecCandidate) => {
+      await fetchApi('/api/watchlist/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: String(c.id),
+          name: c.title,
+          thumbnail: c.cover || '',
+          status: 'Plan to Watch',
+          type: c.format,
+        }),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      queryClient.invalidateQueries({ queryKey: ['insights-recommendations'] })
+      toast.success('Added to Plan to Watch')
+    },
+    onError: () => toast.error('Could not add to watchlist'),
+  })
+
+  const topRecs = useMemo(
+    () => [...(recsData?.candidates || [])].sort((a, b) => b.matchPct - a.matchPct).slice(0, 6),
+    [recsData]
+  )
 
   const getShowTitle = (show: TopShow) => {
     switch (titlePreference) {
@@ -459,6 +516,60 @@ const Insights: React.FC = () => {
               </div>
             ))}
       </div>
+
+      {topRecs.length > 0 && (
+        <div className={styles.recSection}>
+          <h3>Recommended For You</h3>
+          <p className={styles.recSubtext}>
+            From your library taste — updates automatically as you watch
+          </p>
+          <div className={styles.recGrid}>
+            {topRecs.map((c) => (
+              <div key={c.id} className={styles.recCard}>
+                {c.cover && (
+                  <img
+                    src={fixThumbnailUrl(c.cover)}
+                    alt={c.title}
+                    className={styles.recCover}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                <div className={styles.recInfo}>
+                  <Link to={`/anime/${c.id}`} className={styles.recTitle}>
+                    {c.title}
+                  </Link>
+                  <span className={styles.recMatch}>{c.matchPct}% match</span>
+                  <span className={styles.recMeta}>
+                    {[c.year, c.format, c.episodes ? `${c.episodes}ep` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                  <span className={styles.recWhy}>
+                    Shares {c.sharedGenres.join(', ')}
+                    {c.exemplars.length > 0 && ` — like ${c.exemplars.join(', ')}`}
+                  </span>
+                  {c.kind === 'continue' && (
+                    <span className={styles.recNote}>Continue — you watched the earlier part.</span>
+                  )}
+                  {c.kind === 'sequel' && c.prequelTitle && (
+                    <span className={styles.recNote}>
+                      Sequel — start with &quot;{c.prequelTitle}&quot; first.
+                    </span>
+                  )}
+                  <button
+                    className={styles.recAddBtn}
+                    onClick={() => addToPlan.mutate(c)}
+                    disabled={addToPlan.isPending}
+                  >
+                    + Plan to Watch
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {data.droppedShows?.length > 0 && (
         <div className={styles.warningSection}>

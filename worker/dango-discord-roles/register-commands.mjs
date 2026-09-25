@@ -93,5 +93,7 @@ if (!res.ok) {
   console.error(`Registration failed (${res.status}): ${text.slice(0, 1000)}`)
   process.exit(1)
 }
-console.log(`Registered ${commands.length} command(s) ${useGlobal ? 'globally' : `for guild ${guildId}`}.`)
+console.log(
+  `Registered ${commands.length} command(s) ${useGlobal ? 'globally' : `for guild ${guildId}`}.`
+)
 console.log(text.slice(0, 2000))

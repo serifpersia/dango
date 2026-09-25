@@ -748,3 +748,111 @@
     opacity: 0.6;
   }
 }
+
+.recSection {
+  margin-top: 2rem;
+}
+
+.recSection h3 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.03em;
+}
+
+.recSubtext {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-bottom: 1rem;
+}
+
+.recGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-5);
+}
+
+.recCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  gap: var(--space-5);
+  transition: all var(--transition-base);
+}
+
+.recCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-secondary);
+}
+
+.recCover {
+  width: 72px;
+  height: 102px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.recInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recTitle {
+  font-weight: 800;
+  color: var(--text-primary);
+  font-size: 1rem;
+  text-decoration: none;
+}
+
+.recTitle:hover {
+  text-decoration: underline;
+}
+
+.recMatch {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.recMeta {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.recWhy {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.recNote {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.recAddBtn {
+  margin-top: auto;
+  align-self: flex-start;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recAddBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.recAddBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
