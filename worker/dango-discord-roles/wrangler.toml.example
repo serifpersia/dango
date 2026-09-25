@@ -34,6 +34,7 @@ ROLE_KANEDERE = "YOUR_ROLE_ID"
 # Secrets (Set via: npx wrangler secret put <NAME>)
 # - DISCORD_CLIENT_SECRET
 # - DISCORD_BOT_TOKEN
+# - DISCORD_PUBLIC_KEY (General Information → Public Key, needed for /interactions)
 
 # D1 Database binding
 # Run: npx wrangler d1 create dango-ranks-db

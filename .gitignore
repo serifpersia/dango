@@ -17,6 +17,8 @@ server/sync_manifest*.json
 .wrangler/
 worker/**/wrangler.toml
 !worker/**/wrangler.toml.example
+worker/**/.env
+!worker/**/.env.example
 
 # Android
 android-app/local.properties
