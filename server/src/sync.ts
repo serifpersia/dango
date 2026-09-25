@@ -822,7 +822,7 @@ export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseW
     db.run('PRAGMA foreign_keys = ON;')
 
     db.run(
-      `CREATE TABLE IF NOT EXISTS manga_library (id TEXT PRIMARY KEY, provider TEXT NOT NULL, mangaId TEXT NOT NULL, title TEXT, cover TEXT, status TEXT DEFAULT 'Reading', author TEXT, contentRating TEXT, lastChapterId TEXT, lastChapterNumber TEXT, lastPage INTEGER, updatedAt INTEGER, altTitle TEXT)`
+      `CREATE TABLE IF NOT EXISTS manga_library (id TEXT PRIMARY KEY, provider TEXT NOT NULL, mangaId TEXT NOT NULL, title TEXT, cover TEXT, status TEXT DEFAULT 'Reading', author TEXT, contentRating TEXT, lastChapterId TEXT, lastChapterNumber TEXT, lastPage INTEGER, updatedAt INTEGER, altTitle TEXT, anilistId INTEGER, anilistIdSource TEXT)`
     )
     db.run(
       `CREATE TABLE IF NOT EXISTS manga_progress (mangaId TEXT NOT NULL, chapterId TEXT NOT NULL, chapterNumber TEXT, page INTEGER DEFAULT 0, pageCount INTEGER DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mangaId, chapterId))`
@@ -842,6 +842,13 @@ export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseW
     if (!mangaColumns.some((c) => c.name === 'altTitle')) {
       db.run(`ALTER TABLE manga_library ADD COLUMN altTitle TEXT`)
     }
+    if (!mangaColumns.some((c) => c.name === 'anilistId')) {
+      db.run(`ALTER TABLE manga_library ADD COLUMN anilistId INTEGER`)
+    }
+    if (!mangaColumns.some((c) => c.name === 'anilistIdSource')) {
+      db.run(`ALTER TABLE manga_library ADD COLUMN anilistIdSource TEXT`)
+    }
+    db.run(`CREATE INDEX IF NOT EXISTS idx_manga_library_anilist ON manga_library(anilistId)`)
 
     const mangaProgressColumns = db.all<{ name: string }>(`PRAGMA table_info(manga_progress)`)
     if (!mangaProgressColumns.some((c) => c.name === 'title')) {

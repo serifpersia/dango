@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useSidebar } from '../hooks/useSidebar'
+import { useContentType } from '../contexts/ContentTypeContext'
 import { useAnilistAuthCallback } from '../hooks/useAnilistAuthCallback'
 import { Button } from '../components/common/Button'
 import Icon from '../components/common/Icon'
@@ -35,7 +36,9 @@ interface SyncSummary {
   pulled: number
   merged: number
   unchanged: number
+  skipped?: number
   errors: string[]
+  warnings?: string[]
 }
 
 const CLIENT_ID_SETTING = 'tracker_anilist_client_id'
@@ -43,6 +46,8 @@ const SHIPPED_ANILIST_CLIENT_ID = (import.meta.env.VITE_ANILIST_CLIENT_ID || '')
 
 const Trackers: React.FC = () => {
   const { setIsOpen: _setIsOpen } = useSidebar()
+  const { contentType } = useContentType()
+  const showMangaTrackers = contentType === 'manga'
   const queryClient = useQueryClient()
 
   React.useEffect(() => {
@@ -53,6 +58,7 @@ const Trackers: React.FC = () => {
   const [anilistImportMode, setAnilistImportMode] = useState<'username' | 'sync'>('username')
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null)
   const [clientIdInput, setClientIdInput] = useState<string>('')
+  const [eraseManga, setEraseManga] = useState<boolean>(false)
   const isExchangingToken = useAnilistAuthCallback()
 
   const { data: trackerStatus, isLoading: statusLoading } = useQuery({
@@ -183,6 +189,120 @@ const Trackers: React.FC = () => {
     },
     onError: (err: Error) => toast.error(err.message),
   })
+
+  const [mangaUsername, setMangaUsername] = useState<string>('')
+  const [mangaImportMode, setMangaImportMode] = useState<'username' | 'sync'>('sync')
+  const [mangaDirection, setMangaDirection] = useState<'two-way' | 'pull-only'>('two-way')
+  const [mangaSyncSummary, setMangaSyncSummary] = useState<SyncSummary | null>(null)
+
+  const mangaSyncMutation = useMutation({
+    mutationFn: async (): Promise<SyncSummary> => {
+      const res = await fetch('/api/tracker/manga/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: mangaDirection }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Manga sync failed')
+      return data.summary
+    },
+    onSuccess: (summary) => {
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      setMangaSyncSummary(summary)
+      const warningSuffix =
+        (summary.warnings?.length ?? 0) > 0 ? `, ${summary.warnings!.length} warning(s)` : ''
+      toast.success(
+        `Manga sync complete — pushed ${summary.pushed}, pulled ${summary.pulled}, merged ${summary.merged}, unchanged ${summary.unchanged}${warningSuffix}`,
+        { duration: 6000 }
+      )
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const mangaImportMutation = useMutation({
+    mutationFn: async (): Promise<number> => {
+      if (!mangaUsername.trim()) throw new Error('Please enter a username')
+      const res = await fetch('/api/tracker/manga/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: mangaUsername.trim(), erase: eraseManga }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      return data.count
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      toast.success(`Imported ${count} manga entries from AniList`)
+      setMangaUsername('')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const [malMangaUsername, setMalMangaUsername] = useState<string>('')
+  const [malMangaImportMode, setMalMangaImportMode] = useState<'username' | 'xml'>('username')
+  const [malMangaXmlResult, setMalMangaXmlResult] = useState<{
+    imported: number
+    skipped: number
+  } | null>(null)
+  const [malMangaXmlBusy, setMalMangaXmlBusy] = useState<boolean>(false)
+  const [malMangaXmlError, setMalMangaXmlError] = useState<string>('')
+  const [malMangaFileName, setMalMangaFileName] = useState<string>('')
+
+  const malMangaUsernameImport = useMutation({
+    mutationFn: async (): Promise<{ imported: number; skipped: number }> => {
+      if (!malMangaUsername.trim()) throw new Error('Please enter a MAL username')
+      const res = await fetch('/api/tracker/manga/mal-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: malMangaUsername.trim(), erase: eraseManga }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      return { imported: data.imported ?? 0, skipped: data.skipped ?? 0 }
+    },
+    onSuccess: ({ imported, skipped }) => {
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      toast.success(
+        `Imported ${imported} manga entries from MAL${skipped > 0 ? `, skipped ${skipped}` : ''}`
+      )
+      setMalMangaUsername('')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const handleMalMangaXmlImport = useCallback(async () => {
+    const fileInput = document.getElementById('malMangaFile') as HTMLInputElement
+    if (!fileInput.files || fileInput.files.length === 0) {
+      setMalMangaXmlError('Please select a file first.')
+      return
+    }
+    setMalMangaXmlBusy(true)
+    setMalMangaXmlError('')
+    setMalMangaXmlResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('xmlfile', fileInput.files[0])
+      formData.append('erase', String(eraseManga))
+      const res = await fetch('/api/import/mal-xml-manga', { method: 'POST', body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      setMalMangaXmlResult({ imported: data.imported ?? 0, skipped: data.skipped ?? 0 })
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+    } catch (err: unknown) {
+      setMalMangaXmlError((err as Error).message)
+    } finally {
+      setMalMangaXmlBusy(false)
+    }
+  }, [eraseManga, queryClient])
 
   const importMutation = useMutation({
     mutationFn: async (): Promise<number> => {
@@ -357,440 +477,794 @@ const Trackers: React.FC = () => {
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>Trackers</h1>
         <p className={styles.pageSubtitle}>
-          Import &amp; sync your anime watchlists with tracking services
+          Import &amp; sync your anime watchlists and manga reading lists with tracking services
         </p>
       </div>
 
-      <div className={styles.importCard}>
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitleRow}>
-            <Icon name="anilist" className={styles.anilistIcon} />
-            <h3>AniList</h3>
-            {statusLoading ? null : anilistConnected ? (
-              <span className={styles.badgeOnline}>Connected</span>
+      <div
+        style={{
+          marginBottom: '16px',
+          padding: '10px 14px',
+          borderRadius: '8px',
+          fontSize: '0.85rem',
+          background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        ⚠ Syncing writes directly to your AniList entries, and dango may not always handle
+        anime/manga lists correctly — always keep a backup of your lists before syncing.
+      </div>
+
+      {!showMangaTrackers && (
+        <>
+          <div className={styles.importCard}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardTitleRow}>
+                <Icon name="anilist" className={styles.anilistIcon} />
+                <h3>AniList</h3>
+                {statusLoading ? null : anilistConnected ? (
+                  <span className={styles.badgeOnline}>Connected</span>
+                ) : (
+                  <span className={styles.badgeOffline}>Not connected</span>
+                )}
+              </div>
+            </div>
+
+            {anilistConnected && anilistUser ? (
+              <div className={styles.connectedProfile}>
+                {anilistUser.avatar && (
+                  <img
+                    src={anilistUser.avatar}
+                    alt="Avatar"
+                    className={styles.avatar}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                <div className={styles.connectedInfo}>
+                  <span className={styles.connectedName}>{anilistUser.name}</span>
+                  <span className={styles.connectedHint}>2-way sync is ready</span>
+                </div>
+                <button
+                  className={styles.secondaryBtn}
+                  onClick={() => disconnectMutation.mutate()}
+                  disabled={disconnectMutation.isPending}
+                >
+                  <Icon name="sign-out-alt" /> Disconnect
+                </button>
+              </div>
             ) : (
-              <span className={styles.badgeOffline}>Not connected</span>
-            )}
-          </div>
-        </div>
-
-        {anilistConnected && anilistUser ? (
-          <div className={styles.connectedProfile}>
-            {anilistUser.avatar && (
-              <img
-                src={anilistUser.avatar}
-                alt="Avatar"
-                className={styles.avatar}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            <div className={styles.connectedInfo}>
-              <span className={styles.connectedName}>{anilistUser.name}</span>
-              <span className={styles.connectedHint}>2-way sync is ready</span>
-            </div>
-            <button
-              className={styles.secondaryBtn}
-              onClick={() => disconnectMutation.mutate()}
-              disabled={disconnectMutation.isPending}
-            >
-              <Icon name="sign-out-alt" /> Disconnect
-            </button>
-          </div>
-        ) : (
-          <div className={styles.loginSection}>
-            <p className={styles.loginText}>
-              Log in with AniList to enable bidirectional progress &amp; status synchronization.
-              {isExchangingToken && (
-                <span style={{ marginLeft: 8, color: 'var(--accent)' }}>Finishing login…</span>
-              )}
-            </p>
-            <div className={styles.fieldLabel}>
-              AniList client ID — defaults to Dango's app{' '}
-              <a
-                href="https://anilist.co/settings/developer"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                create your own app <Icon name="external-link-alt" size={9} />
-              </a>
-            </div>
-            <div className={styles.inputGroup}>
-              <input
-                type="text"
-                placeholder="Client ID"
-                value={clientIdInput}
-                onChange={(e) => setClientIdInput(e.target.value)}
-                className={styles.input}
-              />
-              <button
-                className={styles.primaryBtn}
-                onClick={handleAniListLogin}
-                disabled={!(clientIdInput.trim() || hasShipped)}
-              >
-                <Icon name="external-link-alt" /> Connect
-              </button>
-            </div>
-            <p className={styles.helpText}>
-              {hasShipped ? (
-                <>
-                  By default uses Dango's client. To use your own AniList app: create it at{' '}
+              <div className={styles.loginSection}>
+                <p className={styles.loginText}>
+                  Log in with AniList to enable bidirectional progress &amp; status synchronization.
+                  {isExchangingToken && (
+                    <span style={{ marginLeft: 8, color: 'var(--accent)' }}>Finishing login…</span>
+                  )}
+                </p>
+                <div className={styles.fieldLabel}>
+                  AniList client ID — defaults to Dango's app{' '}
                   <a
                     href="https://anilist.co/settings/developer"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    anilist.co/settings/developer
+                    create your own app <Icon name="external-link-alt" size={9} />
                   </a>
-                  , set its <strong>Redirect URL</strong> to{' '}
-                  <code>
-                    {window.location.port === '5173'
-                      ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
-                      : `${window.location.origin}/api/tracker/anilist/callback`}
-                  </code>
-                  , then paste only the <strong>Client ID</strong> above (leave empty to use
-                  Dango's).
-                </>
-              ) : (
-                <>
-                  No shipped client in this build — create your own app at{' '}
-                  <a
-                    href="https://anilist.co/settings/developer"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                </div>
+                <div className={styles.inputGroup}>
+                  <input
+                    type="text"
+                    placeholder="Client ID"
+                    value={clientIdInput}
+                    onChange={(e) => setClientIdInput(e.target.value)}
+                    className={styles.input}
+                  />
+                  <button
+                    className={styles.primaryBtn}
+                    onClick={handleAniListLogin}
+                    disabled={!(clientIdInput.trim() || hasShipped)}
                   >
-                    anilist.co/settings/developer
-                  </a>
-                  , set <strong>Redirect URL</strong> to{' '}
-                  <code>
-                    {window.location.port === '5173'
-                      ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
-                      : `${window.location.origin}/api/tracker/anilist/callback`}
-                  </code>
-                  , then paste the <strong>Client ID</strong> above.
-                </>
-              )}
-            </p>
-          </div>
-        )}
+                    <Icon name="external-link-alt" /> Connect
+                  </button>
+                </div>
+                <p className={styles.helpText}>
+                  {hasShipped ? (
+                    <>
+                      By default uses Dango's client. To use your own AniList app: create it at{' '}
+                      <a
+                        href="https://anilist.co/settings/developer"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        anilist.co/settings/developer
+                      </a>
+                      , set its <strong>Redirect URL</strong> to{' '}
+                      <code>
+                        {window.location.port === '5173'
+                          ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
+                          : `${window.location.origin}/api/tracker/anilist/callback`}
+                      </code>
+                      , then paste only the <strong>Client ID</strong> above (leave empty to use
+                      Dango's).
+                    </>
+                  ) : (
+                    <>
+                      No shipped client in this build — create your own app at{' '}
+                      <a
+                        href="https://anilist.co/settings/developer"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        anilist.co/settings/developer
+                      </a>
+                      , set <strong>Redirect URL</strong> to{' '}
+                      <code>
+                        {window.location.port === '5173'
+                          ? `${window.location.protocol}//${window.location.hostname}:3000/api/tracker/anilist/callback`
+                          : `${window.location.origin}/api/tracker/anilist/callback`}
+                      </code>
+                      , then paste the <strong>Client ID</strong> above.
+                    </>
+                  )}
+                </p>
+              </div>
+            )}
 
-        {anilistConnected && (
-          <>
-            <hr className={styles.divider} />
+            {anilistConnected && (
+              <>
+                <hr className={styles.divider} />
+
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="anilistMode"
+                      value="username"
+                      checked={anilistImportMode === 'username'}
+                      onChange={() => setAnilistImportMode('username')}
+                    />
+                    <span>Quick Import</span>
+                  </label>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="anilistMode"
+                      value="sync"
+                      checked={anilistImportMode === 'sync'}
+                      onChange={() => setAnilistImportMode('sync')}
+                    />
+                    <span>Two-way Sync</span>
+                  </label>
+                </div>
+
+                {anilistImportMode === 'username' ? (
+                  <div className={styles.inputGroup}>
+                    <input
+                      type="text"
+                      placeholder="Enter AniList username"
+                      value={publicUsername}
+                      onChange={(e) => setPublicUsername(e.target.value)}
+                      className={styles.input}
+                      disabled={importMutation.isPending}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && publicUsername.trim()) importMutation.mutate()
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className={styles.syncHint}>
+                    Merges progress non-destructively: pushes shows and episodes you watched on
+                    dango to AniList, and pulls anything you updated on AniList into dango.
+                  </p>
+                )}
+
+                {anilistImportMode === 'username' && (
+                  <div className={styles.optionsArea}>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={eraseWatchlist}
+                        onChange={(e) => setEraseWatchlist(e.target.checked)}
+                        className={styles.checkbox}
+                        disabled={importMutation.isPending}
+                      />
+                      <span className={styles.checkboxCustom}></span>
+                      <div className={styles.optionText}>
+                        <span className={styles.optionTitle}>Erase current watchlist</span>
+                        <span className={styles.optionDesc}>
+                          Delete existing watchlist before importing.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {anilistImportMode === 'username' ? (
+                  <button
+                    className={styles.syncBtn}
+                    onClick={() => importMutation.mutate()}
+                    disabled={!publicUsername.trim() || importMutation.isPending}
+                  >
+                    <Icon name="download" />
+                    {importMutation.isPending ? 'Importing...' : 'Start Import'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className={styles.syncBtn}
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                    >
+                      <Icon name="sync-alt" className={syncMutation.isPending ? styles.spin : ''} />
+                      {syncMutation.isPending ? 'Syncing...' : 'Start Sync'}
+                    </button>
+                    {syncSummary && (
+                      <div className={styles.syncSummary}>
+                        Pushed: {syncSummary.pushed} · Pulled: {syncSummary.pulled} · Merged:{' '}
+                        {syncSummary.merged} · Unchanged: {syncSummary.unchanged}
+                        {syncSummary.errors.length > 0 && (
+                          <span className={styles.syncErrors}>
+                            {' '}
+                            · {syncSummary.errors.length} error
+                            {syncSummary.errors.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <p
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-tertiary)',
+                    marginTop: '8px',
+                  }}
+                >
+                  AniList <code>Rewatching (REPEATING)</code> is not tracked — entries with this
+                  status are ignored.
+                </p>
+              </>
+            )}
+          </div>
+        </>
+      )}
+      {showMangaTrackers && (
+        <>
+          <div className={styles.importCard}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardTitleRow}>
+                <Icon name="anilist" className={styles.anilistIcon} />
+                <h3>AniList Manga</h3>
+                {statusLoading ? null : anilistConnected ? (
+                  <span className={styles.badgeOnline}>Connected</span>
+                ) : (
+                  <span className={styles.badgeOffline}>Not connected</span>
+                )}
+              </div>
+            </div>
+
+            {!anilistConnected ? (
+              <p className={styles.loginText}>
+                Connect your AniList account above to sync your manga reading list.
+              </p>
+            ) : (
+              <>
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="mangaMode"
+                      value="username"
+                      checked={mangaImportMode === 'username'}
+                      onChange={() => setMangaImportMode('username')}
+                    />
+                    <span>Quick Import</span>
+                  </label>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="mangaMode"
+                      value="sync"
+                      checked={mangaImportMode === 'sync'}
+                      onChange={() => setMangaImportMode('sync')}
+                    />
+                    <span>Two-way Sync</span>
+                  </label>
+                </div>
+
+                {mangaImportMode === 'username' ? (
+                  <>
+                    <div className={styles.inputGroup}>
+                      <input
+                        type="text"
+                        placeholder="Enter AniList username"
+                        value={mangaUsername}
+                        onChange={(e) => setMangaUsername(e.target.value)}
+                        className={styles.input}
+                        disabled={mangaImportMutation.isPending}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && mangaUsername.trim())
+                            mangaImportMutation.mutate()
+                        }}
+                      />
+                    </div>
+                    <div className={styles.optionsArea}>
+                      <label className={styles.checkboxLabel}>
+                        <input
+                          type="checkbox"
+                          checked={eraseManga}
+                          onChange={(e) => setEraseManga(e.target.checked)}
+                          className={styles.checkbox}
+                          disabled={mangaImportMutation.isPending}
+                        />
+                        <span className={styles.checkboxCustom}></span>
+                        <div className={styles.optionText}>
+                          <span className={styles.optionTitle}>Replace AniList-linked manga</span>
+                          <span className={styles.optionDesc}>
+                            Clears previously imported (anilist:) entries before importing. Your
+                            provider bookmarks are never touched.
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.syncHint}>
+                      Merges chapter progress non-destructively: pushes manga and chapters you read
+                      on dango to AniList, and pulls anything you updated on AniList into dango.
+                      Local titles are linked only on exact title matches, and bookmarks with no
+                      chapters read are never pushed.
+                    </p>
+                    <div className={styles.radioGroup}>
+                      <label className={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="mangaDirection"
+                          value="two-way"
+                          checked={mangaDirection === 'two-way'}
+                          onChange={() => setMangaDirection('two-way')}
+                        />
+                        <span>Two-way</span>
+                      </label>
+                      <label className={styles.radioLabel}>
+                        <input
+                          type="radio"
+                          name="mangaDirection"
+                          value="pull-only"
+                          checked={mangaDirection === 'pull-only'}
+                          onChange={() => setMangaDirection('pull-only')}
+                        />
+                        <span>Pull only (never writes to AniList)</span>
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                {mangaImportMode === 'username' ? (
+                  <button
+                    className={styles.syncBtn}
+                    onClick={() => mangaImportMutation.mutate()}
+                    disabled={!mangaUsername.trim() || mangaImportMutation.isPending}
+                  >
+                    <Icon name="download" />
+                    {mangaImportMutation.isPending ? 'Importing...' : 'Start Import'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className={styles.syncBtn}
+                      onClick={() => mangaSyncMutation.mutate()}
+                      disabled={mangaSyncMutation.isPending}
+                    >
+                      <Icon
+                        name="sync-alt"
+                        className={mangaSyncMutation.isPending ? styles.spin : ''}
+                      />
+                      {mangaSyncMutation.isPending ? 'Syncing...' : 'Start Manga Sync'}
+                    </button>
+                    {mangaSyncSummary && (
+                      <>
+                        <div className={styles.syncSummary}>
+                          Pushed: {mangaSyncSummary.pushed} · Pulled: {mangaSyncSummary.pulled} ·
+                          Merged: {mangaSyncSummary.merged} · Unchanged:{' '}
+                          {mangaSyncSummary.unchanged}
+                          {(mangaSyncSummary.skipped ?? 0) > 0 && (
+                            <span> · Skipped: {mangaSyncSummary.skipped}</span>
+                          )}
+                          {mangaSyncSummary.errors.length > 0 && (
+                            <span className={styles.syncErrors}>
+                              {' '}
+                              · {mangaSyncSummary.errors.length} error
+                              {mangaSyncSummary.errors.length > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        {(mangaSyncSummary.warnings?.length ?? 0) > 0 && (
+                          <div className={styles.syncErrors} style={{ marginTop: '8px' }}>
+                            {(mangaSyncSummary.warnings ?? []).slice(0, 5).map((w, i) => (
+                              <div key={i}>⚠ {w}</div>
+                            ))}
+                            {(mangaSyncSummary.warnings?.length ?? 0) > 5 && (
+                              <div>
+                                +{(mangaSyncSummary.warnings?.length ?? 0) - 5} more warning(s)
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+
+                <p
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-tertiary)',
+                    marginTop: '8px',
+                  }}
+                >
+                  AniList <code>Rereading (REPEATING)</code> is not tracked — entries with this
+                  status are ignored.
+                </p>
+              </>
+            )}
+          </div>
+        </>
+      )}
+      {!showMangaTrackers && (
+        <>
+          <div className={styles.importCard}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardTitleRow}>
+                <Icon name="myanimelist" className={styles.malIcon} />
+                <h3>MyAnimeList</h3>
+              </div>
+            </div>
 
             <div className={styles.radioGroup}>
               <label className={styles.radioLabel}>
                 <input
                   type="radio"
-                  name="anilistMode"
+                  name="malMode"
                   value="username"
-                  checked={anilistImportMode === 'username'}
-                  onChange={() => setAnilistImportMode('username')}
+                  checked={malImportMode === 'username'}
+                  onChange={() => setMalImportMode('username')}
                 />
-                <span>Quick Import</span>
+                <span>Username</span>
               </label>
               <label className={styles.radioLabel}>
                 <input
                   type="radio"
-                  name="anilistMode"
-                  value="sync"
-                  checked={anilistImportMode === 'sync'}
-                  onChange={() => setAnilistImportMode('sync')}
+                  name="malMode"
+                  value="xml"
+                  checked={malImportMode === 'xml'}
+                  onChange={() => setMalImportMode('xml')}
                 />
-                <span>Two-way Sync</span>
+                <span>XML File</span>
               </label>
             </div>
 
-            {anilistImportMode === 'username' ? (
-              <div className={styles.inputGroup}>
-                <input
-                  type="text"
-                  placeholder="Enter AniList username"
-                  value={publicUsername}
-                  onChange={(e) => setPublicUsername(e.target.value)}
-                  className={styles.input}
-                  disabled={importMutation.isPending}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && publicUsername.trim()) importMutation.mutate()
-                  }}
-                />
-              </div>
-            ) : (
-              <p className={styles.syncHint}>
-                Merges progress non-destructively: pushes shows and episodes you watched on dango to
-                AniList, and pulls anything you updated on AniList into dango.
-              </p>
-            )}
-
-            {anilistImportMode === 'username' && (
-              <div className={styles.optionsArea}>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={eraseWatchlist}
-                    onChange={(e) => setEraseWatchlist(e.target.checked)}
-                    className={styles.checkbox}
-                    disabled={importMutation.isPending}
-                  />
-                  <span className={styles.checkboxCustom}></span>
-                  <div className={styles.optionText}>
-                    <span className={styles.optionTitle}>Erase current watchlist</span>
-                    <span className={styles.optionDesc}>
-                      Delete existing watchlist before importing.
-                    </span>
-                  </div>
-                </label>
-              </div>
-            )}
-
-            {anilistImportMode === 'username' ? (
-              <button
-                className={styles.syncBtn}
-                onClick={() => importMutation.mutate()}
-                disabled={!publicUsername.trim() || importMutation.isPending}
-              >
-                <Icon name="download" />
-                {importMutation.isPending ? 'Importing...' : 'Start Import'}
-              </button>
-            ) : (
+            {malImportMode === 'username' ? (
               <>
-                <button
-                  className={styles.syncBtn}
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending}
-                >
-                  <Icon name="sync-alt" className={syncMutation.isPending ? styles.spin : ''} />
-                  {syncMutation.isPending ? 'Syncing...' : 'Start Sync'}
-                </button>
-                {syncSummary && (
-                  <div className={styles.syncSummary}>
-                    Pushed: {syncSummary.pushed} · Pulled: {syncSummary.pulled} · Merged:{' '}
-                    {syncSummary.merged} · Unchanged: {syncSummary.unchanged}
-                    {syncSummary.errors.length > 0 && (
-                      <span className={styles.syncErrors}>
-                        {' '}
-                        · {syncSummary.errors.length} error
-                        {syncSummary.errors.length > 1 ? 's' : ''}
-                      </span>
-                    )}
+                <div className={styles.inputGroup}>
+                  <input
+                    type="text"
+                    placeholder="Enter MAL username"
+                    value={malUsername}
+                    onChange={(e) => setMalUsername(e.target.value)}
+                    className={styles.input}
+                    disabled={malUsernameImport.isPending}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && malUsername.trim())
+                        malUsernameImport.mutate({
+                          erase: eraseWatchlist,
+                          useOfflineDb,
+                          skipFallback,
+                        })
+                    }}
+                  />
+                </div>
+                {malUsernameImport.isPending && (
+                  <div className={styles.importLoading}>
+                    <Icon name="sync-alt" className={styles.spin} />
+                    <span>Importing from MAL...</span>
                   </div>
                 )}
               </>
+            ) : (
+              <div className={styles.uploadArea}>
+                <div className={styles.fileInputWrapper}>
+                  <input
+                    type="file"
+                    id="malFile"
+                    accept=".xml,application/xml"
+                    className={styles.fileInput}
+                    onChange={handleFileChange}
+                    disabled={importing}
+                  />
+                  <div className={styles.fileDisplay}>
+                    <Icon name="file-alt" className={styles.fileIcon} />
+                    <span className={styles.fileName}>
+                      {selectedFileName || 'Choose XML file...'}
+                    </span>
+                  </div>
+                  <label htmlFor="malFile" className={styles.browseButton}>
+                    Browse
+                  </label>
+                </div>
+              </div>
             )}
 
-            <p
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-tertiary)',
-                marginTop: '8px',
-              }}
-            >
-              AniList <code>Rewatching (REPEATING)</code> is not tracked — entries with this status
-              are ignored.
-            </p>
-          </>
-        )}
-      </div>
+            <div className={styles.optionsArea}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={eraseWatchlist}
+                  onChange={(e) => setEraseWatchlist(e.target.checked)}
+                  className={styles.checkbox}
+                  disabled={importing || malUsernameImport.isPending}
+                />
+                <span className={styles.checkboxCustom}></span>
+                <div className={styles.optionText}>
+                  <span className={styles.optionTitle}>Erase current watchlist</span>
+                  <span className={styles.optionDesc}>
+                    Delete existing watchlist before importing.
+                  </span>
+                </div>
+              </label>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={useOfflineDb}
+                  onChange={(e) => setUseOfflineDb(e.target.checked)}
+                  className={styles.checkbox}
+                  disabled={importing || malUsernameImport.isPending}
+                />
+                <span className={styles.checkboxCustom}></span>
+                <div className={styles.optionText}>
+                  <span className={styles.optionTitle}>Use offline database (fast)</span>
+                  <span className={styles.optionDesc}>
+                    Match by MAL ID locally first — instant and avoids AniList rate limits.
+                  </span>
+                </div>
+              </label>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={skipFallback}
+                  onChange={(e) => setSkipFallback(e.target.checked)}
+                  className={styles.checkbox}
+                  disabled={importing || malUsernameImport.isPending}
+                />
+                <span className={styles.checkboxCustom}></span>
+                <div className={styles.optionText}>
+                  <span className={styles.optionTitle}>Skip online fallback</span>
+                  <span className={styles.optionDesc}>
+                    Only import offline matches. Unmatched titles are skipped without API calls.
+                  </span>
+                </div>
+              </label>
+            </div>
 
-      <div className={styles.importCard}>
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitleRow}>
-            <Icon name="myanimelist" className={styles.malIcon} />
-            <h3>MyAnimeList</h3>
+            {malImportMode === 'username' ? (
+              <button
+                className={styles.syncBtn}
+                onClick={() =>
+                  malUsernameImport.mutate({ erase: eraseWatchlist, useOfflineDb, skipFallback })
+                }
+                disabled={!malUsername.trim() || malUsernameImport.isPending}
+              >
+                <Icon name="download" />
+                {malUsernameImport.isPending ? 'Importing...' : 'Start Import'}
+              </button>
+            ) : (
+              <div className={styles.actions}>
+                {importing ? (
+                  <Button onClick={handleCancel} className={styles.cancelBtn}>
+                    Cancel Import
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleMalImport}
+                    className={styles.importBtn}
+                    disabled={!selectedFileName}
+                  >
+                    <Icon name="upload" /> Start Import
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {malImportMode === 'username' && malUsernameImport.isError && (
+              <div className={`${styles.statusMessage} ${styles.error}`}>
+                {malUsernameImport.error.message}
+              </div>
+            )}
+
+            {importing && progress && (
+              <div className={styles.progressSection}>
+                <div className={styles.progressBar}>
+                  <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+                </div>
+                <div className={styles.progressInfo}>
+                  <span className={styles.progressCount}>
+                    {progress.current} / {progress.total}
+                  </span>
+                  <span className={styles.progressTitle}>
+                    {progress.found ? (
+                      <>
+                        {progress.matchedTitle}
+                        <span
+                          className={`${styles.sourceBadge} ${styles[progress.source || 'anilist']}`}
+                        >
+                          {progress.source === 'kitsu'
+                            ? 'Kitsu'
+                            : progress.source === 'offline'
+                              ? 'Offline DB'
+                              : 'AniList'}
+                        </span>
+                      </>
+                    ) : (
+                      <span className={styles.skipped}>Skipped: {progress.title}</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className={`${styles.statusMessage} ${styles.success}`}>
+                Import complete! Imported: {result.imported}, Skipped: {result.skipped}.
+              </div>
+            )}
+
+            {error && <div className={`${styles.statusMessage} ${styles.error}`}>{error}</div>}
           </div>
-        </div>
+        </>
+      )}
+      {showMangaTrackers && (
+        <div className={styles.importCard}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardTitleRow}>
+              <Icon name="myanimelist" className={styles.malIcon} />
+              <h3>MyAnimeList Manga</h3>
+            </div>
+          </div>
 
-        <div className={styles.radioGroup}>
-          <label className={styles.radioLabel}>
-            <input
-              type="radio"
-              name="malMode"
-              value="username"
-              checked={malImportMode === 'username'}
-              onChange={() => setMalImportMode('username')}
-            />
-            <span>Username</span>
-          </label>
-          <label className={styles.radioLabel}>
-            <input
-              type="radio"
-              name="malMode"
-              value="xml"
-              checked={malImportMode === 'xml'}
-              onChange={() => setMalImportMode('xml')}
-            />
-            <span>XML File</span>
-          </label>
-        </div>
+          <div className={styles.radioGroup}>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="malMangaMode"
+                value="username"
+                checked={malMangaImportMode === 'username'}
+                onChange={() => setMalMangaImportMode('username')}
+              />
+              <span>Username</span>
+            </label>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="malMangaMode"
+                value="xml"
+                checked={malMangaImportMode === 'xml'}
+                onChange={() => setMalMangaImportMode('xml')}
+              />
+              <span>XML File</span>
+            </label>
+          </div>
 
-        {malImportMode === 'username' ? (
-          <>
+          {malMangaImportMode === 'username' ? (
             <div className={styles.inputGroup}>
               <input
                 type="text"
                 placeholder="Enter MAL username"
-                value={malUsername}
-                onChange={(e) => setMalUsername(e.target.value)}
+                value={malMangaUsername}
+                onChange={(e) => setMalMangaUsername(e.target.value)}
                 className={styles.input}
-                disabled={malUsernameImport.isPending}
+                disabled={malMangaUsernameImport.isPending}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && malUsername.trim())
-                    malUsernameImport.mutate({ erase: eraseWatchlist, useOfflineDb, skipFallback })
+                  if (e.key === 'Enter' && malMangaUsername.trim()) malMangaUsernameImport.mutate()
                 }}
               />
             </div>
-            {malUsernameImport.isPending && (
-              <div className={styles.importLoading}>
-                <Icon name="sync-alt" className={styles.spin} />
-                <span>Importing from MAL...</span>
+          ) : (
+            <div className={styles.uploadArea}>
+              <div className={styles.fileInputWrapper}>
+                <input
+                  type="file"
+                  id="malMangaFile"
+                  accept=".xml,application/xml"
+                  className={styles.fileInput}
+                  onChange={(e) => setMalMangaFileName(e.target.files?.[0]?.name ?? '')}
+                  disabled={malMangaXmlBusy}
+                />
+                <div className={styles.fileDisplay}>
+                  <Icon name="file-alt" className={styles.fileIcon} />
+                  <span className={styles.fileName}>
+                    {malMangaFileName || 'Choose XML file...'}
+                  </span>
+                </div>
+                <label htmlFor="malMangaFile" className={styles.browseButton}>
+                  Browse
+                </label>
               </div>
-            )}
-          </>
-        ) : (
-          <div className={styles.uploadArea}>
-            <div className={styles.fileInputWrapper}>
+            </div>
+          )}
+
+          <div className={styles.optionsArea}>
+            <label className={styles.checkboxLabel}>
               <input
-                type="file"
-                id="malFile"
-                accept=".xml,application/xml"
-                className={styles.fileInput}
-                onChange={handleFileChange}
-                disabled={importing}
+                type="checkbox"
+                checked={eraseManga}
+                onChange={(e) => setEraseManga(e.target.checked)}
+                className={styles.checkbox}
+                disabled={malMangaUsernameImport.isPending || malMangaXmlBusy}
               />
-              <div className={styles.fileDisplay}>
-                <Icon name="file-alt" className={styles.fileIcon} />
-                <span className={styles.fileName}>{selectedFileName || 'Choose XML file...'}</span>
+              <span className={styles.checkboxCustom}></span>
+              <div className={styles.optionText}>
+                <span className={styles.optionTitle}>Replace AniList-linked manga</span>
+                <span className={styles.optionDesc}>
+                  Clears previously imported (anilist:) entries before importing. Your provider
+                  bookmarks are never touched.
+                </span>
               </div>
-              <label htmlFor="malFile" className={styles.browseButton}>
-                Browse
-              </label>
-            </div>
+            </label>
           </div>
-        )}
 
-        <div className={styles.optionsArea}>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={eraseWatchlist}
-              onChange={(e) => setEraseWatchlist(e.target.checked)}
-              className={styles.checkbox}
-              disabled={importing || malUsernameImport.isPending}
-            />
-            <span className={styles.checkboxCustom}></span>
-            <div className={styles.optionText}>
-              <span className={styles.optionTitle}>Erase current watchlist</span>
-              <span className={styles.optionDesc}>Delete existing watchlist before importing.</span>
-            </div>
-          </label>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={useOfflineDb}
-              onChange={(e) => setUseOfflineDb(e.target.checked)}
-              className={styles.checkbox}
-              disabled={importing || malUsernameImport.isPending}
-            />
-            <span className={styles.checkboxCustom}></span>
-            <div className={styles.optionText}>
-              <span className={styles.optionTitle}>Use offline database (fast)</span>
-              <span className={styles.optionDesc}>
-                Match by MAL ID locally first — instant and avoids AniList rate limits.
-              </span>
-            </div>
-          </label>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={skipFallback}
-              onChange={(e) => setSkipFallback(e.target.checked)}
-              className={styles.checkbox}
-              disabled={importing || malUsernameImport.isPending}
-            />
-            <span className={styles.checkboxCustom}></span>
-            <div className={styles.optionText}>
-              <span className={styles.optionTitle}>Skip online fallback</span>
-              <span className={styles.optionDesc}>
-                Only import offline matches. Unmatched titles are skipped without API calls.
-              </span>
-            </div>
-          </label>
-        </div>
-
-        {malImportMode === 'username' ? (
-          <button
-            className={styles.syncBtn}
-            onClick={() =>
-              malUsernameImport.mutate({ erase: eraseWatchlist, useOfflineDb, skipFallback })
-            }
-            disabled={!malUsername.trim() || malUsernameImport.isPending}
-          >
-            <Icon name="download" />
-            {malUsernameImport.isPending ? 'Importing...' : 'Start Import'}
-          </button>
-        ) : (
-          <div className={styles.actions}>
-            {importing ? (
-              <Button onClick={handleCancel} className={styles.cancelBtn}>
-                Cancel Import
-              </Button>
-            ) : (
+          {malMangaImportMode === 'username' ? (
+            <button
+              className={styles.syncBtn}
+              onClick={() => malMangaUsernameImport.mutate()}
+              disabled={!malMangaUsername.trim() || malMangaUsernameImport.isPending}
+            >
+              <Icon name="download" />
+              {malMangaUsernameImport.isPending ? 'Importing...' : 'Start Import'}
+            </button>
+          ) : (
+            <div className={styles.actions}>
               <Button
-                onClick={handleMalImport}
+                onClick={handleMalMangaXmlImport}
                 className={styles.importBtn}
-                disabled={!selectedFileName}
+                disabled={malMangaXmlBusy || !malMangaFileName}
               >
-                <Icon name="upload" /> Start Import
+                <Icon name="upload" /> {malMangaXmlBusy ? 'Importing...' : 'Start Import'}
               </Button>
-            )}
-          </div>
-        )}
-
-        {malImportMode === 'username' && malUsernameImport.isError && (
-          <div className={`${styles.statusMessage} ${styles.error}`}>
-            {malUsernameImport.error.message}
-          </div>
-        )}
-
-        {importing && progress && (
-          <div className={styles.progressSection}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
             </div>
-            <div className={styles.progressInfo}>
-              <span className={styles.progressCount}>
-                {progress.current} / {progress.total}
-              </span>
-              <span className={styles.progressTitle}>
-                {progress.found ? (
-                  <>
-                    {progress.matchedTitle}
-                    <span
-                      className={`${styles.sourceBadge} ${styles[progress.source || 'anilist']}`}
-                    >
-                      {progress.source === 'kitsu'
-                        ? 'Kitsu'
-                        : progress.source === 'offline'
-                          ? 'Offline DB'
-                          : 'AniList'}
-                    </span>
-                  </>
-                ) : (
-                  <span className={styles.skipped}>Skipped: {progress.title}</span>
-                )}
-              </span>
+          )}
+
+          {malMangaUsernameImport.isError && (
+            <div className={`${styles.statusMessage} ${styles.error}`}>
+              {malMangaUsernameImport.error.message}
             </div>
-          </div>
-        )}
+          )}
 
-        {result && (
-          <div className={`${styles.statusMessage} ${styles.success}`}>
-            Import complete! Imported: {result.imported}, Skipped: {result.skipped}.
-          </div>
-        )}
+          {malMangaXmlError && (
+            <div className={`${styles.statusMessage} ${styles.error}`}>{malMangaXmlError}</div>
+          )}
 
-        {error && <div className={`${styles.statusMessage} ${styles.error}`}>{error}</div>}
-      </div>
+          {malMangaXmlResult && (
+            <div className={`${styles.statusMessage} ${styles.success}`}>
+              Import complete! Imported: {malMangaXmlResult.imported}, Skipped:{' '}
+              {malMangaXmlResult.skipped}.
+            </div>
+          )}
+
+          <p
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-tertiary)',
+              marginTop: '8px',
+            }}
+          >
+            MAL manga is matched to AniList by MAL ID with a title fallback. Unmatched titles are
+            skipped. Imports land as AniList-linked entries alongside your provider bookmarks.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

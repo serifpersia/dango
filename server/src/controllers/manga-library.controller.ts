@@ -55,6 +55,60 @@ export class MangaLibraryController {
     }
   }
 
+  getEntry = async (req: Request, res: Response) => {
+    try {
+      const item = MangaLibraryRepository.getById(mangaDb(req), req.params.id as string)
+      if (!item) return res.status(404).json({ error: 'Not in library' })
+      res.json({ item })
+    } catch {
+      res.status(500).json({ error: 'Failed to load entry' })
+    }
+  }
+
+  linkAnilist = async (req: Request, res: Response) => {
+    const { id, anilistId } = req.body ?? {}
+    const targetId = typeof id === 'string' ? id : ''
+    const mediaId = Number(anilistId)
+    if (!targetId || !Number.isInteger(mediaId) || mediaId <= 0) {
+      return res.status(400).json({ error: 'id and a numeric anilistId are required' })
+    }
+    try {
+      const db = mangaDb(req)
+      const row = MangaLibraryRepository.getById(db, targetId)
+      if (!row) return res.status(404).json({ error: 'Library entry not found' })
+      if (String(row.provider).toLowerCase() === 'anilist') {
+        return res
+          .status(400)
+          .json({ error: 'Link a provider bookmark to the AniList entry, not the reverse' })
+      }
+      let progressMigrated = false
+      await performMangaWriteTransaction(db, (tx) => {
+        MangaLibraryRepository.setAnilistId(tx, targetId, mediaId, 'manual')
+        const orphanId = `anilist:${mediaId}`
+        if (orphanId !== targetId) {
+          const orphan = MangaLibraryRepository.getById(tx, orphanId)
+          const target = MangaLibraryRepository.getById(tx, targetId)
+          const targetProgress = MangaProgressRepository.getByManga(tx, targetId)
+          if (
+            orphan?.lastChapterNumber &&
+            !target?.lastChapterNumber &&
+            targetProgress.length === 0
+          ) {
+            MangaLibraryRepository.setProgressPointer(tx, targetId, orphan.lastChapterNumber)
+            MangaProgressRepository.moveSyntheticChapters(tx, orphanId, targetId)
+            progressMigrated = true
+          }
+          MangaLibraryRepository.delete(tx, orphanId)
+          MangaProgressRepository.deleteByManga(tx, orphanId)
+        }
+      })
+      res.json({ success: true, id: targetId, progressMigrated })
+    } catch (err) {
+      logger.error({ err }, 'Failed to link manga to AniList')
+      res.status(500).json({ error: 'Failed to link entry' })
+    }
+  }
+
   getLibraryIds = async (req: Request, res: Response) => {
     try {
       res.json({ ids: MangaLibraryRepository.getIds(mangaDb(req)) })

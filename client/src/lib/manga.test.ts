@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { isMangaAdult, resolveMangaTitle, mangaNameVariants } from './manga'
+import {
+  isMangaAdult,
+  resolveMangaTitle,
+  mangaNameVariants,
+  parseSyntheticChapterId,
+  findChapterByNumber,
+} from './manga'
 
 describe('isMangaAdult', () => {
   it('flags erotica and pornographic ratings', () => {
@@ -54,5 +60,40 @@ describe('mangaNameVariants', () => {
       englishName: 'Berserk',
       nativeName: undefined,
     })
+  })
+})
+
+describe('parseSyntheticChapterId', () => {
+  it('parses anilist chapter pointers', () => {
+    expect(parseSyntheticChapterId('anilist:ch:5')).toBe(5)
+    expect(parseSyntheticChapterId('anilist:ch:0')).toBe(0)
+  })
+
+  it('rejects real provider chapter ids and junk', () => {
+    expect(parseSyntheticChapterId('8c697de6-a142-4cec')).toBeNull()
+    expect(parseSyntheticChapterId('anilist:ch:abc')).toBeNull()
+    expect(parseSyntheticChapterId('')).toBeNull()
+    expect(parseSyntheticChapterId(null)).toBeNull()
+  })
+})
+
+describe('findChapterByNumber', () => {
+  const chapters = [{ number: '4' }, { number: '5.5' }, { number: ' 6 ' }, { number: 'Oneshot' }]
+
+  it('prefers exact string matches', () => {
+    expect(findChapterByNumber(chapters, 4)).toEqual({ number: '4' })
+  })
+
+  it('matches numeric equivalents', () => {
+    expect(findChapterByNumber(chapters, 6)).toEqual({ number: ' 6 ' })
+  })
+
+  it('does not floor fractional chapters onto integers', () => {
+    expect(findChapterByNumber(chapters, 5)).toBeNull()
+  })
+
+  it('returns null when the provider lacks the chapter', () => {
+    expect(findChapterByNumber(chapters, 99)).toBeNull()
+    expect(findChapterByNumber([], 1)).toBeNull()
   })
 })

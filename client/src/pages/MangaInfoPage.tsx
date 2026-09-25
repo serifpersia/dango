@@ -4,8 +4,9 @@ import Icon from '../components/common/Icon'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import MangaDetail from '../components/manga/MangaDetail'
+import AnilistLinkPanel from '../components/manga/AnilistLinkPanel'
 import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
-import { resolveMangaTitle } from '../lib/manga'
+import { resolveMangaTitle, parseSyntheticChapterId, findChapterByNumber } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import {
   mangaLibraryId,
@@ -66,6 +67,9 @@ export default function MangaInfoPage() {
     return map
   }, [progressQuery.data])
 
+  const anilistIdParam =
+    provider.toLowerCase() === 'anilist' && /^\d+$/.test(id) ? parseInt(id, 10) : null
+
   const inLibrary = checkQuery.data?.inLibrary ?? false
   const currentStatus = checkQuery.data?.status ?? 'Reading'
 
@@ -80,12 +84,21 @@ export default function MangaInfoPage() {
     for (const row of rows) {
       const found = detail.chapters.find((c) => c.id === row.chapterId)
       if (found && !found.externalUrl) return found
+      const synthetic = parseSyntheticChapterId(row.chapterId)
+      if (synthetic != null) {
+        const byNumber = findChapterByNumber(detail.chapters, synthetic)
+        if (byNumber && !byNumber.externalUrl) return byNumber
+      }
     }
     return readableChapters[0] ?? null
   }, [detail, progressQuery.data, readableChapters])
 
   const resumeProgress = resumeChapter ? progressByChapter.get(resumeChapter.id) : undefined
-  const resumeLabel = resumeProgress ? `Continue Ch. ${resumeChapter?.number}` : 'Start Reading'
+  const hasAnyProgress = (progressQuery.data?.progress?.length ?? 0) > 0
+  const resumeLabel =
+    resumeChapter && (resumeProgress || hasAnyProgress)
+      ? `Continue Ch. ${resumeChapter?.number}`
+      : 'Start Reading'
 
   const openChapter = (ch: MangaChapter) => {
     if (ch.externalUrl) {
@@ -127,12 +140,16 @@ export default function MangaInfoPage() {
           <div className={`${styles.skeletonLine} ${styles.shimmer}`} style={{ width: '70%' }} />
         </div>
       ) : detailQuery.isError || !detail || !displayDetail ? (
-        <>
-          <button className={styles.backBtn} onClick={() => navigate('/manga')}>
-            <Icon name="chevron-left" size={12} /> Back to browse
-          </button>
-          <ErrorMessage message="Failed to load this title. Please try again." />
-        </>
+        anilistIdParam != null && libId ? (
+          <AnilistLinkPanel libId={libId} anilistId={anilistIdParam} />
+        ) : (
+          <>
+            <button className={styles.backBtn} onClick={() => navigate('/manga')}>
+              <Icon name="chevron-left" size={12} /> Back to browse
+            </button>
+            <ErrorMessage message="Failed to load this title. Please try again." />
+          </>
+        )
       ) : (
         <MangaDetail
           detail={displayDetail}

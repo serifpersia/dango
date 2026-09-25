@@ -25,6 +25,8 @@ export interface MangaLibraryRow {
   lastChapterNumber?: string | null
   lastPage?: number | null
   updatedAt?: number | null
+  anilistId?: number | null
+  anilistIdSource?: string | null
   [key: string]: unknown
 }
 
@@ -106,12 +108,14 @@ export const MangaLibraryRepository = {
       author?: string
       altTitle?: string
       contentRating?: string
+      anilistId?: number | null
+      anilistIdSource?: string | null
     }
   ) =>
     dbRun(
       db,
-      `INSERT INTO manga_library (id, provider, mangaId, title, cover, status, author, altTitle, contentRating, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+      `INSERT INTO manga_library (id, provider, mangaId, title, cover, status, author, altTitle, contentRating, anilistId, anilistIdSource, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
        ON CONFLICT(id) DO UPDATE SET
           provider = COALESCE(NULLIF(EXCLUDED.provider, ''), manga_library.provider),
           title = COALESCE(NULLIF(EXCLUDED.title, ''), manga_library.title),
@@ -120,6 +124,8 @@ export const MangaLibraryRepository = {
           author = COALESCE(NULLIF(EXCLUDED.author, ''), manga_library.author),
           altTitle = COALESCE(NULLIF(EXCLUDED.altTitle, ''), manga_library.altTitle),
           contentRating = COALESCE(EXCLUDED.contentRating, manga_library.contentRating),
+          anilistId = COALESCE(EXCLUDED.anilistId, manga_library.anilistId),
+          anilistIdSource = COALESCE(EXCLUDED.anilistIdSource, manga_library.anilistIdSource),
           updatedAt = strftime('%s', 'now')`,
       [
         data.id,
@@ -131,8 +137,22 @@ export const MangaLibraryRepository = {
         data.author || null,
         data.altTitle || null,
         data.contentRating || null,
+        data.anilistId ?? null,
+        data.anilistIdSource ?? null,
       ]
     ),
+
+  setAnilistId: (db: DatabaseWrapper, id: string, anilistId: number, source?: string) =>
+    source
+      ? dbRun(db, 'UPDATE manga_library SET anilistId = ?, anilistIdSource = ? WHERE id = ?', [
+          anilistId,
+          source,
+          id,
+        ])
+      : dbRun(db, 'UPDATE manga_library SET anilistId = ? WHERE id = ?', [anilistId, id]),
+
+  getByAnilistId: (db: DatabaseWrapper, anilistId: number) =>
+    dbAll<MangaLibraryRow>(db, 'SELECT * FROM manga_library WHERE anilistId = ?', [anilistId]),
 
   updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
     dbRun(
@@ -160,6 +180,13 @@ export const MangaLibraryRepository = {
       db,
       `UPDATE manga_library SET lastChapterId = ?, lastChapterNumber = ?, lastPage = ?, updatedAt = strftime('%s', 'now') WHERE id = ?`,
       [progress.chapterId, progress.chapterNumber, progress.page, id]
+    ),
+
+  setProgressPointer: (db: DatabaseWrapper, id: string, chapterNumber: string) =>
+    dbRun(
+      db,
+      `UPDATE manga_library SET lastChapterNumber = ?, updatedAt = strftime('%s', 'now') WHERE id = ?`,
+      [chapterNumber, id]
     ),
 
   delete: (db: DatabaseWrapper, id: string) =>
@@ -251,6 +278,20 @@ export const MangaProgressRepository = {
       mangaId,
       chapterId,
     ]),
+
+  deleteSyntheticChapters: (db: DatabaseWrapper, mangaId: string, keepChapterId: string) =>
+    dbRun(
+      db,
+      `DELETE FROM manga_progress WHERE mangaId = ? AND chapterId LIKE 'anilist:ch:%' AND chapterId != ?`,
+      [mangaId, keepChapterId]
+    ),
+
+  moveSyntheticChapters: (db: DatabaseWrapper, fromMangaId: string, toMangaId: string) =>
+    dbRun(
+      db,
+      `UPDATE manga_progress SET mangaId = ?, updatedAt = strftime('%s', 'now') WHERE mangaId = ? AND chapterId LIKE 'anilist:ch:%'`,
+      [toMangaId, fromMangaId]
+    ),
 
   getContinueReading: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''

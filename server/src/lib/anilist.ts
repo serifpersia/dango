@@ -1425,12 +1425,13 @@ function extractEpisodes(result: {
 }
 
 export async function searchAnilistByTitle(
-  title: string
+  title: string,
+  type: 'ANIME' | 'MANGA' = 'ANIME'
 ): Promise<{ id: number; title: { romaji?: string; english?: string; native?: string } } | null> {
   const query = `
     query ($search: String) {
       Page(page: 1, perPage: 5) {
-        media(search: $search, type: ANIME) {
+        media(search: $search, type: ${type}) {
           id
           title { romaji english native }
         }
@@ -1469,7 +1470,7 @@ export async function searchAnilistByTitle(
   }
 
   if (!media || media.length === 0) {
-    if (anyFailed && anilistUnavailable()) {
+    if (anyFailed && type === 'ANIME' && anilistUnavailable()) {
       const fb = await kitsuSearchAnime({ query: title, page: 1, perPage: 5 })
       if (fb.length > 0) {
         const best = fb[0]
@@ -1508,6 +1509,57 @@ export async function searchAnilistByTitle(
     }
   }
   return { id: best.id, title: best.title }
+}
+
+export async function searchAnilistMangaByTitle(
+  title: string
+): Promise<{ id: number; title: { romaji?: string; english?: string; native?: string } } | null> {
+  return searchAnilistByTitle(title, 'MANGA')
+}
+
+export interface MangaMeta {
+  id: number
+  title: { romaji?: string; english?: string; native?: string }
+  cover?: string
+}
+
+interface MangaMetaMedia {
+  id: number
+  title?: { romaji?: string; english?: string; native?: string }
+  coverImage?: { large?: string }
+}
+
+const MANGA_META_FRAGMENT = `id title { romaji english native } coverImage { large }`
+
+export async function getMangaMetaById(id: number): Promise<MangaMeta | null> {
+  if (!id) return null
+  try {
+    const result = await anilistRequest<{ Media?: MangaMetaMedia | null }>(
+      `query ($id: Int) { Media(id: $id, type: MANGA) { ${MANGA_META_FRAGMENT} } }`,
+      { id }
+    )
+    const m = result?.data?.Media
+    if (!m) return null
+    return { id: m.id, title: m.title ?? {}, cover: m.coverImage?.large }
+  } catch {
+    return null
+  }
+}
+
+export async function getMangaMetaByMalId(malId: number): Promise<MangaMeta | null> {
+  const absMal = Math.abs(malId)
+  if (!absMal) return null
+  try {
+    const result = await anilistRequest<{ Media?: MangaMetaMedia | null }>(
+      `query ($id: Int) { Media(idMal: $id, type: MANGA) { ${MANGA_META_FRAGMENT} } }`,
+      { id: absMal }
+    )
+    const m = result?.data?.Media
+    if (!m) return null
+    return { id: m.id, title: m.title ?? {}, cover: m.coverImage?.large }
+  } catch {
+    return null
+  }
 }
 
 export async function getAiredEpisodesForShows(

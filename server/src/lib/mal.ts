@@ -1068,6 +1068,81 @@ export async function fetchMalUserList(username: string): Promise<MalUserListEnt
   return entries
 }
 
+export interface MalMangaListEntry {
+  malId: number
+  title: string
+  titleEnglish: string | null
+  status: number
+  chaptersRead: number
+}
+
+export function mapMalMangaStatusCode(status: number): string | null {
+  switch (status) {
+    case 1:
+      return 'Reading'
+    case 2:
+      return 'Completed'
+    case 3:
+      return 'On-Hold'
+    case 4:
+      return 'Dropped'
+    case 6:
+      return 'Planned'
+    default:
+      return null
+  }
+}
+
+export async function fetchMalMangaList(username: string): Promise<MalMangaListEntry[]> {
+  const user = username.trim()
+  if (!user || /[^A-Za-z0-9_-]/.test(user)) throw new Error('Invalid MAL username')
+  const entries: MalMangaListEntry[] = []
+  let offset = 0
+  for (let page = 0; page < MAL_USER_LIST_MAX_PAGES; page++) {
+    const url = `https://myanimelist.net/mangalist/${encodeURIComponent(user)}/load.json?status=7&offset=${offset}`
+    await politeWait()
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: 'manual',
+    })
+    if (res.status === 400 || res.status === 404) throw new Error(`MAL user "${user}" not found`)
+    if (res.status === 403 || res.status === 429) {
+      throw new Error(`MAL blocked the request (HTTP ${res.status}) — try again later`)
+    }
+    if (res.status >= 300 && res.status < 400) {
+      throw new Error(`MAL list for "${user}" is private or unavailable`)
+    }
+    if (!res.ok) throw new Error(`MAL list fetch failed (HTTP ${res.status})`)
+    const data: unknown = await parseJsonBody(res)
+    if (!Array.isArray(data) || data.length === 0) break
+    for (const item of data) {
+      const rec = item as Record<string, unknown>
+      const malId = Number(rec.manga_id)
+      if (!malId) continue
+      const titleRaw =
+        typeof rec.manga_title === 'string' && rec.manga_title.trim() !== ''
+          ? rec.manga_title
+          : typeof rec.manga_title_eng === 'string'
+            ? rec.manga_title_eng
+            : ''
+      entries.push({
+        malId,
+        title: decodeHtml(titleRaw),
+        titleEnglish:
+          typeof rec.manga_title_eng === 'string' && rec.manga_title_eng.trim() !== ''
+            ? decodeHtml(rec.manga_title_eng)
+            : null,
+        status: Number(rec.status) || 0,
+        chaptersRead: Number(rec.num_read_chapters ?? rec.num_chapters_read) || 0,
+      })
+    }
+    if (data.length < MAL_USER_LIST_PAGE_SIZE) break
+    offset += MAL_USER_LIST_PAGE_SIZE
+  }
+  return entries
+}
+
 export async function malLatestReleases(
   store: MalCacheStore,
   format: string = 'TV',

@@ -1,16 +1,53 @@
 import { Router } from 'express'
+import multer from 'multer'
+import { XMLParser } from 'fast-xml-parser'
 import { AniListTracker } from '../lib/tracker/anilist-tracker.js'
 import {
   syncAniList,
   importFromMalUsername,
   importFromUsername,
 } from '../lib/tracker/sync.service.js'
+import {
+  syncAniListManga,
+  importFromUsernameManga,
+  importMangaFromMalUsername,
+  importMangaFromMalXmlItems,
+  type MalXmlMangaItem,
+} from '../lib/tracker/manga-sync.service.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import { performWriteTransaction } from '../sync.js'
 
 const TOKEN_KEY = 'tracker_anilist_token'
 const USER_KEY = 'tracker_anilist_user'
 const CLIENT_ID_KEY = 'tracker_anilist_client_id'
+
+const malMangaXmlParser = new XMLParser({
+  isArray: (name) => name === 'manga',
+  parseTagValue: false,
+  trimValues: true,
+})
+
+type MangaXmlVal = string | string[] | undefined
+
+function mangaXmlText(value: MangaXmlVal): string {
+  if (Array.isArray(value)) return String(value[0] ?? '')
+  return String(value ?? '')
+}
+
+function mapMalMangaXmlStatus(status: string): string {
+  switch (status) {
+    case 'Plan to Read':
+      return 'Planned'
+    case 'On Hold':
+      return 'On-Hold'
+    case 'Reading':
+    case 'Completed':
+    case 'Dropped':
+      return status
+    default:
+      return 'Planned'
+  }
+}
 
 export function createTrackerRouter(): Router {
   const router = Router()
@@ -166,6 +203,117 @@ export function createTrackerRouter(): Router {
       if (message.includes('blocked') || message.includes('HTTP 429')) {
         return res.status(429).json({ error: message })
       }
+      res.status(500).json({ error: message })
+    }
+  })
+
+  router.post('/tracker/manga/sync', async (req, res) => {
+    const { direction } = req.body ?? {}
+    try {
+      if (!req.mangaDb || req.mangaDb.isClosedCheck()) {
+        return res.status(503).json({ error: 'Manga database is not ready' })
+      }
+      const syncDirection = direction === 'pull-only' ? 'pull-only' : 'two-way'
+      const result = await syncAniListManga(req.db, req.mangaDb, {
+        direction: syncDirection,
+      })
+      res.json({
+        success: true,
+        summary: result.summary,
+        details: result.details,
+        direction: syncDirection,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Manga sync failed'
+      res.status(500).json({ error: message })
+    }
+  })
+
+  router.post('/tracker/manga/import', async (req, res) => {
+    const { username, erase } = req.body ?? {}
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'Username is required' })
+    }
+    try {
+      if (!req.mangaDb || req.mangaDb.isClosedCheck()) {
+        return res.status(503).json({ error: 'Manga database is not ready' })
+      }
+      const count = await importFromUsernameManga(
+        req.db,
+        req.mangaDb,
+        username.trim(),
+        erase === true
+      )
+      res.json({ success: true, count })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      res.status(500).json({ error: message })
+    }
+  })
+
+  router.post('/tracker/manga/mal-import', async (req, res) => {
+    const { username, erase } = req.body ?? {}
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'MAL username is required' })
+    }
+    try {
+      if (!req.mangaDb || req.mangaDb.isClosedCheck()) {
+        return res.status(503).json({ error: 'Manga database is not ready' })
+      }
+      const result = await importMangaFromMalUsername(
+        req.db,
+        req.mangaDb,
+        username.trim(),
+        erase === true
+      )
+      res.json({ success: true, ...result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      if (message.includes('private') || message.includes('not found')) {
+        return res.status(404).json({ error: message })
+      }
+      if (message.includes('blocked') || message.includes('HTTP 429')) {
+        return res.status(429).json({ error: message })
+      }
+      res.status(500).json({ error: message })
+    }
+  })
+
+  router.post('/import/mal-xml-manga', multer().single('xmlfile'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file' })
+    const eraseRaw = req.body?.erase
+    const erase = eraseRaw === true || eraseRaw === 'true' || eraseRaw === '1'
+    try {
+      if (!req.mangaDb || req.mangaDb.isClosedCheck()) {
+        return res.status(503).json({ error: 'Manga database is not ready' })
+      }
+      let result: { myanimelist?: { manga?: Record<string, MangaXmlVal>[] } }
+      try {
+        result = malMangaXmlParser.parse(req.file.buffer.toString()) as {
+          myanimelist?: { manga?: Record<string, MangaXmlVal>[] }
+        }
+      } catch {
+        return res.status(400).json({ error: 'Invalid XML' })
+      }
+      const mangaList = result?.myanimelist?.manga || []
+      if (mangaList.length === 0) {
+        return res.status(400).json({ error: 'No manga found in XML' })
+      }
+      const items: MalXmlMangaItem[] = mangaList.map((item) => ({
+        malId: parseInt(mangaXmlText(item.series_mangadb_id), 10) || 0,
+        title: mangaXmlText(item.series_title),
+        status: mapMalMangaXmlStatus(mangaXmlText(item.my_status)),
+        chapters: Math.max(parseInt(mangaXmlText(item.my_read_chapters), 10) || 0, 0),
+      }))
+      const { imported, skipped } = await importMangaFromMalXmlItems(
+        req.db,
+        req.mangaDb,
+        items,
+        erase
+      )
+      res.json({ success: true, imported, skipped })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed'
       res.status(500).json({ error: message })
     }
   })

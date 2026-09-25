@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router'
 import ErrorMessage from '../components/common/ErrorMessage'
 import MangaReader from '../components/manga/MangaReader'
 import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
-import { resolveMangaTitle } from '../lib/manga'
+import { resolveMangaTitle, parseSyntheticChapterId, findChapterByNumber } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { mangaLibraryId, useMangaProgress, useSaveMangaProgress } from '../hooks/useMangaLibrary'
 import styles from '../components/manga/Manga.module.css'
@@ -22,7 +22,20 @@ export default function MangaReadPage() {
   const activeRating = hasConsent ? rating : 'safe'
 
   const libId = provider && id ? mangaLibraryId(provider, id) : ''
-  const detailQuery = useMangaDetail(provider || null, id || null, activeRating, hasConsent)
+  const isAnilistEntry = provider.toLowerCase() === 'anilist'
+
+  useEffect(() => {
+    if (isAnilistEntry && id) {
+      navigate(`/manga/anilist/${encodeURIComponent(id)}`, { replace: true })
+    }
+  }, [isAnilistEntry, id, navigate])
+
+  const detailQuery = useMangaDetail(
+    !isAnilistEntry && provider ? provider : null,
+    !isAnilistEntry && id ? id : null,
+    activeRating,
+    hasConsent
+  )
   const detail = detailQuery.data
   const { titlePreference } = useTitlePreference()
   const displayTitle = detail ? resolveMangaTitle(detail, titlePreference) : 'Manga'
@@ -31,6 +44,26 @@ export default function MangaReadPage() {
 
   const activeChapter: MangaChapter | null =
     detail && chapterId ? (detail.chapters.find((c) => c.id === chapterId) ?? null) : null
+
+  const syntheticChapter = parseSyntheticChapterId(chapterId)
+  const resolvedChapter =
+    syntheticChapter != null && detail
+      ? findChapterByNumber(detail.chapters, syntheticChapter)
+      : null
+
+  useEffect(() => {
+    if (syntheticChapter != null && resolvedChapter && resolvedChapter.id !== chapterId) {
+      const params = new URLSearchParams()
+      params.set('chapter', resolvedChapter.id)
+      if (hasConsent && rating !== 'safe') params.set('rating', rating)
+      navigate(`/manga/${provider}/${encodeURIComponent(id)}/read?${params.toString()}`, {
+        replace: true,
+      })
+    }
+  }, [syntheticChapter, resolvedChapter, chapterId, hasConsent, rating, provider, id, navigate])
+
+  const isResolvingChapter = syntheticChapter != null && !!detail && !!resolvedChapter
+  const syntheticMissingChapter = syntheticChapter != null && !!detail && !resolvedChapter
 
   const savedPage = useMemo(() => {
     const row = (progressQuery.data?.progress ?? []).find((p) => p.chapterId === chapterId)
@@ -175,9 +208,11 @@ export default function MangaReadPage() {
     navigate(`/manga/${provider}/${encodeURIComponent(id)}${suffix}`)
   }
 
+  if (isAnilistEntry) return null
+
   return (
     <div className={styles.page}>
-      {detailQuery.isLoading ? (
+      {detailQuery.isLoading || isResolvingChapter ? (
         <div className={styles.readerPages} aria-hidden>
           {Array.from({ length: 3 }).map((_, i) => (
             <div
@@ -192,7 +227,13 @@ export default function MangaReadPage() {
           <button className={styles.backBtn} onClick={backToDetail}>
             Back to title
           </button>
-          <ErrorMessage message="Failed to load this chapter. Please try again." />
+          <ErrorMessage
+            message={
+              syntheticMissingChapter
+                ? `Chapter ${syntheticChapter} isn't available from ${provider} for this title.`
+                : 'Failed to load this chapter. Please try again.'
+            }
+          />
         </>
       ) : (
         <MangaReader

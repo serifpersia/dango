@@ -87,6 +87,42 @@ export const useMangaLibraryCheck = (id?: string) => {
   })
 }
 
+export const useMangaLibraryEntry = (id?: string) => {
+  return useQuery<{ item: MangaLibraryItem | null }>({
+    queryKey: ['manga-library-entry', id],
+    queryFn: () => fetchApi(`/api/manga/library/entry/${encodeURIComponent(id || '')}`),
+    enabled: !!id,
+    staleTime: 1000 * 60,
+  })
+}
+
+export const useLinkMangaAnilist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, anilistId }: { id: string; anilistId: number }) => {
+      return fetchApi('/api/manga/library/link', {
+        method: 'POST',
+        body: JSON.stringify({ id, anilistId }),
+      }) as Promise<{ success: boolean; id: string; progressMigrated?: boolean }>
+    },
+    onSuccess: (data) => {
+      toast.success(
+        data?.progressMigrated
+          ? 'Linked — chapter progress carried over'
+          : 'Linked to AniList entry'
+      )
+      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-check'] })
+      queryClient.invalidateQueries({ queryKey: ['manga-library-entry'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to link: ${error.message}`)
+    },
+  })
+}
+
 export const useMangaContinueReading = (limit: number = 24) => {
   return useQuery<{ data: ContinueReadingItem[]; total: number }>({
     queryKey: ['manga-continue-reading', limit],

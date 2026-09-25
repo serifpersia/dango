@@ -16,10 +16,19 @@ export const ANILIST_TO_DANGO_STATUS: Record<AniListMediaListStatus, string> = {
 
 export const DANGO_TO_ANILIST_STATUS: Record<string, AniListMediaListStatus> = {
   Watching: 'CURRENT',
+  Reading: 'CURRENT',
   Completed: 'COMPLETED',
   'On-Hold': 'PAUSED',
   Dropped: 'DROPPED',
   Planned: 'PLANNING',
+}
+
+export const ANILIST_TO_MANGA_STATUS: Record<AniListMediaListStatus, string> = {
+  CURRENT: 'Reading',
+  COMPLETED: 'Completed',
+  PAUSED: 'On-Hold',
+  DROPPED: 'Dropped',
+  PLANNING: 'Planned',
 }
 
 export interface AnilistViewer {
@@ -40,6 +49,21 @@ export interface RemoteMediaEntry {
   coverImage?: string
   totalEpisodes?: number
   episodeDuration?: number
+}
+
+export interface RemoteMangaEntry {
+  mediaId: number
+  entryId?: number
+  idMal?: number
+  status: string
+  progress: number
+  progressVolumes?: number
+  score?: number
+  updatedAt: number
+  title: { romaji?: string; english?: string; native?: string }
+  coverImage?: string
+  totalChapters?: number
+  totalVolumes?: number
 }
 
 interface RequestOptions {
@@ -198,6 +222,68 @@ export class AniListTracker {
     return entries
   }
 
+  async fetchUserMangaList(userIdOrName?: number | string): Promise<RemoteMangaEntry[]> {
+    const query = `
+      query ($userId: Int, $userName: String) {
+        MediaListCollection(userId: $userId, userName: $userName, type: MANGA) {
+          lists {
+            entries {
+              id
+              mediaId
+              status
+              progress
+              progressVolumes
+              score(format: POINT_10)
+              updatedAt
+              media {
+                id
+                idMal
+                chapters
+                volumes
+                title { romaji english native }
+                coverImage { large }
+              }
+            }
+          }
+        }
+      }
+    `
+    const variables: Record<string, unknown> =
+      typeof userIdOrName === 'number'
+        ? { userId: userIdOrName }
+        : typeof userIdOrName === 'string'
+          ? { userName: userIdOrName }
+          : {}
+
+    const data = await this.request<{
+      MediaListCollection: { lists: AnilistMangaListEntry[] } | null
+    }>(query, variables)
+    const lists = data.MediaListCollection?.lists ?? []
+    const entries: RemoteMangaEntry[] = []
+
+    for (const list of lists) {
+      for (const entry of list.entries ?? []) {
+        if (!entry.media) continue
+        if (entry.status === 'REPEATING') continue
+        entries.push({
+          mediaId: entry.mediaId,
+          entryId: (entry as { id?: number }).id,
+          idMal: entry.media.idMal ?? undefined,
+          status: ANILIST_TO_MANGA_STATUS[entry.status as AniListMediaListStatus] ?? 'Planned',
+          progress: entry.progress ?? 0,
+          progressVolumes: entry.progressVolumes ?? undefined,
+          score: entry.score ?? undefined,
+          updatedAt: entry.updatedAt ?? 0,
+          title: entry.media.title ?? {},
+          coverImage: entry.media.coverImage?.large,
+          totalChapters: entry.media.chapters ?? undefined,
+          totalVolumes: entry.media.volumes ?? undefined,
+        })
+      }
+    }
+    return entries
+  }
+
   async updateMediaEntry(params: {
     mediaId: number
     status?: string
@@ -336,6 +422,26 @@ interface AnilistListEntry {
       idMal?: number
       episodes?: number
       duration?: number
+      title?: { romaji?: string; english?: string; native?: string }
+      coverImage?: { large?: string }
+    }
+  }[]
+}
+
+interface AnilistMangaListEntry {
+  entries?: {
+    id?: number
+    mediaId: number
+    status?: string
+    progress?: number
+    progressVolumes?: number
+    score?: number
+    updatedAt?: number
+    media?: {
+      id: number
+      idMal?: number
+      chapters?: number
+      volumes?: number
       title?: { romaji?: string; english?: string; native?: string }
       coverImage?: { large?: string }
     }

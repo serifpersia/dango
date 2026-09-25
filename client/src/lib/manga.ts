@@ -28,3 +28,28 @@ export function mangaNameVariants(source: MangaTitleSource): {
     nativeName: source.titles?.native ?? source.titles?.romaji ?? source.altTitle ?? undefined,
   }
 }
+
+const SYNTHETIC_CHAPTER_RE = /^anilist:ch:(\d+)$/
+
+export function parseSyntheticChapterId(chapterId: string | null | undefined): number | null {
+  if (!chapterId) return null
+  const match = SYNTHETIC_CHAPTER_RE.exec(chapterId.trim())
+  if (!match) return null
+  const n = Number.parseInt(match[1], 10)
+  return Number.isFinite(n) ? n : null
+}
+
+export function findChapterByNumber<T extends { number: string }>(
+  chapters: T[],
+  chapterNumber: number
+): T | null {
+  const want = String(chapterNumber)
+  const exact = chapters.find((c) => (c.number ?? '').trim() === want)
+  if (exact) return exact
+  return (
+    chapters.find((c) => {
+      const n = Number.parseFloat((c.number ?? '').trim())
+      return Number.isFinite(n) && n === chapterNumber
+    }) ?? null
+  )
+}
