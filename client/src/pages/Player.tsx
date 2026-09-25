@@ -26,6 +26,7 @@ import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useLowEndMode } from '../contexts/LowEndModeContext'
 import PlayerControls from '../components/player/PlayerControls'
 import PlayerStatusArea from '../components/player/PlayerStatusArea'
 import QueueRail from '../components/player/QueueRail'
@@ -936,6 +937,7 @@ const Player: React.FC = () => {
   }, [shouldPauseForModal, refs.videoRef])
 
   const { titlePreference } = useTitlePreference()
+  const { lowEndMode } = useLowEndMode()
   const displayTitle = useMemo(() => {
     if (!state.showMeta || state.loadingShowData) return 'Loading...'
     const { name, names } = state.showMeta
@@ -2098,17 +2100,19 @@ const Player: React.FC = () => {
                     >
                       {state.currentMode === 'dub' ? 'DUB' : 'SUB'}
                     </button>
-                    <button
-                      className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${player.state.useNativeControls ? styles.modeToggleActive : ''}`}
-                      onClick={() => {
-                        const newValue = !player.state.useNativeControls
-                        player.actions.setUseNativeControls(newValue)
-                        localStorage.setItem('playerUseNativeControls', newValue.toString())
-                      }}
-                      type="button"
-                    >
-                      {player.state.useNativeControls ? 'NATIVE: ON' : 'NATIVE: OFF'}
-                    </button>
+                    {lowEndMode && (
+                      <button
+                        className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${player.state.useNativeControls ? styles.modeToggleActive : ''}`}
+                        onClick={() => {
+                          const newValue = !player.state.useNativeControls
+                          player.actions.setUseNativeControls(newValue)
+                          localStorage.setItem('playerUseNativeControls', newValue.toString())
+                        }}
+                        type="button"
+                      >
+                        {player.state.useNativeControls ? 'NATIVE: ON' : 'NATIVE: OFF'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

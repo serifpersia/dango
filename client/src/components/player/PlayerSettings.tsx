@@ -9,6 +9,7 @@ import SubtitleStyleMenu from './SubtitleStyleMenu'
 import AvSyncMenu from './AvSyncMenu'
 import OptionListMenu from './OptionListMenu'
 import type { FallbackChoice } from '../../lib/fallbackChoice'
+import { useLowEndMode } from '../../contexts/LowEndModeContext'
 
 interface PlayerSettingsProps {
   isOpen: boolean
@@ -92,6 +93,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     fallbackChoice,
     onFallbackChoiceChange,
   } = props
+  const { lowEndMode } = useLowEndMode()
   const [view, setView] = useState<SettingsView>('main')
 
   React.useEffect(() => {
@@ -114,17 +116,19 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       <button className={styles.menuItem} onClick={() => setView('subtitle-style')}>
         <span>Subtitle Style</span>
       </button>
-      <button
-        className={`${styles.menuItem} ${useNativeControls ? styles.selected : ''}`}
-        onClick={() => {
-          const newValue = !useNativeControls
-          onNativeControlsToggle(newValue)
-          localStorage.setItem('playerUseNativeControls', newValue.toString())
-        }}
-      >
-        <span>Native Controls</span>
-        {useNativeControls && <Icon name="check" size={12} />}
-      </button>
+      {lowEndMode && (
+        <button
+          className={`${styles.menuItem} ${useNativeControls ? styles.selected : ''}`}
+          onClick={() => {
+            const newValue = !useNativeControls
+            onNativeControlsToggle(newValue)
+            localStorage.setItem('playerUseNativeControls', newValue.toString())
+          }}
+        >
+          <span>Native Controls</span>
+          {useNativeControls && <Icon name="check" size={12} />}
+        </button>
+      )}
       {anime4kSupported && (
         <button
           className={`${styles.menuItem} ${anime4kEnabled ? styles.selected : ''}`}
