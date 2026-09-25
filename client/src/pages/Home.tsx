@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import Icon from '../components/common/Icon'
 import Pagination from '../components/common/Pagination'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'

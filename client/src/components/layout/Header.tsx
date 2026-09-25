@@ -165,6 +165,15 @@ const Header: React.FC = () => {
           ? { to: '/listening-list', label: 'Listening List' }
           : { to: '/watchlist', label: 'Watchlist' }
 
+  const browseLink =
+    contentType === 'manga'
+      ? { to: '/manga', label: 'Manga' }
+      : contentType === 'tv'
+        ? { to: '/tv-search', label: 'TV and Movies' }
+        : contentType === 'asmr'
+          ? { to: '/asmr', label: 'ASMR' }
+          : null
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     hideVirtualKeyboard()
@@ -207,12 +216,14 @@ const Header: React.FC = () => {
               >
                 {listLink.label}
               </Link>
-              <Link
-                to="/insights"
-                className={`${styles.navLink} ${location.pathname === '/insights' ? styles.navLinkActive : ''}`}
-              >
-                Insights
-              </Link>
+              {contentType === 'anime' && (
+                <Link
+                  to="/insights"
+                  className={`${styles.navLink} ${location.pathname === '/insights' ? styles.navLinkActive : ''}`}
+                >
+                  Insights
+                </Link>
+              )}
               <Link
                 to="/settings"
                 className={`${styles.navLink} ${location.pathname.startsWith('/settings') ? styles.navLinkActive : ''}`}

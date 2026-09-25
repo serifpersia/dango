@@ -48,7 +48,9 @@ const Sidebar: React.FC = () => {
         : isAsmr
           ? { to: '/listening-list', icon: <Icon name="history" />, label: 'Listening List' }
           : { to: '/watchlist', icon: <Icon name="clock" />, label: 'Watchlist' },
-    { to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' },
+    ...(contentType === 'anime'
+      ? [{ to: '/insights', icon: <Icon name="chart-pie" />, label: 'Insights' }]
+      : []),
     { to: '/trackers', icon: <Icon name="sync-alt" />, label: 'Trackers' },
     { to: '/radio', icon: <Icon name="broadcast-tower" />, label: 'Radio' },
     { to: '/music', icon: <Icon name="headphones" />, label: 'Music' },
