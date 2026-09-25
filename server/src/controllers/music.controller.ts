@@ -634,10 +634,7 @@ export class MusicController {
     try {
       res.json({ tracks: await fetchPlaylistTracks(yt, id) })
     } catch (err) {
-      logger.warn(
-        { err },
-        '[music] playlist failed, retrying with a fresh saved-cookie session'
-      )
+      logger.warn({ err }, '[music] playlist failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
       if (!fresh) return res.json({ tracks: [] })
       try {
@@ -659,10 +656,7 @@ export class MusicController {
       if (first.tracks.length > 0 || first.playlists.length > 0) return res.json(first)
       logger.warn('[music] library came back empty, retrying with a fresh saved-cookie session')
     } catch (err) {
-      logger.warn(
-        { err },
-        '[music] library failed, retrying with a fresh saved-cookie session'
-      )
+      logger.warn({ err }, '[music] library failed, retrying with a fresh saved-cookie session')
     }
     const fresh = await refreshAuthedInnertube()
     if (!fresh) return res.json({ tracks: [], playlists: [] })
@@ -749,10 +743,7 @@ export class MusicController {
       this.cache.set(cacheKey, likedIds, 120)
       res.json({ likedIds })
     } catch (err) {
-      logger.warn(
-        { err },
-        '[music] liked ids failed, retrying with a fresh saved-cookie session'
-      )
+      logger.warn({ err }, '[music] liked ids failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
       if (!fresh) return res.json({ likedIds: [] })
       try {
@@ -799,10 +790,7 @@ export class MusicController {
     try {
       await attempt(yt)
     } catch (err) {
-      logger.warn(
-        { err },
-        '[music] rate failed, retrying with a fresh saved-cookie session'
-      )
+      logger.warn({ err }, '[music] rate failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
       if (!fresh) return res.status(502).json({ error: 'Like action failed' })
       try {

@@ -165,15 +165,6 @@ const Header: React.FC = () => {
           ? { to: '/listening-list', label: 'Listening List' }
           : { to: '/watchlist', label: 'Watchlist' }
 
-  const browseLink =
-    contentType === 'manga'
-      ? { to: '/manga', label: 'Manga' }
-      : contentType === 'tv'
-        ? { to: '/tv-search', label: 'TV and Movies' }
-        : contentType === 'asmr'
-          ? { to: '/asmr', label: 'ASMR' }
-          : null
-
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     hideVirtualKeyboard()
