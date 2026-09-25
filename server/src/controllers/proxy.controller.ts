@@ -361,18 +361,23 @@ export class ProxyController {
         if (ProxyController.isGotScrapingHost(urlStr)) {
           if (req.headers.range) headers['Range'] = req.headers.range as string
 
-          const resp = await gotScraping({
-            url: urlStr,
-            method: 'GET',
-            headers,
-            responseType: 'buffer',
-            timeout: { request: 30000 },
-            followRedirect: true,
-            throwHttpErrors: false,
-          })
+          let resp = null
+          for (const candidate of ProxyController.nexabloomFallbackUrls(urlStr)) {
+            const attempt = await gotScraping({
+              url: candidate,
+              method: 'GET',
+              headers,
+              responseType: 'buffer',
+              timeout: { request: 30000 },
+              followRedirect: true,
+              throwHttpErrors: false,
+            })
+            resp = attempt
+            if (attempt.statusCode === 200 || attempt.statusCode === 206) break
+          }
 
-          if (resp.statusCode !== 200 && resp.statusCode !== 206) {
-            return res.status(resp.statusCode ?? 502).send('Upstream error')
+          if (!resp || (resp.statusCode !== 200 && resp.statusCode !== 206)) {
+            return res.status(resp?.statusCode ?? 502).send('Upstream error')
           }
 
           const ct = resp.headers['content-type']
@@ -391,11 +396,29 @@ export class ProxyController {
           res.set('Access-Control-Allow-Origin', '*')
           res.send(resp.body)
         } else {
-          const upstream = await fetchWithRetry(
-            urlStr,
-            { method: 'GET', headers },
-            { retries: 3, timeoutMs: 30000, signal: abortController.signal }
-          )
+          let upstream = null
+          for (const candidate of ProxyController.nexabloomFallbackUrls(urlStr)) {
+            if (abortController.signal.aborted) break
+            try {
+              const attempt = await fetchWithRetry(
+                candidate,
+                { method: 'GET', headers },
+                { retries: 3, timeoutMs: 30000, signal: abortController.signal }
+              )
+              upstream = attempt
+              if (attempt.status === 200 || attempt.status === 206) break
+              try {
+                await attempt.body?.cancel()
+              } catch {
+                // ignore
+              }
+            } catch {
+              // ignore
+            }
+          }
+          if (!upstream) {
+            return res.status(502).send('Upstream error')
+          }
           const status = upstream.status
           if (status !== 200 && status !== 206) {
             try {
