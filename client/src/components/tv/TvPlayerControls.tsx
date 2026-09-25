@@ -58,6 +58,8 @@ interface TvPlayerControlsProps {
   onCalibrateAvSync?: () => void
   subtitleDelayMs?: number
   onSubtitleDelayChange?: (ms: number) => void
+  showNextEpisodeButton?: boolean
+  onNextEpisode?: () => void
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -86,6 +88,8 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   onCalibrateAvSync,
   subtitleDelayMs = 0,
   onSubtitleDelayChange,
+  showNextEpisodeButton = false,
+  onNextEpisode,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -576,6 +580,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           </div>
 
           <div className={styles.rightControls}>
+            {showNextEpisodeButton && (
+              <button
+                className={styles.nextEpisodeBtn}
+                onClick={onNextEpisode}
+                title="Play next episode"
+              >
+                Next EP
+              </button>
+            )}
             {hasSubtitles && (
               <button
                 className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}

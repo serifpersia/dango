@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
@@ -93,6 +94,15 @@ interface StreamSource {
   frameRate?: number
 }
 
+interface TvStreamResponse {
+  valid?: boolean
+  error?: string
+  sources?: StreamSource[]
+  referer?: string
+  audioTracks?: AudioTrack[]
+  subtitles?: SubtitleTrack[]
+}
+
 interface AudioTrack {
   language: string
   label: string
@@ -116,7 +126,10 @@ const NO_TV_PROVIDERS: TvProviderOption[] = []
 const Tv: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
+  const searchParamsRef = useRef(searchParams)
+  searchParamsRef.current = searchParams
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const typeParam = searchParams.get('type') as MediaType | null
 
   const [details, setDetails] = useState<TvDetails | null>(null)
@@ -132,6 +145,7 @@ const Tv: React.FC = () => {
     }
   })
   const [streams, setStreams] = useState<StreamSource[]>([])
+  const [streamsEpisodeKey, setStreamsEpisodeKey] = useState('')
   const {
     options: providerOptions,
     isFallback: providersFallback,
@@ -170,6 +184,12 @@ const Tv: React.FC = () => {
       return ''
     }
   })
+  const activeProvider = useMemo(
+    () => tvProviders.find((p) => p.id === source),
+    [tvProviders, source]
+  )
+  const isEmbedProvider = activeProvider?.tier === 'embed'
+  const activeServers = useMemo(() => activeProvider?.servers ?? [], [activeProvider])
   const streamsRef = useRef<StreamSource[]>([])
   useEffect(() => {
     streamsRef.current = streams
@@ -182,9 +202,9 @@ const Tv: React.FC = () => {
   useEffect(() => {
     selectedSubtitleRef.current = selectedSubtitle
   }, [selectedSubtitle])
-  const player = useVideoPlayer({ skipIntervals: [] })
+  const tvSkipIntervals = useMemo(() => [], [])
+  const player = useVideoPlayer({ skipIntervals: tvSkipIntervals })
   const videoRef = player.refs.videoRef
-  useAutoRotateFullscreen(player, streams.length > 0 || iframeUrl !== '')
   const hlsRef = useRef<Hls | null>(null)
   const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -338,11 +358,11 @@ const Tv: React.FC = () => {
       adult: details.adult,
     })
   }, [details, id, typeParam, toggleTvWatchlist])
-  const { data: savedProgress, isFetched: resumeFetched } = useTvLatestProgress(
-    mediaId || undefined,
-    season,
-    episode
-  )
+  const {
+    data: savedProgress,
+    isFetched: resumeFetched,
+    isPending: progressPending,
+  } = useTvLatestProgress(mediaId || undefined, season, episode)
   const sortedEpisodeNumbers = useMemo(
     () => episodes.map((ep) => ep.episode_number).sort((a, b) => a - b),
     [episodes]
@@ -376,8 +396,11 @@ const Tv: React.FC = () => {
   const isSavedCompleted = savedCompleted || isProgressCompleted(savedCt, savedDur)
   const [showWatchedModal, setShowWatchedModal] = useState(false)
   const hasDismissedWatchedRef = useRef(false)
+  const resumeEvaluatedKeyRef = useRef<string | null>(null)
+  const watchedEvaluatedKeyRef = useRef<string | null>(null)
   useEffect(() => {
     hasDismissedWatchedRef.current = false
+    watchedEvaluatedKeyRef.current = null
     setShowWatchedModal(false)
   }, [mediaId, season, episode])
 
@@ -385,9 +408,17 @@ const Tv: React.FC = () => {
   const [resumeTime, setResumeTime] = useState(0)
   const [resumeChecked, setResumeChecked] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false)
   const [completeTitle, setCompleteTitle] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
+  useAutoRotateFullscreen(
+    player,
+    (streams.length > 0 || iframeUrl !== '') &&
+      !showResumeModal &&
+      !showWatchedModal &&
+      !showCompleteModal
+  )
   const isMobile = useIsMobile()
   const [isAutoplayEnabled, setIsAutoplayEnabled] = useState(loadAutoplayEnabled)
   const handleAutoplayChange = useCallback((checked: boolean) => {
@@ -465,15 +496,88 @@ const Tv: React.FC = () => {
     [searchParams, navigate]
   )
 
+  const updateNextEpisodePrompt = useCallback(() => {
+    const video = videoRef.current
+    if (!video || isMovie || nextEpisodeNumber == null) {
+      setShowNextEpisodePrompt(false)
+      return
+    }
+    const duration = video.duration || 0
+    const currentTime = video.currentTime || 0
+    setShowNextEpisodePrompt(duration > 0 && currentTime / duration >= 0.8)
+  }, [isMovie, nextEpisodeNumber, videoRef])
+
+  const tvStreamQueryKey = useCallback(
+    (targetSeason: number, targetEpisode: number) => [
+      'tv-sources',
+      source,
+      isMovie ? 'movie' : 'tv',
+      id,
+      targetSeason,
+      targetEpisode,
+      selectedMovyServer,
+    ],
+    [source, isMovie, id, selectedMovyServer]
+  )
+
+  const fetchTvStreams = useCallback(
+    async (targetSeason: number, targetEpisode: number): Promise<TvStreamResponse> => {
+      if (!details || !id || !source) return { valid: false, sources: [] }
+      const type = isMovie ? 'movie' : 'tv'
+      const params = new URLSearchParams({
+        title: details.title || '',
+        year: details.year || '',
+        season: String(targetSeason),
+        episode: String(targetEpisode),
+        totalSeasons: String(details.number_of_seasons || 1),
+        imdbId: details.imdb_id || '',
+      })
+      if (activeServers.length > 0 && selectedMovyServer) {
+        params.set('server', selectedMovyServer)
+      }
+      const res = await fetch(`/api/tv/sources/${source}/${type}/${id}?${params.toString()}`)
+      return (await res.json()) as TvStreamResponse
+    },
+    [details, id, source, isMovie, activeServers, selectedMovyServer]
+  )
+
+  const prefetchNextTvEpisode = useCallback(() => {
+    if (isMovie || !details || !id || !source || isEmbedProvider || nextEpisodeNumber == null)
+      return
+    const queryKey = tvStreamQueryKey(season, nextEpisodeNumber)
+    if (queryClient.getQueryState(queryKey)?.status === 'success') return
+    void queryClient.prefetchQuery({
+      queryKey,
+      queryFn: () => fetchTvStreams(season, nextEpisodeNumber),
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    })
+  }, [
+    isMovie,
+    details,
+    id,
+    source,
+    isEmbedProvider,
+    nextEpisodeNumber,
+    season,
+    queryClient,
+    tvStreamQueryKey,
+    fetchTvStreams,
+  ])
+
   const handleVideoTimeUpdate = useCallback(() => {
     if (testClipActive) return
+    updateNextEpisodePrompt()
     const video = videoRef.current
     if (!video || video.paused || video.ended) return
+    if (video.duration > 0 && video.duration - video.currentTime <= 60) {
+      prefetchNextTvEpisode()
+    }
     if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
     progressSaveTimerRef.current = setTimeout(() => {
       saveVideoProgress(video.currentTime, video.duration || 0)
     }, 5000)
-  }, [saveVideoProgress, videoRef, testClipActive])
+  }, [saveVideoProgress, videoRef, testClipActive, updateNextEpisodePrompt, prefetchNextTvEpisode])
 
   const handleVideoEnded = useCallback(() => {
     const video = videoRef.current
@@ -543,7 +647,8 @@ const Tv: React.FC = () => {
       }
       pendingSeekRef.current = null
     }
-  }, [player.actions, videoRef])
+    updateNextEpisodePrompt()
+  }, [player.actions, videoRef, updateNextEpisodePrompt])
 
   const applyPendingSeek = useCallback(() => {
     const video = videoRef.current
@@ -640,7 +745,9 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     hasResumedRef.current = false
+    resumeEvaluatedKeyRef.current = null
     setShowResumeModal(false)
+    setShowNextEpisodePrompt(false)
     setResumeTime(0)
     setResumeChecked(false)
     resumeCheckedRef.current = false
@@ -658,6 +765,9 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     if (!savedProgress || hasResumedRef.current) return
+    const epKey = `${mediaId}:${season}:${episode}`
+    if (resumeEvaluatedKeyRef.current === epKey) return
+    resumeEvaluatedKeyRef.current = epKey
     const c = savedProgress as { currentTime?: number; duration?: number }
     const ct = c.currentTime ?? 0
     const dur = c.duration ?? 0
@@ -670,12 +780,19 @@ const Tv: React.FC = () => {
   useEffect(() => {
     if (!resumeChecked || hasResumedRef.current || hasDismissedWatchedRef.current) return
     if (showResumeModal || showCompleteModal || showWatchedModal) return
-    if (!isSavedCompleted) return
+    const epKey = `${mediaId}:${season}:${episode}`
+    if (watchedEvaluatedKeyRef.current === epKey) return
+    if (!isSavedCompleted) {
+      if (!progressPending) watchedEvaluatedKeyRef.current = epKey
+      return
+    }
     if (isMovie) {
+      watchedEvaluatedKeyRef.current = epKey
       setShowWatchedModal(true)
       return
     }
     if (!details || episodeIndex < 0 || episodes.length === 0) return
+    watchedEvaluatedKeyRef.current = epKey
     if (nextEpisodeNumber == null && nextSeasonNumber == null) {
       if (details && episodes.length > 0) {
         setCompleteTitle(`${details.title} — Season ${season}`)
@@ -689,6 +806,7 @@ const Tv: React.FC = () => {
   }, [
     resumeChecked,
     isSavedCompleted,
+    progressPending,
     showResumeModal,
     showCompleteModal,
     showWatchedModal,
@@ -761,13 +879,6 @@ const Tv: React.FC = () => {
     return pickSubtitleIndex(tracks, { lastKey: null, enabled: true })
   }, [])
 
-  const activeProvider = useMemo(
-    () => tvProviders.find((p) => p.id === source),
-    [tvProviders, source]
-  )
-  const isEmbedProvider = activeProvider?.tier === 'embed'
-  const activeServers = useMemo(() => activeProvider?.servers ?? [], [activeProvider])
-
   const { data: tvProgress } = useTvProgress(mediaId || undefined)
   const watchedEpisodeIds = useMemo(() => {
     const rows = tvProgress?.progress ?? []
@@ -839,6 +950,7 @@ const Tv: React.FC = () => {
     if (!id) {
       setDetails(null)
       setStreams([])
+      setStreamsEpisodeKey('')
       setStreamError('')
       setIframeUrl('')
       return
@@ -849,10 +961,11 @@ const Tv: React.FC = () => {
     setDetailsLoading(true)
     setDetails(null)
     setStreams([])
+    setStreamsEpisodeKey('')
     setStreamError('')
     setIframeUrl('')
-    const sParam = parseInt(searchParams.get('s') || '', 10)
-    const eParam = parseInt(searchParams.get('e') || '', 10)
+    const sParam = parseInt(searchParamsRef.current.get('s') || '', 10)
+    const eParam = parseInt(searchParamsRef.current.get('e') || '', 10)
     setSeason(isNaN(sParam) ? 1 : sParam)
     setEpisode(isNaN(eParam) ? 1 : eParam)
     setQualityIdx(0)
@@ -870,7 +983,7 @@ const Tv: React.FC = () => {
         setDetailsLoading(false)
         // ignore
       })
-  }, [id, typeParam, searchParams])
+  }, [id, typeParam])
 
   useEffect(() => {
     if (!details || !id) return
@@ -931,6 +1044,7 @@ const Tv: React.FC = () => {
   const loadStreams = useCallback(async () => {
     if (!details || !id || !source || isEmbedProvider) return
     if (details.adult && !hasMatureConsent) return
+    const episodeKey = `${mediaId}:${season}:${episode}`
     const hasExisting = streamsRef.current.length > 0
     if (hasExisting) {
       setStreamError('')
@@ -944,20 +1058,13 @@ const Tv: React.FC = () => {
     }
 
     try {
-      const type = isMovie ? 'movie' : 'tv'
-      const params = new URLSearchParams({
-        title: details.title || '',
-        year: details.year || '',
-        season: String(season),
-        episode: String(episode),
-        totalSeasons: String(details.number_of_seasons || 1),
-        imdbId: details.imdb_id || '',
+      const data = await queryClient.fetchQuery({
+        queryKey: tvStreamQueryKey(season, episode),
+        queryFn: () => fetchTvStreams(season, episode),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
       })
-      if (activeServers.length > 0 && selectedMovyServer) {
-        params.set('server', selectedMovyServer)
-      }
-      const res = await fetch(`/api/tv/sources/${source}/${type}/${id}?${params.toString()}`)
-      const data = await res.json()
+      if (streamKeyRef.current !== episodeKey) return
       setStreamLoading(false)
       if (!data.valid || !data.sources?.length) {
         setStreamError(
@@ -970,6 +1077,7 @@ const Tv: React.FC = () => {
         return
       }
       setStreams(data.sources)
+      setStreamsEpisodeKey(episodeKey)
       setSourceTypeFilter('all')
       setQualityIdx(0)
       if (data.referer) setReferer(data.referer)
@@ -985,10 +1093,12 @@ const Tv: React.FC = () => {
       } else {
         setSelectedSubtitle(-1)
       }
+      const type = isMovie ? 'movie' : 'tv'
       const subId = id
       fetch(`/api/tv/subtitles/${type}/${subId}?season=${season}&episode=${episode}`)
         .then((r) => r.json())
         .then((sd: { subtitles?: SubtitleTrack[] }) => {
+          if (streamKeyRef.current !== episodeKey) return
           const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
           if (osSubs.length === 0) return
           setSubtitles((prev) => {
@@ -1004,6 +1114,7 @@ const Tv: React.FC = () => {
         .catch(() => {})
       setStreamError('')
     } catch {
+      if (streamKeyRef.current !== episodeKey) return
       setStreamLoading(false)
       setStreamError('Failed to load streams.')
     }
@@ -1021,6 +1132,10 @@ const Tv: React.FC = () => {
     pickDefaultSubtitle,
     persistSubtitlePick,
     pickDefaultAudio,
+    mediaId,
+    queryClient,
+    tvStreamQueryKey,
+    fetchTvStreams,
   ])
 
   const handleMovyServerSelect = useCallback((city: string) => {
@@ -1075,8 +1190,16 @@ const Tv: React.FC = () => {
 
     const filtered =
       sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
-    const currentUrl = filtered[qualityIdx]?.url || ''
-    if (!currentUrl) return
+    const currentUrl =
+      streamsEpisodeKey === `${mediaId}:${season}:${episode}` ? filtered[qualityIdx]?.url || '' : ''
+    if (!currentUrl) {
+      try {
+        videoRef.current?.pause()
+      } catch {
+        // ignore
+      }
+      return
+    }
 
     const video = videoRef.current
     if (
@@ -1233,6 +1356,7 @@ const Tv: React.FC = () => {
     }
   }, [
     streams,
+    streamsEpisodeKey,
     qualityIdx,
     sourceTypeFilter,
     source,
@@ -1645,12 +1769,17 @@ const Tv: React.FC = () => {
     (epId: string) => {
       const next = parseInt(epId, 10)
       if (!isNaN(next)) {
+        try {
+          videoRef.current?.pause()
+        } catch {
+          // ignore
+        }
         setEpisode(next)
         updateUrlEpisode(season, next)
       }
       setIsEpisodeDrawerOpen(false)
     },
-    [season, updateUrlEpisode]
+    [season, updateUrlEpisode, videoRef]
   )
 
   useEffect(() => {
@@ -1903,7 +2032,7 @@ const Tv: React.FC = () => {
                 allow="autoplay; fullscreen"
                 allowFullScreen
               />
-            ) : !isEmbedProvider && !streamLoading && filteredStreams.length > 0 ? (
+            ) : !isEmbedProvider && (filteredStreams.length > 0 || streamLoading) ? (
               <>
                 {streamError && (
                   <div
@@ -1983,6 +2112,13 @@ const Tv: React.FC = () => {
                   onCalibrateAvSync={openAvSyncCalibrator}
                   subtitleDelayMs={subtitleDelayMs}
                   onSubtitleDelayChange={handleSubtitleDelayChange}
+                  showNextEpisodeButton={
+                    showNextEpisodePrompt &&
+                    !showResumeModal &&
+                    !showWatchedModal &&
+                    !showCompleteModal
+                  }
+                  onNextEpisode={handleWatchNextEpisode}
                 >
                   <video
                     ref={videoRef}
@@ -1998,6 +2134,7 @@ const Tv: React.FC = () => {
                     onPause={handleVideoPause}
                     onSeeked={() => {
                       lastSeekedAtRef.current = Date.now()
+                      updateNextEpisodePrompt()
                     }}
                     onLoadedMetadata={handleVideoLoadedMetadata}
                     onVolumeChange={player.actions.onVolumeChange}

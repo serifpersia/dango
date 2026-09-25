@@ -320,8 +320,6 @@ const Player: React.FC = () => {
     }
   })
 
-  useAutoRotateFullscreen(player, !!state.selectedLink && !isTheaterMode)
-
   useEffect(() => {
     try {
       if (isTheaterMode) {
@@ -392,6 +390,8 @@ const Player: React.FC = () => {
     !pendingQueueTransition &&
     (state.showResumeModal || hasReachedEpisodeEnd)
   const shouldPauseForModal = shouldShowModal || shouldShowNextEpisodeModal
+
+  useAutoRotateFullscreen(player, !!state.selectedLink && !isTheaterMode && !shouldPauseForModal)
 
   useEffect(() => {
     const videoElement = refs.videoRef.current
@@ -878,7 +878,7 @@ const Player: React.FC = () => {
         videoElement.removeEventListener('ended', handleVideoEnd)
       }
     }
-  }, [handlePlaybackFinished, refs.videoRef, player.state.isFullscreen, testClipActive])
+  }, [handlePlaybackFinished, refs.videoRef, testClipActive])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

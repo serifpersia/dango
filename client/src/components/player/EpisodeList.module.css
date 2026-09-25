@@ -20,6 +20,7 @@
 .drawerHeader {
   position: sticky;
   top: 0;
+  z-index: 5;
   background: rgba(12, 12, 15, 0.98);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

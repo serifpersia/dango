@@ -290,6 +290,29 @@
   gap: clamp(0.5rem, 2cqw, 0.75rem);
 }
 
+.nextEpisodeBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.nextEpisodeBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .controlBtn {
   background: transparent;
   border: none;
