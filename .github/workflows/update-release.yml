@@ -107,6 +107,17 @@ jobs:
           grep -q "dango-providers" server/dist/shipped-defaults.js || (echo "shipped defaults missing provider URL" && exit 1)
           node --input-type=module -e "await import('./server/dist/shipped-defaults.js'); await import('./server/dist/config.js'); console.log('server entry imports OK')"
 
+      - name: Sync root deps for npm channel
+        # prepublishOnly (sync-deps.js) is skipped by --ignore-scripts at
+        # publish time, so sync here and fail on drift: root package.json
+        # must mirror server deps, or the npm tarball misses runtime deps
+        # (server/ has its own package.json that npm never installs).
+        # NOTE: compares dependency maps, not `git diff`, because Inject
+        # Version Date legitimately dirties package.json earlier in the job.
+        run: |
+          node sync-deps.js
+          node -e "const r=require('./package.json').dependencies,s=require('./server/package.json').dependencies;if(JSON.stringify(r)!==JSON.stringify(s)){console.error('root dependencies out of sync with server/package.json — run node sync-deps.js locally and commit');process.exit(1)}console.log('root deps in sync with server')"
+
       - name: Create Release Archive
         run: |
           mkdir -p release-package/client
