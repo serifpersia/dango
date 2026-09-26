@@ -7,7 +7,7 @@ import Footer from './components/layout/Footer'
 import { useTelemetry } from './hooks/useTelemetry'
 import TelemetryNoticeModal from './components/modals/TelemetryNoticeModal'
 import DiscordCommunityPromo from './components/modals/DiscordCommunityPromo'
-import { fetchApi } from './lib/fetchApi'
+import { trpcClient } from './lib/trpc'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
@@ -61,10 +61,10 @@ function App() {
   const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState('')
 
   useEffect(() => {
-    fetchApi('/api/discord-roles-config')
+    trpcClient.discord.rolesConfig
+      .query()
       .then((d) => {
-        if ((d as { workerUrl?: string }).workerUrl)
-          setDiscordRolesWorkerUrl((d as { workerUrl: string }).workerUrl)
+        if (d.workerUrl) setDiscordRolesWorkerUrl(d.workerUrl)
       })
       .catch(() => {})
   }, [])

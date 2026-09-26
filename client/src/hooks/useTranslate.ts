@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { trpcClient } from '../lib/trpc'
 
 const CACHE_KEY = 'asmrTranslateCache'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -55,13 +56,11 @@ function _normalizeTranslation(s: string): string {
 async function translateBatch(texts: string[]): Promise<Map<string, string>> {
   const jobs = texts.map((t) => t.trim()).filter(Boolean)
   if (jobs.length === 0) return new Map()
-  const res = await fetch('/api/translate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texts: jobs, source: 'ja', target: 'en' }),
+  const data = await trpcClient.settings.translate.mutate({
+    texts: jobs,
+    source: 'ja',
+    target: 'en',
   })
-  if (!res.ok) throw new Error(`translate ${res.status}`)
-  const data = (await res.json()) as { translations: Record<string, string> }
   const map = new Map<string, string>()
   for (const [k, v] of Object.entries(data.translations || {})) {
     map.set(k, v)

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
+import { trpcClient } from '../../lib/trpc'
 import styles from './GoogleAuthSettings.module.css'
 
 interface GitHubUser {
@@ -63,15 +64,13 @@ const GitHubSyncSettings: React.FC = () => {
   }, [])
 
   const fetchStatus = useCallback(async () => {
-    const res = await fetch('/api/auth/github/status')
-    const data = await res.json()
-    applyStatus(data)
+    const data = await trpcClient.auth.githubStatus.query()
+    applyStatus(data as unknown as GitHubStatus)
   }, [applyStatus])
 
   const pollStatus = async () => {
     try {
-      const res = await fetch('/api/auth/github/poll')
-      const nextDevice: DeviceState = await res.json()
+      const nextDevice = (await trpcClient.auth.githubPoll.query()) as DeviceState
       setDevice(nextDevice)
 
       if (nextDevice.status === 'success') {
@@ -122,12 +121,7 @@ const GitHubSyncSettings: React.FC = () => {
   const handleStart = async () => {
     setStarting(true)
     try {
-      const res = await fetch('/api/auth/github/start', { method: 'POST' })
-      const nextDevice: DeviceState = await res.json()
-
-      if (!res.ok) {
-        throw new Error('Failed to start GitHub authentication.')
-      }
+      const nextDevice = (await trpcClient.auth.githubStart.mutate()) as DeviceState
 
       setDevice(nextDevice)
       startPolling(nextDevice.verification?.interval)
@@ -144,7 +138,7 @@ const GitHubSyncSettings: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
-      await fetch('/api/auth/github/logout', { method: 'POST' })
+      await trpcClient.auth.githubLogout.mutate()
       setAuthenticated(false)
       setUser(null)
       setDevice({ status: 'idle' })
@@ -157,12 +151,7 @@ const GitHubSyncSettings: React.FC = () => {
   const handleSaveOverride = async () => {
     setSaving(true)
     try {
-      const res = await fetch('/api/auth/github/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: customClientId }),
-      })
-      if (!res.ok) throw new Error('save failed')
+      await trpcClient.auth.saveGithubAuth.mutate({ clientId: customClientId })
       setCustomClientId('')
       await fetchStatus()
       setStatusModal({
@@ -180,11 +169,7 @@ const GitHubSyncSettings: React.FC = () => {
   const handleClearOverride = async () => {
     setSaving(true)
     try {
-      await fetch('/api/auth/github/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: '' }),
-      })
+      await trpcClient.auth.saveGithubAuth.mutate({ clientId: '' })
       setCustomClientId('')
       await fetchStatus()
       setStatusModal({

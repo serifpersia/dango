@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '../common/Button'
 import ToggleSwitch from '../common/ToggleSwitch'
+import { trpcClient } from '../../lib/trpc'
 import styles from './OfflineDbSettings.module.css'
 
 interface OfflineDbInfo {
@@ -30,12 +31,9 @@ export const OfflineDbSettings: React.FC = () => {
 
   const fetchInfo = async () => {
     try {
-      const res = await fetch('/api/settings/offline-db')
-      if (res.ok) {
-        const data: OfflineDbInfo = await res.json()
-        setInfo(data)
-        return data
-      }
+      const data = await trpcClient.settings.offlineDbInfo.query()
+      setInfo(data)
+      return data
     } catch (err) {
       console.error('Failed to fetch offline DB info:', err)
     } finally {
@@ -78,14 +76,7 @@ export const OfflineDbSettings: React.FC = () => {
     setIsUpdatingToggle(true)
     setInfo({ ...info, autoUpdateEnabled: nextVal })
     try {
-      const res = await fetch('/api/settings/offline-db/auto-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: nextVal }),
-      })
-      if (!res.ok) {
-        setInfo({ ...info, autoUpdateEnabled: !nextVal })
-      }
+      await trpcClient.settings.setOfflineDbAutoUpdate.mutate({ enabled: nextVal })
     } catch (err) {
       console.error('Failed to update auto update setting:', err)
       setInfo({ ...info, autoUpdateEnabled: !nextVal })
@@ -98,19 +89,17 @@ export const OfflineDbSettings: React.FC = () => {
     if (info?.isRefreshing || triggerLoading) return
     setTriggerLoading(true)
     try {
-      const res = await fetch('/api/settings/offline-db/update', { method: 'POST' })
-      if (res.ok) {
-        setInfo((prev: OfflineDbInfo | null) =>
-          prev
-            ? {
-                ...prev,
-                isRefreshing: true,
-                lastStatus: 'updating',
-                lastMessage: 'Downloading database...',
-              }
-            : null
-        )
-      }
+      await trpcClient.settings.triggerOfflineDbUpdate.mutate()
+      setInfo((prev: OfflineDbInfo | null) =>
+        prev
+          ? {
+              ...prev,
+              isRefreshing: true,
+              lastStatus: 'updating',
+              lastMessage: 'Downloading database...',
+            }
+          : null
+      )
     } catch (err) {
       console.error('Failed to trigger offline DB update:', err)
     } finally {

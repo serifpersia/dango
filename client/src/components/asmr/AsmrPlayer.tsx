@@ -11,6 +11,7 @@ import {
   useAddAsmrBookmark,
 } from '../../hooks/useAsmrLibrary'
 import { buildAsmrId } from '../../lib/asmr'
+import { trpcClient } from '../../lib/trpc'
 import { formatTime } from '../../lib/utils'
 import { loadHls } from '../../lib/hls'
 import type Hls from 'hls.js'
@@ -279,10 +280,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       const cur = audio ? audio.currentTime : 0
       const dur = audio ? audio.duration || 0 : 0
       const poster = images[0] || ''
-      fetch('/api/discord/asmr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      trpcClient.discord.asmrPresence
+        .mutate({
           title,
           trackLabel,
           isPlaying: playing,
@@ -293,13 +292,9 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           isAdult: !!isAdult,
           rjCode: rjCode || '',
           sessionId: sessionIdRef.current,
-        }),
-      }).catch(() => {})
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sessionIdRef.current }),
-      }).catch(() => {})
+        })
+        .catch(() => {})
+      trpcClient.discord.heartbeat.mutate({ sessionId: sessionIdRef.current }).catch(() => {})
     },
     [title, tracks, trackIndex, images, isAdult, rjCode]
   )

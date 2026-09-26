@@ -398,7 +398,7 @@ class DiscordGatewayService {
             this.gateway.send(JSON.stringify(identify))
           }
         } else if (msg.op === 11) {
-          // heartbeat ack
+          // ignore
         } else if (msg.op === 0) {
           if (msg.t === 'READY') {
             responded = true

@@ -11,8 +11,7 @@ function sendToParent(message: IpcMessage) {
       process.send(message)
     }
   } catch {
-    // No IPC channel (dev under npm, or parent already gone).
-    // The stdout tag below remains the fallback signal.
+    // ignore
   }
 }
 

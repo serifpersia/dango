@@ -36,7 +36,7 @@ import AsmrSpotlightBanner from '../components/asmr/AsmrSpotlightBanner'
 import { useTvTrending } from '../hooks/useTv'
 import { useMangaTrending } from '../hooks/useManga'
 import { useAsmrSpotlight } from '../hooks/useAsmr'
-import { fetchApi } from '../lib/fetchApi'
+import { useTRPC } from '../lib/trpc'
 import styles from './Home.module.css'
 
 type ActiveTab = 'latest' | 'season' | 'popular' | 'week'
@@ -50,6 +50,7 @@ const CONTENT_OPTIONS: { value: ContentType; label: string }[] = [
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const [page, setPage] = React.useState(1)
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     return (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
@@ -139,20 +140,17 @@ const Home: React.FC = () => {
   const canGoNext =
     currentSeason && currentSeason.length >= seasonLimit && nextPageData && nextPageData.length > 0
 
-  const removeCw = useMutation({
-    mutationFn: async (showId: string) => {
-      await fetchApi('/api/continue-watching/remove', {
-        method: 'POST',
-        body: JSON.stringify({ showId }),
-      })
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-      if (hasMoreContinueWatching && cwList.length - 1 < 14) {
-        fetchMoreContinueWatching()
-      }
-    },
-  })
+  const removeCw = useMutation(
+    trpc.continueWatching.remove.mutationOptions({
+      onSuccess: async () => {
+        void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
+        await queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+        if (hasMoreContinueWatching && cwList.length - 1 < 14) {
+          fetchMoreContinueWatching()
+        }
+      },
+    })
+  )
 
   const handleRemove = useCallback(
     (id: string) => {
@@ -167,8 +165,8 @@ const Home: React.FC = () => {
 
   const handleConfirmRemove = useCallback(() => {
     if (!itemToRemove) return
-    removeCw.mutate(itemToRemove.id)
-    if (alsoRemoveFromWatchlist) removeWatchlistMutation.mutate(itemToRemove.id)
+    removeCw.mutate({ showId: itemToRemove.id })
+    if (alsoRemoveFromWatchlist) removeWatchlistMutation.mutate({ id: itemToRemove.id })
     setItemToRemove(null)
     setAlsoRemoveFromWatchlist(false)
   }, [itemToRemove, removeCw, removeWatchlistMutation, alsoRemoveFromWatchlist])

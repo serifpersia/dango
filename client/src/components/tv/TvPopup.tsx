@@ -3,6 +3,7 @@ import Icon from '../common/Icon'
 import { Link } from 'react-router'
 import { tvDetailPath, tvWatchPath, buildTvId } from '../../lib/tv'
 import { useToggleTvBookmark } from '../../hooks/useTvLibrary'
+import { trpcClient } from '../../lib/trpc'
 import MediaPopupShell from '../common/MediaPopupShell'
 import styles from '../common/MediaPopup.module.css'
 
@@ -50,21 +51,14 @@ const TvPopup: React.FC<TvPopupProps> = ({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`/api/tv/details/${item.type}/${item.id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed')
-        return r.json()
-      })
+    trpcClient.tv.details
+      .query({ type: item.type, id: String(item.id) })
       .then((data) => {
         if (!cancelled) {
           setDetails({
             overview: data.overview,
-            genres: data.genres,
             vote_average: data.vote_average,
-            vote_count: data.vote_count,
-            status: data.status,
             number_of_seasons: data.number_of_seasons,
-            number_of_episodes: data.number_of_episodes,
           })
           setLoading(false)
         }

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchApi } from '../lib/fetchApi'
+import { useTRPC } from '../lib/trpc'
 
 export interface MusicTrack {
   id: string
@@ -25,49 +25,47 @@ export interface MusicAuthStatus {
 const STALE_5_MIN = 5 * 60 * 1000
 
 export const useMusicAuthStatus = () => {
-  return useQuery<MusicAuthStatus>({
-    queryKey: ['music-auth'],
-    queryFn: () => fetchApi('/api/music/auth/status'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.authStatus.queryOptions(),
     staleTime: 30 * 1000,
-    refetchInterval: (query) => (query.state.data?.authenticated ? false : 3000),
+    refetchInterval: (query) => {
+      const data = query.state.data as MusicAuthStatus | undefined
+      return data?.authenticated ? false : 3000
+    },
     retry: 1,
   })
 }
 
 export const useMusicSaveCookie = () => {
+  const trpc = useTRPC()
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (
-      cookie: string
-    ): Promise<{ success: boolean; tracks: number; playlists: number }> =>
-      fetchApi('/api/music/auth/start', {
-        method: 'POST',
-        body: JSON.stringify({ cookie }),
-      }),
-    onSuccess: (_data, cookie) => {
-      localStorage.setItem('ytmusic_cookie', cookie)
-      qc.invalidateQueries({ queryKey: ['music-auth'] })
-      qc.invalidateQueries({ queryKey: ['music-library'] })
-    },
-  })
+  return useMutation(
+    trpc.music.authStart.mutationOptions({
+      onSuccess: (_data, variables) => {
+        localStorage.setItem('ytmusic_cookie', variables.cookie ?? '')
+        void qc.invalidateQueries(trpc.music.pathFilter())
+      },
+    })
+  )
 }
 
 export const useMusicSignOut = () => {
+  const trpc = useTRPC()
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (): Promise<{ success: boolean }> =>
-      fetchApi('/api/music/auth/signout', { method: 'POST' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['music-auth'] })
-      qc.invalidateQueries({ queryKey: ['music-library'] })
-    },
-  })
+  return useMutation(
+    trpc.music.signOut.mutationOptions({
+      onSuccess: () => {
+        void qc.invalidateQueries(trpc.music.pathFilter())
+      },
+    })
+  )
 }
 
 export const useMusicSearch = (query: string) => {
-  return useQuery<{ tracks: MusicTrack[] }>({
-    queryKey: ['music-search', query],
-    queryFn: () => fetchApi(`/api/music/search?q=${encodeURIComponent(query)}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.search.queryOptions({ q: query }),
     enabled: query.trim().length > 0,
     staleTime: STALE_5_MIN,
     retry: 1,
@@ -75,9 +73,9 @@ export const useMusicSearch = (query: string) => {
 }
 
 export const useMusicLibrary = (enabled: boolean) => {
-  return useQuery<{ tracks: MusicTrack[]; playlists: MusicPlaylist[] }>({
-    queryKey: ['music-library'],
-    queryFn: () => fetchApi('/api/music/library'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.library.queryOptions(),
     enabled,
     staleTime: STALE_5_MIN,
     retry: 1,
@@ -85,9 +83,9 @@ export const useMusicLibrary = (enabled: boolean) => {
 }
 
 export const useMusicTrack = (trackId: string | null) => {
-  return useQuery<{ track: MusicTrack | null }>({
-    queryKey: ['music-track', trackId],
-    queryFn: () => fetchApi(`/api/music/track?id=${encodeURIComponent(trackId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.track.queryOptions({ id: trackId || undefined }),
     enabled: !!trackId,
     staleTime: STALE_5_MIN,
     retry: 1,
@@ -95,9 +93,9 @@ export const useMusicTrack = (trackId: string | null) => {
 }
 
 export const useMusicPlaylist = (playlistId: string | null) => {
-  return useQuery<{ tracks: MusicTrack[] }>({
-    queryKey: ['music-playlist', playlistId],
-    queryFn: () => fetchApi(`/api/music/playlist?id=${encodeURIComponent(playlistId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.playlist.queryOptions({ id: playlistId || undefined }),
     enabled: !!playlistId,
     staleTime: STALE_5_MIN,
     retry: 1,
@@ -105,9 +103,9 @@ export const useMusicPlaylist = (playlistId: string | null) => {
 }
 
 export const useMusicUpNext = (trackId: string | null) => {
-  return useQuery<{ tracks: MusicTrack[]; playlistId?: string | null }>({
-    queryKey: ['music-upnext', trackId],
-    queryFn: () => fetchApi(`/api/music/upnext?id=${encodeURIComponent(trackId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.upnext.queryOptions({ id: trackId || undefined }),
     enabled: !!trackId,
     staleTime: STALE_5_MIN,
     retry: 1,
@@ -115,9 +113,9 @@ export const useMusicUpNext = (trackId: string | null) => {
 }
 
 export const useMusicLikedIds = (enabled: boolean) => {
-  return useQuery<{ likedIds: string[] }>({
-    queryKey: ['music-likes'],
-    queryFn: () => fetchApi('/api/music/likes'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.music.likes.queryOptions(),
     enabled,
     staleTime: 2 * 60 * 1000,
     retry: 1,
@@ -125,26 +123,13 @@ export const useMusicLikedIds = (enabled: boolean) => {
 }
 
 export const useMusicRate = () => {
+  const trpc = useTRPC()
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({
-      id,
-      like,
-    }: {
-      id: string
-      like: boolean
-    }): Promise<{
-      success: boolean
-      liked: boolean
-    }> =>
-      fetchApi('/api/music/like', {
-        method: 'POST',
-        body: JSON.stringify({ id, like }),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['music-likes'] })
-      qc.invalidateQueries({ queryKey: ['music-library'] })
-      qc.invalidateQueries({ queryKey: ['music-upnext'] })
-    },
-  })
+  return useMutation(
+    trpc.music.like.mutationOptions({
+      onSuccess: () => {
+        void qc.invalidateQueries(trpc.music.pathFilter())
+      },
+    })
+  )
 }

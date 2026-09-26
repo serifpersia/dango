@@ -10,6 +10,7 @@ import type {
 } from '../types/player'
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
 import { fetchApi } from '../lib/fetchApi'
+import { trpcClient, useTRPC } from '../lib/trpc'
 import { normalizeScore } from '../lib/utils'
 import { useShowMeta } from './useShowMeta'
 import { useProviders } from './useProviders'
@@ -65,12 +66,17 @@ async function fetchVideoSources(
 
   try {
     const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
-      fetchApi(
-        `/api/video?showId=${showId}&episodeNumber=${episodeNumber}&mode=${ui.currentMode}&provider=${ui.selectedProvider}`
-      ).catch(() => null),
-      fetchApi(`/api/episode-progress/${showId}/${episodeNumber}`).catch(() => null),
-      fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
-      fetchApi(`/api/skip-times/${showId}/${episodeNumber}`).catch(() => []),
+      trpcClient.data.video
+        .query({
+          showId,
+          episodeNumber,
+          mode: ui.currentMode,
+          provider: ui.selectedProvider,
+        })
+        .catch(() => null),
+      trpcClient.progress.getEpisode.query({ showId, episodeNumber }).catch(() => null),
+      trpcClient.settings.getByKey.query({ key: 'preferredSource' }).catch(() => null),
+      trpcClient.data.skipTimes.query({ showId, episodeNumber }).catch(() => []),
     ])
 
     const preferredSourceName = preferredSourceData?.value
@@ -180,6 +186,7 @@ export const usePlayerData = (
       : {},
   }))
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const hasForcedProvider = useRef<string | null>(null)
   const hasForcedAdultProvider = useRef<string | null>(null)
   const { options: providerOptions } = useProviders()
@@ -224,9 +231,13 @@ export const usePlayerData = (
         description?: string
       } | null> => {
         try {
-          const data = await fetchApi(
-            `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
-          )
+          const data = await trpcClient.data.episodes
+            .query({
+              showId,
+              mode: uiState.currentMode,
+              provider: uiState.selectedProvider,
+            })
+            .catch(() => null)
           if (data?.episodes?.length) return data
         } catch {
           // ignore
@@ -236,8 +247,10 @@ export const usePlayerData = (
 
       const [episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
         fetchEpisodes(),
-        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
-        fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
+        trpcClient.watchlist.check
+          .query({ showId })
+          .catch(() => ({ inWatchlist: false, status: null })),
+        trpcClient.progress.getWatchedEpisodes.query({ showId }).catch(() => []),
       ])
 
       const episodes = episodeData?.episodes
@@ -321,26 +334,21 @@ export const usePlayerData = (
 
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
     mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
-      const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
-      const payload = {
-        id: showId,
-        name: showMeta.name || showMeta.names?.romaji,
-        thumbnail: showMeta.thumbnail,
-        nativeName: showMeta.names?.native,
-        englishName: showMeta.names?.english,
-        type: showMeta.type,
-        isAdult: showMeta.isAdult,
-      }
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string
-        } | null
-        throw new Error(body?.error || 'Failed to update watchlist')
+      if (!showId) throw new Error('Missing showId')
+      if (wasIn) {
+        await trpcClient.watchlist.remove.mutate({ id: showId })
+      } else {
+        const name = showMeta.name || showMeta.names?.romaji
+        if (!name) throw new Error('Missing show name')
+        await trpcClient.watchlist.add.mutate({
+          id: showId,
+          name,
+          thumbnail: showMeta.thumbnail,
+          nativeName: showMeta.names?.native,
+          englishName: showMeta.names?.english,
+          type: showMeta.type,
+          isAdult: showMeta.isAdult,
+        })
       }
       return !wasIn
     },
@@ -364,10 +372,7 @@ export const usePlayerData = (
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
-      await fetchApi('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify({ key: 'preferredSource', value: sourceName }),
-      })
+      await trpcClient.settings.set.mutate({ key: 'preferredSource', value: sourceName })
     } catch (e) {
       console.error(e)
     }
@@ -377,12 +382,7 @@ export const usePlayerData = (
     useMutation({
       mutationFn: async ({ status }: { status: string }) => {
         if (!showId) throw new Error('Missing showId')
-
-        await fetchApi('/api/watchlist/status', {
-          method: 'POST',
-          body: JSON.stringify({ id: showId, status }),
-        })
-
+        await trpcClient.watchlist.setStatus.mutate({ id: showId, status })
         return status
       },
       onSuccess: (status) => {
@@ -441,6 +441,7 @@ export const usePlayerData = (
       })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
       queryClient.invalidateQueries({ queryKey: ['thisWeekSchedule'] })
+      void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
     },
     onError: () => toast.error('Failed to mark episode as watched'),
   })

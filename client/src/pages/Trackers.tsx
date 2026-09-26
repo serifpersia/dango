@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useSidebar } from '../hooks/useSidebar'
 import { useContentType } from '../contexts/ContentTypeContext'
 import { useAnilistAuthCallback } from '../hooks/useAnilistAuthCallback'
+import { trpcClient } from '../lib/trpc'
 import { Button } from '../components/common/Button'
 import Icon from '../components/common/Icon'
 
@@ -64,17 +65,15 @@ const Trackers: React.FC = () => {
   const { data: trackerStatus, isLoading: statusLoading } = useQuery({
     queryKey: ['trackerStatus'],
     queryFn: async (): Promise<TrackerStatus> => {
-      const res = await fetch('/api/tracker/status')
-      if (!res.ok) throw new Error('Failed to load tracker status')
-      return res.json()
+      const data = await trpcClient.tracker.status.query()
+      return data as unknown as TrackerStatus
     },
   })
 
   const { data: savedClientId } = useQuery({
     queryKey: ['anilistClientId'],
     queryFn: async (): Promise<string> => {
-      const res = await fetch(`/api/settings?key=${CLIENT_ID_SETTING}`)
-      const data = await res.json()
+      const data = await trpcClient.settings.getByKey.query({ key: CLIENT_ID_SETTING })
       return data.value || ''
     },
   })
@@ -107,12 +106,7 @@ const Trackers: React.FC = () => {
       return
     }
     const saveSetting = async (key: string, value: string) => {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      })
-      if (!res.ok) throw new Error(`Failed to save ${key}`)
+      await trpcClient.settings.set.mutate({ key, value })
     }
     try {
       if (inputTrim) {
@@ -141,12 +135,7 @@ const Trackers: React.FC = () => {
       return
     }
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: CLIENT_ID_SETTING, value: '' }),
-      })
-      if (!res.ok) throw new Error('Failed to clear')
+      await trpcClient.settings.set.mutate({ key: CLIENT_ID_SETTING, value: '' })
       queryClient.invalidateQueries({ queryKey: ['anilistClientId'] })
       toast.success('Reverted to Dango app client — hidden ID will be used')
     } catch (e) {
@@ -156,9 +145,7 @@ const Trackers: React.FC = () => {
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/tracker/anilist/disconnect', { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to disconnect')
-      return res.json()
+      return trpcClient.tracker.anilistDisconnect.mutate()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
@@ -169,14 +156,8 @@ const Trackers: React.FC = () => {
 
   const syncMutation = useMutation({
     mutationFn: async (): Promise<SyncSummary> => {
-      const res = await fetch('/api/tracker/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'anilist' }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Sync failed')
-      return data.summary
+      const data = await trpcClient.tracker.sync.mutate({ provider: 'anilist' })
+      return data.summary as unknown as SyncSummary
     },
     onSuccess: (summary) => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
@@ -197,14 +178,8 @@ const Trackers: React.FC = () => {
 
   const mangaSyncMutation = useMutation({
     mutationFn: async (): Promise<SyncSummary> => {
-      const res = await fetch('/api/tracker/manga/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direction: mangaDirection }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Manga sync failed')
-      return data.summary
+      const data = await trpcClient.tracker.mangaSync.mutate({ direction: mangaDirection })
+      return data.summary as unknown as SyncSummary
     },
     onSuccess: (summary) => {
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
@@ -224,13 +199,10 @@ const Trackers: React.FC = () => {
   const mangaImportMutation = useMutation({
     mutationFn: async (): Promise<number> => {
       if (!mangaUsername.trim()) throw new Error('Please enter a username')
-      const res = await fetch('/api/tracker/manga/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: mangaUsername.trim(), erase: eraseManga }),
+      const data = await trpcClient.tracker.mangaImport.mutate({
+        username: mangaUsername.trim(),
+        erase: eraseManga,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
       return data.count
     },
     onSuccess: (count) => {
@@ -256,13 +228,10 @@ const Trackers: React.FC = () => {
   const malMangaUsernameImport = useMutation({
     mutationFn: async (): Promise<{ imported: number; skipped: number }> => {
       if (!malMangaUsername.trim()) throw new Error('Please enter a MAL username')
-      const res = await fetch('/api/tracker/manga/mal-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: malMangaUsername.trim(), erase: eraseManga }),
+      const data = await trpcClient.tracker.mangaMalImport.mutate({
+        username: malMangaUsername.trim(),
+        erase: eraseManga,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
       return { imported: data.imported ?? 0, skipped: data.skipped ?? 0 }
     },
     onSuccess: ({ imported, skipped }) => {
@@ -307,13 +276,10 @@ const Trackers: React.FC = () => {
   const importMutation = useMutation({
     mutationFn: async (): Promise<number> => {
       if (!publicUsername.trim()) throw new Error('Please enter a username')
-      const res = await fetch('/api/tracker/anilist/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: publicUsername.trim(), erase: eraseWatchlist }),
+      const data = await trpcClient.tracker.anilistImport.mutate({
+        username: publicUsername.trim(),
+        erase: eraseWatchlist,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
       return data.count
     },
     onSuccess: (count) => {
@@ -334,18 +300,12 @@ const Trackers: React.FC = () => {
       skipFallback: boolean
     }): Promise<number> => {
       if (!malUsername.trim()) throw new Error('Please enter a MAL username')
-      const res = await fetch('/api/tracker/mal/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: malUsername.trim(),
-          erase: opts.erase,
-          useOfflineDb: opts.useOfflineDb,
-          skipFallback: opts.skipFallback,
-        }),
+      const data = await trpcClient.tracker.malImport.mutate({
+        username: malUsername.trim(),
+        erase: opts.erase,
+        useOfflineDb: opts.useOfflineDb,
+        skipFallback: opts.skipFallback,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
       return data.count
     },
     onSuccess: (count) => {
@@ -465,7 +425,7 @@ const Trackers: React.FC = () => {
 
   const handleCancel = () => {
     abortRef.current?.abort()
-    fetch('/api/import/mal-xml/cancel', { method: 'POST' }).catch(() => {})
+    trpcClient.settings.malImportCancel.mutate().catch(() => {})
   }
 
   const progressPercent = progress ? Math.round((progress.current / progress.total) * 100) : 0

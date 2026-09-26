@@ -9,6 +9,7 @@ import { LowEndModeProvider } from './contexts/LowEndModeProvider'
 import { ThemeProvider } from './contexts/ThemeProvider'
 import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { TRPCProvider, trpcClient } from './lib/trpc'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,21 +26,23 @@ const root = document.getElementById('root')
 if (root) {
   render(
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AnimePaheCookieProvider>
-          <SidebarProvider>
-            <ContentTypeProvider>
-              <TitlePreferenceProvider>
-                <LowEndModeProvider>
-                  <ThemeProvider>
-                    <App />
-                  </ThemeProvider>
-                </LowEndModeProvider>
-              </TitlePreferenceProvider>
-            </ContentTypeProvider>
-          </SidebarProvider>
-        </AnimePaheCookieProvider>
-      </QueryClientProvider>
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <AnimePaheCookieProvider>
+            <SidebarProvider>
+              <ContentTypeProvider>
+                <TitlePreferenceProvider>
+                  <LowEndModeProvider>
+                    <ThemeProvider>
+                      <App />
+                    </ThemeProvider>
+                  </LowEndModeProvider>
+                </TitlePreferenceProvider>
+              </ContentTypeProvider>
+            </SidebarProvider>
+          </AnimePaheCookieProvider>
+        </QueryClientProvider>
+      </TRPCProvider>
     </BrowserRouter>,
     root
   )

@@ -11,7 +11,7 @@ import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useProviders } from '../hooks/useProviders'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient, useTRPC } from '../lib/trpc'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from './Search.module.css'
 import matureStyles from './Mature.module.css'
@@ -26,32 +26,6 @@ interface MatureShow {
   type?: string
   year?: number | null
   isAdult?: boolean
-}
-
-interface MatureSearchResponse {
-  data: MatureShow[]
-  hasMore: boolean
-  total?: number
-  genres?: { slug: string; name: string }[]
-}
-
-interface MatureProviderCaps {
-  genre?: boolean
-  order?: boolean
-  studio?: boolean
-  sort?: boolean
-  pageSize?: number
-}
-
-interface MatureProviderFilters {
-  label: string
-  browse?: MatureProviderCaps
-  genres?: string[]
-  orders?: string[]
-}
-
-interface MatureFiltersResponse {
-  providers: Record<string, MatureProviderFilters>
 }
 
 const META_PROVIDER_OPTIONS = [
@@ -102,8 +76,67 @@ const prettyLabel = (slug: string) =>
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(' ')
 
+const MATURE_SEARCH_NUMBERS = new Set(['page', 'limit', 'year', 'minScore', 'minEpisodes'])
+
+const MATURE_SEARCH_KEYS = new Set([
+  'provider',
+  'query',
+  'page',
+  'limit',
+  'type',
+  'status',
+  'season',
+  'year',
+  'country',
+  'genres',
+  'genre',
+  'excludeGenres',
+  'sortBy',
+  'order',
+  'studio',
+  'blacklist',
+  'minScore',
+  'minEpisodes',
+])
+
+type MatureSearchInput = {
+  provider?: string
+  query?: string
+  page?: number
+  limit?: number
+  type?: string
+  status?: string
+  season?: string
+  year?: number
+  country?: string
+  genres?: string
+  genre?: string
+  excludeGenres?: string
+  sortBy?: string
+  order?: string
+  studio?: string
+  blacklist?: string
+  minScore?: number
+  minEpisodes?: number
+}
+
+function parseMatureSearchInput(paramString: string): MatureSearchInput {
+  const params = new URLSearchParams(paramString)
+  const input: MatureSearchInput = {}
+  for (const [key, value] of params.entries()) {
+    if (!MATURE_SEARCH_KEYS.has(key)) continue
+    if (MATURE_SEARCH_NUMBERS.has(key)) {
+      ;(input as Record<string, string | number>)[key] = Number(value) || 0
+    } else {
+      ;(input as Record<string, string | number>)[key] = value
+    }
+  }
+  return input
+}
+
 export default function Mature() {
   const navigate = useNavigate()
+  const trpc = useTRPC()
   const [searchParams, setSearchParams] = useSearchParams()
   const { hasConsent, grant } = useMatureConsent()
 
@@ -145,9 +178,8 @@ export default function Mature() {
     [matureStreamingOptions]
   )
 
-  const { data: filters } = useQuery<MatureFiltersResponse>({
-    queryKey: ['mature-filters'],
-    queryFn: () => fetchApi('/api/mature/filters'),
+  const { data: filters } = useQuery({
+    ...trpc.data.matureFilters.queryOptions(),
     enabled: hasConsent,
     staleTime: Infinity,
   })
@@ -252,9 +284,8 @@ export default function Mature() {
     isLoading,
     isError,
     error,
-  } = useQuery<MatureSearchResponse>({
-    queryKey: ['mature-search', paramString],
-    queryFn: () => fetchApi(`/api/mature/search?${paramString}`),
+  } = useQuery({
+    ...trpc.data.matureSearch.queryOptions(parseMatureSearchInput(paramString)),
     enabled: hasConsent,
   })
 
@@ -339,37 +370,28 @@ export default function Mature() {
       if (provider !== 'anilist') {
         let anilistUp = false
         try {
-          const st = (await fetchApi('/api/anilist-status')) as { available?: boolean }
+          const st = await trpcClient.data.anilistStatus.query()
           anilistUp = st?.available === true
         } catch {
           anilistUp = false
         }
         if (anilistUp) {
-          const data = (await fetchApi(
-            `/api/mature/resolve?title=${encodeURIComponent(show.name)}`
-          )) as { id: number }
-          navigate(`/anime/${data.id}`)
+          const data = await trpcClient.data.matureResolve.query({ title: show.name })
+          navigate(`/anime/${(data as { id: number }).id}`)
           return
         }
-        const res = await fetch('/api/mature/allocate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider,
-            nativeId: id,
-            title: show.name,
-            thumbnail: show.thumbnail,
-          }),
+        const data = await trpcClient.data.matureAllocate.mutate({
+          provider,
+          nativeId: id,
+          title: show.name,
+          thumbnail: show.thumbnail,
         })
-        const data = (await res.json().catch(() => null)) as { id?: string } | null
-        if (!res.ok || !data?.id) throw new Error('Allocate failed')
+        if (!data?.id) throw new Error('Allocate failed')
         navigate(`/anime/${data.id}`)
         return
       }
-      const data = (await fetchApi(
-        `/api/mature/resolve?title=${encodeURIComponent(show.name)}`
-      )) as { id: number }
-      navigate(`/anime/${data.id}`)
+      const data = await trpcClient.data.matureResolve.query({ title: show.name })
+      navigate(`/anime/${(data as { id: number }).id}`)
     } catch {
       toast.error('Could not match this title on AniList')
     } finally {

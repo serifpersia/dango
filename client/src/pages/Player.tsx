@@ -9,7 +9,7 @@ import Icon from '../components/common/Icon'
 import { fixThumbnailUrl } from '../lib/utils'
 import { isProgressCompleted, storeAutoplayEnabled } from '../lib/playbackCompletion'
 import { loadHls } from '../lib/hls'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
 import { pickSubtitleIndex } from '../lib/subtitles'
 import {
   buildCueCss,
@@ -683,9 +683,12 @@ const Player: React.FC = () => {
         triedProvidersRef.current.push(provider)
         let sources: VideoSource[] | null = null
         try {
-          sources = (await fetchApi(
-            `/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${provider}`
-          )) as VideoSource[] | null
+          sources = (await trpcClient.data.video.query({
+            showId,
+            episodeNumber: state.currentEpisode,
+            mode: state.currentMode,
+            provider,
+          })) as VideoSource[] | null
         } catch {
           continue
         }

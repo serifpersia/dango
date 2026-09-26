@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 import { formatTime } from '../lib/utils'
 import { fetchApi } from '../lib/fetchApi'
+import { useTRPC } from '../lib/trpc'
 import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
 import {
   toggleFullscreen as toggleFullscreenCrossBrowser,
@@ -36,6 +37,7 @@ const useVideoPlayer = ({
   showMeta,
 }: VideoPlayerProps) => {
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
   const progressBarRef = useRef<HTMLDivElement>(null)
@@ -170,6 +172,7 @@ const useVideoPlayer = ({
           queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
           queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
           queryClient.invalidateQueries({ queryKey: ['thisWeekSchedule'] })
+          void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
         } catch (err) {
           console.error('Failed to update progress:', err)
         }
@@ -187,7 +190,7 @@ const useVideoPlayer = ({
 
       return true
     },
-    [buildProgressPayload, sourceType, queryClient, showId, episodeNumber]
+    [buildProgressPayload, sourceType, queryClient, showId, episodeNumber, trpc.continueWatching]
   )
 
   useEffect(() => {

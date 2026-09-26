@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient, useTRPC } from '../lib/trpc'
 
 export type MangaProviderName = string
 
@@ -76,16 +76,16 @@ export const useMangaBrowse = (params: MangaBrowseParams, enabled: boolean = tru
   return useQuery({
     queryKey: ['mangaBrowse', provider, query, page, sort, status, type, rating, mature],
     queryFn: () => {
-      const p = new URLSearchParams()
-      p.set('provider', provider)
-      if (query.trim()) p.set('q', query.trim())
-      p.set('page', String(page))
-      if (sort) p.set('sort', sort)
-      if (status) p.set('status', status)
-      if (type) p.set('type', type)
-      if (rating) p.set('rating', rating)
-      if (mature) p.set('mature', '1')
-      return fetchApi(`/api/manga/search?${p.toString()}`) as Promise<MangaBrowseResult>
+      return trpcClient.manga.search.query({
+        provider,
+        q: query.trim() || undefined,
+        page,
+        sort: sort || undefined,
+        status: status || undefined,
+        type: type || undefined,
+        rating: rating || undefined,
+        mature: mature ? '1' : undefined,
+      }) as Promise<MangaBrowseResult>
     },
     staleTime: STALE_5_MIN,
     enabled: enabled && !!provider,
@@ -100,17 +100,17 @@ export const useInfiniteMangaBrowse = (
   return useInfiniteQuery<MangaBrowseResult>({
     queryKey: ['mangaBrowseInfinite', provider, query, sort, status, type, rating, mature, size],
     queryFn: ({ pageParam = 1 }) => {
-      const p = new URLSearchParams()
-      p.set('provider', provider)
-      if (query.trim()) p.set('q', query.trim())
-      p.set('page', String(pageParam as number))
-      p.set('limit', String(size))
-      if (sort) p.set('sort', sort)
-      if (status) p.set('status', status)
-      if (type) p.set('type', type)
-      if (rating) p.set('rating', rating)
-      if (mature) p.set('mature', '1')
-      return fetchApi(`/api/manga/search?${p.toString()}`) as Promise<MangaBrowseResult>
+      return trpcClient.manga.search.query({
+        provider,
+        q: query.trim() || undefined,
+        page: pageParam as number,
+        limit: size,
+        sort: sort || undefined,
+        status: status || undefined,
+        type: type || undefined,
+        rating: rating || undefined,
+        mature: mature ? '1' : undefined,
+      }) as Promise<MangaBrowseResult>
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasNext ? allPages.length + 1 : undefined),
@@ -128,12 +128,12 @@ export const useMangaDetail = (
   return useQuery({
     queryKey: ['mangaDetail', provider, id, rating, mature],
     queryFn: () => {
-      const p = new URLSearchParams()
-      p.set('provider', provider || '')
-      p.set('id', id || '')
-      if (rating) p.set('rating', rating)
-      if (mature) p.set('mature', '1')
-      return fetchApi(`/api/manga/info?${p.toString()}`) as Promise<MangaDetail>
+      return trpcClient.manga.info.query({
+        provider: provider || '',
+        id: id || '',
+        rating,
+        mature: mature ? '1' : undefined,
+      }) as Promise<MangaDetail>
     },
     enabled: !!provider && !!id,
     staleTime: STALE_5_MIN,
@@ -148,9 +148,10 @@ export const useMangaPages = (
   return useQuery({
     queryKey: ['mangaPages', provider, chapterId],
     queryFn: () =>
-      fetchApi(
-        `/api/manga/pages?provider=${provider}&id=${encodeURIComponent(chapterId || '')}`
-      ) as Promise<{ pages: string[] }>,
+      trpcClient.manga.pages.query({
+        provider: provider || '',
+        id: chapterId || '',
+      }) as Promise<{ pages: string[] }>,
     enabled: enabled && !!provider && !!chapterId,
     staleTime: 30 * 60 * 1000,
   })
@@ -167,9 +168,10 @@ export interface MangaTrendingItem {
 }
 
 export const useMangaTrending = () => {
+  const trpc = useTRPC()
   return useQuery({
-    queryKey: ['mangaTrending'],
-    queryFn: () => fetchApi('/api/manga/trending') as Promise<MangaTrendingItem[]>,
+    ...trpc.manga.trending.queryOptions(),
     staleTime: 10 * 60 * 1000,
+    retry: 1,
   })
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import packageJson from '../../package.json'
+import { trpcClient } from '../lib/trpc'
 
 const newInstallationId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -58,8 +59,7 @@ export const sendTelemetryPing = async () => {
 
     if (!installationId) {
       try {
-        const res = await fetch('/api/installation-id')
-        const data = await res.json()
+        const data = await trpcClient.settings.installationId.query()
         if (data.id) {
           installationId = data.id
           localStorage.setItem('installation_id', installationId!)

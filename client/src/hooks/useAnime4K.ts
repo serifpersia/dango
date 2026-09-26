@@ -13,8 +13,6 @@ interface UseAnime4KOptions {
   delayMs?: number
 }
 
-// Presets only run their CNN upscale stages when target > 1.2x native
-// (strict `>` in the lib), so scales must stay clearly above 1.2.
 const PROFILE_SCALES: Record<Anime4KProfile, { sd: number; hd: number; fhd: number }> = {
   low: { sd: 1.5, hd: 1.3, fhd: 1.25 },
   balanced: { sd: 2, hd: 1.5, fhd: 1.25 },

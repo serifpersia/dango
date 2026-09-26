@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { fetchApi } from '../lib/fetchApi'
 import { buildAsmrId } from '../lib/asmr'
+import { trpcClient, useTRPC } from '../lib/trpc'
 
 export type AsmrLibraryStatus = 'Listening' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
 
@@ -44,56 +44,39 @@ export interface ContinueListeningItem extends AsmrLibraryItem {
   progressAt?: number | null
 }
 
-interface PaginatedAsmrLibrary {
-  data: AsmrLibraryItem[]
-  total: number
-  page: number
-  limit: number
-}
-
 export const asmrLibraryId = (rjCode: string) => buildAsmrId(rjCode)
 
 export const useAsmrLibrary = (status: string = 'All', page: number = 1, limit: number = 24) => {
-  return useQuery<PaginatedAsmrLibrary>({
-    queryKey: ['asmr-library', status, page, limit],
-    queryFn: () => {
-      const p = new URLSearchParams()
-      p.set('status', status)
-      p.set('page', String(page))
-      p.set('limit', String(limit))
-      return fetchApi(`/api/asmr/library?${p.toString()}`)
-    },
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.asmrLibrary.list.queryOptions({ status, page, limit }))
 }
 
 export const useAsmrLibraryIds = () => {
-  return useQuery<{ ids: string[] }>({
-    queryKey: ['asmr-library-ids'],
-    queryFn: () => fetchApi('/api/asmr/library/ids'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.asmrLibrary.ids.queryOptions(),
     staleTime: 1000 * 60,
   })
 }
 
 export const useAsmrLibraryCheck = (id?: string) => {
-  return useQuery<{ inLibrary: boolean; status: string | null }>({
-    queryKey: ['asmr-library-check', id],
-    queryFn: () => fetchApi(`/api/asmr/library/check/${encodeURIComponent(id || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.asmrLibrary.check.queryOptions({ id: id || '' }),
     enabled: !!id,
     staleTime: 1000 * 60,
   })
 }
 
 export const useAsmrContinueListening = (limit: number = 24) => {
-  return useQuery<{ data: ContinueListeningItem[]; total: number }>({
-    queryKey: ['asmr-continue-listening', limit],
-    queryFn: () => fetchApi(`/api/asmr/continue-listening?limit=${limit}`),
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.asmrProgress.continueListening.queryOptions({ limit }))
 }
 
 export const useAsmrProgress = (workId?: string) => {
-  return useQuery<{ progress: AsmrProgressItem[] }>({
-    queryKey: ['asmr-progress', workId],
-    queryFn: () => fetchApi(`/api/asmr/progress/${encodeURIComponent(workId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.asmrProgress.getByWork.queryOptions({ workId: workId || '' }),
     enabled: !!workId,
   })
 }
@@ -108,6 +91,7 @@ export const useAsmrTrackProgress = (workId?: string, trackIndex?: number) => {
 }
 
 export const useAddAsmrBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (item: {
@@ -119,10 +103,7 @@ export const useAddAsmrBookmark = () => {
       silent?: boolean
     }) => {
       const { silent: _silent, ...body } = item
-      return fetchApi('/api/asmr/library/add', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }) as Promise<{ success: boolean; id: string }>
+      return trpcClient.asmrLibrary.add.mutate(body)
     },
     onSuccess: (_data, variables) => {
       if (!variables.silent) toast.success('Added to listening list')
@@ -131,6 +112,7 @@ export const useAddAsmrBookmark = () => {
       queryClient.invalidateQueries({
         queryKey: ['asmr-library-check', asmrLibraryId(variables.rjCode)],
       })
+      void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
     },
     onError: (error: Error) => {
       toast.error(`Failed to add: ${error.message}`)
@@ -139,158 +121,141 @@ export const useAddAsmrBookmark = () => {
 }
 
 export const useRemoveAsmrBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await fetchApi('/api/asmr/library/remove', {
-        method: 'POST',
-        body: JSON.stringify({ id }),
-      })
-    },
-    onSuccess: (_data, id) => {
-      toast.success('Removed from listening list')
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-check', id] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrLibrary.remove.mutationOptions({
+      onSuccess: (_data, variables) => {
+        toast.success('Removed from listening list')
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library-check', variables.id] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useUpdateAsmrStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await fetchApi('/api/asmr/library/status', {
-        method: 'POST',
-        body: JSON.stringify({ id, status }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Status updated')
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update status: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrLibrary.setStatus.mutationOptions({
+      onSuccess: () => {
+        toast.success('Status updated')
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to update status: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useSaveAsmrProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (progress: {
-      workId: string
-      trackIndex: number
-      trackLabel?: string
-      currentTime: number
-      duration?: number
-      title?: string
-      thumbnail?: string
-      rjCode?: string
-      isAdult?: number
-    }) => {
-      await fetchApi('/api/asmr/progress', {
-        method: 'POST',
-        body: JSON.stringify(progress),
-      })
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['asmr-progress', variables.workId] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
-    },
-  })
+  return useMutation(
+    trpc.asmrProgress.save.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['asmr-progress', variables.workId] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+    })
+  )
 }
 
 export const useRemoveAsmrProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ workId, trackIndex }: { workId: string; trackIndex?: number }) => {
-      await fetchApi('/api/asmr/progress/remove', {
-        method: 'POST',
-        body: JSON.stringify({ workId, trackIndex }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Progress reset')
-      queryClient.invalidateQueries({ queryKey: ['asmr-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrProgress.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success('Progress reset')
+        queryClient.invalidateQueries({ queryKey: ['asmr-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchUpdateAsmrStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      return fetchApi('/api/asmr/library/batch-status', {
-        method: 'POST',
-        body: JSON.stringify({ ids, status }),
-      }) as Promise<{ success: boolean; updated: number }>
-    },
-    onSuccess: (data) => {
-      toast.success(`Status updated for ${data.updated ?? 0} items`)
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update statuses: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrLibrary.batchStatus.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(`Status updated for ${data.updated ?? 0} items`)
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to update statuses: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveAsmr = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/asmr/library/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from listening list`)
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrLibrary.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from listening list`)
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveAsmrProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/asmr/progress/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
-      queryClient.invalidateQueries({ queryKey: ['asmr-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.asmrProgress.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
+        queryClient.invalidateQueries({ queryKey: ['asmr-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
+        queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
+        void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useToggleAsmrBookmark = () => {
@@ -307,7 +272,7 @@ export const useToggleAsmrBookmark = () => {
   }) => {
     const libId = asmrLibraryId(item.rjCode)
     if (bookmarkedIds.has(libId)) {
-      remove.mutate(libId)
+      remove.mutate({ id: libId })
     } else {
       add.mutate({ ...item, thumbnail: item.thumbnail || '' })
     }

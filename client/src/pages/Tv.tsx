@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { trpcClient } from '../lib/trpc'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
@@ -524,19 +525,26 @@ const Tv: React.FC = () => {
     async (targetSeason: number, targetEpisode: number): Promise<TvStreamResponse> => {
       if (!details || !id || !source) return { valid: false, sources: [] }
       const type = isMovie ? 'movie' : 'tv'
-      const params = new URLSearchParams({
+      const data = await trpcClient.tv.sources.query({
+        provider: source,
+        type,
+        tmdbId: String(id),
+        season: targetSeason,
+        episode: targetEpisode,
         title: details.title || '',
         year: details.year || '',
-        season: String(targetSeason),
-        episode: String(targetEpisode),
         totalSeasons: String(details.number_of_seasons || 1),
         imdbId: details.imdb_id || '',
+        ...(activeServers.length > 0 && selectedMovyServer ? { server: selectedMovyServer } : {}),
       })
-      if (activeServers.length > 0 && selectedMovyServer) {
-        params.set('server', selectedMovyServer)
+      return {
+        valid: 'valid' in data ? data.valid : false,
+        error: 'error' in data ? data.error : undefined,
+        sources: data.sources,
+        referer: 'referer' in data ? data.referer : undefined,
+        audioTracks: data.audioTracks,
+        subtitles: 'subtitles' in data ? data.subtitles : undefined,
       }
-      const res = await fetch(`/api/tv/sources/${source}/${type}/${id}?${params.toString()}`)
-      return (await res.json()) as TvStreamResponse
     },
     [details, id, source, isMovie, activeServers, selectedMovyServer]
   )
@@ -970,13 +978,26 @@ const Tv: React.FC = () => {
     setEpisode(isNaN(eParam) ? 1 : eParam)
     setQualityIdx(0)
 
-    fetch(`/api/tv/details/${mediaType}/${itemId}`)
-      .then((r) => r.json())
-      .then((d: TvDetails) => {
-        setDetails(d)
+    trpcClient.tv.details
+      .query({ type: mediaType, id: String(itemId) })
+      .then((d) => {
+        const mapped: TvDetails = {
+          id: d.id,
+          title: d.title || '',
+          overview: d.overview || '',
+          vote_average: d.vote_average,
+          year: d.year,
+          poster: d.poster,
+          backdrop: d.backdrop,
+          imdb_id: d.imdb_id || undefined,
+          adult: d.adult,
+          seasons: d.seasons,
+          number_of_seasons: d.number_of_seasons,
+        }
+        setDetails(mapped)
         setDetailsLoading(false)
-        if (d.seasons && d.seasons.length > 0 && isNaN(sParam)) {
-          setSeason(d.seasons[0].season_number)
+        if (mapped.seasons && mapped.seasons.length > 0 && isNaN(sParam)) {
+          setSeason(mapped.seasons[0].season_number)
         }
       })
       .catch(() => {
@@ -993,15 +1014,22 @@ const Tv: React.FC = () => {
       return
     }
     const eParam = parseInt(searchParams.get('e') || '', 10)
-    fetch(`/api/tv/episodes/${id}/${season}`)
-      .then((r) => r.json())
-      .then((d: { episodes: Episode[] }) => {
-        setEpisodes(d.episodes || [])
-        if (d.episodes?.length > 0) {
+    trpcClient.tv.episodes
+      .query({ id: String(id), season: String(season) })
+      .then((d) => {
+        const eps: Episode[] = (d.episodes || []).map((ep) => ({
+          episode_number: ep.episode_number,
+          name: ep.name || '',
+          vote_average: ep.vote_average,
+          overview: ep.overview || '',
+          still_path: ep.still_path || '',
+        }))
+        setEpisodes(eps)
+        if (eps.length > 0) {
           const wanted =
-            !isNaN(eParam) && d.episodes.find((ep) => ep.episode_number === eParam)
+            !isNaN(eParam) && eps.find((ep) => ep.episode_number === eParam)
               ? eParam
-              : d.episodes[0].episode_number
+              : eps[0].episode_number
           setEpisode(wanted)
         }
       })
@@ -1012,10 +1040,16 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     if (!details || !id || isMovie) return
-    fetch(`/api/tv/episodes/${id}/${season}`)
-      .then((r) => r.json())
-      .then((d: { episodes: Episode[] }) => {
-        const eps = d.episodes || []
+    trpcClient.tv.episodes
+      .query({ id: String(id), season: String(season) })
+      .then((d) => {
+        const eps: Episode[] = (d.episodes || []).map((ep) => ({
+          episode_number: ep.episode_number,
+          name: ep.name || '',
+          vote_average: ep.vote_average,
+          overview: ep.overview || '',
+          still_path: ep.still_path || '',
+        }))
         setEpisodes(eps)
         if (eps.length > 0 && !eps.find((ep) => ep.episode_number === episode)) {
           setEpisode(eps[0].episode_number)
@@ -1095,9 +1129,9 @@ const Tv: React.FC = () => {
       }
       const type = isMovie ? 'movie' : 'tv'
       const subId = id
-      fetch(`/api/tv/subtitles/${type}/${subId}?season=${season}&episode=${episode}`)
-        .then((r) => r.json())
-        .then((sd: { subtitles?: SubtitleTrack[] }) => {
+      trpcClient.tv.subtitles
+        .query({ type, tmdbId: String(subId), season: String(season), episode: String(episode) })
+        .then((sd) => {
           if (streamKeyRef.current !== episodeKey) return
           const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
           if (osSubs.length === 0) return
@@ -1869,10 +1903,8 @@ const Tv: React.FC = () => {
     const episodeLabel = isMovie
       ? ''
       : `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
-    fetch('/api/discord/tv', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    trpcClient.discord.tvPresence
+      .mutate({
         title: details.title,
         episodeLabel,
         isPlaying: video ? !video.paused && !video.ended : true,
@@ -1881,13 +1913,9 @@ const Tv: React.FC = () => {
         duration: video ? video.duration || 0 : 0,
         isAdult: details.adult === true,
         sessionId: discordSessionRef.current,
-      }),
-    }).catch(() => {})
-    fetch('/api/discord/heartbeat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: discordSessionRef.current }),
-    }).catch(() => {})
+      })
+      .catch(() => {})
+    trpcClient.discord.heartbeat.mutate({ sessionId: discordSessionRef.current }).catch(() => {})
   }, [details, isMovie, season, episode, videoRef])
 
   useEffect(() => {

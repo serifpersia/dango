@@ -18,7 +18,7 @@ import {
   type MusicTrack,
   type MusicPlaylist,
 } from '../hooks/useMusic'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
 import asmrStyles from '../components/asmr/Asmr.module.css'
 import radioStyles from '../components/radio/Radio.module.css'
 import musicStyles from '../components/music/Music.module.css'
@@ -111,7 +111,7 @@ const Music: React.FC = () => {
           }
           setCookieInput(raw)
           toast.success('Cookie extracted from helper — signing in…')
-          saveCookie.mutate(raw)
+          saveCookie.mutate({ cookie: raw })
         } else if (detail?.error === 'NO_COOKIE') {
           toast.error('Helper found no YouTube login — log in on a music.youtube.com tab first.')
         } else {
@@ -179,8 +179,6 @@ const Music: React.FC = () => {
       const found = list.find((t) => t.id === paramId)
       if (found) {
         setSelected(found)
-        // Preserve the existing queue (radio/search context) when it already
-        // contains the track — otherwise resolving the URL would clobber it.
         setQueue((q) => (q.some((t) => t.id === paramId) ? q : list.length > 0 ? list : [found]))
         return true
       }
@@ -219,9 +217,7 @@ const Music: React.FC = () => {
     if (!anchor) return
     extendingRef.current = true
     try {
-      const data = await fetchApi<{ tracks: MusicTrack[] }>(
-        `/api/music/upnext?id=${encodeURIComponent(anchor.id)}`
-      )
+      const data = await trpcClient.music.upnext.query({ id: anchor.id })
       const known = new Set(currentQueue.map((t) => t.id))
       const fresh = (data.tracks || []).filter(
         (t) => !known.has(t.id) && !failedRef.current.has(t.id)
@@ -257,7 +253,6 @@ const Music: React.FC = () => {
       void extendRadio()
       return
     }
-    // Skip tracks that failed to load (bounded so an all-failed queue stops).
     const isBad = (t: MusicTrack) => failedRef.current.has(t.id)
     const len = currentQueue.length
     let next: MusicTrack
@@ -507,7 +502,7 @@ const Music: React.FC = () => {
                   return
                 }
                 if (raw !== cookieInput) setCookieInput(raw)
-                saveCookie.mutate(raw)
+                saveCookie.mutate({ cookie: raw })
               }}
               className={musicStyles.cookieForm}
             >

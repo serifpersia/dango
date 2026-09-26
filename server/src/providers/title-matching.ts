@@ -137,7 +137,6 @@ function detectSeasonMarker(s: string): string {
   const trailing = t.match(/\b(ii|iii|iv|v|vi|vii|viii|ix|x)\b(?!\s*(st|nd|rd|th|season))/)
   if (trailing) return String(ROMAN_TO_NUM[trailing[1]])
 
-  // bare trailing number, e.g. "...Another World 2"
   const trailingNum = t.match(/\b(\d+)\s*(season)?\s*$/)
   if (trailingNum) return trailingNum[1]
 

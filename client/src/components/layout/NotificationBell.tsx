@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Icon from '../common/Icon'
 import { useQueryClient } from '@tanstack/react-query'
+import { useTRPC } from '../../lib/trpc'
 import NotificationDropdown from './NotificationDropdown'
 import {
   useNotifications,
@@ -14,6 +15,7 @@ const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const bellRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const triggerDiscovery = useTriggerDiscovery()
 
   const { data: notifications = [] } = useNotifications()
@@ -38,11 +40,11 @@ const NotificationBell: React.FC = () => {
   useEffect(() => {
     const running = !!discoveryStatus?.running
     if (wasDiscoveryRunning.current && !running) {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['discovery-status'] })
+      void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+      void queryClient.invalidateQueries(trpc.discovery.pathFilter())
     }
     wasDiscoveryRunning.current = running
-  }, [discoveryStatus?.running, queryClient])
+  }, [discoveryStatus?.running, queryClient, trpc])
 
   const handleToggle = () => {
     const nextOpen = !isOpen

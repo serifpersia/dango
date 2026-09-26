@@ -54,8 +54,6 @@ export class GoogleDriveService {
   private folderIdCache: Map<string, string> = new Map()
 
   constructor() {
-    // Client ID/secret now live in Cloudflare Worker (GOOGLE_AUTH_WORKER_URL).
-    // Legacy user-owned .env credentials are optional fallback only.
     if (!CONFIG.GOOGLE_AUTH_WORKER_URL && !CONFIG.GOOGLE_CLIENT_ID) {
       logger.error('GOOGLE_AUTH_WORKER_URL is missing and no GOOGLE_CLIENT_ID fallback!')
     }
@@ -91,7 +89,6 @@ export class GoogleDriveService {
   }
 
   private getGoogleClientConfig() {
-    // Legacy fallback only. Preferred path is Worker (no secret in dango).
     return {
       clientId: CONFIG.GOOGLE_CLIENT_ID || '',
       clientSecret: CONFIG.GOOGLE_CLIENT_SECRET || '',
@@ -148,7 +145,6 @@ export class GoogleDriveService {
       throw new Error('Missing refresh token')
     }
 
-    // Preferred: secret stays in Worker
     if (this.useWorker()) {
       await this.refreshViaWorker()
       return
@@ -270,7 +266,6 @@ export class GoogleDriveService {
   }
 
   public async getAuthUrl(): Promise<string> {
-    // Preferred: Worker builds URL with bundled client_id, no secret needed here
     if (this.useWorker()) {
       try {
         const url = new URL(`${CONFIG.GOOGLE_AUTH_WORKER_URL}/auth-url`)
@@ -297,7 +292,6 @@ export class GoogleDriveService {
   }
 
   public async handleCallback(code: string) {
-    // Preferred: Worker exchanges code with secret, dango never sees secret
     if (this.useWorker()) {
       try {
         const data = await this.postJson<GoogleTokenSet>(
@@ -312,7 +306,6 @@ export class GoogleDriveService {
       }
     }
 
-    // Legacy fallback: user-owned client_id/secret in .env
     const { clientId, clientSecret } = this.getGoogleClientConfig()
     const params = new URLSearchParams({
       code,

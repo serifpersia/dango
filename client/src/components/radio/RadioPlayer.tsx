@@ -3,6 +3,7 @@ import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
 import type { RadioStation, ListenMoeNowPlaying } from '../../hooks/useRadio'
 import { songArt, songArtist } from '../../hooks/useRadio'
+import { trpcClient } from '../../lib/trpc'
 import styles from '../asmr/Asmr.module.css'
 import radioStyles from './Radio.module.css'
 
@@ -100,23 +101,17 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
   const sendRadioPresence = React.useCallback(
     (playing: boolean) => {
       if (!station) return
-      fetch('/api/discord/radio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      trpcClient.discord.radioPresence
+        .mutate({
           title: headline,
           stationLabel: station.name,
           isPlaying: playing,
           thumbnail: effectiveCover || '',
           currentTime: elapsedSeconds(nowPlaying.startTime),
           sessionId: sessionIdRef.current,
-        }),
-      }).catch(() => {})
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sessionIdRef.current }),
-      }).catch(() => {})
+        })
+        .catch(() => {})
+      trpcClient.discord.heartbeat.mutate({ sessionId: sessionIdRef.current }).catch(() => {})
     },
     [station, headline, effectiveCover, nowPlaying.startTime]
   )

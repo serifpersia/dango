@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Icon from '../common/Icon'
 import { useQuery } from '@tanstack/react-query'
+import { trpcClient } from '../../lib/trpc'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
@@ -34,10 +35,7 @@ const formatLocalDate = (date: Date) => {
 }
 
 const fetchEpisodeSchedule = async (date: string, format: string): Promise<Anime[]> => {
-  const url = `/api/schedule/${date}?format=${format}`
-  const response = await fetch(url)
-  if (!response.ok) throw new Error('Failed to fetch episode schedule')
-  return response.json()
+  return (await trpcClient.data.schedule.query({ date, format })) as Anime[]
 }
 
 const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {

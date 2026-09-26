@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { trpcClient } from '../lib/trpc'
 
-// Handles the AniList OAuth return trip: backend `?anilist=` params,
-// implicit-flow `#access_token` fragments, and `?code` exchanges.
-// Runs on the Trackers page, which is where every login flow starts
-// (the authorize redirect always returns to the initiating page).
-// Returns true while a token exchange is in flight.
 export function useAnilistAuthCallback(): boolean {
   const queryClient = useQueryClient()
   const [isExchanging, setIsExchanging] = useState(false)
@@ -46,15 +42,11 @@ export function useAnilistAuthCallback(): boolean {
 
     setIsExchanging(true)
     toast('Connecting to AniList...')
-    fetch('/api/tracker/anilist/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(accessToken ? { token: accessToken } : { code, redirectUri }),
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Authentication failed')
-        toast.success(`Connected to AniList as ${data.user?.name ?? 'AniList user'}`)
+    trpcClient.tracker.anilistAuth
+      .mutate(accessToken ? { token: accessToken } : { code, redirectUri })
+      .then(async (data) => {
+        const user = (data as { user?: { name?: string } }).user
+        toast.success(`Connected to AniList as ${user?.name ?? 'AniList user'}`)
         queryClient.invalidateQueries({ queryKey: ['trackerStatus'] })
       })
       .catch((err) => {

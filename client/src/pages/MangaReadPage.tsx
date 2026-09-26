@@ -6,6 +6,7 @@ import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
 import { resolveMangaTitle, parseSyntheticChapterId, findChapterByNumber } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { mangaLibraryId, useMangaProgress, useSaveMangaProgress } from '../hooks/useMangaLibrary'
+import { trpcClient } from '../lib/trpc'
 import styles from '../components/manga/Manga.module.css'
 
 const SAVE_DEBOUNCE_MS = 800
@@ -164,10 +165,8 @@ export default function MangaReadPage() {
       detail.contentRating === 'pornographic' ||
       detail.type === 'doujinshi'
     const send = () => {
-      fetch('/api/discord/manga', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      trpcClient.discord.mangaPresence
+        .mutate({
           title: detail.title,
           chapterLabel: `Chapter ${activeChapter.number}`,
           isPlaying: true,
@@ -175,13 +174,9 @@ export default function MangaReadPage() {
           thumbnails: [detail.cover].filter(Boolean),
           isAdult,
           sessionId: discordSessionRef.current,
-        }),
-      }).catch(() => {})
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: discordSessionRef.current }),
-      }).catch(() => {})
+        })
+        .catch(() => {})
+      trpcClient.discord.heartbeat.mutate({ sessionId: discordSessionRef.current }).catch(() => {})
     }
     send()
     const timer = window.setInterval(send, 60000)

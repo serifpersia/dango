@@ -4,6 +4,7 @@ import Icon from '../components/common/Icon'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useToggleTvBookmark, useTvLibraryCheck } from '../hooks/useTvLibrary'
+import { trpcClient } from '../lib/trpc'
 import { buildTvId, normalizeTvMediaType, tvWatchPath } from '../lib/tv'
 import styles from './TvInfo.module.css'
 
@@ -59,13 +60,23 @@ export default function TvInfo() {
     if (!tmdbId) return
     setLoading(true)
     setError('')
-    fetch(`/api/tv/details/${type}/${tmdbId}`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed to load details')
-        return r.json()
-      })
-      .then((data: TvDetails) => {
-        setDetails(data)
+    trpcClient.tv.details
+      .query({ type, id: String(tmdbId) })
+      .then((data) => {
+        const mapped: TvDetails = {
+          id: data.id,
+          title: data.title || '',
+          overview: data.overview || '',
+          vote_average: data.vote_average,
+          year: data.year,
+          poster: data.poster,
+          backdrop: data.backdrop,
+          imdb_id: data.imdb_id || undefined,
+          adult: data.adult,
+          seasons: data.seasons?.map((s) => ({ ...s, name: '' })),
+          number_of_seasons: data.number_of_seasons,
+        }
+        setDetails(mapped)
         setLoading(false)
       })
       .catch((e) => {

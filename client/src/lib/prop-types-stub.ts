@@ -1,12 +1,3 @@
-// Minimal runtime stub for the `prop-types` package.
-//
-// `react-simple-maps` (used only by the /map page) still does
-// `import PropTypes from 'prop-types'` for legacy runtime checks.
-// We deliberately do not ship the real `prop-types` dependency:
-// our code is strict TypeScript and never uses it directly.
-// This stub provides no-op validators so the legacy import resolves
-// at bundle time without pulling an unneeded dependency.
-
 interface PropTypesValidator {
   (...args: unknown[]): null
   isRequired: PropTypesValidator

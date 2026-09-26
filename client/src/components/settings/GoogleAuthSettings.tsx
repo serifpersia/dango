@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
+import { trpcClient } from '../../lib/trpc'
 import styles from './GoogleAuthSettings.module.css'
 
 interface User {
@@ -30,9 +31,8 @@ const GoogleAuthSettings: React.FC = () => {
 
   const fetchUser = async () => {
     try {
-      const res = await fetch('/api/auth/user')
-      const userData = await res.json()
-      setUser(userData?.email ? userData : null)
+      const userData = await trpcClient.auth.user.query()
+      setUser(userData?.email ? (userData as User) : null)
     } catch {
       setUser(null)
     }
@@ -40,12 +40,10 @@ const GoogleAuthSettings: React.FC = () => {
 
   const fetchStatus = async () => {
     try {
-      const [configRes, authRes] = await Promise.all([
-        fetch('/api/auth/config-status'),
-        fetch('/api/auth/google-auth'),
+      const [config, auth] = await Promise.all([
+        trpcClient.auth.configStatus.query(),
+        trpcClient.auth.googleAuth.query(),
       ])
-      const config = await configRes.json()
-      const auth = await authRes.json()
       setHasAuthConfig(!!config.hasConfig)
       setHasOverride(!!(auth.hasCustomWorkerUrl || auth.hasCustomClientId || auth.hasClientSecret))
     } catch (error) {
@@ -89,8 +87,7 @@ const GoogleAuthSettings: React.FC = () => {
 
   const handleSignIn = async () => {
     try {
-      const res = await fetch('/api/auth/google/login', { method: 'POST' })
-      const data = await res.json()
+      const data = await trpcClient.auth.googleLogin.mutate()
 
       if (data.authenticated) {
         window.location.reload()
@@ -128,7 +125,7 @@ const GoogleAuthSettings: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await trpcClient.auth.logout.mutate()
       setUser(null)
       setStatusModal({ show: true, message: 'Successfully signed out.', type: 'success' })
       window.location.reload()
@@ -141,12 +138,7 @@ const GoogleAuthSettings: React.FC = () => {
   const handleSaveOverride = async () => {
     setSaving(true)
     try {
-      const res = await fetch('/api/auth/google-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerUrl, clientId, clientSecret }),
-      })
-      if (!res.ok) throw new Error('save failed')
+      await trpcClient.auth.saveGoogleAuth.mutate({ workerUrl, clientId, clientSecret })
       setWorkerUrl('')
       setClientId('')
       setClientSecret('')
@@ -166,11 +158,7 @@ const GoogleAuthSettings: React.FC = () => {
   const handleClearOverride = async () => {
     setSaving(true)
     try {
-      await fetch('/api/auth/google-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerUrl: '', clientId: '', clientSecret: '' }),
-      })
+      await trpcClient.auth.saveGoogleAuth.mutate({ workerUrl: '', clientId: '', clientSecret: '' })
       setWorkerUrl('')
       setClientId('')
       setClientSecret('')

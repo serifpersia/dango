@@ -15,7 +15,7 @@ import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
 import DiscordRolesSettings from '../components/settings/DiscordRolesSettings'
 import Icon from '../components/common/Icon'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
@@ -67,8 +67,8 @@ const Settings: React.FC = () => {
   )
 
   useEffect(() => {
-    fetch('/api/installation-id')
-      .then((res) => res.json())
+    trpcClient.settings.installationId
+      .query()
       .then((data) => {
         if (data.id) {
           setInstallationId(data.id)
@@ -79,10 +79,10 @@ const Settings: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    fetchApi('/api/discord-roles-config')
+    trpcClient.discord.rolesConfig
+      .query()
       .then((d) => {
-        if ((d as { workerUrl?: string }).workerUrl)
-          setDiscordRolesWorkerUrl((d as { workerUrl: string }).workerUrl)
+        if (d.workerUrl) setDiscordRolesWorkerUrl(d.workerUrl)
       })
       .catch(() => {})
   }, [])
@@ -103,8 +103,8 @@ const Settings: React.FC = () => {
   } | null>(null)
 
   useEffect(() => {
-    fetch('/api/discord/gateway/status')
-      .then((res) => res.json())
+    trpcClient.discord.gatewayStatus
+      .query()
       .then((data) => {
         setDiscordGatewayStatus(data)
         if (data.masked && data.masked !== 'none') {
@@ -454,21 +454,18 @@ const Settings: React.FC = () => {
                     variant="primary"
                     size="sm"
                     onClick={async () => {
-                      const res = await fetch('/api/discord/gateway/save', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token: discordGatewayToken }),
-                      })
-                      const data = await res.json()
-                      if (res.ok) {
+                      try {
+                        const data = await trpcClient.discord.gatewaySave.mutate({
+                          token: discordGatewayToken,
+                        })
                         setDiscordGatewayStatus({
                           hasToken: true,
                           masked: data.masked,
                           enabled: true,
                         })
                         setDiscordGatewayToken(data.masked)
-                      } else {
-                        alert(data.error || 'Failed to save token')
+                      } catch (e) {
+                        alert(e instanceof Error ? e.message : 'Failed to save token')
                       }
                     }}
                   >
@@ -478,7 +475,7 @@ const Settings: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     onClick={async () => {
-                      await fetch('/api/discord/gateway/remove', { method: 'POST' })
+                      await trpcClient.discord.gatewayRemove.mutate().catch(() => {})
                       setDiscordGatewayToken('')
                       setDiscordGatewayStatus({ hasToken: false, masked: null, enabled: false })
                     }}

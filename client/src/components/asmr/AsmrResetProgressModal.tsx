@@ -21,7 +21,7 @@ const AsmrResetProgressModal: React.FC<AsmrResetProgressModalProps> = ({
     if (!workId) return
     removeProgress.mutate({ workId })
     if (alsoRemoveFromList) {
-      removeBookmark.mutate(workId)
+      removeBookmark.mutate({ id: workId })
     }
     setAlsoRemoveFromList(false)
     onClose()

@@ -8,7 +8,6 @@ export const fixThumbnailUrl = (
 ): string => {
   if (!url || url.trim() === '') return '/placeholder.svg'
 
-  // If it's already a full proxy URL, just handle dimensions
   if (url.includes('/api/image-proxy')) {
     let finalUrl = url
     if (width && !finalUrl.includes('w=')) {

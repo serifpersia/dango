@@ -37,8 +37,6 @@ export type AnimeSyncPayload = SyncPayload<SyncTable>
 export type MangaSyncPayload = SyncPayload<MangaSyncTable>
 export type TvSyncPayload = SyncPayload<TvSyncTable>
 export type AsmrSyncPayload = SyncPayload<AsmrSyncTable>
-// anime_id_map (offline MAL<->AniList metadata) is intentionally local-only:
-// it is rebuilt weekly from the upstream JSON dump and never synced.
 
 async function exportSyncPayload(db: DatabaseWrapper): Promise<AnimeSyncPayload> {
   return exportTables(db, SYNC_TABLES)

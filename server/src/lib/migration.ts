@@ -10,20 +10,16 @@ import logger from '../logger.js'
 const inFlightMigrations = new Map<string, Promise<string>>()
 
 async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): Promise<string> {
-  // Check if this numeric ID might be a MAL alias that should redirect to the canonical AniList ID
   const metaRow = dbGet<{ anilistId: number | null }>(
     db,
     'SELECT anilistId FROM shows_meta WHERE id = ? AND anilistId IS NOT NULL',
     [numericId]
   )
 
-  // Determine the true anilistId for this numeric ID
   let trueAnilistId: number | undefined
   if (metaRow?.anilistId != null && String(metaRow.anilistId) !== numericId) {
-    // shows_meta already has a different anilistId — this is clearly a MAL alias
     trueAnilistId = metaRow.anilistId
   } else if (!metaRow) {
-    // No local shows_meta — only verify via AniList if there's existing data that could be a MAL alias
     if (await WatchlistRepository.exists(db, numericId)) {
       const meta = await getShowMetaById(numericId)
       if (meta?.anilistId && meta.anilistId !== parseInt(numericId)) {
@@ -35,7 +31,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
   if (trueAnilistId) {
     const canonicalId = String(trueAnilistId)
     if (await WatchlistRepository.exists(db, numericId)) {
-      // MAL alias is in the watchlist — migrate all entries to the canonical AniList ID
       logger.info(
         { aliasId: numericId, canonicalId },
         'Migrating watchlist from MAL alias to canonical ID'
@@ -86,7 +81,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
       return canonicalId
     }
 
-    // Not in watchlist — check if canonical ID is in the watchlist and save a mapping
     if (await WatchlistRepository.exists(db, canonicalId)) {
       const existing = dbGet<{ numericId: string }>(
         db,
@@ -109,7 +103,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
 
   let legacyId: string | undefined
 
-  // 1. Check legacy_id_mapping for a legacy ID in the watchlist that maps to this numeric ID
   const legacyRow = dbGet<{ legacyId: string }>(
     db,
     'SELECT legacyId FROM legacy_id_mapping WHERE numericId = ? AND legacyId IN (SELECT id FROM watchlist)',
@@ -119,7 +112,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
     legacyId = legacyRow.legacyId
   }
 
-  // 2. If not found, check shows_meta by anilistId where the entry's id IS in the watchlist
   if (!legacyId && trueAnilistId) {
     const metaByAnilist = dbGet<{ id: string }>(
       db,
@@ -186,7 +178,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
   }
 
   try {
-    // 1. Check if mapping already exists
     const mapping = dbGet<{ numericId: string }>(
       db,
       'SELECT numericId FROM legacy_id_mapping WHERE legacyId = ?',
@@ -254,10 +245,8 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       return canonicalId
     }
 
-    // 2. We need to find the title/name of the show
     let showName: string | undefined
 
-    // Try shows_meta by direct ID or anilistId
     const localMeta = (await ShowsMetaRepository.getById(db, legacyId)) as {
       name?: string
       anilistId?: number
@@ -273,7 +262,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       if (metaByAnilist && metaByAnilist.name) {
         showName = metaByAnilist.name
       } else {
-        // Try watchlist
         const watchlistEntry = await WatchlistRepository.getById(db, legacyId)
         if (watchlistEntry && watchlistEntry.name) {
           showName = watchlistEntry.name
@@ -286,7 +274,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       return legacyId
     }
 
-    // 3. Search AniList by title
     const aniListShow = await searchAnilistByTitle(showName)
     if (!aniListShow) {
       logger.warn({ id: legacyId, showName }, 'No AniList match found for legacy ID migration')
@@ -303,7 +290,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       newThumbnail = undefined
     }
 
-    // 4. Perform the DB updates across all tables atomically
     await performWriteTransactionAsync(db, async (tx) => {
       tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
         legacyId,

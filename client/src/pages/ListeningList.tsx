@@ -143,11 +143,11 @@ export default function ListeningList() {
       skipConfirmKey="asmrSkipRemoveConfirmation"
       onBulkStatus={(ids, status) => bulkUpdateStatus.mutate({ ids, status })}
       onBulkRemove={(ids) => {
-        if (isCL) bulkResetProgress.mutate(ids)
-        else bulkRemove.mutate(ids)
+        if (isCL) bulkResetProgress.mutate({ ids })
+        else bulkRemove.mutate({ ids })
       }}
       onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
-      onRemoveItem={(libId) => removeBookmark.mutate(libId)}
+      onRemoveItem={(libId) => removeBookmark.mutate({ id: libId })}
       renderCard={(entry) => (
         <MediaCard
           item={{

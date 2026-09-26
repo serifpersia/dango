@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
 import type { MusicTrack } from '../../hooks/useMusic'
+import { trpcClient } from '../../lib/trpc'
 import styles from '../asmr/Asmr.module.css'
 import radioStyles from '../radio/Radio.module.css'
 
@@ -154,10 +155,8 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const sendMusicPresence = React.useCallback(
     (playing: boolean) => {
       const audio = audioRef.current
-      fetch('/api/discord/music', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      trpcClient.discord.musicPresence
+        .mutate({
           title: track.title,
           artistLabel: track.artists,
           isPlaying: playing,
@@ -165,13 +164,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
           currentTime: audio?.currentTime ?? 0,
           duration: Number.isFinite(audio?.duration ?? NaN) ? audio?.duration : 0,
           sessionId: sessionIdRef.current,
-        }),
-      }).catch(() => {})
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sessionIdRef.current }),
-      }).catch(() => {})
+        })
+        .catch(() => {})
+      trpcClient.discord.heartbeat.mutate({ sessionId: sessionIdRef.current }).catch(() => {})
     },
     [track, cover]
   )

@@ -1,0 +1,231 @@
+import { TRPCError } from '@trpc/server'
+import { protectedProcedure, router } from '../index.js'
+import type { DatabaseWrapper } from '../../db.js'
+import { performTvWriteTransactionAsync } from '../../sync.js'
+import { dbAll } from '../../utils/db-utils.js'
+import { SettingsRepository } from '../../repositories/settings.repository.js'
+import {
+  normalizeTvMediaId,
+  TvLibraryRepository,
+  TvProgressRepository,
+} from '../../repositories/tv.repository.js'
+import { defineSchema, reqObj, reqStr } from '../validation.js'
+
+const isTvContinueAdult = (row: { adult?: boolean | number | null }) =>
+  row.adult === true || row.adult === 1
+
+async function getAdultNonListMediaIds(db: DatabaseWrapper): Promise<string[]> {
+  const rows = await dbAll<{ mediaId: string }>(
+    db,
+    `SELECT DISTINCT p.mediaId as mediaId
+       FROM tv_progress p
+       LEFT JOIN tv_library l ON l.id = p.mediaId
+       WHERE COALESCE(l.adult, p.adult) = 1
+         AND l.id IS NULL`
+  )
+  return rows.map((r) => r.mediaId)
+}
+
+export type TvProgressMediaInput = { mediaId: string }
+
+const tvProgressMediaInput = () =>
+  defineSchema<TvProgressMediaInput, TvProgressMediaInput>((value) => ({
+    mediaId: reqStr(reqObj(value), 'mediaId'),
+  }))
+
+export type TvProgressLatestInput = { mediaId: string; season?: unknown; episode?: unknown }
+
+const tvProgressLatestInput = () =>
+  defineSchema<TvProgressLatestInput, TvProgressLatestInput>((value) => {
+    const obj = reqObj(value)
+    return { mediaId: reqStr(obj, 'mediaId'), season: obj.season, episode: obj.episode }
+  })
+
+export type TvProgressSaveInput = {
+  mediaId: string
+  season?: unknown
+  episode?: unknown
+  currentTime?: unknown
+  duration?: unknown
+  completed?: unknown
+  title?: unknown
+  poster?: unknown
+  backdrop?: unknown
+  year?: unknown
+  overview?: unknown
+  tmdbId?: unknown
+  mediaType?: unknown
+  adult?: unknown
+}
+
+const tvProgressSaveInput = () =>
+  defineSchema<TvProgressSaveInput, TvProgressSaveInput>((value) => {
+    const obj = reqObj(value)
+    return {
+      mediaId: reqStr(obj, 'mediaId'),
+      season: obj.season,
+      episode: obj.episode,
+      currentTime: obj.currentTime,
+      duration: obj.duration,
+      completed: obj.completed,
+      title: obj.title ?? null,
+      poster: obj.poster ?? null,
+      backdrop: obj.backdrop ?? null,
+      year: obj.year ?? null,
+      overview: obj.overview ?? null,
+      tmdbId: obj.tmdbId ?? null,
+      mediaType: obj.mediaType ?? null,
+      adult: obj.adult ?? null,
+    }
+  })
+
+export type TvProgressRemoveInput = { mediaId: string; season?: unknown; episode?: unknown }
+
+const tvProgressRemoveInput = () =>
+  defineSchema<TvProgressRemoveInput, TvProgressRemoveInput>((value) => {
+    const obj = reqObj(value)
+    return { mediaId: reqStr(obj, 'mediaId'), season: obj.season, episode: obj.episode }
+  })
+
+const tvProgressRemoveManyInput = () =>
+  defineSchema<string[], string[]>((value) => {
+    if (!Array.isArray(value) || value.length === 0)
+      throw new Error('ids must be a non-empty array')
+    return value.map((id) => String(id))
+  })
+
+export type TvContinueWatchingInput = { limit?: number }
+
+const tvContinueWatchingInput = () =>
+  defineSchema<TvContinueWatchingInput, TvContinueWatchingInput>((value) => {
+    const obj = reqObj(value)
+    const out: TvContinueWatchingInput = {}
+    if (obj.limit !== undefined && obj.limit !== null && obj.limit !== '') {
+      const limit = Number(obj.limit)
+      if (Number.isFinite(limit)) out.limit = limit
+    }
+    return out
+  })
+
+export const tvProgressRouter = router({
+  getByMedia: protectedProcedure.input(tvProgressMediaInput()).query(async ({ ctx, input }) => {
+    const rows = await TvProgressRepository.getByMedia(ctx.tvDb, normalizeTvMediaId(input.mediaId))
+    return { progress: rows }
+  }),
+
+  latest: protectedProcedure.input(tvProgressLatestInput()).query(async ({ ctx, input }) => {
+    const mediaId = normalizeTvMediaId(input.mediaId)
+    const season = parseInt(String(input.season), 10)
+    const episode = parseInt(String(input.episode), 10)
+    if (Number.isFinite(season) && Number.isFinite(episode)) {
+      const row = await TvProgressRepository.getEpisode(ctx.tvDb, mediaId, season, episode)
+      return row || { currentTime: 0, duration: 0, completed: 0 }
+    }
+    const row = await TvProgressRepository.getLatest(ctx.tvDb, mediaId)
+    return row || { currentTime: 0, duration: 0, completed: 0 }
+  }),
+
+  save: protectedProcedure.input(tvProgressSaveInput()).mutation(async ({ ctx, input }) => {
+    const mediaId = normalizeTvMediaId(input.mediaId)
+    if (!mediaId) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'mediaId is required' })
+    }
+    const seasonNum = Math.max(Number(input.season) || 1, 1)
+    const episodeNum = Math.max(Number(input.episode) || 1, 1)
+    const timeNum = Math.max(Number(input.currentTime) || 0, 0)
+    const durationNum = Math.max(Number(input.duration) || 0, 0)
+    const clampedTime = durationNum > 0 ? Math.min(timeNum, durationNum) : timeNum
+    const storedTime =
+      durationNum > 0 && clampedTime >= durationNum * 0.8 ? durationNum : clampedTime
+    const completedNow =
+      Number(input.completed) === 1 || (durationNum > 0 && storedTime >= durationNum * 0.8) ? 1 : 0
+    await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
+      await TvProgressRepository.upsert(tx, {
+        mediaId: String(mediaId),
+        season: Math.round(seasonNum),
+        episode: Math.round(episodeNum),
+        currentTime: storedTime,
+        duration: durationNum,
+        completed: completedNow,
+        title: (input.title ?? null) as string | null,
+        poster: (input.poster ?? null) as string | null,
+        backdrop: (input.backdrop ?? null) as string | null,
+        year: (input.year ?? null) as string | null,
+        overview: (input.overview ?? null) as string | null,
+        tmdbId: input.tmdbId != null ? Number(input.tmdbId) : null,
+        mediaType: (input.mediaType ?? null) as string | null,
+        adult: input.adult != null ? Number(input.adult) : null,
+      })
+      await TvLibraryRepository.touchProgress(tx, String(mediaId), {
+        season: Math.round(seasonNum),
+        episode: Math.round(episodeNum),
+      })
+    })
+    return { success: true }
+  }),
+
+  remove: protectedProcedure.input(tvProgressRemoveInput()).mutation(async ({ ctx, input }) => {
+    const mediaId = normalizeTvMediaId(input.mediaId)
+    if (!mediaId) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'mediaId is required' })
+    }
+    await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
+      if (input.season !== undefined && input.episode !== undefined) {
+        await TvProgressRepository.deleteEpisode(
+          tx,
+          String(mediaId),
+          Number(input.season),
+          Number(input.episode)
+        )
+      } else {
+        await TvProgressRepository.deleteByMedia(tx, String(mediaId))
+      }
+    })
+    return { success: true }
+  }),
+
+  removeMany: protectedProcedure
+    .input(tvProgressRemoveManyInput())
+    .mutation(async ({ ctx, input }) => {
+      const ids = input.map((id) => normalizeTvMediaId(id))
+      await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
+        await TvProgressRepository.deleteMany(tx, ids)
+      })
+      return { success: true, removed: ids.length }
+    }),
+
+  continueWatching: protectedProcedure
+    .input(tvContinueWatchingInput())
+    .query(async ({ ctx, input }) => {
+      const limit = Math.min(Math.max(parseInt(String(input.limit ?? 24)) || 24, 1), 100)
+      const ignoreAdultRow = await SettingsRepository.getByKey(ctx.db, 'tvIgnoreAdultContent')
+      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
+      const listOnlyRow = await SettingsRepository.getByKey(ctx.db, 'tvCwWatchlistOnly')
+      const listOnly = listOnlyRow
+        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
+        : false
+      const rows = (await TvProgressRepository.getContinueWatching(ctx.tvDb, limit)).filter(
+        (row) => {
+          if (ignoreAdult && isTvContinueAdult(row)) return false
+          if (listOnly && row.watchlistStatus !== 'Watching') return false
+          return true
+        }
+      )
+      return { data: rows, total: rows.length }
+    }),
+
+  adultCount: protectedProcedure.query(async ({ ctx }) => {
+    const ids = await getAdultNonListMediaIds(ctx.tvDb)
+    return { count: ids.length }
+  }),
+
+  purgeAdult: protectedProcedure.mutation(async ({ ctx }) => {
+    const ids = await getAdultNonListMediaIds(ctx.tvDb)
+    if (ids.length > 0) {
+      await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
+        for (const id of ids) await TvProgressRepository.deleteByMedia(tx, id)
+      })
+    }
+    return { success: true, removed: ids.length }
+  }),
+})

@@ -1,6 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
+import { useTRPC } from '../lib/trpc'
 
 export interface Anime {
   _id: string
@@ -47,17 +48,17 @@ export interface QueueItem {
 }
 
 export const useTrendingAnime = () => {
-  return useQuery<Anime[]>({
-    queryKey: ['trending'],
-    queryFn: () => fetchApi('/api/trending'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.trending.queryOptions(),
     staleTime: 1000 * 60 * 5,
   })
 }
 
 export const useSpotlightBanners = () => {
-  return useQuery<Anime[]>({
-    queryKey: ['spotlight'],
-    queryFn: () => fetchApi('/api/spotlight'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.spotlight.queryOptions(),
     staleTime: 1000 * 60 * 5,
     retry: 1,
   })
@@ -70,9 +71,9 @@ export interface BatchedHomeData {
 }
 
 export const useBatchedHome = (format: string = 'TV') => {
-  return useQuery<BatchedHomeData>({
-    queryKey: ['batchedHome', format],
-    queryFn: () => fetchApi(`/api/home?format=${format}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.home.queryOptions({ format }),
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -81,7 +82,11 @@ export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: nu
   return useInfiniteQuery<Anime[]>({
     queryKey: ['trendingList', sort, size],
     queryFn: ({ pageParam = 1 }) =>
-      fetchApi(`/api/popular-list?sort=${sort}&page=${pageParam as number}&size=${size}`),
+      trpcClient.data.popularList.query({
+        sort,
+        page: pageParam as number,
+        size,
+      }) as Promise<Anime[]>,
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length >= size ? allPages.length + 1 : undefined
@@ -90,9 +95,9 @@ export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: nu
 }
 
 export const useLatestReleases = (format: string = 'TV') => {
-  return useQuery<Anime[]>({
-    queryKey: ['latestReleases', format],
-    queryFn: () => fetchApi(`/api/latest-releases?format=${format}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.latestReleases.queryOptions({ format }),
   })
 }
 
@@ -100,7 +105,11 @@ export const useInfiniteLatestReleases = (format: string = 'TV', size: number = 
   return useInfiniteQuery<Anime[]>({
     queryKey: ['latestReleases', format, size],
     queryFn: ({ pageParam = 1 }) =>
-      fetchApi(`/api/latest-releases?format=${format}&page=${pageParam as number}&size=${size}`),
+      trpcClient.data.latestReleases.query({
+        format,
+        page: pageParam as number,
+        size,
+      }) as Promise<Anime[]>,
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length >= size ? allPages.length + 1 : undefined
@@ -111,7 +120,8 @@ export const useInfiniteLatestReleases = (format: string = 'TV', size: number = 
 export const useCurrentSeason = (format: string = 'ALL') => {
   return useInfiniteQuery({
     queryKey: ['currentSeason', format],
-    queryFn: ({ pageParam = 1 }) => fetchApi(`/api/seasonal?format=${format}&page=${pageParam}`),
+    queryFn: ({ pageParam = 1 }) =>
+      trpcClient.data.seasonal.query({ format, page: pageParam as number }),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length > 0 ? allPages.length + 1 : undefined
@@ -124,209 +134,200 @@ export const usePaginatedCurrentSeason = (
   format: string = 'TV',
   enabled: boolean = true
 ) => {
-  return useQuery<Anime[]>({
-    queryKey: ['currentSeason', page, format],
-    queryFn: () => fetchApi(`/api/seasonal?page=${page}&format=${format}&size=14`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.seasonal.queryOptions({ page, format }),
     enabled,
     staleTime: 1000 * 60 * 5,
   })
 }
+
+const SEARCH_PARAMS = [
+  'query',
+  'sortBy',
+  'type',
+  'status',
+  'season',
+  'year',
+  'country',
+  'genres',
+  'excludeGenres',
+  'excludeTags',
+  'minScore',
+  'minEpisodes',
+  'adult',
+] as const
 
 export const usePaginatedSearchAnime = (
   searchQueryString: string,
   page: number,
   limit: number = 14
 ) => {
-  return useQuery<Anime[]>({
-    queryKey: ['searchAnime', searchQueryString, page, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams(searchQueryString)
-      params.set('page', page.toString())
-      params.set('limit', limit.toString())
-      return fetchApi(`/api/search?${params.toString()}`)
-    },
+  const trpc = useTRPC()
+  const params = new URLSearchParams(searchQueryString)
+  const input: {
+    page: number
+    limit: number
+    query?: string
+    sortBy?: string
+    type?: string
+    status?: string
+    season?: string
+    year?: string
+    country?: string
+    genres?: string
+    excludeGenres?: string
+    excludeTags?: string
+    minScore?: string
+    minEpisodes?: string
+    adult?: string
+  } = { page, limit }
+  for (const key of SEARCH_PARAMS) {
+    const value = params.get(key)
+    if (value !== null) (input as Record<string, string | number>)[key] = value
+  }
+  return useQuery({
+    ...trpc.data.search.queryOptions(input),
     enabled: searchQueryString != null,
   })
 }
 
 export const useQueue = () => {
-  return useQuery<QueueItem[]>({
-    queryKey: ['queue'],
-    queryFn: () => fetchApi('/api/queue'),
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.queue.list.queryOptions())
 }
 
 export const useAddToQueue = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (item: {
-      showId: string
-      episodeNumber: string
-      showName?: string
-      showThumbnail?: string
-      nativeName?: string
-      englishName?: string
-      type?: string
-    }) => {
-      return fetchApi('/api/queue/add', {
-        method: 'POST',
-        body: JSON.stringify(item),
-      }) as Promise<{ success: boolean; queued: boolean }>
-    },
-    onSuccess: (data) => {
-      if (data.queued) {
-        toast.success('Added to queue')
-      } else {
-        toast.success('Removed from queue')
-      }
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update queue: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.queue.add.mutationOptions({
+      onSuccess: (data) => {
+        if (data.queued) {
+          toast.success('Added to queue')
+        } else {
+          toast.success('Removed from queue')
+        }
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to update queue: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useRemoveFromQueue = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (item: { showId: string; episodeNumber: string }) => {
-      await fetchApi('/api/queue/remove', {
-        method: 'POST',
-        body: JSON.stringify(item),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Removed from queue')
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.queue.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success('Removed from queue')
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useQueueRemainingEpisodes = (showId?: string, enabled: boolean = true) => {
   return useQuery<{ showId: string; episodes: string[] }>({
     queryKey: ['queue-remaining', showId],
-    queryFn: () => fetchApi(`/api/queue/remaining/${showId}`),
+    queryFn: () => trpcClient.watchlist.queueRemaining.query({ showId: showId as string }),
     enabled: !!showId && enabled,
     staleTime: 1000 * 60,
   })
 }
 
-export interface QueueAddPayload {
-  showId: string
-  showName?: string
-  showThumbnail?: string
-  nativeName?: string
-  englishName?: string
-  type?: string
-}
-
 export const useAddToQueueBatch = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      episodeNumbers,
-      ...meta
-    }: QueueAddPayload & { episodeNumbers: string[] }) => {
-      return fetchApi('/api/queue/batch', {
-        method: 'POST',
-        body: JSON.stringify({ ...meta, episodeNumbers }),
-      }) as Promise<{ success: boolean; added: number }>
-    },
-    onSuccess: (data, variables) => {
-      const count = data.added ?? variables.episodeNumbers.length
-      toast.success(`${count} ${count === 1 ? 'episode' : 'episodes'} added to queue`)
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update queue: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.queue.addBatch.mutationOptions({
+      onSuccess: (data, variables) => {
+        const count = data.added ?? variables.episodeNumbers.length
+        toast.success(`${count} ${count === 1 ? 'episode' : 'episodes'} added to queue`)
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to update queue: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useRemoveFromQueueBatch = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      showId,
-      episodeNumbers,
-    }: {
-      showId: string
-      episodeNumbers?: string[]
-    }) => {
-      await fetchApi('/api/queue/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ showId, episodeNumbers }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Removed from queue')
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.queue.removeMany.mutationOptions({
+      onSuccess: () => {
+        toast.success('Removed from queue')
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useClearQueue = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      await fetchApi('/api/queue/clear', { method: 'POST' })
-    },
-    onSuccess: () => {
-      toast.success('Queue cleared')
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to clear queue: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.queue.clear.mutationOptions({
+      onSuccess: () => {
+        toast.success('Queue cleared')
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to clear queue: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useReorderQueue = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (items: Pick<QueueItem, 'id' | 'showId' | 'episodeNumber'>[]) => {
-      await fetchApi('/api/queue/reorder', {
-        method: 'POST',
-        body: JSON.stringify({ items }),
-      })
-    },
-    onMutate: async (items) => {
-      await queryClient.cancelQueries({ queryKey: ['queue'] })
-      const previousQueue = queryClient.getQueryData<QueueItem[]>(['queue'])
-      queryClient.setQueryData<QueueItem[]>(['queue'], (old) => {
-        if (!old) return old
-        const byId = new Map(old.map((item) => [item.id, item]))
-        return items
-          .map((item, index) => {
-            const existing = byId.get(item.id)
-            return existing ? { ...existing, queue_order: index } : undefined
-          })
-          .filter((item): item is QueueItem => !!item)
-      })
-      return { previousQueue }
-    },
-    onError: (_error, _items, context) => {
-      if (context?.previousQueue) queryClient.setQueryData(['queue'], context.previousQueue)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['queue'] })
-    },
-  })
+  const listKey = trpc.queue.list.queryOptions().queryKey
+  return useMutation(
+    trpc.queue.reorder.mutationOptions({
+      onMutate: async (items) => {
+        await queryClient.cancelQueries({ queryKey: listKey })
+        const previousQueue = queryClient.getQueryData<QueueItem[]>(listKey)
+        queryClient.setQueryData<QueueItem[]>(listKey, (old) => {
+          if (!old) return old
+          const byId = new Map(old.map((item) => [item.id, item]))
+          return items
+            .map((item, index) => {
+              const existing = byId.get(item.id ?? -1)
+              return existing ? { ...existing, queue_order: index } : undefined
+            })
+            .filter((item): item is QueueItem => !!item)
+        })
+        return { previousQueue }
+      },
+      onError: (_error, _items, context) => {
+        if (context?.previousQueue) queryClient.setQueryData(listKey, context.previousQueue)
+      },
+      onSettled: () => {
+        void queryClient.invalidateQueries(trpc.queue.pathFilter())
+      },
+    })
+  )
 }
 
 interface PaginatedAnimeResponse {
@@ -336,6 +337,44 @@ interface PaginatedAnimeResponse {
   limit: number
 }
 
+const LIST_PARAMS = [
+  'status',
+  'showMature',
+  'query',
+  'type',
+  'season',
+  'year',
+  'genres',
+  'excludeGenres',
+  'sortBy',
+  'titlePreference',
+] as const
+
+type ListFilterInput = {
+  status?: string
+  showMature?: string
+  query?: string
+  type?: string
+  season?: string
+  year?: string
+  genres?: string
+  excludeGenres?: string
+  sortBy?: string
+  titlePreference?: string
+  page?: number
+  limit?: number
+}
+
+function parseListFilters(filters: string, page: number, limit: number): ListFilterInput {
+  const params = new URLSearchParams(filters)
+  const input: ListFilterInput = { page, limit }
+  for (const key of LIST_PARAMS) {
+    const value = params.get(key)
+    if (value !== null) (input as Record<string, string | number>)[key] = value
+  }
+  return input
+}
+
 export const useInfiniteWatchlist = (status: string, filters: string = '') => {
   return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: unknown[] }>(
     {
@@ -343,10 +382,10 @@ export const useInfiniteWatchlist = (status: string, filters: string = '') => {
       queryFn: async ({ pageParam = 1 }) => {
         const params = new URLSearchParams(filters)
         params.set('status', status)
-        params.set('page', String(pageParam))
-        params.set('limit', '14')
-        const response = await fetchApi(`/api/watchlist?${params.toString()}`)
-        return response
+        const response = await trpcClient.watchlist.list.query(
+          parseListFilters(params.toString(), pageParam as number, 14)
+        )
+        return response as unknown as PaginatedAnimeResponse
       },
       initialPageParam: 1,
       getNextPageParam: (lastPage) => {
@@ -374,9 +413,10 @@ export const usePaginatedWatchlist = (
     queryFn: async () => {
       const params = new URLSearchParams(filters)
       params.set('status', status)
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      return fetchApi(`/api/watchlist?${params.toString()}`)
+      const response = await trpcClient.watchlist.list.query(
+        parseListFilters(params.toString(), page, limit)
+      )
+      return response as unknown as PaginatedAnimeResponse
     },
   })
 }
@@ -386,11 +426,10 @@ export const useAllContinueWatching = (filters: string = '') => {
     {
       queryKey: ['allContinueWatching', filters],
       queryFn: async ({ pageParam = 1 }) => {
-        const params = new URLSearchParams(filters)
-        params.set('page', String(pageParam))
-        params.set('limit', '14')
-        const response = await fetchApi(`/api/continue-watching/all?${params.toString()}`)
-        return response
+        const response = await trpcClient.watchlist.continueWatchingAll.query(
+          parseListFilters(filters, pageParam as number, 14)
+        )
+        return response as unknown as PaginatedAnimeResponse
       },
       initialPageParam: 1,
       getNextPageParam: (lastPage) => {
@@ -415,92 +454,84 @@ export const usePaginatedAllContinueWatching = (
   return useQuery<PaginatedAnimeResponse>({
     queryKey: ['allContinueWatching', filters, page, limit],
     queryFn: async () => {
-      const params = new URLSearchParams(filters)
-      params.set('page', String(page))
-      params.set('limit', String(limit))
-      return fetchApi(`/api/continue-watching/all?${params.toString()}`)
+      const response = await trpcClient.watchlist.continueWatchingAll.query(
+        parseListFilters(filters, page, limit)
+      )
+      return response as unknown as PaginatedAnimeResponse
     },
   })
 }
 
 export const useRemoveFromWatchlist = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (showId: string) => {
-      await fetchApi(`/api/watchlist/remove`, {
-        method: 'POST',
-        body: JSON.stringify({ id: showId }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Removed from watchlist')
-      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
-    },
-    onError: (error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.watchlist.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success('Removed from watchlist')
+        void queryClient.invalidateQueries(trpc.watchlist.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchUpdateWatchlistStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      return fetchApi('/api/watchlist/batch-status', {
-        method: 'POST',
-        body: JSON.stringify({ ids, status }),
-      }) as Promise<{ success: boolean; updated: number }>
-    },
-    onSuccess: (data) => {
-      toast.success(`Status updated for ${data.updated ?? 0} items`)
-      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update statuses: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.watchlist.batchStatus.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(`Status updated for ${data.updated ?? 0} items`)
+        void queryClient.invalidateQueries(trpc.watchlist.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to update statuses: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveFromWatchlist = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/watchlist/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from watchlist`)
-      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.watchlist.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from watchlist`)
+        void queryClient.invalidateQueries(trpc.watchlist.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveFromContinueWatching = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/continue-watching/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from continue watching`)
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.continueWatching.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from continue watching`)
+        void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export interface Notification {
@@ -523,18 +554,18 @@ export interface SystemNotification {
 }
 
 export const useNotifications = (enabled: boolean = true) => {
-  return useQuery<Notification[]>({
-    queryKey: ['notifications'],
-    queryFn: () => fetchApi('/api/notifications'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.notifications.list.queryOptions(),
     enabled,
     refetchInterval: 30000,
   })
 }
 
 export const useSystemNotifications = (enabled: boolean = true) => {
-  return useQuery<SystemNotification[]>({
-    queryKey: ['system-notifications'],
-    queryFn: () => fetchApi('/api/system-notifications'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.systemNotifications.queryOptions(),
     enabled,
     refetchInterval: 30000,
   })
@@ -549,9 +580,9 @@ export interface DiscoveryStatus {
 }
 
 export const useDiscoveryStatus = (enabled: boolean = true) => {
-  return useQuery<DiscoveryStatus>({
-    queryKey: ['discovery-status'],
-    queryFn: () => fetchApi('/api/discovery/status'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.discovery.status.queryOptions(),
     enabled,
     refetchInterval: (query) => {
       const data = query.state.data as DiscoveryStatus | undefined
@@ -561,95 +592,89 @@ export const useDiscoveryStatus = (enabled: boolean = true) => {
 }
 
 export const useTriggerDiscovery = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      return fetchApi('/api/discovery/refresh', { method: 'POST' }) as Promise<
-        DiscoveryStatus & { success: boolean; started: boolean }
-      >
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
-        running: data.running,
-        state: data.state,
-        total: data.total,
-        done: data.done,
-        lastRunAt: data.lastRunAt,
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['discovery-status'] })
-    },
-  })
+  const statusKey = trpc.discovery.status.queryOptions().queryKey
+  return useMutation(
+    trpc.discovery.refresh.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.setQueryData<DiscoveryStatus>(statusKey, {
+          running: data.running,
+          state: data.state,
+          total: data.total,
+          done: data.done,
+          lastRunAt: data.lastRunAt,
+        })
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      },
+      onError: () => {
+        queryClient.invalidateQueries({ queryKey: statusKey })
+      },
+    })
+  )
 }
 
 export const useNudgeDiscovery = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async () => {
-      return fetchApi('/api/discovery/nudge', { method: 'POST' }) as Promise<
-        DiscoveryStatus & { success: boolean; started: boolean }
-      >
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
-        running: data.running,
-        state: data.state,
-        total: data.total,
-        done: data.done,
-        lastRunAt: data.lastRunAt,
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['discovery-status'] })
-    },
-  })
+  const statusKey = trpc.discovery.status.queryOptions().queryKey
+  return useMutation(
+    trpc.discovery.nudge.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.setQueryData<DiscoveryStatus>(statusKey, {
+          running: data.running,
+          state: data.state,
+          total: data.total,
+          done: data.done,
+          lastRunAt: data.lastRunAt,
+        })
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      },
+      onError: () => {
+        queryClient.invalidateQueries({ queryKey: statusKey })
+      },
+    })
+  )
 }
 
 export const useDismissNotification = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ showId, episodeNumber }: { showId: string; episodeNumber: string }) => {
-      await fetchApi(`/api/notifications/dismiss`, {
-        method: 'POST',
-        body: JSON.stringify({ showId, episodeNumber }),
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-  })
+  return useMutation(
+    trpc.notifications.dismiss.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+      },
+    })
+  )
 }
 
 export const useClearAllNotifications = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (showId?: string) => {
-      await fetchApi(`/api/notifications/clear-all`, {
-        method: 'POST',
-        body: JSON.stringify({ showId }),
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    },
-  })
+  return useMutation(
+    trpc.notifications.clearAll.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+      },
+    })
+  )
 }
 
 export const useThisWeekSchedule = () => {
-  return useQuery<Anime[]>({
-    queryKey: ['thisWeekSchedule'],
-    queryFn: () => fetchApi('/api/continue-watching/this-week'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.continueWatching.thisWeek.queryOptions(),
     staleTime: 1000 * 60 * 5,
   })
 }
 
 export const useGenresAndTags = () => {
-  return useQuery<{ genres: string[]; tags: string[] }>({
-    queryKey: ['genresAndTags'],
-    queryFn: () => fetchApi('/api/genres-and-tags'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.data.genresAndTags.queryOptions(),
     staleTime: 1000 * 60 * 60,
   })
 }
@@ -674,6 +699,6 @@ export interface TopShow {
 export const useGenreCards = () => {
   return useQuery<GenreCard[]>({
     queryKey: ['genreCards'],
-    queryFn: () => fetchApi('/api/insights/genre-cards'),
+    queryFn: () => trpcClient.insights.genreCards.query() as unknown as Promise<GenreCard[]>,
   })
 }

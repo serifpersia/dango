@@ -7,6 +7,7 @@ import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { usePaginatedSearchAnime, useGenresAndTags } from '../hooks/useAnimeData'
+import { trpcClient } from '../lib/trpc'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from './Search.module.css'
@@ -81,8 +82,8 @@ export default function Search() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/anilist-status')
-      .then((r) => r.json())
+    trpcClient.data.anilistStatus
+      .query()
       .then((j) => {
         if (!cancelled) setAnilistAvailable(j.available)
       })
@@ -121,7 +122,6 @@ export default function Search() {
     return states
   })
 
-  // We only pass filters that are NOT 'page' to usePaginatedSearchAnime
   const filterParams = new URLSearchParams(searchParams)
   filterParams.delete('page')
   const filterString = filterParams.toString()

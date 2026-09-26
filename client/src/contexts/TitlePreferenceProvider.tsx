@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { TitlePreferenceContext } from './TitlePreferenceContext'
+import { trpcClient } from '../lib/trpc'
 
 interface TitlePreferenceProviderProps {
   children: React.ReactNode
@@ -14,12 +15,9 @@ export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = (
   useEffect(() => {
     const fetchPreference = async () => {
       try {
-        const response = await fetch('/api/settings?key=titlePreference')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.value) {
-            setTitlePreference(data.value as 'name' | 'nativeName' | 'englishName')
-          }
+        const data = await trpcClient.settings.getByKey.query({ key: 'titlePreference' })
+        if (data.value) {
+          setTitlePreference(data.value as 'name' | 'nativeName' | 'englishName')
         }
       } catch (err) {
         console.error('Error fetching title preference in context:', err)

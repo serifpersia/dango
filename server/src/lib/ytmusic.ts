@@ -59,7 +59,6 @@ export function isParserVariantError(err: unknown): boolean {
   )
 }
 
-/** Public session: never signed in. Used for search/stream/home. */
 export function getInnertube(): Promise<Innertube> {
   if (publicTube) return Promise.resolve(publicTube)
   if (Date.now() - publicFailedAt < PUBLIC_FAIL_COOLDOWN_MS) {
@@ -83,7 +82,6 @@ export function getInnertube(): Promise<Innertube> {
   return publicPromise
 }
 
-/** Authenticated session built from the saved cookie. Null when not signed in. */
 export async function getAuthedInnertube(forceRefresh = false): Promise<Innertube | null> {
   const cookie = readCookie()
   if (!cookie) {

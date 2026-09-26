@@ -80,18 +80,15 @@ import {
   prepareMalImport,
   executeMalImport,
 } from './lib/mal-import.js'
-import { registerMangaLibrary } from './hono/manga-library.js'
-import { registerTvLibrary } from './hono/tv-library.js'
-import { registerAsmrLibrary } from './hono/asmr-library.js'
 import { registerMusic } from './hono/music.js'
-import { registerRadio } from './hono/radio.js'
 import { registerAuth, type RunSyncSequence } from './hono/auth.js'
-import { registerManga } from './hono/manga.js'
 import { registerWatchlist } from './hono/watchlist.js'
-import { registerAsmr, type JasmrApi } from './hono/asmr.js'
+import { type JasmrApi } from './hono/asmr.js'
 import { registerTv } from './hono/tv.js'
 import { registerProxy } from './hono/proxy.js'
-import { registerData } from './hono/data.js'
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
+import { appRouter } from './trpc/router.js'
+import { buildTrpcContext } from './trpc/context.js'
 import type { AppCache } from './utils/cache.utils.js'
 import type { Provider } from './providers/provider.interface.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
@@ -557,109 +554,27 @@ export function createHonoApp(
     }
   )
 
-  app.get('/api/installation-id', (c) => {
-    try {
-      return c.json({ id: getMachineId() })
-    } catch (err) {
-      logger.error({ err }, 'Failed to get machine ID')
-      return c.json({ error: 'Failed to get machine ID' }, 500)
-    }
-  })
-
-  app.get('/api/settings', async (c) => {
-    try {
-      const key = c.req.query('key') as string
-      const row = await SettingsRepository.getByKey(getDbs().db, key)
-      let value = row ? row.value : null
-      if (value === null && key === 'discordRPCEnabled') {
-        value = 'true'
-      }
-      if (value === null && key === 'discordRPCHideMature') {
-        value = 'true'
-      }
-      if (value === null && key === 'ignoreAdultContent') {
-        value = 'true'
-      }
-      if (
-        value === null &&
-        (key === 'mangaIgnoreAdultContent' ||
-          key === 'tvIgnoreAdultContent' ||
-          key === 'asmrIgnoreAdultContent')
-      ) {
-        value = 'true'
-      }
-      return c.json({ value: value })
-    } catch {
-      return c.json({ error: 'DB error' }, 500)
-    }
-  })
-
-  app.post('/api/settings', async (c) => {
-    try {
-      const body = (await c.req.json()) as { key: unknown; value: unknown }
-      const key = String(body.key)
-      const value = String(body.value ?? '')
-      const shouldDelete = value === '' && key === 'tracker_anilist_client_id'
-      await performWriteTransactionAsync(getDbs().db, async (tx) => {
-        if (shouldDelete) await SettingsRepository.deleteByKey(tx, key)
-        else await SettingsRepository.upsert(tx, key, value)
-      })
-      if (body.key === 'discordRPCEnabled') {
-        discordRPCService.setEnabled(body.value === 'true' || body.value === true)
-      }
-      if (body.key === 'discordRPCHideMature') {
-        discordRPCService.setHideMature(body.value === 'true' || body.value === true)
-      }
-      return c.json({ success: true })
-    } catch {
-      return c.json({ error: 'DB error' }, 500)
-    }
-  })
-
-  app.get('/api/settings/offline-db', async (c) => {
-    try {
-      return c.json(await offlineDb.getOfflineDbInfo(getDbs().db))
-    } catch {
-      return c.json({ error: 'DB error' }, 500)
-    }
-  })
-
-  app.post('/api/settings/offline-db/auto-update', async (c) => {
-    try {
-      const body = (await c.req.json().catch(() => undefined)) as { enabled?: unknown } | undefined
-      const enabled = body?.enabled
-      if (typeof enabled !== 'boolean') {
-        return c.json({ error: 'enabled must be a boolean' }, 400)
-      }
-      await SettingsRepository.upsert(getDbs().db, 'offlineDbAutoUpdateEnabled', String(enabled))
-      return c.json({ success: true, enabled })
-    } catch {
-      return c.json({ error: 'DB error' }, 500)
-    }
-  })
-
-  app.post('/api/settings/offline-db/update', async (c) => {
-    try {
-      const info = await offlineDb.getOfflineDbInfo(getDbs().db)
-      if (info.isRefreshing) {
-        return c.json({ error: 'Offline database refresh already in progress' }, 409)
-      }
-      offlineDb.refreshDatabase(getDbs().db).catch((err) => {
-        logger.warn({ err: err?.message }, 'Manual offline database update failed')
-      })
-      return c.json({ message: 'Offline database refresh started' }, 202)
-    } catch {
-      return c.json({ error: 'DB error' }, 500)
-    }
-  })
-
-  app.get('/api/import/mal-xml/status', (c) => {
-    return c.json(getMalImportStatus())
-  })
-
-  app.post('/api/import/mal-xml/cancel', (c) => {
-    return c.json(requestMalImportCancel())
-  })
+  app.all('/api/trpc/*', (c) =>
+    fetchRequestHandler({
+      endpoint: '/api/trpc',
+      req: c.req.raw,
+      router: appRouter,
+      createContext: () =>
+        buildTrpcContext(
+          {
+            ...getDbs(),
+            apiCache: media.getApiCache(),
+            getTvProvider: media.getTvProvider,
+            getMangaProvider: media.getMangaProvider,
+            getJasmr: media.getJasmr,
+            getProviders: media.getProviders,
+            getCatalog: providerApi.getCatalog,
+          },
+          c.req.header('authorization'),
+          c.req.header('cookie')
+        ),
+    })
+  )
 
   app.post('/api/import/mal-xml', async (c) => {
     const dbs = getDbs()
@@ -717,97 +632,6 @@ export function createHonoApp(
     }
   })
 
-  app.post('/api/translate', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      { texts?: unknown; source?: unknown; target?: unknown } | undefined
-    const { texts, source = 'ja', target = 'en' } = body ?? {}
-    if (!Array.isArray(texts) || texts.length === 0) {
-      return c.json({ translations: {} })
-    }
-    return c.json({
-      translations: await translateTexts(texts, String(source), String(target)),
-    })
-  })
-
-  app.get('/api/discord/gateway/status', (c) => {
-    const hasToken = discordGatewayService.hasToken()
-    return c.json({
-      hasToken,
-      masked: hasToken ? maskToken(process.env.DISCORD_GATEWAY_TOKEN) : null,
-      enabled: discordGatewayService.serviceEnabled,
-    })
-  })
-
-  app.post('/api/discord/gateway/save', async (c) => {
-    const body = (await c.req.json()) as { token?: unknown }
-    let token = ((body.token || '') as string).trim()
-    if (token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1)
-    if (token.length < 30) return c.json({ error: 'Token too short' }, 400)
-
-    try {
-      await updateEnvFile({ DISCORD_GATEWAY_TOKEN: token })
-      discordGatewayService.reloadToken()
-      gatewayLog.info(`Discord Gateway token saved ${maskToken(token)} (not logged)`)
-      return c.json({ ok: true, masked: maskToken(token) })
-    } catch (e) {
-      gatewayLog.error({ err: e }, 'Failed to save Discord Gateway token')
-      return c.json({ error: 'Failed to save token' }, 500)
-    }
-  })
-
-  app.post('/api/discord/gateway/remove', async (c) => {
-    try {
-      await updateEnvFile({ DISCORD_GATEWAY_TOKEN: '' })
-      discordGatewayService.reloadToken()
-      gatewayLog.info('Discord Gateway token removed')
-      return c.json({ ok: true })
-    } catch (e) {
-      gatewayLog.error({ err: e }, 'Failed to remove Discord Gateway token')
-      return c.json({ error: 'Failed to remove token' }, 500)
-    }
-  })
-
-  app.get('/api/insights', async (c) => {
-    return c.json(await getWatchInsights(getDbs().db))
-  })
-
-  app.get('/api/insights/genre-cards', async (c) => {
-    return c.json(await getGenreCards(getDbs().db))
-  })
-
-  app.get('/api/insights/recommendations', async (c) => {
-    return c.json({ candidates: await getCachedRecommendations(getDbs().db) })
-  })
-
-  app.get('/api/insights/discord-sync-stats', async (c) => {
-    return c.json(await computeDiscordSyncStats(getDbs().db))
-  })
-
-  app.get('/api/discord-roles-config', (c) => {
-    return c.json({ workerUrl: CONFIG.DISCORD_ROLES_WORKER_URL || null })
-  })
-
-  app.get('/api/discord-user', async (c) => {
-    return c.json({ user: await getLinkedDiscordUser(getDbs().db) })
-  })
-
-  app.post('/api/discord-user', async (c) => {
-    const { user } = (await c.req.json()) as { user: { id?: unknown } | null }
-    if (
-      user !== null &&
-      user !== undefined &&
-      (typeof user !== 'object' || typeof user.id !== 'string' || !user.id)
-    ) {
-      return c.json({ error: 'Invalid user payload: expected { id, ... } or null' }, 400)
-    }
-    await setLinkedDiscordUser(getDbs().db, (user as never) || null)
-    return c.json({ success: true, user: user || null })
-  })
-
-  app.post('/api/discord-sync-now', async (c) => {
-    return c.json(await syncDiscordRoles(getDbs().db, true))
-  })
-
   app.get('/api/tracker/anilist/callback', (c) => {
     return c.html(`<!doctype html>
 <html><head><meta charset="utf-8"><title>AniList — completing login</title></head>
@@ -854,198 +678,6 @@ export function createHonoApp(
   location.replace(frontend + (frontend.indexOf('?') !== -1 ? '&' : '?') + 'anilist=error&reason=no_token');
 })();
 </script></body></html>`)
-  })
-
-  app.get('/api/tracker/status', async (c) => {
-    try {
-      const tokenRow = await SettingsRepository.getByKey(getDbs().db, TRACKER_TOKEN_KEY)
-      const userRow = await SettingsRepository.getByKey(getDbs().db, TRACKER_USER_KEY)
-      let user: unknown = null
-      if (userRow?.value) {
-        try {
-          user = JSON.parse(userRow.value)
-        } catch {
-          user = null
-        }
-      }
-      return c.json({ anilist: { connected: !!tokenRow?.value, user } })
-    } catch {
-      return c.json({ error: 'Failed to read tracker status' }, 500)
-    }
-  })
-
-  app.post('/api/tracker/anilist/auth', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as { token?: unknown } | undefined
-    const { token } = body ?? {}
-    const accessToken = typeof token === 'string' ? token.trim() : ''
-    if (!accessToken) {
-      return c.json({ error: 'Access token is required' }, 400)
-    }
-
-    try {
-      const tracker = new AniListTracker(accessToken)
-      const viewer = await tracker.getViewer()
-
-      await performWriteTransactionAsync(getDbs().db, async (tx) => {
-        await SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, accessToken)
-        await SettingsRepository.upsert(tx, TRACKER_USER_KEY, JSON.stringify(viewer))
-      })
-
-      return c.json({ success: true, user: viewer })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed'
-      return c.json({ error: message }, 401)
-    }
-  })
-
-  app.post('/api/tracker/anilist/disconnect', async (c) => {
-    try {
-      await performWriteTransactionAsync(getDbs().db, async (tx) => {
-        await SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, '')
-        await SettingsRepository.upsert(tx, TRACKER_USER_KEY, '')
-      })
-      return c.json({ success: true })
-    } catch {
-      return c.json({ error: 'Failed to disconnect' }, 500)
-    }
-  })
-
-  app.post('/api/tracker/sync', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as { provider?: unknown } | undefined
-    const { provider = 'anilist' } = body ?? {}
-    if (provider !== 'anilist') {
-      return c.json({ error: `Provider "${provider}" is not supported yet` }, 400)
-    }
-    try {
-      const summary = await syncAniList(getDbs().db)
-      return c.json({ success: true, summary })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed'
-      return c.json({ error: message }, 500)
-    }
-  })
-
-  app.post('/api/tracker/anilist/import', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      { username?: unknown; erase?: unknown } | undefined
-    const { username, erase } = body ?? {}
-    if (!username || typeof username !== 'string') {
-      return c.json({ error: 'Username is required' }, 400)
-    }
-    try {
-      const count = await importFromUsername(getDbs().db, username.trim(), erase === true)
-      return c.json({ success: true, count })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      return c.json({ error: message }, 500)
-    }
-  })
-
-  app.post('/api/tracker/mal/import', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      | { username?: unknown; erase?: unknown; useOfflineDb?: unknown; skipFallback?: unknown }
-      | undefined
-    const { username, erase, useOfflineDb, skipFallback } = body ?? {}
-    if (!username || typeof username !== 'string') {
-      return c.json({ error: 'MAL username is required' }, 400)
-    }
-    try {
-      const count = await importFromMalUsername(getDbs().db, username.trim(), {
-        erase: erase === true,
-        useOfflineDb: useOfflineDb !== false,
-        skipFallback: skipFallback === true,
-      })
-      return c.json({ success: true, count })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      if (message.includes('private') || message.includes('not found')) {
-        return c.json({ error: message }, 404)
-      }
-      if (message.includes('blocked') || message.includes('HTTP 429')) {
-        return c.json({ error: message }, 429)
-      }
-      return c.json({ error: message }, 500)
-    }
-  })
-
-  app.post('/api/tracker/manga/sync', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as { direction?: unknown } | undefined
-    const { direction } = body ?? {}
-    try {
-      const mangaDb = getDbs().mangaDb
-      if (!mangaDb || mangaDb.isClosedCheck()) {
-        return c.json({ error: 'Manga database is not ready' }, 503)
-      }
-      const syncDirection = direction === 'pull-only' ? 'pull-only' : 'two-way'
-      const result = await syncAniListManga(getDbs().db, mangaDb, {
-        direction: syncDirection,
-      })
-      return c.json({
-        success: true,
-        summary: result.summary,
-        details: result.details,
-        direction: syncDirection,
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Manga sync failed'
-      return c.json({ error: message }, 500)
-    }
-  })
-
-  app.post('/api/tracker/manga/import', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      { username?: unknown; erase?: unknown } | undefined
-    const { username, erase } = body ?? {}
-    if (!username || typeof username !== 'string') {
-      return c.json({ error: 'Username is required' }, 400)
-    }
-    try {
-      const mangaDb = getDbs().mangaDb
-      if (!mangaDb || mangaDb.isClosedCheck()) {
-        return c.json({ error: 'Manga database is not ready' }, 503)
-      }
-      const count = await importFromUsernameManga(
-        getDbs().db,
-        mangaDb,
-        username.trim(),
-        erase === true
-      )
-      return c.json({ success: true, count })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      return c.json({ error: message }, 500)
-    }
-  })
-
-  app.post('/api/tracker/manga/mal-import', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      { username?: unknown; erase?: unknown } | undefined
-    const { username, erase } = body ?? {}
-    if (!username || typeof username !== 'string') {
-      return c.json({ error: 'Username is required' }, 400)
-    }
-    try {
-      const mangaDb = getDbs().mangaDb
-      if (!mangaDb || mangaDb.isClosedCheck()) {
-        return c.json({ error: 'Manga database is not ready' }, 503)
-      }
-      const result = await importMangaFromMalUsername(
-        getDbs().db,
-        mangaDb,
-        username.trim(),
-        erase === true
-      )
-      return c.json({ success: true, ...result })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      if (message.includes('private') || message.includes('not found')) {
-        return c.json({ error: message }, 404)
-      }
-      if (message.includes('blocked') || message.includes('HTTP 429')) {
-        return c.json({ error: message }, 429)
-      }
-      return c.json({ error: message }, 500)
-    }
   })
 
   app.post('/api/import/mal-xml-manga', async (c) => {
@@ -1178,18 +810,11 @@ export function createHonoApp(
     return restoreLegacyDatabase(c, dbs, buffer, dbAdmin)
   })
 
-  registerMangaLibrary(app, getDbs)
-  registerTvLibrary(app, getDbs)
-  registerAsmrLibrary(app, getDbs)
   registerMusic(app)
-  registerRadio(app)
   registerAuth(app, getDbs, runSync)
-  registerManga(app, media.getApiCache, media.getMangaProvider)
   registerWatchlist(app, getDbs)
-  registerAsmr(app, media.getApiCache, media.getJasmr)
   registerTv(app, media.getApiCache, media.getTvProvider)
   registerProxy(app)
-  registerData(app, getDbs, media.getApiCache, media.getProviders, providerApi.getCatalog)
 
   app.onError((err: Error & { status?: number }, c) => {
     logger.error({ err, url: c.req.path, method: c.req.method }, 'Unhandled error')

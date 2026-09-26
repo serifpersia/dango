@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 import { useSetting } from './useSettings'
+import { trpcClient } from '../lib/trpc'
 
 export function useDiscordPageStatus() {
   const location = useLocation()
@@ -17,12 +18,7 @@ export function useDiscordPageStatus() {
     if (discordEnabled === false || discordEnabled === 'false') return
 
     const sessionId = sessionIdRef.current
-    const heartbeat = () =>
-      fetch('/api/discord/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
-      }).catch(() => {})
+    const heartbeat = () => trpcClient.discord.heartbeat.mutate({ sessionId }).catch(() => {})
 
     heartbeat()
     const interval = setInterval(heartbeat, 15000)
@@ -63,10 +59,6 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/music')) page = 'music'
     else if (path.startsWith('/tv')) page = 'tv'
 
-    fetch('/api/discord/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page }),
-    }).catch(() => {})
+    trpcClient.discord.pageStatus.mutate({ page }).catch(() => {})
   }, [location.pathname, discordEnabled])
 }

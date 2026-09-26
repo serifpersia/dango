@@ -1,3 +1,5 @@
+import { trpcClient } from './trpc'
+
 export interface SuggestedEpisode {
   showId: string
   episodeNumber: string
@@ -5,9 +7,9 @@ export interface SuggestedEpisode {
 }
 
 export async function getSuggestedEpisode(showId: string): Promise<SuggestedEpisode> {
-  const response = await fetch(`/api/queue/suggested/${showId}`)
-  if (!response.ok) {
+  try {
+    return await trpcClient.watchlist.queueSuggested.query({ showId })
+  } catch {
     throw new Error('Failed to resolve suggested episode')
   }
-  return response.json()
 }

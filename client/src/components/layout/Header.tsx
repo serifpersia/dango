@@ -7,6 +7,7 @@ import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
 import { useContentType } from '../../contexts/ContentTypeContext'
 import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
+import { trpcClient } from '../../lib/trpc'
 import styles from './Header.module.css'
 
 interface UserProfile {
@@ -17,16 +18,17 @@ interface UserProfile {
 }
 
 const fetchSyncProfile = async (): Promise<UserProfile | null> => {
-  const settingsRes = await fetch('/api/auth/settings/sync')
-  if (!settingsRes.ok) return null
-
-  const settings = await settingsRes.json()
+  let settings: { actualActiveProvider?: string }
+  try {
+    settings = await trpcClient.auth.syncSettings.query()
+  } catch {
+    return null
+  }
   const activeProvider = settings.actualActiveProvider as 'github' | 'google' | 'rclone' | 'none'
 
   if (activeProvider === 'github') {
-    const githubRes = await fetch('/api/auth/github/status')
-    if (githubRes.ok) {
-      const github = await githubRes.json()
+    try {
+      const github = await trpcClient.auth.githubStatus.query()
       if (github.authenticated && github.user) {
         return {
           name: github.user.name || github.user.login,
@@ -34,21 +36,24 @@ const fetchSyncProfile = async (): Promise<UserProfile | null> => {
           provider: 'github',
         }
       }
+    } catch {
+      // ignore
     }
   }
 
   if (activeProvider === 'google') {
-    const googleRes = await fetch('/api/auth/user')
-    if (googleRes.ok) {
-      const google = await googleRes.json()
+    try {
+      const google = await trpcClient.auth.user.query()
       if (google) {
         return {
-          name: google.name,
-          picture: google.picture,
-          email: google.email,
+          name: (google as { name: string }).name,
+          picture: (google as { picture?: string }).picture,
+          email: (google as { email?: string }).email,
           provider: 'google',
         }
       }
+    } catch {
+      // ignore
     }
   }
 

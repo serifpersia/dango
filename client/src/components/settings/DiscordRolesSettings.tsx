@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchApi } from '../../lib/fetchApi'
+import { trpcClient } from '../../lib/trpc'
 import styles from './DiscordRolesSettings.module.css'
 
 const RANK_THRESHOLDS = [
@@ -168,11 +168,7 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
           setUser(parsed)
           setLoadingUser(false)
           localStorage.setItem(DISCORD_USER_KEY, JSON.stringify(parsed))
-          fetch('/api/discord-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: parsed }),
-          }).catch(() => {})
+          trpcClient.insights.setDiscordUser.mutate({ user: parsed }).catch(() => {})
         }
       } catch {
         // ignore
@@ -192,9 +188,9 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
       return
     }
     try {
-      const data = (await fetchApi('/api/discord-user')) as { user: DiscordUser | null }
+      const data = await trpcClient.insights.discordUser.query()
       if (data.user) {
-        setUser(data.user)
+        setUser(data.user as DiscordUser)
         localStorage.setItem(DISCORD_USER_KEY, JSON.stringify(data.user))
       }
     } catch {
@@ -206,8 +202,8 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
 
   const fetchStats = useCallback(async () => {
     try {
-      const data = (await fetchApi('/api/insights/discord-sync-stats')) as SyncStats
-      setStats(data)
+      const data = await trpcClient.insights.discordSyncStats.query()
+      setStats(data as unknown as SyncStats)
     } catch {
       // ignore
     }
@@ -222,11 +218,7 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
     localStorage.removeItem(DISCORD_USER_KEY)
     setUser(null)
     setStatus(null)
-    fetch('/api/discord-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: null }),
-    }).catch(() => {})
+    trpcClient.insights.setDiscordUser.mutate({ user: null }).catch(() => {})
   }
 
   const handleSync = async () => {
@@ -234,8 +226,7 @@ export default function DiscordRolesSettings({ workerUrl }: DiscordRolesSettings
     setSyncing(true)
     setStatus(null)
     try {
-      const res = await fetch('/api/discord-sync-now', { method: 'POST' })
-      const data = await res.json()
+      const data = await trpcClient.insights.discordSyncNow.mutate()
       if (data.success) {
         setStatus({ type: 'success', text: `✅ ${data.message}` })
       } else {

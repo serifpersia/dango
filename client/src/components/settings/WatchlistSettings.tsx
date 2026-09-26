@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import ToggleSwitch from '../common/ToggleSwitch'
 import { useContentType, type ContentType } from '../../contexts/ContentTypeContext'
+import { trpcClient, useTRPC } from '../../lib/trpc'
 import styles from './WatchlistSettings.module.css'
 
 interface ListSettingsConfig {
@@ -105,8 +106,7 @@ const useServerToggle = (key: string, defaultValue: boolean, invalidateKeys: str
   useEffect(() => {
     const fetchSetting = async () => {
       try {
-        const response = await fetch(`/api/settings?key=${key}`)
-        const data = await response.json()
+        const data = await trpcClient.settings.getByKey.query({ key })
         setValue(parseBool(data.value, defaultValue))
       } catch (error) {
         console.error('Failed to fetch setting', error)
@@ -121,11 +121,7 @@ const useServerToggle = (key: string, defaultValue: boolean, invalidateKeys: str
     const newValue = !value
     setValue(newValue)
     try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: newValue }),
-      })
+      await trpcClient.settings.set.mutate({ key, value: newValue })
       for (const queryKey of invalidateKeys) {
         queryClient.invalidateQueries({ queryKey })
       }
@@ -151,13 +147,13 @@ const WatchlistSettings: React.FC = () => {
   const [purgeCount, setPurgeCount] = useState<number | null>(null)
   const [isPurging, setIsPurging] = useState(false)
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
 
   useEffect(() => {
     setIsLoading(true)
     const fetchSetting = async () => {
       try {
-        const response = await fetch(`/api/settings?key=${config.skipKey}`)
-        const data = await response.json()
+        const data = await trpcClient.settings.getByKey.query({ key: config.skipKey })
         if (String(data.value) === 'true' || String(data.value) === '1') {
           setSkipConfirmation(true)
         } else {
@@ -180,11 +176,7 @@ const WatchlistSettings: React.FC = () => {
     setSkipConfirmation(newValue)
 
     try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: config.skipKey, value: newValue }),
-      })
+      await trpcClient.settings.set.mutate({ key: config.skipKey, value: newValue })
     } catch (err) {
       console.error('Error saving setting:', err)
       setSkipConfirmation(!newValue)
@@ -197,10 +189,22 @@ const WatchlistSettings: React.FC = () => {
     if (ignoreAdult.isUpdating) return
     if (ignoreAdult.value) {
       try {
-        const response = await fetch(config.adultCountUrl)
-        const data = await response.json()
-        if (typeof data.count === 'number' && data.count > 0) {
-          setPurgeCount(data.count)
+        let count: number | undefined
+        if (contentType === 'anime') {
+          const data = await trpcClient.continueWatching.adultCount.query()
+          count = data.count
+        } else if (contentType === 'manga') {
+          const data = await trpcClient.mangaProgress.adultCount.query()
+          count = data.count
+        } else if (contentType === 'asmr') {
+          const data = await trpcClient.asmrProgress.adultCount.query()
+          count = data.count
+        } else {
+          const data = await trpcClient.tvProgress.adultCount.query()
+          count = data.count
+        }
+        if (typeof count === 'number' && count > 0) {
+          setPurgeCount(count)
           return
         }
       } catch (error) {
@@ -219,13 +223,35 @@ const WatchlistSettings: React.FC = () => {
     if (isPurging) return
     setIsPurging(true)
     try {
-      const response = await fetch(config.purgeUrl, {
-        method: 'POST',
-      })
-      const data = await response.json()
-      toast.success(config.purgeDoneText(data.removed))
+      let removed: number | undefined
+      if (contentType === 'anime') {
+        const data = await trpcClient.continueWatching.purgeAdult.mutate()
+        removed = data.removed
+      } else if (contentType === 'manga') {
+        const data = await trpcClient.mangaProgress.purgeAdult.mutate()
+        removed = data.removed
+      } else if (contentType === 'asmr') {
+        const data = await trpcClient.asmrProgress.purgeAdult.mutate()
+        removed = data.removed
+      } else {
+        const data = await trpcClient.tvProgress.purgeAdult.mutate()
+        removed = data.removed
+      }
+      toast.success(config.purgeDoneText(removed ?? 0))
       for (const queryKey of config.invalidateKeys) {
         queryClient.invalidateQueries({ queryKey })
+      }
+      if (contentType === 'anime') {
+        void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
+      }
+      if (contentType === 'manga') {
+        void queryClient.invalidateQueries(trpc.mangaProgress.pathFilter())
+      }
+      if (contentType === 'asmr') {
+        void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
+      }
+      if (contentType === 'tv') {
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
       }
     } catch (error) {
       console.error('Failed to purge adult entries', error)

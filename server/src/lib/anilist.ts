@@ -1013,7 +1013,7 @@ export async function findPosterByTitle(
       if (!expected) return e.imageUrl
     }
   } catch {
-    // ignore, try Kitsu next
+    // ignore
   }
   try {
     const kitsu = await kitsuSearchAnime({ query: clean, page: 1, perPage: 5 })
@@ -1296,7 +1296,7 @@ export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, s
         result.set(id, status)
       }
     } catch {
-      // Kitsu fallback failed
+      // ignore
     }
   }
 
@@ -1687,7 +1687,7 @@ export async function getSchedule(date: Date, format?: string, adult = false): P
           if (adult ? !meta.isAdult : meta.isAdult) continue
           shows.push(withScheduleFields(meta, entry.episode, entry.airingAt))
         } catch {
-          // keep going without this show
+          // ignore
         }
       }
     }

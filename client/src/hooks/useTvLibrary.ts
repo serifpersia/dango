@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { fetchApi } from '../lib/fetchApi'
 import { buildTvId } from '../lib/tv'
+import { trpcClient, useTRPC } from '../lib/trpc'
 
 export type TvLibraryStatus = 'Watching' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
 
@@ -49,79 +49,55 @@ export interface ContinueWatchingTvItem extends TvLibraryItem {
   progressAt?: number | null
 }
 
-interface PaginatedTvLibrary {
-  data: TvLibraryItem[]
-  total: number
-  page: number
-  limit: number
-}
-
 export const tvLibraryId = (mediaType: string, tmdbId: number | string) =>
   buildTvId(mediaType, tmdbId)
 
 export const useTvLibrary = (status: string = 'All', page: number = 1, limit: number = 24) => {
-  return useQuery<PaginatedTvLibrary>({
-    queryKey: ['tv-library', status, page, limit],
-    queryFn: () => {
-      const p = new URLSearchParams()
-      p.set('status', status)
-      p.set('page', String(page))
-      p.set('limit', String(limit))
-      return fetchApi(`/api/tv/library?${p.toString()}`)
-    },
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.tvLibrary.list.queryOptions({ status, page, limit }))
 }
 
 export const useTvLibraryIds = () => {
-  return useQuery<{ ids: string[] }>({
-    queryKey: ['tv-library-ids'],
-    queryFn: () => fetchApi('/api/tv/library/ids'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.tvLibrary.ids.queryOptions(),
     staleTime: 1000 * 60,
   })
 }
 
 export const useTvLibraryCheck = (id?: string) => {
-  return useQuery<{ inLibrary: boolean; status: string | null }>({
-    queryKey: ['tv-library-check', id],
-    queryFn: () => fetchApi(`/api/tv/library/check/${encodeURIComponent(id || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.tvLibrary.check.queryOptions({ id: id || '' }),
     enabled: !!id,
     staleTime: 1000 * 60,
   })
 }
 
 export const useTvContinueWatching = (limit: number = 24) => {
-  return useQuery<{ data: ContinueWatchingTvItem[]; total: number }>({
-    queryKey: ['tv-continue-watching', limit],
-    queryFn: () => fetchApi(`/api/tv/continue-watching?limit=${limit}`),
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.tvProgress.continueWatching.queryOptions({ limit }))
 }
 
 export const useTvProgress = (mediaId?: string) => {
-  return useQuery<{ progress: TvProgressItem[] }>({
-    queryKey: ['tv-progress', mediaId],
-    queryFn: () => fetchApi(`/api/tv/progress/${encodeURIComponent(mediaId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.tvProgress.getByMedia.queryOptions({ mediaId: mediaId || '' }),
     enabled: !!mediaId,
   })
 }
 
 export const useTvLatestProgress = (mediaId?: string, season?: number, episode?: number) => {
-  return useQuery<TvProgressItem | { currentTime: number; duration: number; completed: number }>({
-    queryKey: ['tv-progress-latest', mediaId, season, episode],
-    queryFn: () => {
-      const params = new URLSearchParams()
-      if (season !== undefined) params.set('season', String(season))
-      if (episode !== undefined) params.set('episode', String(episode))
-      const qs = params.toString()
-      return fetchApi(
-        `/api/tv/progress/${encodeURIComponent(mediaId || '')}/latest${qs ? `?${qs}` : ''}`
-      )
-    },
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.tvProgress.latest.queryOptions({ mediaId: mediaId || '', season, episode }),
     enabled: !!mediaId,
     staleTime: 0,
   })
 }
 
 export const useAddTvBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (item: {
@@ -137,10 +113,7 @@ export const useAddTvBookmark = () => {
       silent?: boolean
     }) => {
       const { silent: _silent, ...body } = item
-      return fetchApi('/api/tv/library/add', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }) as Promise<{ success: boolean; id: string }>
+      return trpcClient.tvLibrary.add.mutate(body)
     },
     onSuccess: (_data, variables) => {
       if (!variables.silent) toast.success('Added to TV watchlist')
@@ -149,6 +122,7 @@ export const useAddTvBookmark = () => {
       queryClient.invalidateQueries({
         queryKey: ['tv-library-check', tvLibraryId(variables.mediaType, variables.tmdbId)],
       })
+      void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
     },
     onError: (error: Error) => {
       toast.error(`Failed to add: ${error.message}`)
@@ -157,172 +131,142 @@ export const useAddTvBookmark = () => {
 }
 
 export const useRemoveTvBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await fetchApi('/api/tv/library/remove', {
-        method: 'POST',
-        body: JSON.stringify({ id }),
-      })
-    },
-    onSuccess: (_data, id) => {
-      toast.success('Removed from TV watchlist')
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-check', id] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvLibrary.remove.mutationOptions({
+      onSuccess: (_data, id) => {
+        toast.success('Removed from TV watchlist')
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library-check', id] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useUpdateTvStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await fetchApi('/api/tv/library/status', {
-        method: 'POST',
-        body: JSON.stringify({ id, status }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Status updated')
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update status: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvLibrary.setStatus.mutationOptions({
+      onSuccess: () => {
+        toast.success('Status updated')
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to update status: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useSaveTvProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (progress: {
-      mediaId: string
-      season: number
-      episode: number
-      currentTime: number
-      duration?: number
-      completed?: boolean | number
-      title?: string
-      poster?: string
-      backdrop?: string
-      year?: string
-      overview?: string
-      tmdbId?: number
-      mediaType?: string
-      adult?: number
-    }) => {
-      await fetchApi('/api/tv/progress', {
-        method: 'POST',
-        body: JSON.stringify(progress),
-      })
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['tv-progress', variables.mediaId] })
-      queryClient.invalidateQueries({ queryKey: ['tv-progress-latest', variables.mediaId] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
-    },
-  })
+  return useMutation(
+    trpc.tvProgress.save.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tv-progress', variables.mediaId] })
+        queryClient.invalidateQueries({ queryKey: ['tv-progress-latest', variables.mediaId] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+    })
+  )
 }
 
 export const useRemoveTvProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      mediaId,
-      season,
-      episode,
-    }: {
-      mediaId: string
-      season?: number
-      episode?: number
-    }) => {
-      await fetchApi('/api/tv/progress/remove', {
-        method: 'POST',
-        body: JSON.stringify({ mediaId, season, episode }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Progress reset')
-      queryClient.invalidateQueries({ queryKey: ['tv-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvProgress.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success('Progress reset')
+        queryClient.invalidateQueries({ queryKey: ['tv-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchUpdateTvStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      return fetchApi('/api/tv/library/batch-status', {
-        method: 'POST',
-        body: JSON.stringify({ ids, status }),
-      }) as Promise<{ success: boolean; updated: number }>
-    },
-    onSuccess: (data) => {
-      toast.success(`Status updated for ${data.updated ?? 0} items`)
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update statuses: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvLibrary.batchStatus.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(`Status updated for ${data.updated ?? 0} items`)
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to update statuses: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveTv = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/tv/library/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from TV watchlist`)
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvLibrary.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from TV watchlist`)
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveTvProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/tv/progress/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
-      queryClient.invalidateQueries({ queryKey: ['tv-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.tvProgress.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
+        queryClient.invalidateQueries({ queryKey: ['tv-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
+        queryClient.invalidateQueries({ queryKey: ['tv-library'] })
+        void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
+        void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useToggleTvBookmark = () => {

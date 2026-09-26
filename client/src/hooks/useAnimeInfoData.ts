@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type { DetailedShowMeta } from '../types/player'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient, useTRPC } from '../lib/trpc'
 import { useShowMeta } from './useShowMeta'
 
 interface UseAnimeInfoDataReturn {
@@ -15,17 +15,12 @@ interface UseAnimeInfoDataReturn {
 
 export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataReturn {
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const { data: showMeta, isLoading: loadingMeta, error: showDataError } = useShowMeta(showId)
+  const checkKey = trpc.watchlist.check.queryOptions({ showId: showId ?? '' }).queryKey
 
   const { data: watchlistData } = useQuery({
-    queryKey: ['watchlist-check', showId],
-    queryFn: async () => {
-      if (!showId) return { inWatchlist: false }
-      return fetchApi(`/api/watchlist/check/${showId}`) as Promise<{
-        inWatchlist: boolean
-        status?: string | null
-      }>
-    },
+    ...trpc.watchlist.check.queryOptions({ showId: showId ?? '' }),
     enabled: !!showId,
   })
 
@@ -33,42 +28,34 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
 
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
     mutationFn: async ({ wasIn, meta }: { wasIn: boolean; meta: Record<string, unknown> }) => {
-      const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
-      const payload = {
-        id: showId,
-        name: meta?.name || (meta?.names as Record<string, string> | undefined)?.romaji,
-        thumbnail: meta?.thumbnail,
-        nativeName: (meta?.names as Record<string, string> | undefined)?.native,
-        englishName: (meta?.names as Record<string, string> | undefined)?.english,
-        type: meta?.type,
-        isAdult: (meta as { isAdult?: boolean } | undefined)?.isAdult,
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string
-        } | null
-        throw new Error(body?.error || 'Watchlist update failed')
+      if (!showId) throw new Error('Missing showId')
+      if (wasIn) {
+        await trpcClient.watchlist.remove.mutate({ id: showId })
+      } else {
+        const names = meta?.names as Record<string, string> | undefined
+        const name = (meta?.name as string | undefined) || names?.romaji
+        if (!name) throw new Error('Missing show name')
+        await trpcClient.watchlist.add.mutate({
+          id: showId,
+          name,
+          thumbnail: meta?.thumbnail as string | undefined,
+          nativeName: names?.native,
+          englishName: names?.english,
+          type: meta?.type as string | undefined,
+          isAdult: (meta as { isAdult?: boolean } | undefined)?.isAdult,
+        })
       }
       return !wasIn
     },
     onMutate: async ({ wasIn }) => {
-      await queryClient.cancelQueries({ queryKey: ['watchlist-check', showId] })
-      queryClient.setQueryData(
-        ['watchlist-check', showId],
-        (old: { inWatchlist: boolean } | undefined) => ({
-          ...old,
-          inWatchlist: !wasIn,
-        })
-      )
+      await queryClient.cancelQueries({ queryKey: checkKey })
+      queryClient.setQueryData(checkKey, (old: { inWatchlist: boolean } | undefined) => ({
+        ...old,
+        inWatchlist: !wasIn,
+      }))
     },
     onError: (err) => {
-      queryClient.invalidateQueries({ queryKey: ['watchlist-check', showId] })
+      queryClient.invalidateQueries({ queryKey: checkKey })
       toast.error(err instanceof Error ? err.message : 'Failed to update watchlist')
     },
     onSuccess: (newInWatchlist) => {

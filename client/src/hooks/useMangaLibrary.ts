@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { fetchApi } from '../lib/fetchApi'
-import type { MangaProviderName, MangaCard } from './useManga'
+import { useTRPC } from '../lib/trpc'
+import type { MangaCard } from './useManga'
 
 export type MangaLibraryStatus = 'Reading' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
 
@@ -47,285 +47,228 @@ export interface ContinueReadingItem extends MangaLibraryItem {
   progressAt?: number | null
 }
 
-interface PaginatedMangaLibrary {
-  data: MangaLibraryItem[]
-  total: number
-  page: number
-  limit: number
-}
-
 export const mangaLibraryId = (provider: string, mangaId: string) =>
   `${provider.toLowerCase()}:${mangaId}`
 
 export const useMangaLibrary = (status: string = 'All', page: number = 1, limit: number = 24) => {
-  return useQuery<PaginatedMangaLibrary>({
-    queryKey: ['manga-library', status, page, limit],
-    queryFn: () => {
-      const p = new URLSearchParams()
-      p.set('status', status)
-      p.set('page', String(page))
-      p.set('limit', String(limit))
-      return fetchApi(`/api/manga/library?${p.toString()}`)
-    },
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.mangaLibrary.list.queryOptions({ status, page, limit }))
 }
 
 export const useMangaLibraryIds = () => {
-  return useQuery<{ ids: string[] }>({
-    queryKey: ['manga-library-ids'],
-    queryFn: () => fetchApi('/api/manga/library/ids'),
-    staleTime: 1000 * 60,
-  })
+  const trpc = useTRPC()
+  return useQuery({ ...trpc.mangaLibrary.ids.queryOptions(), staleTime: 1000 * 60 })
 }
 
 export const useMangaLibraryCheck = (id?: string) => {
-  return useQuery<{ inLibrary: boolean; status: string | null }>({
-    queryKey: ['manga-library-check', id],
-    queryFn: () => fetchApi(`/api/manga/library/check/${encodeURIComponent(id || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.mangaLibrary.check.queryOptions({ id: id ?? '' }),
     enabled: !!id,
     staleTime: 1000 * 60,
   })
 }
 
 export const useMangaLibraryEntry = (id?: string) => {
-  return useQuery<{ item: MangaLibraryItem | null }>({
-    queryKey: ['manga-library-entry', id],
-    queryFn: () => fetchApi(`/api/manga/library/entry/${encodeURIComponent(id || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.mangaLibrary.entry.queryOptions({ id: id ?? '' }),
     enabled: !!id,
     staleTime: 1000 * 60,
   })
 }
 
 export const useLinkMangaAnilist = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, anilistId }: { id: string; anilistId: number }) => {
-      return fetchApi('/api/manga/library/link', {
-        method: 'POST',
-        body: JSON.stringify({ id, anilistId }),
-      }) as Promise<{ success: boolean; id: string; progressMigrated?: boolean }>
-    },
-    onSuccess: (data) => {
-      toast.success(
-        data?.progressMigrated
-          ? 'Linked — chapter progress carried over'
-          : 'Linked to AniList entry'
-      )
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-check'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-entry'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to link: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.link.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(
+          data?.progressMigrated
+            ? 'Linked — chapter progress carried over'
+            : 'Linked to AniList entry'
+        )
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-check'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-entry'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to link: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useMangaContinueReading = (limit: number = 24) => {
-  return useQuery<{ data: ContinueReadingItem[]; total: number }>({
-    queryKey: ['manga-continue-reading', limit],
-    queryFn: () => fetchApi(`/api/manga/continue-reading?limit=${limit}`),
-  })
+  const trpc = useTRPC()
+  return useQuery(trpc.mangaProgress.continueReading.queryOptions({ limit }))
 }
 
 export const useMangaProgress = (mangaId?: string) => {
-  return useQuery<{ progress: MangaProgressItem[] }>({
-    queryKey: ['manga-progress', mangaId],
-    queryFn: () => fetchApi(`/api/manga/progress/${encodeURIComponent(mangaId || '')}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.mangaProgress.byManga.queryOptions({ mangaId: mangaId ?? '' }),
     enabled: !!mangaId,
   })
 }
 
 export const useAddMangaBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (item: {
-      provider: MangaProviderName
-      mangaId: string
-      title: string
-      cover?: string
-      status?: string
-      author?: string
-      altTitle?: string
-      contentRating?: string
-      silent?: boolean
-    }) => {
-      const { silent: _silent, ...body } = item
-      return fetchApi('/api/manga/library/add', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }) as Promise<{ success: boolean; id: string }>
-    },
-    onSuccess: (_data, variables) => {
-      if (!variables.silent) toast.success('Bookmarked')
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-      queryClient.invalidateQueries({
-        queryKey: ['manga-library-check', mangaLibraryId(variables.provider, variables.mangaId)],
-      })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to bookmark: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.add.mutationOptions({
+      onSuccess: (_data, variables) => {
+        if (!variables.silent) toast.success('Bookmarked')
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+        queryClient.invalidateQueries({
+          queryKey: [
+            'manga-library-check',
+            mangaLibraryId(variables.provider ?? '', variables.mangaId ?? ''),
+          ],
+        })
+      },
+      onError: (error) => {
+        toast.error(`Failed to bookmark: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useRemoveMangaBookmark = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await fetchApi('/api/manga/library/remove', {
-        method: 'POST',
-        body: JSON.stringify({ id }),
-      })
-    },
-    onSuccess: (_data, id) => {
-      toast.success('Bookmark removed')
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-check', id] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.remove.mutationOptions({
+      onSuccess: (_data, id) => {
+        toast.success('Bookmark removed')
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-check', id] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useUpdateMangaStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await fetchApi('/api/manga/library/status', {
-        method: 'POST',
-        body: JSON.stringify({ id, status }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Status updated')
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update status: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.setStatus.mutationOptions({
+      onSuccess: () => {
+        toast.success('Status updated')
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to update status: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useSaveMangaProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (progress: {
-      mangaId: string
-      chapterId: string
-      chapterNumber?: string
-      page: number
-      pageCount?: number
-      title?: string
-      cover?: string
-      provider?: string
-      altTitle?: string
-      contentRating?: string
-    }) => {
-      await fetchApi('/api/manga/progress', {
-        method: 'POST',
-        body: JSON.stringify(progress),
-      })
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['manga-progress', variables.mangaId] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-    },
-  })
+  return useMutation(
+    trpc.mangaProgress.save.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['manga-progress', variables.mangaId] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+        void queryClient.invalidateQueries(trpc.mangaProgress.pathFilter())
+      },
+    })
+  )
 }
 
 export const useRemoveMangaProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ mangaId, chapterId }: { mangaId: string; chapterId?: string }) => {
-      await fetchApi('/api/manga/progress/remove', {
-        method: 'POST',
-        body: JSON.stringify({ mangaId, chapterId }),
-      })
-    },
-    onSuccess: () => {
-      toast.success('Progress reset')
-      queryClient.invalidateQueries({ queryKey: ['manga-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaProgress.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success('Progress reset')
+        queryClient.invalidateQueries({ queryKey: ['manga-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        void queryClient.invalidateQueries(trpc.mangaProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchUpdateMangaStatus = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
-      return fetchApi('/api/manga/library/batch-status', {
-        method: 'POST',
-        body: JSON.stringify({ ids, status }),
-      }) as Promise<{ success: boolean; updated: number }>
-    },
-    onSuccess: (data) => {
-      toast.success(`Status updated for ${data.updated ?? 0} items`)
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update statuses: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.batchStatus.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(`Status updated for ${data.updated ?? 0} items`)
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to update statuses: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveManga = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/manga/library/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from reading list`)
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaLibrary.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from reading list`)
+        void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useBatchRemoveMangaProgress = () => {
+  const trpc = useTRPC()
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      return fetchApi('/api/manga/progress/remove-many', {
-        method: 'POST',
-        body: JSON.stringify({ ids }),
-      }) as Promise<{ success: boolean; removed: number }>
-    },
-    onSuccess: (data) => {
-      const count = data.removed ?? 0
-      toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
-      queryClient.invalidateQueries({ queryKey: ['manga-progress'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reset progress: ${error.message}`)
-    },
-  })
+  return useMutation(
+    trpc.mangaProgress.removeMany.mutationOptions({
+      onSuccess: (data) => {
+        const count = data.removed ?? 0
+        toast.success(`Reset progress for ${count} ${count === 1 ? 'item' : 'items'}`)
+        queryClient.invalidateQueries({ queryKey: ['manga-progress'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
+        queryClient.invalidateQueries({ queryKey: ['manga-library'] })
+        void queryClient.invalidateQueries(trpc.mangaProgress.pathFilter())
+      },
+      onError: (error) => {
+        toast.error(`Failed to reset progress: ${error.message}`)
+      },
+    })
+  )
 }
 
 export const useToggleMangaBookmark = () => {

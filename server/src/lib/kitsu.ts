@@ -62,7 +62,6 @@ function asArray(data?: KitsuEntry | KitsuEntry[]): KitsuEntry[] {
   return Array.isArray(data) ? data : [data]
 }
 
-/** Builds a map of kitsu relationship id -> included resource for a given type. */
 function includedMap(
   entry: KitsuEntry,
   included: KitsuEntry[] | undefined,
@@ -78,7 +77,6 @@ function includedMap(
   return included.filter((i) => i.type === type && ids.has(i.id))
 }
 
-/** Kitsu status/subtype/season values are lowercase; map to AniList-style values. */
 const STATUS_MAP: Record<string, string> = {
   current: 'RELEASING',
   finished: 'FINISHED',
@@ -149,7 +147,6 @@ function anilistSortToKitsu(sort: string | undefined): string {
   }
 }
 
-/** Translates an AniList-style status filter to a Kitsu filter value. */
 function statusToKitsuFilter(status: string | undefined): string | undefined {
   if (!status) return undefined
   const s = status.toUpperCase()
@@ -164,7 +161,6 @@ function seasonToKitsu(season: string | undefined): string | undefined {
   return season.toLowerCase()
 }
 
-/** Kitsu genre-ish taxonomy: `categories`. */
 const CATEGORY_ALIASES: Record<string, string> = {
   'Sci-Fi': 'Science Fiction',
   'Sci Fi': 'Science Fiction',
@@ -198,9 +194,6 @@ export interface KitsuListOptions extends KitsuSearchOptions {
   sortValue?: string
 }
 
-/**
- * Resolves the included anime resource linked by a mapping entry's `item` relationship.
- */
 function mappingItem(entry: KitsuEntry, included: KitsuEntry[]): KitsuEntry | undefined {
   const rel = entry.relationships?.item?.data
   if (!rel) return undefined
@@ -208,10 +201,6 @@ function mappingItem(entry: KitsuEntry, included: KitsuEntry[]): KitsuEntry | un
   return included.find((i) => i.type === rel.type && i.id === rel.id)
 }
 
-/**
- * Fetches a list of anime from Kitsu and normalizes entries to AnilistMedia.
- * `include=mappings,categories` gives AniList/MAL ids + genres in one request.
- */
 export async function kitsuSearchAnime(options: KitsuSearchOptions = {}): Promise<AnilistMedia[]> {
   const {
     query,
@@ -281,7 +270,6 @@ export async function kitsuSearchAnime(options: KitsuSearchOptions = {}): Promis
   return results
 }
 
-/** Deduplicates by the resolved AniList/MAL id (keeps the first occurrence). */
 export function dedupeKitsuMedia(list: AnilistMedia[]): AnilistMedia[] {
   const seen = new Set<number>()
   const out: AnilistMedia[] = []
@@ -294,7 +282,6 @@ export function dedupeKitsuMedia(list: AnilistMedia[]): AnilistMedia[] {
   return out
 }
 
-/** Converts a Kitsu entry + included resources into AnilistMedia (id = AniList or MAL id). */
 function normalizeKitsuEntry(
   entry: KitsuEntry,
   included: KitsuEntry[],
@@ -371,9 +358,6 @@ function normalizeKitsuEntry(
   }
 }
 
-/**
- * Finds the Kitsu entry id for a given AniList id via the mappings endpoint.
- */
 async function kitsuIdByAnilistId(anilistId: number): Promise<string | null> {
   const json = await kitsuFetch(
     `/mappings?filter[externalSite]=anilist%2Fanime&filter[externalId]=${anilistId}&include=item`
@@ -412,13 +396,12 @@ export async function kitsuBatchGetStatuses(anilistIds: number[]): Promise<Map<n
       const status = raw ? (KITSU_STATUS_MAP[raw] ?? raw.toUpperCase()) : undefined
       if (status) result.set(id, status)
     } catch {
-      // skip failed lookups
+      // ignore
     }
   }
   return result
 }
 
-/** Fetches full detail (genres + studios) for a Kitsu anime id. */
 async function kitsuDetail(
   kitsuId: string,
   knownIds?: { anilistId?: number | null; malId?: number | null }
@@ -469,7 +452,6 @@ export interface KitsuTitles {
   native?: string
 }
 
-/** Batch-resolves English/Japanese titles for MAL ids via the mappings endpoint. */
 export async function kitsuTitlesByMalIds(malIds: number[]): Promise<Map<number, KitsuTitles>> {
   const result = new Map<number, KitsuTitles>()
   const unique = [...new Set(malIds.filter((n) => Number.isFinite(n) && n > 0))]
@@ -510,7 +492,6 @@ export async function kitsuTitlesByMalIds(malIds: number[]): Promise<Map<number,
   return result
 }
 
-/** Episode numbers for a show, via the episodes relationship. */
 export async function kitsuEpisodes(anilistId: number, idMal: number | null): Promise<string[]> {
   let kitsuId: string | null = null
   if (anilistId > 0) kitsuId = await kitsuIdByAnilistId(anilistId)
@@ -547,7 +528,6 @@ export async function kitsuEpisodes(anilistId: number, idMal: number | null): Pr
   return Array.from({ length: max }, (_, i) => (i + 1).toString())
 }
 
-/** Trending proxy: currently-airing shows sorted by popularity (user count). */
 export async function kitsuTrending(
   page: number = 1,
   perPage: number = 20,
@@ -567,7 +547,6 @@ export async function kitsuTrending(
   )
 }
 
-/** Spotlight: top popular shows with native Kitsu banners (3360x800). */
 export async function kitsuSpotlight(
   page: number = 1,
   perPage: number = 20
@@ -585,11 +564,6 @@ export async function kitsuSpotlight(
   )
 }
 
-/**
- * Latest releases: currently-airing shows. Kitsu has no reliable episode airdates,
- * so we sort current shows by start date (newest first) and bump shows with a known
- * next episode date to the front (soonest first).
- */
 export async function kitsuLatestReleases(
   format: string = 'TV',
   page: number = 1,
@@ -635,7 +609,6 @@ function fallbackStartRank(m: AnilistMedia): number {
   )
 }
 
-/** Seasonal list for a given season/year, matching AniList's POPULARITY_DESC order. */
 export async function kitsuSeasonal(
   season: string,
   year: number,

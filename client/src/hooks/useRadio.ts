@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchApi } from '../lib/fetchApi'
+import { useTRPC } from '../lib/trpc'
 
 export interface RadioStation {
   id: string
@@ -65,17 +65,17 @@ export function songAnime(song: ListenMoeSong | null): string {
 }
 
 export const useRadioStations = () => {
-  return useQuery<{ stations: RadioStation[] }>({
-    queryKey: ['radioStations'],
-    queryFn: () => fetchApi('/api/radio/stations'),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.radio.stations.queryOptions(),
     staleTime: STALE_5_MIN,
   })
 }
 
 export const useRadioSearch = (query: string) => {
-  return useQuery<{ stations: RadioStation[] }>({
-    queryKey: ['radioSearch', query],
-    queryFn: () => fetchApi(`/api/radio/search?q=${encodeURIComponent(query)}`),
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.radio.search.queryOptions({ q: query }),
     enabled: query.trim().length > 0,
     staleTime: STALE_5_MIN,
   })

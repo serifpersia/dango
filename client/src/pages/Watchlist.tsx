@@ -20,7 +20,7 @@ import {
   useGenresAndTags,
 } from '../hooks/useAnimeData'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient, useTRPC } from '../lib/trpc'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import {
@@ -76,6 +76,7 @@ const Watchlist: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'last_added')
@@ -182,10 +183,7 @@ const Watchlist: React.FC = () => {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await fetchApi('/api/watchlist/status', {
-        method: 'POST',
-        body: JSON.stringify({ id, status }),
-      })
+      await trpcClient.watchlist.setStatus.mutate({ id, status })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
@@ -193,15 +191,14 @@ const Watchlist: React.FC = () => {
     },
   })
 
-  const removeCw = useMutation({
-    mutationFn: async (showId: string) => {
-      await fetchApi('/api/continue-watching/remove', {
-        method: 'POST',
-        body: JSON.stringify({ showId }),
-      })
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] }),
-  })
+  const removeCw = useMutation(
+    trpc.continueWatching.remove.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+    })
+  )
 
   const removeWl = useRemoveFromWatchlist()
   const { data: skipConfirm } = useSetting('skipRemoveConfirmation')
@@ -291,7 +288,7 @@ const Watchlist: React.FC = () => {
 
     const shouldSkip = String(skipConfirm) === 'true' || String(skipConfirm) === '1'
     if (shouldSkip) {
-      removeWl.mutate(id)
+      removeWl.mutate({ id })
     } else {
       setItemToRemove({ id, name })
     }
@@ -301,12 +298,12 @@ const Watchlist: React.FC = () => {
     if (!itemToRemove) return
     if (itemToRemove.ids) {
       if (isCW) {
-        bulkRemoveCw.mutate(itemToRemove.ids)
+        bulkRemoveCw.mutate({ ids: itemToRemove.ids })
         if (confirmRemoveFromWatchlist) {
-          bulkRemove.mutate(itemToRemove.ids)
+          bulkRemove.mutate({ ids: itemToRemove.ids })
         }
       } else {
-        bulkRemove.mutate(itemToRemove.ids)
+        bulkRemove.mutate({ ids: itemToRemove.ids })
       }
       setSelectedIds(new Set())
       setItemToRemove(null)
@@ -315,12 +312,12 @@ const Watchlist: React.FC = () => {
       return
     }
     if (isCW) {
-      removeCw.mutate(itemToRemove.id)
+      removeCw.mutate({ showId: itemToRemove.id as string })
       if (confirmRemoveFromWatchlist) {
-        removeWl.mutate(itemToRemove.id)
+        removeWl.mutate({ id: itemToRemove.id })
       }
     } else {
-      removeWl.mutate(itemToRemove.id)
+      removeWl.mutate({ id: itemToRemove.id })
     }
     if (confirmRememberPreference)
       updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true })

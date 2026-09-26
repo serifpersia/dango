@@ -56,7 +56,6 @@ function migrateLegacyData(packageServerRoot: string, dataRoot: string) {
     moveFileIfNeeded(path.join(packageServerRoot, filename), path.join(dataRoot, filename))
   }
 
-  // Manga library database + manifests (added after anime DB; migrate if present)
   for (const filename of [
     'manga.db',
     'manga.db-shm',

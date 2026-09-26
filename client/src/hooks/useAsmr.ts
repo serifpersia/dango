@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
 
 export interface AsmrEpisodeAvailability {
   sub?: number
@@ -63,12 +63,13 @@ export const useAsmrBrowse = (query: string, page: number, sort: string, rating:
       return {
         queryKey: ['asmrBrowse', query, n, sort, rating],
         queryFn: () => {
-          const params = new URLSearchParams()
-          if (query.trim()) params.set('q', query.trim())
-          params.set('page', n.toString())
-          if (sort && sort !== 'latest') params.set('sort', sort)
-          if (rating) params.set('rating', rating)
-          return fetchApi(`/api/asmr/browse?${params.toString()}`)
+          const trimmed = query.trim()
+          return trpcClient.asmr.browse.query({
+            q: trimmed || undefined,
+            page: n,
+            sort: sort && sort !== 'latest' ? sort : undefined,
+            rating: rating || undefined,
+          })
         },
         staleTime: STALE_5_MIN,
       }
@@ -98,7 +99,7 @@ export const useAsmrBrowse = (query: string, page: number, sort: string, rating:
 export const useAsmrWork = (rjCode: string | null) => {
   return useQuery<AsmrWorkDetail>({
     queryKey: ['asmrWork', rjCode],
-    queryFn: () => fetchApi(`/api/asmr/work/${rjCode}`),
+    queryFn: () => trpcClient.asmr.work.query({ rj: rjCode as string }),
     enabled: !!rjCode,
     staleTime: STALE_5_MIN,
     refetchOnMount: 'always',
@@ -136,12 +137,7 @@ export const useAsmrSpotlight = (enabled = true) => {
       const n = i + 1
       return {
         queryKey: ['asmrBrowse', '', n, 'popular_month', ''],
-        queryFn: () => {
-          const params = new URLSearchParams()
-          params.set('page', String(n))
-          params.set('sort', 'popular_month')
-          return fetchApi(`/api/asmr/browse?${params.toString()}`)
-        },
+        queryFn: () => trpcClient.asmr.browse.query({ page: n, sort: 'popular_month' }),
         staleTime: STALE_5_MIN,
         enabled,
         retry: 1,
@@ -156,13 +152,7 @@ export const useAsmrSpotlight = (enabled = true) => {
   const needFallback = enabled && settled && merged.length < SPOTLIGHT_NEED
   const fallback = useQuery({
     queryKey: ['asmrBrowse', '', 1, 'popular', 'sfw'],
-    queryFn: () => {
-      const params = new URLSearchParams()
-      params.set('page', '1')
-      params.set('sort', 'popular')
-      params.set('rating', 'sfw')
-      return fetchApi(`/api/asmr/browse?${params.toString()}`)
-    },
+    queryFn: () => trpcClient.asmr.browse.query({ page: 1, sort: 'popular', rating: 'sfw' }),
     staleTime: STALE_5_MIN,
     enabled: needFallback,
     retry: 1,

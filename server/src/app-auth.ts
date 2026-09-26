@@ -35,7 +35,7 @@ function saveSessions(sessions: Record<string, number>) {
     fs.mkdirSync(CONFIG.ROOT, { recursive: true })
     fs.writeFileSync(sessionsFile(), JSON.stringify(sessions))
   } catch {
-    // sessions won't be saved if disk write fails
+    // ignore
   }
 }
 

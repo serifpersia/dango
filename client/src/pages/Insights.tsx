@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
-import { fetchApi } from '../lib/fetchApi'
+import { trpcClient } from '../lib/trpc'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import styles from './Insights.module.css'
 
@@ -77,9 +77,8 @@ const Insights: React.FC = () => {
   const { data, isLoading, isError } = useQuery<InsightData>({
     queryKey: ['insights'],
     queryFn: async () => {
-      const res = await fetch('/api/insights')
-      if (!res.ok) throw new Error('Failed to fetch insights')
-      return res.json()
+      const data = await trpcClient.insights.summary.query()
+      return data as unknown as InsightData
     },
   })
 
@@ -90,9 +89,8 @@ const Insights: React.FC = () => {
   const { data: recsData } = useQuery<{ candidates: RecCandidate[] }>({
     queryKey: ['insights-recommendations'],
     queryFn: async () => {
-      const res = await fetch('/api/insights/recommendations')
-      if (!res.ok) throw new Error('Failed to fetch recommendations')
-      return res.json()
+      const data = await trpcClient.insights.recommendations.query()
+      return data as unknown as { candidates: RecCandidate[] }
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -100,15 +98,12 @@ const Insights: React.FC = () => {
 
   const addToPlan = useMutation({
     mutationFn: async (c: RecCandidate) => {
-      await fetchApi('/api/watchlist/add', {
-        method: 'POST',
-        body: JSON.stringify({
-          id: String(c.id),
-          name: c.title,
-          thumbnail: c.cover || '',
-          status: 'Plan to Watch',
-          type: c.format,
-        }),
+      await trpcClient.watchlist.add.mutate({
+        id: String(c.id),
+        name: c.title,
+        thumbnail: c.cover || '',
+        status: 'Plan to Watch',
+        type: c.format,
       })
     },
     onSuccess: () => {
