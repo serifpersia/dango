@@ -197,7 +197,7 @@ export const TvProgressRepository = {
       ON CONFLICT(mediaId, season, episode) DO UPDATE SET
          currentTime = EXCLUDED.currentTime,
          duration = EXCLUDED.duration,
-         completed = CASE WHEN tv_progress.completed = 1 OR EXCLUDED.completed = 1 THEN 1 ELSE 0 END,
+         completed = EXCLUDED.completed,
          title = COALESCE(EXCLUDED.title, tv_progress.title),
          poster = COALESCE(EXCLUDED.poster, tv_progress.poster),
          backdrop = COALESCE(EXCLUDED.backdrop, tv_progress.backdrop),

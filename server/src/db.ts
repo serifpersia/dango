@@ -1,14 +1,19 @@
 import { DatabaseSync, StatementSync } from 'node:sqlite'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import fs from 'fs'
 import path from 'path'
 import logger from './logger.js'
 
 type BindableValue = string | number | bigint | null | Uint8Array
 
+const txOwner = new AsyncLocalStorage<DatabaseWrapper>()
+
 export class DatabaseWrapper {
   private db: DatabaseSync
   private isClosed = false
   private statementCache = new Map<string, StatementSync>()
+  private txDepth = 0
+  private txQueue: Promise<void> = Promise.resolve()
 
   constructor(_dbPath: string, db: DatabaseSync) {
     this.db = db
@@ -39,13 +44,76 @@ export class DatabaseWrapper {
   }
 
   public serialize(cb: () => void) {
-    this.db.exec('BEGIN IMMEDIATE')
+    const outer = this.txDepth === 0
+    const level = this.txDepth
+    this.run(outer ? 'BEGIN IMMEDIATE' : `SAVEPOINT dango_sp_${level}`)
+    this.txDepth = level + 1
     try {
-      cb()
-      this.db.exec('COMMIT')
+      txOwner.run(this, cb)
     } catch (e) {
-      this.db.exec('ROLLBACK')
+      this.txDepth = level
+      try {
+        this.run(outer ? 'ROLLBACK' : `ROLLBACK TO SAVEPOINT dango_sp_${level}`)
+      } catch {
+        // ignore
+      }
       throw e
+    }
+    this.txDepth = level
+    this.run(outer ? 'COMMIT' : `RELEASE SAVEPOINT dango_sp_${level}`)
+  }
+
+  private acquireTxQueue(): Promise<() => void> {
+    const prev = this.txQueue
+    let release!: () => void
+    const current = new Promise<void>((res) => {
+      release = res
+    })
+    this.txQueue = prev.then(() => current)
+    return prev.then(() => release)
+  }
+
+  public async transact(fn: (tx: DatabaseWrapper) => Promise<void>): Promise<void> {
+    if (txOwner.getStore() === this) {
+      const level = this.txDepth
+      this.run(`SAVEPOINT dango_sp_${level}`)
+      this.txDepth = level + 1
+      try {
+        await fn(this)
+      } catch (e) {
+        this.txDepth = level
+        try {
+          this.run(`ROLLBACK TO SAVEPOINT dango_sp_${level}`)
+        } catch {
+          // ignore
+        }
+        throw e
+      }
+      this.txDepth = level
+      this.run(`RELEASE SAVEPOINT dango_sp_${level}`)
+      return
+    }
+    const release = await this.acquireTxQueue()
+    try {
+      await txOwner.run(this, async () => {
+        this.run('BEGIN IMMEDIATE')
+        this.txDepth = 1
+        try {
+          await fn(this)
+        } catch (e) {
+          this.txDepth = 0
+          try {
+            this.run('ROLLBACK')
+          } catch {
+            // ignore
+          }
+          throw e
+        }
+        this.txDepth = 0
+        this.run('COMMIT')
+      })
+    } finally {
+      release()
     }
   }
 

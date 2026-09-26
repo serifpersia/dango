@@ -37,16 +37,5 @@ export function getDrizzle(db: DatabaseWrapper): AnimeDb {
 }
 
 export async function runTx(db: DatabaseWrapper, fn: (tx: DatabaseWrapper) => Promise<void>) {
-  db.run('BEGIN IMMEDIATE')
-  try {
-    await fn(db)
-    db.run('COMMIT')
-  } catch (e) {
-    try {
-      db.run('ROLLBACK')
-    } catch {
-      // ignore
-    }
-    throw e
-  }
+  await db.transact(fn)
 }

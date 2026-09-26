@@ -1238,14 +1238,18 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
          WHERE mediaId = NEW.mediaId AND season = NEW.season AND episode = NEW.episode;
        END`
     )
+    db.run(`DROP TRIGGER IF EXISTS trg_tv_progress_completed_update`)
     db.run(
       `CREATE TRIGGER IF NOT EXISTS trg_tv_progress_completed_update
        AFTER UPDATE OF currentTime, duration ON tv_progress
-       WHEN OLD.completed = 1 OR (NEW.duration > 0 AND NEW.currentTime >= NEW.duration * 0.8)
+       WHEN NEW.duration > 0 AND NEW.currentTime >= NEW.duration * 0.8
        BEGIN
          UPDATE tv_progress SET completed = 1
          WHERE mediaId = NEW.mediaId AND season = NEW.season AND episode = NEW.episode;
        END`
+    )
+    db.run(
+      `UPDATE tv_progress SET completed = 0 WHERE completed = 1 AND NOT (duration > 0 AND currentTime >= duration * 0.8)`
     )
 
     db.run(
