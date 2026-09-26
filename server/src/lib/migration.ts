@@ -1,5 +1,5 @@
 import { DatabaseWrapper } from '../db.js'
-import { performWriteTransaction } from '../sync.js'
+import { performWriteTransactionAsync } from '../sync.js'
 import { searchAnilistByTitle, getShowMetaById } from './anilist.js'
 import { isTempShowId } from './temp-ids.js'
 import { WatchlistRepository } from '../repositories/watchlist.repository.js'
@@ -24,7 +24,7 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
     trueAnilistId = metaRow.anilistId
   } else if (!metaRow) {
     // No local shows_meta — only verify via AniList if there's existing data that could be a MAL alias
-    if (WatchlistRepository.exists(db, numericId)) {
+    if (await WatchlistRepository.exists(db, numericId)) {
       const meta = await getShowMetaById(numericId)
       if (meta?.anilistId && meta.anilistId !== parseInt(numericId)) {
         trueAnilistId = meta.anilistId
@@ -34,15 +34,15 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
 
   if (trueAnilistId) {
     const canonicalId = String(trueAnilistId)
-    if (WatchlistRepository.exists(db, numericId)) {
+    if (await WatchlistRepository.exists(db, numericId)) {
       // MAL alias is in the watchlist — migrate all entries to the canonical AniList ID
       logger.info(
         { aliasId: numericId, canonicalId },
         'Migrating watchlist from MAL alias to canonical ID'
       )
-      await performWriteTransaction(db, (tx) => {
-        const aliasWatchlist = WatchlistRepository.getById(tx, numericId)
-        const aliasShowsMeta = ShowsMetaRepository.getById(tx, numericId)
+      await performWriteTransactionAsync(db, async (tx) => {
+        const aliasWatchlist = await WatchlistRepository.getById(tx, numericId)
+        const aliasShowsMeta = await ShowsMetaRepository.getById(tx, numericId)
 
         tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
           canonicalId,
@@ -87,7 +87,7 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
     }
 
     // Not in watchlist — check if canonical ID is in the watchlist and save a mapping
-    if (WatchlistRepository.exists(db, canonicalId)) {
+    if (await WatchlistRepository.exists(db, canonicalId)) {
       const existing = dbGet<{ numericId: string }>(
         db,
         'SELECT numericId FROM legacy_id_mapping WHERE legacyId = ?',
@@ -105,7 +105,7 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
     }
   }
 
-  if (WatchlistRepository.exists(db, numericId)) return numericId
+  if (await WatchlistRepository.exists(db, numericId)) return numericId
 
   let legacyId: string | undefined
 
@@ -136,9 +136,9 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
   logger.info({ legacyId, numericId }, 'Consolidating watchlist entry from legacy to numeric ID')
 
   const aniListId = parseInt(numericId)
-  await performWriteTransaction(db, (tx) => {
-    const legacyWatchlist = WatchlistRepository.getById(tx, legacyId)
-    const legacyShowsMeta = ShowsMetaRepository.getById(tx, legacyId)
+  await performWriteTransactionAsync(db, async (tx) => {
+    const legacyWatchlist = await WatchlistRepository.getById(tx, legacyId)
+    const legacyShowsMeta = await ShowsMetaRepository.getById(tx, legacyId)
 
     tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
       numericId,
@@ -201,9 +201,9 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         return consolidateFromNumeric(db, mapping.numericId)
       }
 
-      await performWriteTransaction(db, (tx) => {
-        const legacyWatchlist = WatchlistRepository.getById(tx, mapping.numericId)
-        const legacyShowsMeta = ShowsMetaRepository.getById(tx, mapping.numericId)
+      await performWriteTransactionAsync(db, async (tx) => {
+        const legacyWatchlist = await WatchlistRepository.getById(tx, mapping.numericId)
+        const legacyShowsMeta = await ShowsMetaRepository.getById(tx, mapping.numericId)
 
         tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
           canonicalId,
@@ -304,17 +304,17 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
     }
 
     // 4. Perform the DB updates across all tables atomically
-    await performWriteTransaction(db, (tx) => {
+    await performWriteTransactionAsync(db, async (tx) => {
       tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
         legacyId,
         newId,
       ])
 
-      const legacyWatchlist = WatchlistRepository.getById(tx, legacyId)
+      const legacyWatchlist = await WatchlistRepository.getById(tx, legacyId)
       if (legacyWatchlist) {
-        const newWatchlistExists = WatchlistRepository.getById(tx, newId)
+        const newWatchlistExists = await WatchlistRepository.getById(tx, newId)
         if (newWatchlistExists) {
-          WatchlistRepository.delete(tx, legacyId)
+          await WatchlistRepository.delete(tx, legacyId)
         } else {
           tx.run('UPDATE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
             newId,
@@ -324,9 +324,9 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         }
       }
 
-      const legacyShowsMeta = ShowsMetaRepository.getById(tx, legacyId)
+      const legacyShowsMeta = await ShowsMetaRepository.getById(tx, legacyId)
       if (legacyShowsMeta) {
-        const newShowsMetaExists = ShowsMetaRepository.getById(tx, newId)
+        const newShowsMetaExists = await ShowsMetaRepository.getById(tx, newId)
         if (newShowsMetaExists) {
           tx.run('DELETE FROM shows_meta WHERE id = ?', [legacyId])
         } else {

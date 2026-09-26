@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
-import { performWriteTransaction } from '../sync.js'
+import { performWriteTransactionAsync } from '../sync.js'
 import { WatchlistRepository } from '../repositories/watchlist.repository.js'
 import {
   WatchedEpisodesRepository,
@@ -353,7 +353,7 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
   }, BACKGROUND_DISCOVERY_INTERVAL_MS)
 }
 
-function showsMetaChanged(
+async function showsMetaChanged(
   db: DatabaseWrapper,
   showId: string,
   candidate: {
@@ -370,8 +370,8 @@ function showsMetaChanged(
     isAdult?: number | null
     episodeDuration?: number
   }
-): boolean {
-  const existing = ShowsMetaRepository.getById(db, showId) as {
+): Promise<boolean> {
+  const existing = (await ShowsMetaRepository.getById(db, showId)) as {
     name?: string | null
     thumbnail?: string | null
     nativeName?: string | null
@@ -637,7 +637,7 @@ async function backfillMissingPosters(
         const dual = row as { _id: string } & Record<string, unknown>
         if (dual._id !== undefined) dual._id = row.id
         try {
-          ShowsMetaRepository.upsert(db, {
+          await ShowsMetaRepository.upsert(db, {
             id: row.id,
             thumbnail: poster,
             popularityScore:
@@ -697,7 +697,7 @@ function resolveOfflinePoster(id: string): string | null {
 
 async function applyPoster(db: DatabaseWrapper, id: string, poster: string): Promise<void> {
   try {
-    ShowsMetaRepository.upsert(db, { id, thumbnail: poster })
+    await ShowsMetaRepository.upsert(db, { id, thumbnail: poster })
   } catch {
     // ignore
   }
@@ -944,9 +944,9 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
   app.post('/api/continue-watching/remove', async (c) => {
     const { showId: showIdRaw } = (await c.req.json()) as { showId?: unknown }
     const showId = await getMigratedId(db(), showIdRaw as string)
-    await performWriteTransaction(db(), (tx) => {
-      WatchedEpisodesRepository.deleteByShow(tx, showId)
-      NotificationsRepository.deleteByShow(tx, showId)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchedEpisodesRepository.deleteByShow(tx, showId)
+      await NotificationsRepository.deleteByShow(tx, showId)
     })
     return c.json({ success: true })
   })
@@ -958,10 +958,10 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     }
 
     const ids = await Promise.all(idsRaw.map((id: string) => getMigratedId(db(), id)))
-    await performWriteTransaction(db(), (tx) => {
+    await performWriteTransactionAsync(db(), async (tx) => {
       for (const id of ids) {
-        WatchedEpisodesRepository.deleteByShow(tx, id)
-        NotificationsRepository.deleteByShow(tx, id)
+        await WatchedEpisodesRepository.deleteByShow(tx, id)
+        await NotificationsRepository.deleteByShow(tx, id)
       }
     })
 
@@ -977,10 +977,10 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
   app.post('/api/continue-watching/purge-adult', async (c) => {
     const ids = await getAdultNonWatchlistShowIds(db())
     if (ids.length > 0) {
-      await performWriteTransaction(db(), (tx) => {
+      await performWriteTransactionAsync(db(), async (tx) => {
         for (const id of ids) {
-          WatchedEpisodesRepository.deleteByShow(tx, id)
-          NotificationsRepository.deleteByShow(tx, id)
+          await WatchedEpisodesRepository.deleteByShow(tx, id)
+          await NotificationsRepository.deleteByShow(tx, id)
         }
       })
       db().scheduleSave()
@@ -1056,27 +1056,27 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
       episodeDuration: (duration as number) > 0 ? Math.round((duration as number) / 60) : undefined,
     }
 
-    const metaChanged = showsMetaChanged(db(), showId, metaCandidate)
+    const metaChanged = await showsMetaChanged(db(), showId, metaCandidate)
 
     if (metaChanged) {
-      await performWriteTransaction(db(), (tx) => {
-        ShowsMetaRepository.upsert(tx, {
+      await performWriteTransactionAsync(db(), async (tx) => {
+        await ShowsMetaRepository.upsert(tx, {
           id: showId,
           ...metaCandidate,
         })
       })
     }
 
-    await performWriteTransaction(db(), (tx) => {
-      WatchedEpisodesRepository.upsert(tx, {
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchedEpisodesRepository.upsert(tx, {
         showId,
         episodeNumber: episodeNumber as string,
         currentTime: currentTime as number,
         duration: duration as number,
       })
 
-      NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber as string)
-      NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber as string)
+      await NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber as string)
+      await NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber as string)
     })
 
     db().scheduleSave()
@@ -1124,7 +1124,7 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     for (const row of rows) {
       if (!row.thumbnail || row.thumbnail.trim() === '') {
         try {
-          const meta = ShowsMetaRepository.getById(db(), row.id) as {
+          const meta = (await ShowsMetaRepository.getById(db(), row.id)) as {
             thumbnail?: string
           } | null
           if (meta?.thumbnail && meta.thumbnail.trim() !== '') {
@@ -1207,9 +1207,9 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
 
     const existing = await QueueRepository.getByEpisode(db(), showId, String(episodeNumber))
 
-    await performWriteTransaction(db(), (tx) => {
+    await performWriteTransactionAsync(db(), async (tx) => {
       if (showName || showThumbnail || nativeName || englishName || type) {
-        ShowsMetaRepository.upsert(tx, {
+        await ShowsMetaRepository.upsert(tx, {
           id: showId,
           name: (showName || '') as string,
           thumbnail: (showThumbnail || '') as string,
@@ -1220,9 +1220,9 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
       }
 
       if (existing) {
-        QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
+        await QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
       } else {
-        QueueRepository.addToEnd(tx, showId, String(episodeNumber))
+        await QueueRepository.addToEnd(tx, showId, String(episodeNumber))
       }
     })
 
@@ -1256,9 +1256,9 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     const showId = await getMigratedId(db(), showIdRaw as string)
     const normalized = [...new Set(episodeNumbers.map((ep: string) => String(ep)))]
 
-    await performWriteTransaction(db(), (tx) => {
+    await performWriteTransactionAsync(db(), async (tx) => {
       if (showName || showThumbnail || nativeName || englishName || type) {
-        ShowsMetaRepository.upsert(tx, {
+        await ShowsMetaRepository.upsert(tx, {
           id: showId,
           name: (showName || '') as string,
           thumbnail: (showThumbnail || '') as string,
@@ -1267,7 +1267,7 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
           type: type as string | undefined,
         })
       }
-      return QueueRepository.addManyToEnd(
+      return await QueueRepository.addManyToEnd(
         tx,
         normalized.map((episodeNumber) => ({ showId, episodeNumber }))
       )
@@ -1283,8 +1283,8 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
       episodeNumber?: unknown
     }
     const showId = await getMigratedId(db(), showIdRaw as string)
-    await performWriteTransaction(db(), (tx) => {
-      QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
     })
     return c.json({ success: true })
   })
@@ -1301,21 +1301,21 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     const showId = await getMigratedId(db(), showIdRaw as string)
 
     let removed: string[]
-    await performWriteTransaction(db(), (tx) => {
-      removed = (QueueRepository.getByShow(tx, showId) || []).map((ep) => ep.episodeNumber)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      removed = ((await QueueRepository.getByShow(tx, showId)) || []).map((ep) => ep.episodeNumber)
       const toRemove =
         Array.isArray(episodeNumbers) && episodeNumbers.length
           ? [...new Set(episodeNumbers.map((ep: string) => String(ep)))]
           : removed
-      return QueueRepository.removeMany(tx, showId, toRemove)
+      await QueueRepository.removeMany(tx, showId, toRemove)
     })
 
     return c.json({ success: true, removed: removed!.length })
   })
 
   app.post('/api/queue/clear', async (c) => {
-    await performWriteTransaction(db(), (tx) => {
-      QueueRepository.clear(tx)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await QueueRepository.clear(tx)
     })
     return c.json({ success: true })
   })
@@ -1326,8 +1326,8 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
       return c.json({ error: 'items must be an array' }, 400)
     }
 
-    await performWriteTransaction(db(), (tx) => {
-      QueueRepository.reorder(tx, items)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await QueueRepository.reorder(tx, items)
     })
     return c.json({ success: true })
   })
@@ -1426,8 +1426,8 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     }
     const id = await getMigratedId(db(), idRaw as string)
 
-    await performWriteTransaction(db(), (tx) => {
-      WatchlistRepository.upsert(tx, {
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchlistRepository.upsert(tx, {
         id,
         name: name as string,
         thumbnail: thumbnail as string,
@@ -1437,7 +1437,7 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
         type: (type as string) || 'TV',
       })
       if (typeof isAdultRaw === 'boolean') {
-        ShowsMetaRepository.upsert(tx, { id, isAdult: isAdultRaw ? 1 : 0 })
+        await ShowsMetaRepository.upsert(tx, { id, isAdult: isAdultRaw ? 1 : 0 })
       }
     })
 
@@ -1448,7 +1448,7 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
         if (!isAnilistRateLimited()) {
           const result = await searchAnilistByTitle(name as string)
           if (result?.id) {
-            ShowsMetaRepository.upsert(db(), { id, anilistId: result.id })
+            await ShowsMetaRepository.upsert(db(), { id, anilistId: result.id })
             db().scheduleSave()
             return
           }
@@ -1461,7 +1461,7 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
           })
           if (kitsuResults.length > 0) {
             const anilistId = Math.abs(kitsuResults[0].id)
-            ShowsMetaRepository.upsert(db(), { id, anilistId })
+            await ShowsMetaRepository.upsert(db(), { id, anilistId })
             db().scheduleSave()
           }
         } catch {
@@ -1477,10 +1477,10 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
   app.post('/api/watchlist/remove', async (c) => {
     const { id: idRaw } = (await c.req.json()) as { id?: unknown }
     const id = await getMigratedId(db(), idRaw as string)
-    await performWriteTransaction(db(), (tx) => {
-      WatchlistRepository.delete(tx, id)
-      WatchedEpisodesRepository.deleteByShow(tx, id)
-      NotificationsRepository.deleteByShow(tx, id)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchlistRepository.delete(tx, id)
+      await WatchedEpisodesRepository.deleteByShow(tx, id)
+      await NotificationsRepository.deleteByShow(tx, id)
     })
     return c.json({ success: true })
   })
@@ -1492,11 +1492,11 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     }
 
     const ids = await Promise.all(idsRaw.map((id: string) => getMigratedId(db(), id)))
-    await performWriteTransaction(db(), (tx) => {
-      WatchlistRepository.deleteMany(tx, ids)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchlistRepository.deleteMany(tx, ids)
       for (const id of ids) {
-        WatchedEpisodesRepository.deleteByShow(tx, id)
-        NotificationsRepository.deleteByShow(tx, id)
+        await WatchedEpisodesRepository.deleteByShow(tx, id)
+        await NotificationsRepository.deleteByShow(tx, id)
       }
     })
 
@@ -1507,8 +1507,8 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
   app.post('/api/watchlist/status', async (c) => {
     const { id: idRaw, status } = (await c.req.json()) as { id?: unknown; status?: unknown }
     const id = await getMigratedId(db(), idRaw as string)
-    await performWriteTransaction(db(), (tx) => {
-      WatchlistRepository.updateStatus(tx, id, status as string)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchlistRepository.updateStatus(tx, id, status as string)
     })
     return c.json({ success: true })
   })
@@ -1523,8 +1523,8 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
     }
 
     const ids = await Promise.all(idsRaw.map((id: string) => getMigratedId(db(), id)))
-    await performWriteTransaction(db(), (tx) => {
-      WatchlistRepository.updateStatusMany(tx, ids, status as string)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await WatchlistRepository.updateStatusMany(tx, ids, status as string)
     })
 
     db().scheduleSave()
@@ -1578,16 +1578,16 @@ export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
       showId?: unknown
       episodeNumber?: unknown
     }
-    await performWriteTransaction(db(), (tx) => {
-      NotificationsRepository.addDismissed(tx, showId as string, episodeNumber as string)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await NotificationsRepository.addDismissed(tx, showId as string, episodeNumber as string)
     })
     return c.json({ success: true })
   })
 
   app.post('/api/notifications/clear-all', async (c) => {
     const { showId } = (await c.req.json()) as { showId?: unknown }
-    await performWriteTransaction(db(), (tx) => {
-      NotificationsRepository.dismissFromDiscovered(tx, showId as string)
+    await performWriteTransactionAsync(db(), async (tx) => {
+      await NotificationsRepository.dismissFromDiscovered(tx, showId as string)
     })
     return c.json({ success: true })
   })

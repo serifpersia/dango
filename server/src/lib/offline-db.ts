@@ -163,8 +163,8 @@ class OfflineDb {
       this.loadCache(db)
       log.info(`OfflineDb loaded ${this.malToEntry.size} MAL mappings from SQLite`)
       const wasInterrupted =
-        SettingsRepository.getByKey(db, 'offlineDbLastStatus')?.value === 'updating'
-      const autoUpdateSetting = SettingsRepository.getByKey(db, 'offlineDbAutoUpdateEnabled')
+        (await SettingsRepository.getByKey(db, 'offlineDbLastStatus'))?.value === 'updating'
+      const autoUpdateSetting = await SettingsRepository.getByKey(db, 'offlineDbAutoUpdateEnabled')
       const autoUpdateEnabled = !autoUpdateSetting || autoUpdateSetting.value !== 'false'
       this.backfillShowsMetaGenres(db)
 
@@ -173,10 +173,10 @@ class OfflineDb {
         this.refreshDatabase(db).catch((err) => {
           log.warn({ err: err?.message }, 'Background offline database download failed')
         })
-      } else if (wasInterrupted && autoUpdateEnabled && this.interruptedRetryDue(db)) {
+      } else if (wasInterrupted && autoUpdateEnabled && (await this.interruptedRetryDue(db))) {
         log.info('Previous offline database refresh was interrupted. Retrying in background...')
-        SettingsRepository.upsert(db, 'offlineDbLastStatus', 'idle')
-        SettingsRepository.upsert(
+        await SettingsRepository.upsert(db, 'offlineDbLastStatus', 'idle')
+        await SettingsRepository.upsert(
           db,
           'offlineDbLastMessage',
           'Previous refresh was interrupted by a restart. Retrying automatically...'
@@ -185,8 +185,8 @@ class OfflineDb {
           log.warn({ err: err?.message }, 'Interrupted offline database retry failed')
         })
       } else if (wasInterrupted) {
-        SettingsRepository.upsert(db, 'offlineDbLastStatus', 'idle')
-        SettingsRepository.upsert(
+        await SettingsRepository.upsert(db, 'offlineDbLastStatus', 'idle')
+        await SettingsRepository.upsert(
           db,
           'offlineDbLastMessage',
           'Previous refresh was interrupted by a restart. Trigger an update to retry.'
@@ -274,42 +274,42 @@ class OfflineDb {
     return this.anilistToMal.get(anilistId) ?? null
   }
 
-  getOfflineDbInfo(db: DatabaseWrapper): OfflineDbInfo {
-    const get = (key: string) => SettingsRepository.getByKey(db, key)?.value ?? null
-    const autoUpdate = get('offlineDbAutoUpdateEnabled')
-    const lastStatus = get('offlineDbLastStatus') as OfflineDbInfo['lastStatus'] | null
-    const entryCount = Number(get('offlineDbEntryCount') ?? this.malToEntry.size) || 0
+  async getOfflineDbInfo(db: DatabaseWrapper): Promise<OfflineDbInfo> {
+    const get = async (key: string) => (await SettingsRepository.getByKey(db, key))?.value ?? null
+    const autoUpdate = await get('offlineDbAutoUpdateEnabled')
+    const lastStatus = (await get('offlineDbLastStatus')) as OfflineDbInfo['lastStatus'] | null
+    const entryCount = Number((await get('offlineDbEntryCount')) ?? this.malToEntry.size) || 0
     return {
       totalMapped: this.malToEntry.size,
       totalMalMapped: this.malToEntry.size,
       isInitialized: this.isInitialized,
       isRefreshing: this.isRefreshing,
       autoUpdateEnabled: autoUpdate ? autoUpdate !== 'false' : true,
-      lastCheckedAt: get('offlineDbLastCheckedAt'),
-      lastUpdatedAt: get('offlineDbLastUpdatedAt'),
+      lastCheckedAt: await get('offlineDbLastCheckedAt'),
+      lastUpdatedAt: await get('offlineDbLastUpdatedAt'),
       lastStatus: lastStatus || (this.isRefreshing ? 'updating' : 'idle'),
-      lastMessage: get('offlineDbLastMessage'),
-      sourceUrl: get('offlineDbSourceUrl'),
-      releaseTag: get('offlineDbReleaseTag'),
-      contentSha256: get('offlineDbContentSha256'),
+      lastMessage: await get('offlineDbLastMessage'),
+      sourceUrl: await get('offlineDbSourceUrl'),
+      releaseTag: await get('offlineDbReleaseTag'),
+      contentSha256: await get('offlineDbContentSha256'),
       entryCount,
       schemaVersion: SCHEMA_VERSION,
       nextDueAt: latestSaturdayUtc().toISOString(),
     }
   }
 
-  checkWeeklyUpdateDue(db: DatabaseWrapper): boolean {
-    const autoUpdate = SettingsRepository.getByKey(db, 'offlineDbAutoUpdateEnabled')
+  async checkWeeklyUpdateDue(db: DatabaseWrapper): Promise<boolean> {
+    const autoUpdate = await SettingsRepository.getByKey(db, 'offlineDbAutoUpdateEnabled')
     if (autoUpdate && autoUpdate.value === 'false') return false
-    const lastChecked = SettingsRepository.getByKey(db, 'offlineDbLastCheckedAt')
+    const lastChecked = await SettingsRepository.getByKey(db, 'offlineDbLastCheckedAt')
     if (!lastChecked?.value) return true
     const lastCheckedTime = new Date(lastChecked.value).getTime()
     if (Number.isNaN(lastCheckedTime)) return true
     return lastCheckedTime < latestSaturdayUtc().getTime()
   }
 
-  private interruptedRetryDue(db: DatabaseWrapper): boolean {
-    const lastChecked = SettingsRepository.getByKey(db, 'offlineDbLastCheckedAt')
+  private async interruptedRetryDue(db: DatabaseWrapper): Promise<boolean> {
+    const lastChecked = await SettingsRepository.getByKey(db, 'offlineDbLastCheckedAt')
     if (!lastChecked?.value) return true
     const lastCheckedTime = new Date(lastChecked.value).getTime()
     if (Number.isNaN(lastCheckedTime)) return true
@@ -336,9 +336,13 @@ class OfflineDb {
     }
     this.isRefreshing = true
     const startedAt = Date.now()
-    SettingsRepository.upsert(db, 'offlineDbLastStatus', 'updating')
-    SettingsRepository.upsert(db, 'offlineDbLastCheckedAt', new Date().toISOString())
-    SettingsRepository.upsert(db, 'offlineDbLastMessage', 'Downloading and parsing database...')
+    await SettingsRepository.upsert(db, 'offlineDbLastStatus', 'updating')
+    await SettingsRepository.upsert(db, 'offlineDbLastCheckedAt', new Date().toISOString())
+    await SettingsRepository.upsert(
+      db,
+      'offlineDbLastMessage',
+      'Downloading and parsing database...'
+    )
 
     try {
       let text: string | null = null
@@ -363,7 +367,7 @@ class OfflineDb {
         throw lastErr || new Error('Could not download anime-offline-database from any source')
 
       const sha256 = crypto.createHash('sha256').update(text).digest('hex')
-      const storedSha = SettingsRepository.getByKey(db, 'offlineDbContentSha256')?.value
+      const storedSha = (await SettingsRepository.getByKey(db, 'offlineDbContentSha256'))?.value
       const data = (JSON.parse(text) as { data: unknown[] }).data
       log.info(`Parsing ${data.length} entries from anime-offline-database...`)
 
@@ -453,14 +457,14 @@ class OfflineDb {
       this.backfillShowsMetaGenres(db)
 
       const releaseTag = sourceUrl?.includes('/releases/') ? 'latest' : 'raw'
-      SettingsRepository.upsert(db, 'offlineDbLastStatus', 'success')
-      SettingsRepository.upsert(db, 'offlineDbLastUpdatedAt', new Date().toISOString())
-      SettingsRepository.upsert(db, 'offlineDbSourceUrl', sourceUrl ?? '')
-      SettingsRepository.upsert(db, 'offlineDbReleaseTag', releaseTag)
-      SettingsRepository.upsert(db, 'offlineDbContentSha256', sha256)
-      SettingsRepository.upsert(db, 'offlineDbEntryCount', String(parsedEntries.length))
+      await SettingsRepository.upsert(db, 'offlineDbLastStatus', 'success')
+      await SettingsRepository.upsert(db, 'offlineDbLastUpdatedAt', new Date().toISOString())
+      await SettingsRepository.upsert(db, 'offlineDbSourceUrl', sourceUrl ?? '')
+      await SettingsRepository.upsert(db, 'offlineDbReleaseTag', releaseTag)
+      await SettingsRepository.upsert(db, 'offlineDbContentSha256', sha256)
+      await SettingsRepository.upsert(db, 'offlineDbEntryCount', String(parsedEntries.length))
       const skipped = storedSha === sha256
-      SettingsRepository.upsert(
+      await SettingsRepository.upsert(
         db,
         'offlineDbLastMessage',
         `Updated ${parsedEntries.length} entries in ${Math.round((Date.now() - startedAt) / 1000)}s${skipped ? ' (unchanged upstream hash)' : ''}.`
@@ -470,8 +474,8 @@ class OfflineDb {
     } catch (err) {
       const errMsg = (err as Error).message || 'Failed to refresh offline database'
       log.error({ err }, 'Failed to refresh anime-offline-database')
-      SettingsRepository.upsert(db, 'offlineDbLastStatus', 'failed')
-      SettingsRepository.upsert(db, 'offlineDbLastMessage', errMsg)
+      await SettingsRepository.upsert(db, 'offlineDbLastStatus', 'failed')
+      await SettingsRepository.upsert(db, 'offlineDbLastMessage', errMsg)
       return { success: false, count: this.malToEntry.size, error: errMsg }
     } finally {
       this.isRefreshing = false

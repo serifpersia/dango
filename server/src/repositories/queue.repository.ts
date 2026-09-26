@@ -1,5 +1,7 @@
+import { and, eq, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
-import { dbAll, dbGet, dbRun } from '../utils/db-utils.js'
+import { getDrizzle } from '../db/drizzle.js'
+import { queue } from '../db/schema-anime.js'
 
 export interface QueueRow {
   id: number
@@ -21,9 +23,8 @@ export interface SuggestedEpisode {
 
 export const QueueRepository = {
   getAll: (db: DatabaseWrapper) =>
-    dbAll<QueueRow>(
-      db,
-      `SELECT
+    getDrizzle(db).all<QueueRow>(sql`
+      SELECT
         q.id,
         q.showId,
         q.episodeNumber,
@@ -36,35 +37,36 @@ export const QueueRepository = {
       FROM queue q
       LEFT JOIN shows_meta sm ON q.showId = sm.id
       LEFT JOIN watchlist w ON q.showId = w.id
-      ORDER BY q.queue_order ASC, q.id ASC`
-    ),
+      ORDER BY q.queue_order ASC, q.id ASC`),
 
-  getByEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
-    dbGet<QueueRow>(db, 'SELECT * FROM queue WHERE showId = ? AND episodeNumber = ?', [
-      showId,
-      episodeNumber,
-    ]),
+  getByEpisode: async (db: DatabaseWrapper, showId: string, episodeNumber: string) => {
+    const rows = await getDrizzle(db).all<QueueRow>(
+      sql`SELECT * FROM queue WHERE showId = ${showId} AND episodeNumber = ${episodeNumber}`
+    )
+    return rows[0]
+  },
 
   getByShow: (db: DatabaseWrapper, showId: string) =>
-    dbAll<QueueRow>(db, 'SELECT * FROM queue WHERE showId = ? ORDER BY queue_order ASC', [showId]),
+    getDrizzle(db).all<QueueRow>(
+      sql`SELECT * FROM queue WHERE showId = ${showId} ORDER BY queue_order ASC`
+    ),
 
   getMaxOrder: async (db: DatabaseWrapper) => {
-    const row = await dbGet<{ maxOrder: number }>(
-      db,
-      'SELECT COALESCE(MAX(queue_order), -1) as maxOrder FROM queue'
+    const rows = await getDrizzle(db).all<{ maxOrder: number }>(
+      sql`SELECT COALESCE(MAX(queue_order), -1) as maxOrder FROM queue`
     )
-    return row?.maxOrder ?? -1
+    return rows[0]?.maxOrder ?? -1
   },
 
   addToEnd: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
-    dbRun(
-      db,
-      'INSERT INTO queue (showId, episodeNumber, queue_order) VALUES (?, ?, (SELECT COALESCE(MAX(queue_order), -1) + 1 FROM queue))',
-      [showId, episodeNumber]
-    ),
+    getDrizzle(db).run(sql`
+      INSERT INTO queue (showId, episodeNumber, queue_order) VALUES
+      (${showId}, ${episodeNumber}, (SELECT COALESCE(MAX(queue_order), -1) + 1 FROM queue))`),
 
   removeEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
-    dbRun(db, 'DELETE FROM queue WHERE showId = ? AND episodeNumber = ?', [showId, episodeNumber]),
+    getDrizzle(db)
+      .delete(queue)
+      .where(and(eq(queue.showId, showId), eq(queue.episodeNumber, episodeNumber))),
 
   addManyToEnd: async (
     db: DatabaseWrapper,
@@ -75,25 +77,25 @@ export const QueueRepository = {
     for (const episode of episodes) {
       const existing = await QueueRepository.getByEpisode(db, episode.showId, episode.episodeNumber)
       if (existing) continue
-      await dbRun(db, 'INSERT INTO queue (showId, episodeNumber, queue_order) VALUES (?, ?, ?)', [
-        episode.showId,
-        episode.episodeNumber,
-        nextOrder,
-      ])
+      await getDrizzle(db).insert(queue).values({
+        showId: episode.showId,
+        episodeNumber: episode.episodeNumber,
+        queueOrder: nextOrder,
+      })
       nextOrder += 1
     }
   },
 
   removeMany: (db: DatabaseWrapper, showId: string, episodeNumbers: string[]) => {
     if (episodeNumbers.length === 0) return Promise.resolve()
-    const placeholders = episodeNumbers.map(() => '?').join(', ')
-    return dbRun(db, `DELETE FROM queue WHERE showId = ? AND episodeNumber IN (${placeholders})`, [
-      showId,
-      ...episodeNumbers,
-    ])
+    return getDrizzle(db).run(sql`
+      DELETE FROM queue WHERE showId = ${showId} AND episodeNumber IN (${sql.join(
+        episodeNumbers.map((e) => sql`${e}`),
+        sql`, `
+      )})`)
   },
 
-  clear: (db: DatabaseWrapper) => dbRun(db, 'DELETE FROM queue'),
+  clear: (db: DatabaseWrapper) => getDrizzle(db).delete(queue),
 
   reorder: (
     db: DatabaseWrapper,
@@ -102,19 +104,24 @@ export const QueueRepository = {
     Promise.all(
       items.map((item, index) => {
         if (item.id !== undefined) {
-          return dbRun(db, 'UPDATE queue SET queue_order = ? WHERE id = ?', [index, item.id])
+          return getDrizzle(db)
+            .update(queue)
+            .set({ queueOrder: index })
+            .where(eq(queue.id, item.id))
         }
-        return dbRun(
-          db,
-          'UPDATE queue SET queue_order = ? WHERE showId = ? AND episodeNumber = ?',
-          [index, item.showId, item.episodeNumber]
-        )
+        return getDrizzle(db)
+          .update(queue)
+          .set({ queueOrder: index })
+          .where(
+            and(
+              eq(queue.showId, item.showId ?? ''),
+              eq(queue.episodeNumber, item.episodeNumber ?? '')
+            )
+          )
       })
     ),
 
   cleanupOrphanedShowsMeta: (db: DatabaseWrapper) =>
-    dbRun(
-      db,
-      'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
-    ),
+    getDrizzle(db).run(sql`
+      DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)`),
 }

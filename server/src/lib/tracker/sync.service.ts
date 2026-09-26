@@ -4,7 +4,7 @@ import { WatchedEpisodesRepository } from '../../repositories/watched-episodes.r
 import { ShowsMetaRepository } from '../../repositories/shows-meta.repository.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import { NotificationsRepository } from '../../repositories/notifications.repository.js'
-import { performWriteTransaction } from '../../sync.js'
+import { performWriteTransactionAsync } from '../../sync.js'
 import { DatabaseWrapper } from '../../db.js'
 import { dbGet } from '../../utils/db-utils.js'
 import logger from '../../logger.js'
@@ -322,16 +322,16 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
     watchlistDeletes.length > 0 ||
     Object.keys(stateUpdates).length > 0
   ) {
-    await performWriteTransaction(db, (tx) => {
+    await performWriteTransactionAsync(db, async (tx) => {
       for (const item of watchlistUpserts) {
-        WatchlistRepository.upsert(tx, item)
+        await WatchlistRepository.upsert(tx, item)
       }
       for (const meta of metaUpserts) {
-        ShowsMetaRepository.upsert(tx, meta)
+        await ShowsMetaRepository.upsert(tx, meta)
       }
       for (const w of watchedInserts) {
         for (let ep = w.from; ep <= w.to; ep++) {
-          WatchedEpisodesRepository.insertIfMissing(tx, {
+          await WatchedEpisodesRepository.insertIfMissing(tx, {
             showId: w.showId,
             episodeNumber: String(ep),
             watchedAt: toSqliteDatetime(w.updatedAt),
@@ -339,16 +339,16 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
         }
       }
       for (const id of watchlistDeletes) {
-        WatchlistRepository.delete(tx, id)
-        WatchedEpisodesRepository.deleteByShow(tx, id)
-        NotificationsRepository.deleteByShow(tx, id)
+        await WatchlistRepository.delete(tx, id)
+        await WatchedEpisodesRepository.deleteByShow(tx, id)
+        await NotificationsRepository.deleteByShow(tx, id)
       }
       const mergedState: SyncState = { ...syncState }
       for (const [k, v] of Object.entries(stateUpdates)) {
         if (v === undefined) delete mergedState[k]
         else mergedState[k] = v
       }
-      SettingsRepository.upsert(tx, SYNC_STATE_KEY, JSON.stringify(mergedState))
+      await SettingsRepository.upsert(tx, SYNC_STATE_KEY, JSON.stringify(mergedState))
     })
   }
 
@@ -388,13 +388,13 @@ export async function importFromUsername(
   const now = Math.floor(Date.now() / 1000)
   const syncState = await readSyncState(db)
 
-  await performWriteTransaction(db, (tx) => {
-    if (erase) SettingsRepository.clearWatchlist(tx)
+  await performWriteTransactionAsync(db, async (tx) => {
+    if (erase) await SettingsRepository.clearWatchlist(tx)
     for (const remote of entries) {
       const showId = String(remote.mediaId)
       const title = remote.title.english || remote.title.romaji || `Anime #${remote.mediaId}`
 
-      WatchlistRepository.upsert(tx, {
+      await WatchlistRepository.upsert(tx, {
         id: showId,
         name: title,
         thumbnail: remote.coverImage ?? '',
@@ -404,7 +404,7 @@ export async function importFromUsername(
         type: 'TV',
       })
 
-      ShowsMetaRepository.upsert(tx, {
+      await ShowsMetaRepository.upsert(tx, {
         id: showId,
         name: title,
         thumbnail: remote.coverImage,
@@ -416,7 +416,7 @@ export async function importFromUsername(
 
       if (remote.progress > 0) {
         for (let ep = 1; ep <= remote.progress; ep++) {
-          WatchedEpisodesRepository.insertIfMissing(tx, {
+          await WatchedEpisodesRepository.insertIfMissing(tx, {
             showId,
             episodeNumber: String(ep),
             watchedAt: toSqliteDatetime(remote.updatedAt),
@@ -427,7 +427,7 @@ export async function importFromUsername(
       syncState[showId] = { lastSyncedAt: now, remoteUpdatedAt: remote.updatedAt }
     }
 
-    SettingsRepository.upsert(tx, SYNC_STATE_KEY, JSON.stringify(syncState))
+    await SettingsRepository.upsert(tx, SYNC_STATE_KEY, JSON.stringify(syncState))
   })
 
   return entries.length
@@ -568,10 +568,10 @@ export async function importFromMalUsername(
   }
 
   if (shows.length > 0 || erase) {
-    await performWriteTransaction(db, (tx) => {
-      if (erase) SettingsRepository.clearWatchlist(tx)
+    await performWriteTransactionAsync(db, async (tx) => {
+      if (erase) await SettingsRepository.clearWatchlist(tx)
       for (const show of shows) {
-        WatchlistRepository.upsert(tx, {
+        await WatchlistRepository.upsert(tx, {
           id: show.id,
           name: show.name,
           thumbnail: show.thumbnail ?? '',
@@ -583,7 +583,7 @@ export async function importFromMalUsername(
       }
       for (const meta of metas) {
         if (meta.thumbnail || meta.type || meta.genres) {
-          ShowsMetaRepository.upsert(tx, {
+          await ShowsMetaRepository.upsert(tx, {
             id: meta.id,
             thumbnail: meta.thumbnail,
             type: meta.type,
@@ -593,7 +593,7 @@ export async function importFromMalUsername(
       }
       for (const w of watched) {
         for (let ep = 1; ep <= w.progress; ep++) {
-          WatchedEpisodesRepository.insertIfMissing(tx, {
+          await WatchedEpisodesRepository.insertIfMissing(tx, {
             showId: w.showId,
             episodeNumber: String(ep),
           })

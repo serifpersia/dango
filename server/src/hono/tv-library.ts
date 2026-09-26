@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
-import { performTvWriteTransaction } from '../sync.js'
+import { performTvWriteTransactionAsync } from '../sync.js'
 import { dbAll } from '../utils/db-utils.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
@@ -59,7 +59,7 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/tv/library/ids', async (c) => {
     try {
-      return c.json({ ids: TvLibraryRepository.getIds(tvDb(getDbs())) })
+      return c.json({ ids: await TvLibraryRepository.getIds(tvDb(getDbs())) })
     } catch {
       return c.json({ ids: [] })
     }
@@ -67,7 +67,7 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/tv/library/check/:id', async (c) => {
     try {
-      const item = TvLibraryRepository.getById(tvDb(getDbs()), c.req.param('id'))
+      const item = await TvLibraryRepository.getById(tvDb(getDbs()), c.req.param('id'))
       return c.json({ inLibrary: !!item, status: item?.status ?? null })
     } catch {
       return c.json({ inLibrary: false, status: null })
@@ -99,8 +99,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     const cleanStatus =
       typeof status === 'string' && (TV_STATUSES as string[]).includes(status) ? status : 'Watching'
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvLibraryRepository.upsert(tx, {
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvLibraryRepository.upsert(tx, {
           id,
           tmdbId: tmdbIdNum,
           mediaType,
@@ -124,9 +124,9 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     const { id } = ((await c.req.json().catch(() => undefined)) ?? {}) as Record<string, unknown>
     if (!id) return c.json({ error: 'id is required' }, 400)
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvLibraryRepository.delete(tx, String(id))
-        TvProgressRepository.deleteByMedia(tx, String(id))
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvLibraryRepository.delete(tx, String(id))
+        await TvProgressRepository.deleteByMedia(tx, String(id))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -144,8 +144,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
       return c.json({ error: 'id and a valid status are required' }, 400)
     }
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvLibraryRepository.updateStatus(tx, String(id), String(status))
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvLibraryRepository.updateStatus(tx, String(id), String(status))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -167,8 +167,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvLibraryRepository.updateStatusMany(tx, ids, String(status))
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvLibraryRepository.updateStatusMany(tx, ids, String(status))
       })
       return c.json({ success: true, updated: ids.length })
     } catch (err) {
@@ -187,9 +187,9 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvLibraryRepository.deleteMany(tx, ids)
-        TvProgressRepository.deleteMany(tx, ids)
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvLibraryRepository.deleteMany(tx, ids)
+        await TvProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -208,8 +208,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => normalizeTvMediaId(id as string))
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvProgressRepository.deleteMany(tx, ids)
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -278,8 +278,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     const completedNow =
       Number(completed) === 1 || (durationNum > 0 && storedTime >= durationNum * 0.8) ? 1 : 0
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
-        TvProgressRepository.upsert(tx, {
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
+        await TvProgressRepository.upsert(tx, {
           mediaId: String(mediaId),
           season: Math.round(seasonNum),
           episode: Math.round(episodeNum),
@@ -295,7 +295,7 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
           mediaType: (mediaType ?? null) as string | null,
           adult: adult != null ? Number(adult) : null,
         })
-        TvLibraryRepository.touchProgress(tx, String(mediaId), {
+        await TvLibraryRepository.touchProgress(tx, String(mediaId), {
           season: Math.round(seasonNum),
           episode: Math.round(episodeNum),
         })
@@ -316,11 +316,16 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
     const mediaId = normalizeTvMediaId(mediaIdRaw as string)
     if (!mediaId) return c.json({ error: 'mediaId is required' }, 400)
     try {
-      await performTvWriteTransaction(tvDb(getDbs()), (tx) => {
+      await performTvWriteTransactionAsync(tvDb(getDbs()), async (tx) => {
         if (season !== undefined && episode !== undefined) {
-          TvProgressRepository.deleteEpisode(tx, String(mediaId), Number(season), Number(episode))
+          await TvProgressRepository.deleteEpisode(
+            tx,
+            String(mediaId),
+            Number(season),
+            Number(episode)
+          )
         } else {
-          TvProgressRepository.deleteByMedia(tx, String(mediaId))
+          await TvProgressRepository.deleteByMedia(tx, String(mediaId))
         }
       })
       return c.json({ success: true })
@@ -340,11 +345,13 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
       const listOnly = listOnlyRow
         ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
         : false
-      const rows = TvProgressRepository.getContinueWatching(tvDb(dbs), limit).filter((row) => {
-        if (ignoreAdult && isTvContinueAdult(row)) return false
-        if (listOnly && row.watchlistStatus !== 'Watching') return false
-        return true
-      })
+      const rows = (await TvProgressRepository.getContinueWatching(tvDb(dbs), limit)).filter(
+        (row) => {
+          if (ignoreAdult && isTvContinueAdult(row)) return false
+          if (listOnly && row.watchlistStatus !== 'Watching') return false
+          return true
+        }
+      )
       return c.json({ data: rows, total: rows.length })
     } catch {
       return c.json({ data: [], total: 0 })
@@ -365,8 +372,8 @@ export function registerTvLibrary(app: Hono, getDbs: () => HonoDbs) {
       const db = tvDb(getDbs())
       const ids = await getAdultNonListMediaIds(db)
       if (ids.length > 0) {
-        await performTvWriteTransaction(db, (tx) => {
-          for (const id of ids) TvProgressRepository.deleteByMedia(tx, id)
+        await performTvWriteTransactionAsync(db, async (tx) => {
+          for (const id of ids) await TvProgressRepository.deleteByMedia(tx, id)
         })
       }
       return c.json({ success: true, removed: ids.length })

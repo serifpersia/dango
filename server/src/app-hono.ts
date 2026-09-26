@@ -52,10 +52,10 @@ import type { DatabaseWrapper } from './db.js'
 import { SettingsRepository } from './repositories/settings.repository.js'
 import { LibraryRepository } from './repositories/library.repository.js'
 import {
-  performAsmrWriteTransaction,
-  performMangaWriteTransaction,
-  performTvWriteTransaction,
-  performWriteTransaction,
+  performAsmrWriteTransactionAsync,
+  performMangaWriteTransactionAsync,
+  performTvWriteTransactionAsync,
+  performWriteTransactionAsync,
   setLocalAsmrManifestVersion,
   setLocalMangaManifestVersion,
   setLocalManifestVersion,
@@ -600,9 +600,9 @@ export function createHonoApp(
       const key = String(body.key)
       const value = String(body.value ?? '')
       const shouldDelete = value === '' && key === 'tracker_anilist_client_id'
-      await performWriteTransaction(getDbs().db, (tx) => {
-        if (shouldDelete) SettingsRepository.deleteByKey(tx, key)
-        else SettingsRepository.upsert(tx, key, value)
+      await performWriteTransactionAsync(getDbs().db, async (tx) => {
+        if (shouldDelete) await SettingsRepository.deleteByKey(tx, key)
+        else await SettingsRepository.upsert(tx, key, value)
       })
       if (body.key === 'discordRPCEnabled') {
         discordRPCService.setEnabled(body.value === 'true' || body.value === true)
@@ -616,9 +616,9 @@ export function createHonoApp(
     }
   })
 
-  app.get('/api/settings/offline-db', (c) => {
+  app.get('/api/settings/offline-db', async (c) => {
     try {
-      return c.json(offlineDb.getOfflineDbInfo(getDbs().db))
+      return c.json(await offlineDb.getOfflineDbInfo(getDbs().db))
     } catch {
       return c.json({ error: 'DB error' }, 500)
     }
@@ -631,16 +631,16 @@ export function createHonoApp(
       if (typeof enabled !== 'boolean') {
         return c.json({ error: 'enabled must be a boolean' }, 400)
       }
-      SettingsRepository.upsert(getDbs().db, 'offlineDbAutoUpdateEnabled', String(enabled))
+      await SettingsRepository.upsert(getDbs().db, 'offlineDbAutoUpdateEnabled', String(enabled))
       return c.json({ success: true, enabled })
     } catch {
       return c.json({ error: 'DB error' }, 500)
     }
   })
 
-  app.post('/api/settings/offline-db/update', (c) => {
+  app.post('/api/settings/offline-db/update', async (c) => {
     try {
-      const info = offlineDb.getOfflineDbInfo(getDbs().db)
+      const info = await offlineDb.getOfflineDbInfo(getDbs().db)
       if (info.isRefreshing) {
         return c.json({ error: 'Offline database refresh already in progress' }, 409)
       }
@@ -886,9 +886,9 @@ export function createHonoApp(
       const tracker = new AniListTracker(accessToken)
       const viewer = await tracker.getViewer()
 
-      await performWriteTransaction(getDbs().db, (tx) => {
-        SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, accessToken)
-        SettingsRepository.upsert(tx, TRACKER_USER_KEY, JSON.stringify(viewer))
+      await performWriteTransactionAsync(getDbs().db, async (tx) => {
+        await SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, accessToken)
+        await SettingsRepository.upsert(tx, TRACKER_USER_KEY, JSON.stringify(viewer))
       })
 
       return c.json({ success: true, user: viewer })
@@ -900,9 +900,9 @@ export function createHonoApp(
 
   app.post('/api/tracker/anilist/disconnect', async (c) => {
     try {
-      await performWriteTransaction(getDbs().db, (tx) => {
-        SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, '')
-        SettingsRepository.upsert(tx, TRACKER_USER_KEY, '')
+      await performWriteTransactionAsync(getDbs().db, async (tx) => {
+        await SettingsRepository.upsert(tx, TRACKER_TOKEN_KEY, '')
+        await SettingsRepository.upsert(tx, TRACKER_USER_KEY, '')
       })
       return c.json({ success: true })
     } catch {
@@ -1124,21 +1124,21 @@ export function createHonoApp(
     }
     try {
       const dbs = getDbs()
-      const before = LibraryRepository.countAll(dbs.db)
-      const beforeManga = LibraryRepository.countManga(dbs.mangaDb)
-      const beforeTv = LibraryRepository.countTv(dbs.tvDb)
-      const beforeAsmr = LibraryRepository.countAsmr(dbs.asmrDb)
-      await performWriteTransaction(dbs.db, (tx) => {
-        LibraryRepository.clearAll(tx)
+      const before = await LibraryRepository.countAll(dbs.db)
+      const beforeManga = await LibraryRepository.countManga(dbs.mangaDb)
+      const beforeTv = await LibraryRepository.countTv(dbs.tvDb)
+      const beforeAsmr = await LibraryRepository.countAsmr(dbs.asmrDb)
+      await performWriteTransactionAsync(dbs.db, async (tx) => {
+        await LibraryRepository.clearAll(tx)
       })
-      await performMangaWriteTransaction(dbs.mangaDb, (tx) => {
-        LibraryRepository.clearManga(tx)
+      await performMangaWriteTransactionAsync(dbs.mangaDb, async (tx) => {
+        await LibraryRepository.clearManga(tx)
       })
-      await performTvWriteTransaction(dbs.tvDb, (tx) => {
-        LibraryRepository.clearTv(tx)
+      await performTvWriteTransactionAsync(dbs.tvDb, async (tx) => {
+        await LibraryRepository.clearTv(tx)
       })
-      await performAsmrWriteTransaction(dbs.asmrDb, (tx) => {
-        LibraryRepository.clearAsmr(tx)
+      await performAsmrWriteTransactionAsync(dbs.asmrDb, async (tx) => {
+        await LibraryRepository.clearAsmr(tx)
       })
       logger.warn(
         { before, beforeManga, beforeTv, beforeAsmr },

@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
-import { dbGet, dbRun } from '../utils/db-utils.js'
+import { getDrizzle } from '../db/drizzle.js'
 
 const LIBRARY_TABLES = [
   'watchlist',
@@ -26,96 +27,50 @@ const ASMR_LIBRARY_TABLES = ['asmr_library', 'asmr_progress'] as const
 
 export type AsmrLibraryCounts = Record<(typeof ASMR_LIBRARY_TABLES)[number], number>
 
+async function countTables<T extends string>(
+  db: DatabaseWrapper,
+  tables: readonly T[]
+): Promise<Record<T, number>> {
+  const counts = {} as Record<T, number>
+  for (const table of tables) {
+    try {
+      const rows = await getDrizzle(db).all<{ rows: number }>(
+        sql`SELECT COUNT(*) AS rows FROM ${sql.raw(`"${table}"`)}`
+      )
+      counts[table] = rows[0]?.rows ?? 0
+    } catch {
+      counts[table] = 0
+    }
+  }
+  return counts
+}
+
+async function clearTables(db: DatabaseWrapper, tables: readonly string[]): Promise<void> {
+  for (const table of tables) {
+    try {
+      await getDrizzle(db).run(sql`DELETE FROM ${sql.raw(`"${table}"`)}`)
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export const LibraryRepository = {
-  countAll: (db: DatabaseWrapper): LibraryCounts => {
-    const counts = {} as LibraryCounts
-    for (const table of LIBRARY_TABLES) {
-      try {
-        counts[table] =
-          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
-      } catch {
-        counts[table] = 0
-      }
-    }
-    return counts
-  },
+  countAll: (db: DatabaseWrapper): Promise<LibraryCounts> => countTables(db, LIBRARY_TABLES),
 
-  clearAll: (db: DatabaseWrapper): void => {
-    for (const table of LIBRARY_TABLES) {
-      try {
-        dbRun(db, `DELETE FROM "${table}"`)
-      } catch {
-        // ignore
-      }
-    }
-  },
+  clearAll: (db: DatabaseWrapper): Promise<void> => clearTables(db, LIBRARY_TABLES),
 
-  countManga: (db: DatabaseWrapper): MangaLibraryCounts => {
-    const counts = {} as MangaLibraryCounts
-    for (const table of MANGA_LIBRARY_TABLES) {
-      try {
-        counts[table] =
-          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
-      } catch {
-        counts[table] = 0
-      }
-    }
-    return counts
-  },
+  countManga: (db: DatabaseWrapper): Promise<MangaLibraryCounts> =>
+    countTables(db, MANGA_LIBRARY_TABLES),
 
-  clearManga: (db: DatabaseWrapper): void => {
-    for (const table of MANGA_LIBRARY_TABLES) {
-      try {
-        dbRun(db, `DELETE FROM "${table}"`)
-      } catch {
-        // ignore
-      }
-    }
-  },
+  clearManga: (db: DatabaseWrapper): Promise<void> => clearTables(db, MANGA_LIBRARY_TABLES),
 
-  countTv: (db: DatabaseWrapper): TvLibraryCounts => {
-    const counts = {} as TvLibraryCounts
-    for (const table of TV_LIBRARY_TABLES) {
-      try {
-        counts[table] =
-          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
-      } catch {
-        counts[table] = 0
-      }
-    }
-    return counts
-  },
+  countTv: (db: DatabaseWrapper): Promise<TvLibraryCounts> => countTables(db, TV_LIBRARY_TABLES),
 
-  clearTv: (db: DatabaseWrapper): void => {
-    for (const table of TV_LIBRARY_TABLES) {
-      try {
-        dbRun(db, `DELETE FROM "${table}"`)
-      } catch {
-        // ignore
-      }
-    }
-  },
+  clearTv: (db: DatabaseWrapper): Promise<void> => clearTables(db, TV_LIBRARY_TABLES),
 
-  countAsmr: (db: DatabaseWrapper): AsmrLibraryCounts => {
-    const counts = {} as AsmrLibraryCounts
-    for (const table of ASMR_LIBRARY_TABLES) {
-      try {
-        counts[table] =
-          dbGet<{ rows: number }>(db, `SELECT COUNT(*) AS rows FROM "${table}"`)?.rows ?? 0
-      } catch {
-        counts[table] = 0
-      }
-    }
-    return counts
-  },
+  countAsmr: (db: DatabaseWrapper): Promise<AsmrLibraryCounts> =>
+    countTables(db, ASMR_LIBRARY_TABLES),
 
-  clearAsmr: (db: DatabaseWrapper): void => {
-    for (const table of ASMR_LIBRARY_TABLES) {
-      try {
-        dbRun(db, `DELETE FROM "${table}"`)
-      } catch {
-        // ignore
-      }
-    }
-  },
+  clearAsmr: (db: DatabaseWrapper): Promise<void> => clearTables(db, ASMR_LIBRARY_TABLES),
 }

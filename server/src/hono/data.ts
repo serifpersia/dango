@@ -418,7 +418,7 @@ export function registerData(
       if (!nativeId || !title) {
         return c.json({ error: 'nativeId and title are required' }, 400)
       }
-      const row = TempShowIdsRepository.allocate(getDbs().db, {
+      const row = await TempShowIdsRepository.allocate(getDbs().db, {
         provider,
         nativeId,
         title,
@@ -468,7 +468,7 @@ export function registerData(
 
       if (isTempShowId(showId)) {
         try {
-          const row = TempShowIdsRepository.getById(db, showId)
+          const row = await TempShowIdsRepository.getById(db, showId)
           if (!row || !isMatureStreamingProvider(row.provider)) return c.json([])
           const wanted = String(c.req.query('provider') || '').toLowerCase()
           const own = providers[row.provider]
@@ -671,7 +671,7 @@ export function registerData(
 
         if (isTempShowId(showId)) {
           try {
-            const row = TempShowIdsRepository.getById(db, showId)
+            const row = await TempShowIdsRepository.getById(db, showId)
             if (!row || !isMatureStreamingProvider(row.provider)) return { body: { episodes: [] } }
             const wanted = String(c.req.query('provider') || '').toLowerCase()
             const own = providers[row.provider]
@@ -813,7 +813,7 @@ export function registerData(
         const id = await getMigratedId(db, showIdRaw)
 
         if (isTempShowId(id)) {
-          const row = TempShowIdsRepository.getById(db, id)
+          const row = await TempShowIdsRepository.getById(db, id)
           if (!row || !isMatureStreamingProvider(row.provider)) {
             return { body: {} }
           }
@@ -863,7 +863,7 @@ export function registerData(
             const poster = meta.thumbnail?.trim() ? meta.thumbnail : undefined
             const hasPoster = !!poster
             try {
-              ShowsMetaRepository.upsert(db, {
+              await ShowsMetaRepository.upsert(db, {
                 id,
                 name: meta.name,
                 thumbnail: poster,

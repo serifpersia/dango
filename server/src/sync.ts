@@ -7,6 +7,7 @@ import { rcloneService } from './rclone.js'
 import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import { DatabaseWrapper } from './db.js'
+import { runTx } from './db/drizzle.js'
 import { dbGet } from './utils/db-utils.js'
 import { TempShowIdsRepository } from './repositories/temp-show-ids.repository.js'
 import { malCachePruneExpired } from './repositories/mal-cache.repository.js'
@@ -641,6 +642,24 @@ export async function performWriteTransaction(
   await setLocalManifestVersion(newVersion)
 }
 
+export async function performWriteTransactionAsync(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => Promise<void>
+): Promise<void> {
+  await runTx(db, async (tx) => {
+    await runnable(tx)
+    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalManifestVersion(newVersion)
+}
+
 export async function performMangaWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
@@ -648,6 +667,24 @@ export async function performMangaWriteTransaction(
   db.serialize(() => {
     runnable(db)
     db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalMangaManifestVersion(newVersion)
+}
+
+export async function performMangaWriteTransactionAsync(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => Promise<void>
+): Promise<void> {
+  await runTx(db, async (tx) => {
+    await runnable(tx)
+    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
   })
 
   const row = dbGet<{ value: number }>(
@@ -677,6 +714,24 @@ export async function performTvWriteTransaction(
   await setLocalTvManifestVersion(newVersion)
 }
 
+export async function performTvWriteTransactionAsync(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => Promise<void>
+): Promise<void> {
+  await runTx(db, async (tx) => {
+    await runnable(tx)
+    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalTvManifestVersion(newVersion)
+}
+
 export async function performAsmrWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
@@ -684,6 +739,24 @@ export async function performAsmrWriteTransaction(
   db.serialize(() => {
     runnable(db)
     db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  })
+
+  const row = dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+  )
+  const newVersion = row?.value ?? 1
+
+  await setLocalAsmrManifestVersion(newVersion)
+}
+
+export async function performAsmrWriteTransactionAsync(
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => Promise<void>
+): Promise<void> {
+  await runTx(db, async (tx) => {
+    await runnable(tx)
+    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
   })
 
   const row = dbGet<{ value: number }>(
@@ -1279,7 +1352,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     )
 
     try {
-      const purged = TempShowIdsRepository.purge(db)
+      const purged = await TempShowIdsRepository.purge(db)
       if (purged > 0) logger.info({ purged }, 'Purged stale temp show ids on boot')
     } catch (e) {
       logger.warn({ err: e }, 'Temp show purge on boot failed')

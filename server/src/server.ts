@@ -262,7 +262,7 @@ async function main() {
   logger.info(`ASMR database initialized at ${asmrDbPath}`)
 
   await offlineDb.init(db)
-  if (offlineDb.checkWeeklyUpdateDue(db)) {
+  if (await offlineDb.checkWeeklyUpdateDue(db)) {
     logger.info('Weekly offline database update is due on startup, starting background update...')
     offlineDb.executeScheduledUpdate(db).catch((err) => {
       logger.warn({ err: err?.message }, 'Startup scheduled offline database update failed')
@@ -384,8 +384,8 @@ async function main() {
   }, 300000)
 
   const offlineDbInterval = setInterval(
-    () => {
-      if (offlineDb.checkWeeklyUpdateDue(db)) {
+    async () => {
+      if (await offlineDb.checkWeeklyUpdateDue(db)) {
         logger.info('Weekly offline database update triggered by periodic schedule...')
         offlineDb.executeScheduledUpdate(db).catch((err) => {
           logger.warn({ err: err?.message }, 'Interval scheduled offline database update failed')

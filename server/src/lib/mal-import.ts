@@ -4,7 +4,7 @@ import { kitsuSearchAnime } from './kitsu.js'
 import { offlineDb } from './offline-db.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
-import { performWriteTransaction } from '../sync.js'
+import { performWriteTransactionAsync } from '../sync.js'
 import type { DatabaseWrapper } from '../db.js'
 import logger from '../logger.js'
 
@@ -173,12 +173,12 @@ export async function executeMalImport(
 
   if (offlineShows.length > 0 || erase) {
     try {
-      await performWriteTransaction(db, (tx) => {
-        if (erase) SettingsRepository.clearWatchlist(tx)
-        SettingsRepository.upsertWatchlistBatch(tx, offlineShows)
+      await performWriteTransactionAsync(db, async (tx) => {
+        if (erase) await SettingsRepository.clearWatchlist(tx)
+        await SettingsRepository.upsertWatchlistBatch(tx, offlineShows)
         for (const meta of offlineMeta) {
           if (meta.thumbnail || meta.type || meta.genres) {
-            ShowsMetaRepository.upsert(tx, {
+            await ShowsMetaRepository.upsert(tx, {
               id: meta.id,
               thumbnail: meta.thumbnail,
               type: meta.type,
@@ -282,11 +282,11 @@ export async function executeMalImport(
       await Promise.allSettled(metaPromises)
       if (batchShows.length > 0) {
         try {
-          await performWriteTransaction(db, (tx) => {
-            SettingsRepository.upsertWatchlistBatch(tx, batchShows)
+          await performWriteTransactionAsync(db, async (tx) => {
+            await SettingsRepository.upsertWatchlistBatch(tx, batchShows)
             for (const meta of batchMeta) {
               if (meta.thumbnail) {
-                ShowsMetaRepository.upsert(tx, {
+                await ShowsMetaRepository.upsert(tx, {
                   id: meta.id,
                   thumbnail: meta.thumbnail,
                   type: meta.type,

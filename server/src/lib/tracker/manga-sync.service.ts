@@ -4,7 +4,7 @@ import {
   MangaProgressRepository,
 } from '../../repositories/manga.repository.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
-import { performMangaWriteTransaction, performWriteTransaction } from '../../sync.js'
+import { performMangaWriteTransactionAsync, performWriteTransactionAsync } from '../../sync.js'
 import { DatabaseWrapper } from '../../db.js'
 import logger from '../../logger.js'
 import { searchAnilistMangaByTitle, getMangaMetaById, getMangaMetaByMalId } from '../anilist.js'
@@ -687,19 +687,19 @@ export async function syncAniListManga(
     libraryDeletes.length > 0 ||
     newLinks.length > 0
   ) {
-    await performMangaWriteTransaction(mangaDb, (tx) => {
+    await performMangaWriteTransactionAsync(mangaDb, async (tx) => {
       for (const item of libraryUpserts) {
-        MangaLibraryRepository.upsert(tx, item)
+        await MangaLibraryRepository.upsert(tx, item)
       }
       for (const link of newLinks) {
-        MangaLibraryRepository.setAnilistId(tx, link.id, link.anilistId, 'search')
+        await MangaLibraryRepository.setAnilistId(tx, link.id, link.anilistId, 'search')
       }
       for (const p of progressPointers) {
-        MangaLibraryRepository.setProgressPointer(tx, p.id, p.chapterNumber)
+        await MangaLibraryRepository.setProgressPointer(tx, p.id, p.chapterNumber)
       }
       for (const p of progressRows) {
-        MangaProgressRepository.deleteSyntheticChapters(tx, p.mangaId, p.chapterId)
-        MangaProgressRepository.upsert(tx, {
+        await MangaProgressRepository.deleteSyntheticChapters(tx, p.mangaId, p.chapterId)
+        await MangaProgressRepository.upsert(tx, {
           mangaId: p.mangaId,
           chapterId: p.chapterId,
           chapterNumber: p.chapterNumber,
@@ -711,8 +711,8 @@ export async function syncAniListManga(
         })
       }
       for (const id of libraryDeletes) {
-        MangaLibraryRepository.delete(tx, id)
-        MangaProgressRepository.deleteByManga(tx, id)
+        await MangaLibraryRepository.delete(tx, id)
+        await MangaProgressRepository.deleteByManga(tx, id)
       }
     })
   }
@@ -725,8 +725,8 @@ export async function syncAniListManga(
         else mergedState[k] = v
       }
       const snapshot = JSON.stringify(mergedState)
-      await performWriteTransaction(db, (tx) => {
-        SettingsRepository.upsert(tx, MANGA_SYNC_STATE_KEY, snapshot)
+      await performWriteTransactionAsync(db, async (tx) => {
+        await SettingsRepository.upsert(tx, MANGA_SYNC_STATE_KEY, snapshot)
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -768,19 +768,19 @@ export async function insertMangaImportEntries(
   const now = Math.floor(Date.now() / 1000)
   const syncState = await readMangaSyncState(db)
 
-  await performMangaWriteTransaction(mangaDb, (tx) => {
+  await performMangaWriteTransactionAsync(mangaDb, async (tx) => {
     if (eraseAnilistRows) {
-      for (const row of MangaLibraryRepository.getAll(tx)) {
+      for (const row of await MangaLibraryRepository.getAll(tx)) {
         if (String(row.provider).toLowerCase() === MANGA_PROVIDER) {
-          MangaLibraryRepository.delete(tx, row.id)
-          MangaProgressRepository.deleteByManga(tx, row.id)
+          await MangaLibraryRepository.delete(tx, row.id)
+          await MangaProgressRepository.deleteByManga(tx, row.id)
         }
       }
     }
     for (const item of items) {
       const id = buildAnilistMangaId(item.mediaId)
       const status = mangaImportStatusOrDefault(item.status)
-      MangaLibraryRepository.upsert(tx, {
+      await MangaLibraryRepository.upsert(tx, {
         id,
         provider: MANGA_PROVIDER,
         mangaId: String(item.mediaId),
@@ -791,10 +791,10 @@ export async function insertMangaImportEntries(
         anilistIdSource: 'anilist',
       })
       if (item.progress > 0) {
-        MangaLibraryRepository.setProgressPointer(tx, id, String(item.progress))
+        await MangaLibraryRepository.setProgressPointer(tx, id, String(item.progress))
         const chapterId = buildSyntheticChapterId(item.progress)
-        MangaProgressRepository.deleteSyntheticChapters(tx, id, chapterId)
-        MangaProgressRepository.upsert(tx, {
+        await MangaProgressRepository.deleteSyntheticChapters(tx, id, chapterId)
+        await MangaProgressRepository.upsert(tx, {
           mangaId: id,
           chapterId,
           chapterNumber: String(item.progress),
@@ -814,8 +814,8 @@ export async function insertMangaImportEntries(
 
   try {
     const snapshot = JSON.stringify(syncState)
-    await performWriteTransaction(db, (tx) => {
-      SettingsRepository.upsert(tx, MANGA_SYNC_STATE_KEY, snapshot)
+    await performWriteTransactionAsync(db, async (tx) => {
+      await SettingsRepository.upsert(tx, MANGA_SYNC_STATE_KEY, snapshot)
     })
   } catch (err) {
     logger.warn({ err }, '[AniList Manga Sync] Failed to persist sync state after import')

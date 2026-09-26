@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
-import { performAsmrWriteTransaction } from '../sync.js'
+import { performAsmrWriteTransactionAsync } from '../sync.js'
 import { dbAll } from '../utils/db-utils.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
@@ -51,7 +51,7 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/asmr/library/ids', async (c) => {
     try {
-      return c.json({ ids: AsmrLibraryRepository.getIds(asmrDb(getDbs())) })
+      return c.json({ ids: await AsmrLibraryRepository.getIds(asmrDb(getDbs())) })
     } catch {
       return c.json({ ids: [] })
     }
@@ -59,7 +59,7 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/asmr/library/check/:id', async (c) => {
     try {
-      const item = AsmrLibraryRepository.getById(asmrDb(getDbs()), c.req.param('id'))
+      const item = await AsmrLibraryRepository.getById(asmrDb(getDbs()), c.req.param('id'))
       return c.json({ inLibrary: !!item, status: item?.status ?? null })
     } catch {
       return c.json({ inLibrary: false, status: null })
@@ -85,8 +85,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
         ? status
         : 'Listening'
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrLibraryRepository.upsert(tx, {
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrLibraryRepository.upsert(tx, {
           id,
           rjCode: buildAsmrId(rawCode),
           title: String(title || ''),
@@ -106,9 +106,9 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     const { id } = ((await c.req.json().catch(() => undefined)) ?? {}) as Record<string, unknown>
     if (!id) return c.json({ error: 'id is required' }, 400)
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrLibraryRepository.delete(tx, String(id))
-        AsmrProgressRepository.deleteByWork(tx, String(id))
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrLibraryRepository.delete(tx, String(id))
+        await AsmrProgressRepository.deleteByWork(tx, String(id))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -126,8 +126,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
       return c.json({ error: 'id and a valid status are required' }, 400)
     }
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrLibraryRepository.updateStatus(tx, String(id), String(status))
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrLibraryRepository.updateStatus(tx, String(id), String(status))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -149,8 +149,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrLibraryRepository.updateStatusMany(tx, ids, String(status))
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrLibraryRepository.updateStatusMany(tx, ids, String(status))
       })
       return c.json({ success: true, updated: ids.length })
     } catch (err) {
@@ -169,9 +169,9 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrLibraryRepository.deleteMany(tx, ids)
-        AsmrProgressRepository.deleteMany(tx, ids)
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrLibraryRepository.deleteMany(tx, ids)
+        await AsmrProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -190,8 +190,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrProgressRepository.deleteMany(tx, ids)
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -237,8 +237,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     const timeNum = Math.max(Number(currentTime) || 0, 0)
     const durationNum = Math.max(Number(duration) || 0, 0)
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
-        AsmrProgressRepository.upsert(tx, {
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
+        await AsmrProgressRepository.upsert(tx, {
           workId: String(workId),
           trackIndex: trackIndexNum,
           trackLabel: String(trackLabel || ''),
@@ -249,7 +249,7 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
           rjCode: (rjCode ?? null) as string | null,
           isAdult: isAdult != null ? Number(isAdult) : null,
         })
-        AsmrLibraryRepository.touchProgress(tx, String(workId), {
+        await AsmrLibraryRepository.touchProgress(tx, String(workId), {
           trackIndex: trackIndexNum,
           trackLabel: String(trackLabel || ''),
           position: timeNum,
@@ -269,11 +269,11 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
     >
     if (!workId) return c.json({ error: 'workId is required' }, 400)
     try {
-      await performAsmrWriteTransaction(asmrDb(getDbs()), (tx) => {
+      await performAsmrWriteTransactionAsync(asmrDb(getDbs()), async (tx) => {
         if (trackIndex !== undefined && trackIndex !== null) {
-          AsmrProgressRepository.deleteTrack(tx, String(workId), Number(trackIndex))
+          await AsmrProgressRepository.deleteTrack(tx, String(workId), Number(trackIndex))
         } else {
-          AsmrProgressRepository.deleteByWork(tx, String(workId))
+          await AsmrProgressRepository.deleteByWork(tx, String(workId))
         }
       })
       return c.json({ success: true })
@@ -293,11 +293,13 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
       const listOnly = listOnlyRow
         ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
         : false
-      const rows = AsmrProgressRepository.getContinueListening(asmrDb(dbs), limit).filter((row) => {
-        if (ignoreAdult && row.isAdult === 1) return false
-        if (listOnly && row.watchlistStatus !== 'Listening') return false
-        return true
-      })
+      const rows = (await AsmrProgressRepository.getContinueListening(asmrDb(dbs), limit)).filter(
+        (row) => {
+          if (ignoreAdult && row.isAdult === 1) return false
+          if (listOnly && row.watchlistStatus !== 'Listening') return false
+          return true
+        }
+      )
       return c.json({ data: rows, total: rows.length })
     } catch {
       return c.json({ data: [], total: 0 })
@@ -318,8 +320,8 @@ export function registerAsmrLibrary(app: Hono, getDbs: () => HonoDbs) {
       const db = asmrDb(getDbs())
       const ids = await getAdultNonListWorkIds(db)
       if (ids.length > 0) {
-        await performAsmrWriteTransaction(db, (tx) => {
-          for (const id of ids) AsmrProgressRepository.deleteByWork(tx, id)
+        await performAsmrWriteTransactionAsync(db, async (tx) => {
+          for (const id of ids) await AsmrProgressRepository.deleteByWork(tx, id)
         })
       }
       return c.json({ success: true, removed: ids.length })

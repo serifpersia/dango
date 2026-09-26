@@ -1,5 +1,7 @@
+import { eq, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
-import { dbAll, dbGet, dbRun } from '../utils/db-utils.js'
+import { getDrizzle } from '../db/drizzle.js'
+import { watchedEpisodes } from '../db/schema-anime.js'
 
 export interface WatchedEpisode {
   showId: string
@@ -29,39 +31,32 @@ export interface ContinueWatchingResult {
 }
 
 export const WatchedEpisodesRepository = {
-  getByShowAndEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
-    dbGet<{ currentTime: number; duration: number }>(
-      db,
-      'SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
-      [showId, episodeNumber]
-    ),
+  getByShowAndEpisode: async (db: DatabaseWrapper, showId: string, episodeNumber: string) => {
+    const rows = await getDrizzle(db).all<{ currentTime: number; duration: number }>(sql`
+      SELECT currentTime, duration FROM watched_episodes WHERE showId = ${showId} AND episodeNumber = ${episodeNumber}`)
+    return rows[0]
+  },
 
   getWatchedEpisodeNumbers: async (db: DatabaseWrapper, showId: string) => {
-    const rows = await dbAll<{ episodeNumber: string }>(
-      db,
-      'SELECT episodeNumber FROM watched_episodes WHERE showId = ?',
-      [showId]
+    const rows = await getDrizzle(db).all<{ episodeNumber: string }>(
+      sql`SELECT episodeNumber FROM watched_episodes WHERE showId = ${showId}`
     )
     return rows.map((r) => r.episodeNumber)
   },
 
   getByShow: (db: DatabaseWrapper, showId: string) =>
-    dbAll<WatchedEpisode>(
-      db,
-      'SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId = ? ORDER BY CAST(episodeNumber AS REAL) ASC',
-      [showId]
-    ),
+    getDrizzle(db).all<WatchedEpisode>(sql`
+      SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId = ${showId} ORDER BY CAST(episodeNumber AS REAL) ASC`),
 
-  getLatestResumeProgress: (db: DatabaseWrapper, showId: string) =>
-    dbGet<WatchedEpisode>(
-      db,
-      `SELECT showId, episodeNumber, currentTime, duration, watchedAt
-       FROM watched_episodes
-       WHERE showId = ? AND currentTime > 5 AND (duration <= 0 OR currentTime < duration * 0.8)
-       ORDER BY watchedAt DESC
-       LIMIT 1`,
-      [showId]
-    ),
+  getLatestResumeProgress: async (db: DatabaseWrapper, showId: string) => {
+    const rows = await getDrizzle(db).all<WatchedEpisode>(sql`
+      SELECT showId, episodeNumber, currentTime, duration, watchedAt
+      FROM watched_episodes
+      WHERE showId = ${showId} AND currentTime > 5 AND (duration <= 0 OR currentTime < duration * 0.8)
+      ORDER BY watchedAt DESC
+      LIMIT 1`)
+    return rows[0]
+  },
 
   upsert: (
     db: DatabaseWrapper,
@@ -72,11 +67,23 @@ export const WatchedEpisodesRepository = {
       duration: number
     }
   ) =>
-    dbRun(
-      db,
-      'INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)',
-      [data.showId, data.episodeNumber, data.currentTime, data.duration]
-    ),
+    getDrizzle(db)
+      .insert(watchedEpisodes)
+      .values({
+        showId: data.showId,
+        episodeNumber: data.episodeNumber,
+        watchedAt: sql`CURRENT_TIMESTAMP`,
+        currentTime: data.currentTime,
+        duration: data.duration,
+      })
+      .onConflictDoUpdate({
+        target: [watchedEpisodes.showId, watchedEpisodes.episodeNumber],
+        set: {
+          watchedAt: sql`CURRENT_TIMESTAMP`,
+          currentTime: data.currentTime,
+          duration: data.duration,
+        },
+      }),
 
   insertIfMissing: (
     db: DatabaseWrapper,
@@ -86,18 +93,23 @@ export const WatchedEpisodesRepository = {
       watchedAt?: string
     }
   ) =>
-    dbRun(
-      db,
-      'INSERT OR IGNORE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, COALESCE(?, CURRENT_TIMESTAMP), 0, 0)',
-      [data.showId, data.episodeNumber, data.watchedAt ?? null]
-    ),
+    getDrizzle(db)
+      .insert(watchedEpisodes)
+      .values({
+        showId: data.showId,
+        episodeNumber: data.episodeNumber,
+        watchedAt: data.watchedAt ? sql`${data.watchedAt}` : sql`CURRENT_TIMESTAMP`,
+        currentTime: 0,
+        duration: 0,
+      })
+      .onConflictDoNothing(),
 
   deleteByShow: (db: DatabaseWrapper, showId: string) =>
-    dbRun(db, 'DELETE FROM watched_episodes WHERE showId = ?', [showId]),
+    getDrizzle(db).delete(watchedEpisodes).where(eq(watchedEpisodes.showId, showId)),
 
   getContinueWatching: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
-    const query = `
+    return getDrizzle(db).all<ContinueWatchingResult>(sql`
       SELECT
         we.showId as _id,
         we.showId as id,
@@ -122,17 +134,13 @@ export const WatchedEpisodesRepository = {
         AND (w.status IS NULL OR w.status = 'Watching')
         AND (w.id IS NOT NULL OR sm.id IS NOT NULL)
       ORDER BY we.watchedAt DESC
-      ${limitClause}
-    `
-    return dbAll<ContinueWatchingResult>(db, query)
+      ${sql.raw(limitClause)}`)
   },
 
-  getEpisodesForShows: (db: DatabaseWrapper, showIds: string[]) => {
-    const placeholders = showIds.map(() => '?').join(',')
-    return dbAll<WatchedEpisode>(
-      db,
-      `SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId IN (${placeholders})`,
-      showIds
-    )
-  },
+  getEpisodesForShows: (db: DatabaseWrapper, showIds: string[]) =>
+    getDrizzle(db).all<WatchedEpisode>(sql`
+      SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId IN (${sql.join(
+        showIds.map((id) => sql`${id}`),
+        sql`, `
+      )})`),
 }

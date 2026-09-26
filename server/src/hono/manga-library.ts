@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
-import { performMangaWriteTransaction } from '../sync.js'
+import { performMangaWriteTransactionAsync } from '../sync.js'
 import { dbAll } from '../utils/db-utils.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import {
@@ -61,7 +61,7 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/manga/library/ids', async (c) => {
     try {
-      return c.json({ ids: MangaLibraryRepository.getIds(mangaDb(getDbs())) })
+      return c.json({ ids: await MangaLibraryRepository.getIds(mangaDb(getDbs())) })
     } catch {
       return c.json({ ids: [] })
     }
@@ -69,7 +69,7 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/manga/library/check/:id', async (c) => {
     try {
-      const item = MangaLibraryRepository.getById(mangaDb(getDbs()), c.req.param('id'))
+      const item = await MangaLibraryRepository.getById(mangaDb(getDbs()), c.req.param('id'))
       return c.json({ inLibrary: !!item, status: item?.status ?? null })
     } catch {
       return c.json({ inLibrary: false, status: null })
@@ -78,7 +78,7 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
 
   app.get('/api/manga/library/entry/:id', async (c) => {
     try {
-      const item = MangaLibraryRepository.getById(mangaDb(getDbs()), c.req.param('id'))
+      const item = await MangaLibraryRepository.getById(mangaDb(getDbs()), c.req.param('id'))
       if (!item) return c.json({ error: 'Not in library' }, 404)
       return c.json({ item })
     } catch {
@@ -111,8 +111,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
         ? status
         : 'Reading'
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaLibraryRepository.upsert(tx, {
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaLibraryRepository.upsert(tx, {
           id,
           provider: String(provider).toLowerCase(),
           mangaId: String(mangaId || idRaw || ''),
@@ -135,9 +135,9 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     const { id } = ((await c.req.json().catch(() => undefined)) ?? {}) as Record<string, unknown>
     if (!id) return c.json({ error: 'id is required' }, 400)
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaLibraryRepository.delete(tx, String(id))
-        MangaProgressRepository.deleteByManga(tx, String(id))
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaLibraryRepository.delete(tx, String(id))
+        await MangaProgressRepository.deleteByManga(tx, String(id))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -155,8 +155,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
       return c.json({ error: 'id and a valid status are required' }, 400)
     }
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaLibraryRepository.updateStatus(tx, String(id), String(status))
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaLibraryRepository.updateStatus(tx, String(id), String(status))
       })
       return c.json({ success: true })
     } catch (err) {
@@ -177,7 +177,7 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     try {
       const db = mangaDb(getDbs())
-      const row = MangaLibraryRepository.getById(db, targetId)
+      const row = await MangaLibraryRepository.getById(db, targetId)
       if (!row) return c.json({ error: 'Library entry not found' }, 404)
       if (String(row.provider).toLowerCase() === 'anilist') {
         return c.json(
@@ -186,24 +186,24 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
         )
       }
       let progressMigrated = false
-      await performMangaWriteTransaction(db, (tx) => {
-        MangaLibraryRepository.setAnilistId(tx, targetId, mediaId, 'manual')
+      await performMangaWriteTransactionAsync(db, async (tx) => {
+        await MangaLibraryRepository.setAnilistId(tx, targetId, mediaId, 'manual')
         const orphanId = `anilist:${mediaId}`
         if (orphanId !== targetId) {
-          const orphan = MangaLibraryRepository.getById(tx, orphanId)
-          const target = MangaLibraryRepository.getById(tx, targetId)
-          const targetProgress = MangaProgressRepository.getByManga(tx, targetId)
+          const orphan = await MangaLibraryRepository.getById(tx, orphanId)
+          const target = await MangaLibraryRepository.getById(tx, targetId)
+          const targetProgress = await MangaProgressRepository.getByManga(tx, targetId)
           if (
             orphan?.lastChapterNumber &&
             !target?.lastChapterNumber &&
             targetProgress.length === 0
           ) {
-            MangaLibraryRepository.setProgressPointer(tx, targetId, orphan.lastChapterNumber)
-            MangaProgressRepository.moveSyntheticChapters(tx, orphanId, targetId)
+            await MangaLibraryRepository.setProgressPointer(tx, targetId, orphan.lastChapterNumber)
+            await MangaProgressRepository.moveSyntheticChapters(tx, orphanId, targetId)
             progressMigrated = true
           }
-          MangaLibraryRepository.delete(tx, orphanId)
-          MangaProgressRepository.deleteByManga(tx, orphanId)
+          await MangaLibraryRepository.delete(tx, orphanId)
+          await MangaProgressRepository.deleteByManga(tx, orphanId)
         }
       })
       return c.json({ success: true, id: targetId, progressMigrated })
@@ -226,8 +226,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaLibraryRepository.updateStatusMany(tx, ids, String(status))
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaLibraryRepository.updateStatusMany(tx, ids, String(status))
       })
       return c.json({ success: true, updated: ids.length })
     } catch (err) {
@@ -246,9 +246,9 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaLibraryRepository.deleteMany(tx, ids)
-        MangaProgressRepository.deleteMany(tx, ids)
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaLibraryRepository.deleteMany(tx, ids)
+        await MangaProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -267,8 +267,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     }
     const ids = idsRaw.map((id) => String(id))
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaProgressRepository.deleteMany(tx, ids)
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaProgressRepository.deleteMany(tx, ids)
       })
       return c.json({ success: true, removed: ids.length })
     } catch (err) {
@@ -314,8 +314,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     const pageNum = Math.max(Number(page) || 0, 0)
     const pageCountNum = Math.max(Number(pageCount) || 0, 0)
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
-        MangaProgressRepository.upsert(tx, {
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
+        await MangaProgressRepository.upsert(tx, {
           mangaId: String(mangaId),
           chapterId: String(chapterId),
           chapterNumber: String(chapterNumber || ''),
@@ -327,7 +327,7 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
           altTitle: (altTitle ?? null) as string | null,
           contentRating: (contentRating ?? null) as string | null,
         })
-        MangaLibraryRepository.touchProgress(tx, String(mangaId), {
+        await MangaLibraryRepository.touchProgress(tx, String(mangaId), {
           chapterId: String(chapterId),
           chapterNumber: String(chapterNumber || ''),
           page: pageNum,
@@ -347,11 +347,11 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
     >
     if (!mangaId) return c.json({ error: 'mangaId is required' }, 400)
     try {
-      await performMangaWriteTransaction(mangaDb(getDbs()), (tx) => {
+      await performMangaWriteTransactionAsync(mangaDb(getDbs()), async (tx) => {
         if (chapterId) {
-          MangaProgressRepository.deleteChapter(tx, String(mangaId), String(chapterId))
+          await MangaProgressRepository.deleteChapter(tx, String(mangaId), String(chapterId))
         } else {
-          MangaProgressRepository.deleteByManga(tx, String(mangaId))
+          await MangaProgressRepository.deleteByManga(tx, String(mangaId))
         }
       })
       return c.json({ success: true })
@@ -371,11 +371,13 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
       const listOnly = listOnlyRow
         ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
         : false
-      const rows = MangaProgressRepository.getContinueReading(mangaDb(dbs), limit).filter((row) => {
-        if (ignoreAdult && isMangaContinueAdult(row)) return false
-        if (listOnly && row.watchlistStatus !== 'Reading') return false
-        return true
-      })
+      const rows = (await MangaProgressRepository.getContinueReading(mangaDb(dbs), limit)).filter(
+        (row) => {
+          if (ignoreAdult && isMangaContinueAdult(row)) return false
+          if (listOnly && row.watchlistStatus !== 'Reading') return false
+          return true
+        }
+      )
       return c.json({ data: rows, total: rows.length })
     } catch {
       return c.json({ data: [], total: 0 })
@@ -396,8 +398,8 @@ export function registerMangaLibrary(app: Hono, getDbs: () => HonoDbs) {
       const db = mangaDb(getDbs())
       const ids = await getAdultNonListMangaIds(db)
       if (ids.length > 0) {
-        await performMangaWriteTransaction(db, (tx) => {
-          MangaProgressRepository.deleteMany(tx, ids)
+        await performMangaWriteTransactionAsync(db, async (tx) => {
+          await MangaProgressRepository.deleteMany(tx, ids)
         })
       }
       return c.json({ success: true, removed: ids.length })

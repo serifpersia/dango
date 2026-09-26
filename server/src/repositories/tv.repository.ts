@@ -1,5 +1,7 @@
+import { eq, inArray, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
-import { dbAll, dbGet, dbRun } from '../utils/db-utils.js'
+import { getDrizzle } from '../db/drizzle.js'
+import { tvLibrary, tvProgress } from '../db/schema-tv.js'
 
 export type TvStatus = 'Watching' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
 
@@ -53,52 +55,49 @@ export function normalizeTvMediaId(raw: unknown): string {
 }
 
 export const TvLibraryRepository = {
-  getById: (db: DatabaseWrapper, id: string) =>
-    dbGet<TvLibraryRow>(db, 'SELECT * FROM tv_library WHERE id = ?', [id]),
-
-  exists: (db: DatabaseWrapper, id: string) => {
-    const row = dbGet<{ inLibrary: number }>(
-      db,
-      'SELECT EXISTS(SELECT 1 FROM tv_library WHERE id = ?) as inLibrary',
-      [id]
+  getById: async (db: DatabaseWrapper, id: string) => {
+    const rows = await getDrizzle(db).all<TvLibraryRow>(
+      sql`SELECT * FROM tv_library WHERE id = ${id}`
     )
-    return !!(row && row.inLibrary)
+    return rows[0]
+  },
+
+  exists: async (db: DatabaseWrapper, id: string) => {
+    const rows = await getDrizzle(db).all<{ inLibrary: number }>(
+      sql`SELECT EXISTS(SELECT 1 FROM tv_library WHERE id = ${id}) as inLibrary`
+    )
+    return !!(rows[0] && rows[0].inLibrary)
   },
 
   getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
-    let query = 'SELECT * FROM tv_library'
-    const params: (string | number)[] = []
-
+    const q = sql`SELECT * FROM tv_library`
     if (status && status !== 'All') {
-      query += ' WHERE status = ?'
-      params.push(status)
+      q.append(sql` WHERE status = ${status}`)
     }
-
-    query += ' ORDER BY updatedAt DESC'
-
+    q.append(sql` ORDER BY updatedAt DESC`)
     if (limit !== undefined && offset !== undefined) {
-      query += ' LIMIT ? OFFSET ?'
-      params.push(limit, offset)
+      q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
     }
-
-    return dbAll<TvLibraryRow>(db, query, params)
+    return getDrizzle(db).all<TvLibraryRow>(q)
   },
 
-  getCount: (db: DatabaseWrapper, status?: string) => {
-    let query = 'SELECT COUNT(*) as total FROM tv_library'
-    const params: string[] = []
-
+  getCount: async (db: DatabaseWrapper, status?: string) => {
     if (status && status !== 'All') {
-      query += ' WHERE status = ?'
-      params.push(status)
+      const rows = await getDrizzle(db).all<{ total: number }>(
+        sql`SELECT COUNT(*) as total FROM tv_library WHERE status = ${status}`
+      )
+      return rows[0]?.total || 0
     }
-
-    const row = dbGet<{ total: number }>(db, query, params)
-    return row?.total || 0
+    const rows = await getDrizzle(db).all<{ total: number }>(
+      sql`SELECT COUNT(*) as total FROM tv_library`
+    )
+    return rows[0]?.total || 0
   },
 
-  getIds: (db: DatabaseWrapper) =>
-    dbAll<{ id: string }>(db, 'SELECT id FROM tv_library').map((r) => r.id),
+  getIds: async (db: DatabaseWrapper) => {
+    const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM tv_library`)
+    return rows.map((r) => r.id)
+  },
 
   upsert: (
     db: DatabaseWrapper,
@@ -115,89 +114,63 @@ export const TvLibraryRepository = {
       adult?: boolean
     }
   ) =>
-    dbRun(
-      db,
-      `INSERT INTO tv_library (id, tmdbId, mediaType, title, poster, backdrop, year, overview, status, adult, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
-       ON CONFLICT(id) DO UPDATE SET
-          tmdbId = EXCLUDED.tmdbId,
-          mediaType = EXCLUDED.mediaType,
-          title = COALESCE(NULLIF(EXCLUDED.title, ''), tv_library.title),
-          poster = COALESCE(NULLIF(EXCLUDED.poster, ''), tv_library.poster),
-          backdrop = COALESCE(NULLIF(EXCLUDED.backdrop, ''), tv_library.backdrop),
-          year = COALESCE(NULLIF(EXCLUDED.year, ''), tv_library.year),
-          overview = COALESCE(NULLIF(EXCLUDED.overview, ''), tv_library.overview),
-          status = COALESCE(NULLIF(EXCLUDED.status, ''), tv_library.status),
-          adult = COALESCE(EXCLUDED.adult, tv_library.adult),
-          updatedAt = strftime('%s', 'now')`,
-      [
-        data.id,
-        data.tmdbId,
-        data.mediaType,
-        data.title,
-        data.poster,
-        data.backdrop || null,
-        data.year || null,
-        data.overview || null,
-        data.status,
-        data.adult ? 1 : 0,
-      ]
-    ),
+    getDrizzle(db).run(sql`
+      INSERT INTO tv_library (id, tmdbId, mediaType, title, poster, backdrop, year, overview, status, adult, updatedAt)
+      VALUES (${data.id}, ${data.tmdbId}, ${data.mediaType}, ${data.title}, ${data.poster}, ${data.backdrop || null}, ${data.year || null}, ${data.overview || null}, ${data.status}, ${data.adult ? 1 : 0}, strftime('%s', 'now'))
+      ON CONFLICT(id) DO UPDATE SET
+         tmdbId = EXCLUDED.tmdbId,
+         mediaType = EXCLUDED.mediaType,
+         title = COALESCE(NULLIF(EXCLUDED.title, ''), tv_library.title),
+         poster = COALESCE(NULLIF(EXCLUDED.poster, ''), tv_library.poster),
+         backdrop = COALESCE(NULLIF(EXCLUDED.backdrop, ''), tv_library.backdrop),
+         year = COALESCE(NULLIF(EXCLUDED.year, ''), tv_library.year),
+         overview = COALESCE(NULLIF(EXCLUDED.overview, ''), tv_library.overview),
+         status = COALESCE(NULLIF(EXCLUDED.status, ''), tv_library.status),
+         adult = COALESCE(EXCLUDED.adult, tv_library.adult),
+         updatedAt = strftime('%s', 'now')`),
 
   updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
-    dbRun(db, "UPDATE tv_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id = ?", [
-      status,
-      id,
-    ]),
+    getDrizzle(db).run(sql`
+      UPDATE tv_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
 
   updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(
-      db,
-      `UPDATE tv_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id IN (${placeholders})`,
-      [status, ...ids]
-    )
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).run(sql`
+      UPDATE tv_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `
+      )})`)
   },
 
   touchProgress: (db: DatabaseWrapper, id: string, progress: { season: number; episode: number }) =>
-    dbRun(
-      db,
-      `UPDATE tv_library SET lastSeason = ?, lastEpisode = ?, updatedAt = strftime('%s', 'now') WHERE id = ?`,
-      [progress.season, progress.episode, id]
-    ),
+    getDrizzle(db).run(sql`
+      UPDATE tv_library SET lastSeason = ${progress.season}, lastEpisode = ${progress.episode}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
 
   delete: (db: DatabaseWrapper, id: string) =>
-    dbRun(db, 'DELETE FROM tv_library WHERE id = ?', [id]),
+    getDrizzle(db).delete(tvLibrary).where(eq(tvLibrary.id, id)),
 
   deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(db, `DELETE FROM tv_library WHERE id IN (${placeholders})`, ids)
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).delete(tvLibrary).where(inArray(tvLibrary.id, ids))
   },
 }
 
 export const TvProgressRepository = {
   getByMedia: (db: DatabaseWrapper, mediaId: string) =>
-    dbAll<TvProgressRow>(
-      db,
-      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC, rowid DESC',
-      [mediaId]
-    ),
+    getDrizzle(db).all<TvProgressRow>(sql`
+      SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ${mediaId} ORDER BY updatedAt DESC, rowid DESC`),
 
-  getEpisode: (db: DatabaseWrapper, mediaId: string, season: number, episode: number) =>
-    dbGet<TvProgressRow>(
-      db,
-      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? AND season = ? AND episode = ?',
-      [mediaId, season, episode]
-    ),
+  getEpisode: async (db: DatabaseWrapper, mediaId: string, season: number, episode: number) => {
+    const rows = await getDrizzle(db).all<TvProgressRow>(sql`
+      SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ${mediaId} AND season = ${season} AND episode = ${episode}`)
+    return rows[0]
+  },
 
-  getLatest: (db: DatabaseWrapper, mediaId: string) =>
-    dbGet<TvProgressRow>(
-      db,
-      'SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ? ORDER BY updatedAt DESC, rowid DESC LIMIT 1',
-      [mediaId]
-    ),
+  getLatest: async (db: DatabaseWrapper, mediaId: string) => {
+    const rows = await getDrizzle(db).all<TvProgressRow>(sql`
+      SELECT mediaId, season, episode, currentTime, duration, completed, updatedAt FROM tv_progress WHERE mediaId = ${mediaId} ORDER BY updatedAt DESC, rowid DESC LIMIT 1`)
+    return rows[0]
+  },
 
   upsert: (
     db: DatabaseWrapper,
@@ -218,77 +191,53 @@ export const TvProgressRepository = {
       adult?: number | null
     }
   ) =>
-    dbRun(
-      db,
-      `INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, completed, title, poster, backdrop, year, overview, tmdbId, mediaType, adult, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
-       ON CONFLICT(mediaId, season, episode) DO UPDATE SET
-          currentTime = EXCLUDED.currentTime,
-          duration = EXCLUDED.duration,
-          completed = CASE WHEN tv_progress.completed = 1 OR EXCLUDED.completed = 1 THEN 1 ELSE 0 END,
-          title = COALESCE(EXCLUDED.title, tv_progress.title),
-          poster = COALESCE(EXCLUDED.poster, tv_progress.poster),
-          backdrop = COALESCE(EXCLUDED.backdrop, tv_progress.backdrop),
-          year = COALESCE(EXCLUDED.year, tv_progress.year),
-          overview = COALESCE(EXCLUDED.overview, tv_progress.overview),
-          tmdbId = COALESCE(EXCLUDED.tmdbId, tv_progress.tmdbId),
-          mediaType = COALESCE(EXCLUDED.mediaType, tv_progress.mediaType),
-          adult = COALESCE(EXCLUDED.adult, tv_progress.adult),
-          updatedAt = strftime('%s', 'now')`,
-      [
-        data.mediaId,
-        data.season,
-        data.episode,
-        data.currentTime,
-        data.duration,
-        data.completed,
-        data.title ?? null,
-        data.poster ?? null,
-        data.backdrop ?? null,
-        data.year ?? null,
-        data.overview ?? null,
-        data.tmdbId ?? null,
-        data.mediaType ?? null,
-        data.adult ?? null,
-      ]
-    ),
+    getDrizzle(db).run(sql`
+      INSERT INTO tv_progress (mediaId, season, episode, currentTime, duration, completed, title, poster, backdrop, year, overview, tmdbId, mediaType, adult, updatedAt)
+      VALUES (${data.mediaId}, ${data.season}, ${data.episode}, ${data.currentTime}, ${data.duration}, ${data.completed}, ${data.title ?? null}, ${data.poster ?? null}, ${data.backdrop ?? null}, ${data.year ?? null}, ${data.overview ?? null}, ${data.tmdbId ?? null}, ${data.mediaType ?? null}, ${data.adult ?? null}, strftime('%s', 'now'))
+      ON CONFLICT(mediaId, season, episode) DO UPDATE SET
+         currentTime = EXCLUDED.currentTime,
+         duration = EXCLUDED.duration,
+         completed = CASE WHEN tv_progress.completed = 1 OR EXCLUDED.completed = 1 THEN 1 ELSE 0 END,
+         title = COALESCE(EXCLUDED.title, tv_progress.title),
+         poster = COALESCE(EXCLUDED.poster, tv_progress.poster),
+         backdrop = COALESCE(EXCLUDED.backdrop, tv_progress.backdrop),
+         year = COALESCE(EXCLUDED.year, tv_progress.year),
+         overview = COALESCE(EXCLUDED.overview, tv_progress.overview),
+         tmdbId = COALESCE(EXCLUDED.tmdbId, tv_progress.tmdbId),
+         mediaType = COALESCE(EXCLUDED.mediaType, tv_progress.mediaType),
+         adult = COALESCE(EXCLUDED.adult, tv_progress.adult),
+         updatedAt = strftime('%s', 'now')`),
 
   deleteByMedia: (db: DatabaseWrapper, mediaId: string) =>
-    dbRun(db, 'DELETE FROM tv_progress WHERE mediaId = ?', [mediaId]),
+    getDrizzle(db).delete(tvProgress).where(eq(tvProgress.mediaId, mediaId)),
 
   deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(db, `DELETE FROM tv_progress WHERE mediaId IN (${placeholders})`, ids)
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).delete(tvProgress).where(inArray(tvProgress.mediaId, ids))
   },
 
   deleteEpisode: (db: DatabaseWrapper, mediaId: string, season: number, episode: number) =>
-    dbRun(db, 'DELETE FROM tv_progress WHERE mediaId = ? AND season = ? AND episode = ?', [
-      mediaId,
-      season,
-      episode,
-    ]),
+    getDrizzle(db).run(sql`
+      DELETE FROM tv_progress WHERE mediaId = ${mediaId} AND season = ${season} AND episode = ${episode}`),
 
   getContinueWatching: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
-    return dbAll<TvLibraryRow & Partial<TvProgressRow>>(
-      db,
-      `SELECT p.mediaId as id,
-              COALESCE(l.tmdbId, p.tmdbId, CAST(SUBSTR(REPLACE(p.mediaId, '-', ':'), INSTR(REPLACE(p.mediaId, '-', ':'), ':') + 1) AS INTEGER)) as tmdbId,
-              COALESCE(l.mediaType, p.mediaType, SUBSTR(REPLACE(p.mediaId, '-', ':'), 1, INSTR(REPLACE(p.mediaId, '-', ':'), ':') - 1)) as mediaType,
-              COALESCE(l.title, p.title) as title, COALESCE(l.poster, p.poster) as poster, COALESCE(l.backdrop, p.backdrop) as backdrop,
-              COALESCE(l.year, p.year) as year, COALESCE(l.overview, p.overview) as overview,
-              l.status as watchlistStatus, COALESCE(l.adult, p.adult) as adult,
-              p.season, p.episode, p.currentTime, p.duration, p.completed, p.updatedAt as progressAt
-       FROM (
-         SELECT *, rowid AS progressRowid, ROW_NUMBER() OVER (PARTITION BY mediaId ORDER BY updatedAt DESC, rowid DESC) as rn
-         FROM tv_progress
-       ) p
-       LEFT JOIN tv_library l ON p.mediaId = l.id
-       WHERE p.rn = 1
-         AND (l.status IS NULL OR l.status = 'Watching')
-       ORDER BY p.updatedAt DESC, p.progressRowid DESC
-       ${limitClause}`
-    )
+    return getDrizzle(db).all<TvLibraryRow & Partial<TvProgressRow>>(sql`
+      SELECT p.mediaId as id,
+             COALESCE(l.tmdbId, p.tmdbId, CAST(SUBSTR(REPLACE(p.mediaId, '-', ':'), INSTR(REPLACE(p.mediaId, '-', ':'), ':') + 1) AS INTEGER)) as tmdbId,
+             COALESCE(l.mediaType, p.mediaType, SUBSTR(REPLACE(p.mediaId, '-', ':'), 1, INSTR(REPLACE(p.mediaId, '-', ':'), ':') - 1)) as mediaType,
+             COALESCE(l.title, p.title) as title, COALESCE(l.poster, p.poster) as poster, COALESCE(l.backdrop, p.backdrop) as backdrop,
+             COALESCE(l.year, p.year) as year, COALESCE(l.overview, p.overview) as overview,
+             l.status as watchlistStatus, COALESCE(l.adult, p.adult) as adult,
+             p.season, p.episode, p.currentTime, p.duration, p.completed, p.updatedAt as progressAt
+      FROM (
+        SELECT *, rowid AS progressRowid, ROW_NUMBER() OVER (PARTITION BY mediaId ORDER BY updatedAt DESC, rowid DESC) as rn
+        FROM tv_progress
+      ) p
+      LEFT JOIN tv_library l ON p.mediaId = l.id
+      WHERE p.rn = 1
+        AND (l.status IS NULL OR l.status = 'Watching')
+      ORDER BY p.updatedAt DESC, p.progressRowid DESC
+      ${sql.raw(limitClause)}`)
   },
 }

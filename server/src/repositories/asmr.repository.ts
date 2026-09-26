@@ -1,5 +1,7 @@
+import { eq, inArray, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
-import { dbAll, dbGet, dbRun } from '../utils/db-utils.js'
+import { getDrizzle } from '../db/drizzle.js'
+import { asmrLibrary, asmrProgress } from '../db/schema-asmr.js'
 
 export type AsmrStatus = 'Listening' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
 
@@ -43,52 +45,49 @@ export function buildAsmrId(rjCode: string): string {
 }
 
 export const AsmrLibraryRepository = {
-  getById: (db: DatabaseWrapper, id: string) =>
-    dbGet<AsmrLibraryRow>(db, 'SELECT * FROM asmr_library WHERE id = ?', [id]),
-
-  exists: (db: DatabaseWrapper, id: string) => {
-    const row = dbGet<{ inLibrary: number }>(
-      db,
-      'SELECT EXISTS(SELECT 1 FROM asmr_library WHERE id = ?) as inLibrary',
-      [id]
+  getById: async (db: DatabaseWrapper, id: string) => {
+    const rows = await getDrizzle(db).all<AsmrLibraryRow>(
+      sql`SELECT * FROM asmr_library WHERE id = ${id}`
     )
-    return !!(row && row.inLibrary)
+    return rows[0]
+  },
+
+  exists: async (db: DatabaseWrapper, id: string) => {
+    const rows = await getDrizzle(db).all<{ inLibrary: number }>(
+      sql`SELECT EXISTS(SELECT 1 FROM asmr_library WHERE id = ${id}) as inLibrary`
+    )
+    return !!(rows[0] && rows[0].inLibrary)
   },
 
   getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
-    let query = 'SELECT * FROM asmr_library'
-    const params: (string | number)[] = []
-
+    const q = sql`SELECT * FROM asmr_library`
     if (status && status !== 'All') {
-      query += ' WHERE status = ?'
-      params.push(status)
+      q.append(sql` WHERE status = ${status}`)
     }
-
-    query += ' ORDER BY updatedAt DESC'
-
+    q.append(sql` ORDER BY updatedAt DESC`)
     if (limit !== undefined && offset !== undefined) {
-      query += ' LIMIT ? OFFSET ?'
-      params.push(limit, offset)
+      q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
     }
-
-    return dbAll<AsmrLibraryRow>(db, query, params)
+    return getDrizzle(db).all<AsmrLibraryRow>(q)
   },
 
-  getCount: (db: DatabaseWrapper, status?: string) => {
-    let query = 'SELECT COUNT(*) as total FROM asmr_library'
-    const params: string[] = []
-
+  getCount: async (db: DatabaseWrapper, status?: string) => {
     if (status && status !== 'All') {
-      query += ' WHERE status = ?'
-      params.push(status)
+      const rows = await getDrizzle(db).all<{ total: number }>(
+        sql`SELECT COUNT(*) as total FROM asmr_library WHERE status = ${status}`
+      )
+      return rows[0]?.total || 0
     }
-
-    const row = dbGet<{ total: number }>(db, query, params)
-    return row?.total || 0
+    const rows = await getDrizzle(db).all<{ total: number }>(
+      sql`SELECT COUNT(*) as total FROM asmr_library`
+    )
+    return rows[0]?.total || 0
   },
 
-  getIds: (db: DatabaseWrapper) =>
-    dbAll<{ id: string }>(db, 'SELECT id FROM asmr_library').map((r) => r.id),
+  getIds: async (db: DatabaseWrapper) => {
+    const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM asmr_library`)
+    return rows.map((r) => r.id)
+  },
 
   upsert: (
     db: DatabaseWrapper,
@@ -101,35 +100,28 @@ export const AsmrLibraryRepository = {
       isAdult?: boolean
     }
   ) =>
-    dbRun(
-      db,
-      `INSERT INTO asmr_library (id, rjCode, title, thumbnail, status, isAdult, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
-       ON CONFLICT(id) DO UPDATE SET
-          rjCode = COALESCE(NULLIF(EXCLUDED.rjCode, ''), asmr_library.rjCode),
-          title = COALESCE(NULLIF(EXCLUDED.title, ''), asmr_library.title),
-          thumbnail = COALESCE(NULLIF(EXCLUDED.thumbnail, ''), asmr_library.thumbnail),
-          status = COALESCE(NULLIF(EXCLUDED.status, ''), asmr_library.status),
-          isAdult = COALESCE(EXCLUDED.isAdult, asmr_library.isAdult),
-          updatedAt = strftime('%s', 'now')`,
-      [data.id, data.rjCode, data.title, data.thumbnail, data.status, data.isAdult ? 1 : 0]
-    ),
+    getDrizzle(db).run(sql`
+      INSERT INTO asmr_library (id, rjCode, title, thumbnail, status, isAdult, updatedAt)
+      VALUES (${data.id}, ${data.rjCode}, ${data.title}, ${data.thumbnail}, ${data.status}, ${data.isAdult ? 1 : 0}, strftime('%s', 'now'))
+      ON CONFLICT(id) DO UPDATE SET
+         rjCode = COALESCE(NULLIF(EXCLUDED.rjCode, ''), asmr_library.rjCode),
+         title = COALESCE(NULLIF(EXCLUDED.title, ''), asmr_library.title),
+         thumbnail = COALESCE(NULLIF(EXCLUDED.thumbnail, ''), asmr_library.thumbnail),
+         status = COALESCE(NULLIF(EXCLUDED.status, ''), asmr_library.status),
+         isAdult = COALESCE(EXCLUDED.isAdult, asmr_library.isAdult),
+         updatedAt = strftime('%s', 'now')`),
 
   updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
-    dbRun(
-      db,
-      "UPDATE asmr_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id = ?",
-      [status, id]
-    ),
+    getDrizzle(db).run(sql`
+      UPDATE asmr_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
 
   updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(
-      db,
-      `UPDATE asmr_library SET status = ?, updatedAt = strftime('%s', 'now') WHERE id IN (${placeholders})`,
-      [status, ...ids]
-    )
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).run(sql`
+      UPDATE asmr_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `
+      )})`)
   },
 
   touchProgress: (
@@ -137,43 +129,34 @@ export const AsmrLibraryRepository = {
     id: string,
     progress: { trackIndex: number; trackLabel: string; position: number }
   ) =>
-    dbRun(
-      db,
-      `UPDATE asmr_library SET lastTrackIndex = ?, lastTrackLabel = ?, lastPosition = ?, updatedAt = strftime('%s', 'now') WHERE id = ?`,
-      [progress.trackIndex, progress.trackLabel, progress.position, id]
-    ),
+    getDrizzle(db).run(sql`
+      UPDATE asmr_library SET lastTrackIndex = ${progress.trackIndex}, lastTrackLabel = ${progress.trackLabel}, lastPosition = ${progress.position}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
 
   delete: (db: DatabaseWrapper, id: string) =>
-    dbRun(db, 'DELETE FROM asmr_library WHERE id = ?', [id]),
+    getDrizzle(db).delete(asmrLibrary).where(eq(asmrLibrary.id, id)),
 
   deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(db, `DELETE FROM asmr_library WHERE id IN (${placeholders})`, ids)
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).delete(asmrLibrary).where(inArray(asmrLibrary.id, ids))
   },
 }
 
 export const AsmrProgressRepository = {
   getByWork: (db: DatabaseWrapper, workId: string) =>
-    dbAll<AsmrProgressRow>(
-      db,
-      'SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ? ORDER BY updatedAt DESC',
-      [workId]
-    ),
+    getDrizzle(db).all<AsmrProgressRow>(sql`
+      SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ${workId} ORDER BY updatedAt DESC`),
 
-  getTrack: (db: DatabaseWrapper, workId: string, trackIndex: number) =>
-    dbGet<AsmrProgressRow>(
-      db,
-      'SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ? AND trackIndex = ?',
-      [workId, trackIndex]
-    ),
+  getTrack: async (db: DatabaseWrapper, workId: string, trackIndex: number) => {
+    const rows = await getDrizzle(db).all<AsmrProgressRow>(sql`
+      SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ${workId} AND trackIndex = ${trackIndex}`)
+    return rows[0]
+  },
 
-  getLatest: (db: DatabaseWrapper, workId: string) =>
-    dbGet<AsmrProgressRow>(
-      db,
-      'SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ? ORDER BY updatedAt DESC LIMIT 1',
-      [workId]
-    ),
+  getLatest: async (db: DatabaseWrapper, workId: string) => {
+    const rows = await getDrizzle(db).all<AsmrProgressRow>(sql`
+      SELECT workId, trackIndex, trackLabel, currentTime, duration, updatedAt FROM asmr_progress WHERE workId = ${workId} ORDER BY updatedAt DESC LIMIT 1`)
+    return rows[0]
+  },
 
   upsert: (
     db: DatabaseWrapper,
@@ -189,67 +172,49 @@ export const AsmrProgressRepository = {
       isAdult?: number | null
     }
   ) =>
-    dbRun(
-      db,
-      `INSERT INTO asmr_progress (workId, trackIndex, trackLabel, currentTime, duration, title, thumbnail, rjCode, isAdult, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
-       ON CONFLICT(workId, trackIndex) DO UPDATE SET
-          trackLabel = COALESCE(NULLIF(EXCLUDED.trackLabel, ''), asmr_progress.trackLabel),
-          currentTime = EXCLUDED.currentTime,
-          duration = EXCLUDED.duration,
-          title = COALESCE(EXCLUDED.title, asmr_progress.title),
-          thumbnail = COALESCE(EXCLUDED.thumbnail, asmr_progress.thumbnail),
-          rjCode = COALESCE(EXCLUDED.rjCode, asmr_progress.rjCode),
-          isAdult = COALESCE(EXCLUDED.isAdult, asmr_progress.isAdult),
-          updatedAt = strftime('%s', 'now')`,
-      [
-        data.workId,
-        data.trackIndex,
-        data.trackLabel,
-        data.currentTime,
-        data.duration,
-        data.title ?? null,
-        data.thumbnail ?? null,
-        data.rjCode ?? null,
-        data.isAdult ?? null,
-      ]
-    ),
+    getDrizzle(db).run(sql`
+      INSERT INTO asmr_progress (workId, trackIndex, trackLabel, currentTime, duration, title, thumbnail, rjCode, isAdult, updatedAt)
+      VALUES (${data.workId}, ${data.trackIndex}, ${data.trackLabel}, ${data.currentTime}, ${data.duration}, ${data.title ?? null}, ${data.thumbnail ?? null}, ${data.rjCode ?? null}, ${data.isAdult ?? null}, strftime('%s', 'now'))
+      ON CONFLICT(workId, trackIndex) DO UPDATE SET
+         trackLabel = COALESCE(NULLIF(EXCLUDED.trackLabel, ''), asmr_progress.trackLabel),
+         currentTime = EXCLUDED.currentTime,
+         duration = EXCLUDED.duration,
+         title = COALESCE(EXCLUDED.title, asmr_progress.title),
+         thumbnail = COALESCE(EXCLUDED.thumbnail, asmr_progress.thumbnail),
+         rjCode = COALESCE(EXCLUDED.rjCode, asmr_progress.rjCode),
+         isAdult = COALESCE(EXCLUDED.isAdult, asmr_progress.isAdult),
+         updatedAt = strftime('%s', 'now')`),
 
   deleteByWork: (db: DatabaseWrapper, workId: string) =>
-    dbRun(db, 'DELETE FROM asmr_progress WHERE workId = ?', [workId]),
+    getDrizzle(db).delete(asmrProgress).where(eq(asmrProgress.workId, workId)),
 
   deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return
-    const placeholders = ids.map(() => '?').join(', ')
-    dbRun(db, `DELETE FROM asmr_progress WHERE workId IN (${placeholders})`, ids)
+    if (ids.length === 0) return Promise.resolve()
+    return getDrizzle(db).delete(asmrProgress).where(inArray(asmrProgress.workId, ids))
   },
 
   deleteTrack: (db: DatabaseWrapper, workId: string, trackIndex: number) =>
-    dbRun(db, 'DELETE FROM asmr_progress WHERE workId = ? AND trackIndex = ?', [
-      workId,
-      trackIndex,
-    ]),
+    getDrizzle(db).run(sql`
+      DELETE FROM asmr_progress WHERE workId = ${workId} AND trackIndex = ${trackIndex}`),
 
   getContinueListening: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
-    return dbAll<AsmrLibraryRow & Partial<AsmrProgressRow>>(
-      db,
-      `SELECT p.workId as id,
-              COALESCE(l.rjCode, p.rjCode, p.workId) as rjCode,
-              COALESCE(l.title, p.title) as title,
-              COALESCE(l.thumbnail, p.thumbnail) as thumbnail,
-              COALESCE(l.isAdult, p.isAdult) as isAdult,
-              l.status as watchlistStatus,
-              p.trackIndex, p.trackLabel, p.currentTime, p.duration, p.updatedAt as progressAt
-       FROM (
-         SELECT *, ROW_NUMBER() OVER (PARTITION BY workId ORDER BY updatedAt DESC) as rn
-         FROM asmr_progress
-       ) p
-       LEFT JOIN asmr_library l ON p.workId = l.id
-       WHERE p.rn = 1
-         AND (l.status IS NULL OR l.status = 'Listening')
-       ORDER BY p.updatedAt DESC
-       ${limitClause}`
-    )
+    return getDrizzle(db).all<AsmrLibraryRow & Partial<AsmrProgressRow>>(sql`
+      SELECT p.workId as id,
+             COALESCE(l.rjCode, p.rjCode, p.workId) as rjCode,
+             COALESCE(l.title, p.title) as title,
+             COALESCE(l.thumbnail, p.thumbnail) as thumbnail,
+             COALESCE(l.isAdult, p.isAdult) as isAdult,
+             l.status as watchlistStatus,
+             p.trackIndex, p.trackLabel, p.currentTime, p.duration, p.updatedAt as progressAt
+      FROM (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY workId ORDER BY updatedAt DESC) as rn
+        FROM asmr_progress
+      ) p
+      LEFT JOIN asmr_library l ON p.workId = l.id
+      WHERE p.rn = 1
+        AND (l.status IS NULL OR l.status = 'Listening')
+      ORDER BY p.updatedAt DESC
+      ${sql.raw(limitClause)}`)
   },
 }
