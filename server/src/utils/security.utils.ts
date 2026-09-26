@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express'
 import { CONFIG } from '../config.js'
 
 export function isSafeExternalUrl(rawUrl: unknown): { safe: boolean; url?: URL; error?: string } {
@@ -91,26 +90,4 @@ export function isAllowedOrigin(origin: string | undefined): boolean {
   } catch {
     return false
   }
-}
-
-export function crossSiteProtectionMiddleware(req: Request, res: Response, next: NextFunction) {
-  const method = req.method.toUpperCase()
-  const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
-
-  if (!isMutating) return next()
-
-  const secFetchSite = req.headers['sec-fetch-site']
-  if (secFetchSite === 'cross-site') {
-    const origin = req.headers.origin
-    if (!isAllowedOrigin(origin)) {
-      return res.status(403).json({ error: 'Forbidden: cross-site request rejected' })
-    }
-  }
-
-  const origin = req.headers.origin
-  if (origin && !isAllowedOrigin(origin)) {
-    return res.status(403).json({ error: 'Forbidden: cross-origin request rejected' })
-  }
-
-  next()
 }

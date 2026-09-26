@@ -1,5 +1,6 @@
-import { Router, Request, Response } from 'express'
-import { AppCache } from '../utils/cache.utils.js'
+import type { Hono } from 'hono'
+import type { AppCache } from '../utils/cache.utils.js'
+import logger from '../logger.js'
 import { parseJsonBody } from '../utils/http.utils.js'
 import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import { URL } from 'url'
@@ -34,6 +35,7 @@ async function resolveTvMeta(
   }
   return meta
 }
+
 interface TmdbSearchItem {
   id: number
   title?: string
@@ -134,15 +136,6 @@ export function isPlaylistBody(body: Buffer): boolean {
   )
 }
 
-function sendRewrittenPlaylist(res: Response, rewritten: string): void {
-  const bodyBuffer = Buffer.from(rewritten, 'utf8')
-  res.set('Content-Type', 'application/vnd.apple.mpegurl')
-  res.set('Content-Length', String(bodyBuffer.length))
-  if (!res.headersSent) {
-    res.send(bodyBuffer)
-  }
-}
-
 interface ImdbSuggestion {
   id?: string
   l?: string
@@ -151,28 +144,57 @@ interface ImdbSuggestion {
   i?: { imageUrl?: string }
 }
 
-export function createTvRouter(
-  apiCache: AppCache,
-  getTvProvider: (name: string) => TvProvider | undefined
-): Router {
-  const router = Router()
+type SearchResultItem = {
+  id: number
+  title: string
+  year: string
+  type: string
+  image: string
+  backdrop: string
+  overview: string
+  vote_average: number
+  adult: boolean
+  genre_ids: number[]
+}
 
-  router.get('/tv/search', async (req, res) => {
-    const query = (req.query.q as string) || ''
-    const page = parseInt(req.query.page as string) || 1
-    const type = (req.query.type as string) || 'multi'
-    const genre = (req.query.genre as string) || ''
-    const year = (req.query.year as string) || ''
-    const sortBy = (req.query.sort_by as string) || 'popularity.desc'
+function toSearchResult(
+  item: TmdbSearchItem & { overview?: string; genre_ids?: number[]; backdrop_path?: string | null },
+  type: string
+): SearchResultItem {
+  return {
+    id: item.id,
+    title: item.title || item.name || '',
+    year: (item.release_date || item.first_air_date || '').split('-')[0],
+    type,
+    image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
+    backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
+    overview: item.overview || '',
+    vote_average: item.vote_average || 0,
+    adult: item.adult === true,
+    genre_ids: item.genre_ids || [],
+  }
+}
+
+export function registerTv(
+  app: Hono,
+  getApiCache: () => AppCache,
+  getTvProvider: (name: string) => TvProvider | undefined
+) {
+  app.get('/api/tv/search', async (c) => {
+    const query = c.req.query('q') || ''
+    const page = parseInt(c.req.query('page') as string) || 1
+    const type = c.req.query('type') || 'multi'
+    const genre = c.req.query('genre') || ''
+    const year = c.req.query('year') || ''
+    const sortBy = c.req.query('sort_by') || 'popularity.desc'
     const hasTypeFilter = type === 'tv' || type === 'movie'
     const hasGenre = !!genre
     const hasYear = !!year && year !== 'ALL'
-    const shouldFallbackToTrending = !query && !hasTypeFilter && !hasGenre && !hasYear
     const cacheKey = `tv-search-${query.toLowerCase()}-${page}-${type}-${genre}-${year}-${sortBy}`
-    const cached = apiCache.get(cacheKey)
-    if (cached) return res.json(cached)
+    const cached = getApiCache().get(cacheKey)
+    if (cached) return c.json(cached)
     const key = await getTmdbKey()
-    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    if (!key) return c.json({ error: 'No TMDB API key available' }, 500)
     try {
       let url: string
       if (type === 'tv' || type === 'movie') {
@@ -216,25 +238,14 @@ export function createTvRouter(
         url = `${TMDB_BASE}/search/multi?${params.toString()}`
       }
       const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-      if (!r.ok) return res.status(500).json({ error: 'TMDB search failed' })
+      if (!r.ok) return c.json({ error: 'TMDB search failed' }, 500)
       const d = await parseJsonBody<{
         results?: TmdbSearchItem[]
         total_results?: number
         total_pages?: number
         page?: number
       }>(r)
-      let results: Array<{
-        id: number
-        title: string
-        year: string
-        type: string
-        image: string
-        backdrop: string
-        overview: string
-        vote_average: number
-        adult: boolean
-        genre_ids: number[]
-      }>
+      let results: SearchResultItem[]
       if (type === 'tv' || type === 'movie') {
         results = (d.results || []).map(
           (
@@ -243,18 +254,7 @@ export function createTvRouter(
               genre_ids?: number[]
               backdrop_path?: string | null
             }
-          ) => ({
-            id: item.id,
-            title: item.title || item.name || '',
-            year: (item.release_date || item.first_air_date || '').split('-')[0],
-            type,
-            image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
-            backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
-            overview: item.overview || '',
-            vote_average: item.vote_average || 0,
-            adult: item.adult === true,
-            genre_ids: item.genre_ids || [],
-          })
+          ) => toSearchResult(item, type)
         )
       } else {
         results = (d.results || [])
@@ -266,18 +266,7 @@ export function createTvRouter(
                 genre_ids?: number[]
                 backdrop_path?: string | null
               }
-            ) => ({
-              id: item.id,
-              title: item.title || item.name || '',
-              year: (item.release_date || item.first_air_date || '').split('-')[0],
-              type: item.media_type || 'tv',
-              image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
-              backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
-              overview: item.overview || '',
-              vote_average: item.vote_average || 0,
-              adult: item.adult === true,
-              genre_ids: item.genre_ids || [],
-            })
+            ) => toSearchResult(item, item.media_type || 'tv')
           )
       }
       const payload = {
@@ -286,28 +275,28 @@ export function createTvRouter(
         total_pages: d.total_pages || 0,
         page: d.page || page,
       }
-      apiCache.set(cacheKey, payload, 1800)
-      res.json(payload)
+      getApiCache().set(cacheKey, payload, 1800)
+      return c.json(payload)
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/trending', async (req, res) => {
-    const mediaType = (req.query.media_type as string) || 'all'
-    const timeWindow = (req.query.time_window as string) || 'week'
-    const page = parseInt(req.query.page as string) || 1
+  app.get('/api/tv/trending', async (c) => {
+    const mediaType = c.req.query('media_type') || 'all'
+    const timeWindow = c.req.query('time_window') || 'week'
+    const page = parseInt(c.req.query('page') as string) || 1
     const cacheKey = `tv-trending-${mediaType}-${timeWindow}-${page}`
-    const cached = apiCache.get(cacheKey)
-    if (cached) return res.json(cached)
+    const cached = getApiCache().get(cacheKey)
+    if (cached) return c.json(cached)
     const key = await getTmdbKey()
-    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    if (!key) return c.json({ error: 'No TMDB API key available' }, 500)
     try {
       const r = await fetch(
         `${TMDB_BASE}/trending/${mediaType}/${timeWindow}?api_key=${key}&page=${page}`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
-      if (!r.ok) return res.status(500).json({ error: 'TMDB trending failed' })
+      if (!r.ok) return c.json({ error: 'TMDB trending failed' }, 500)
       const d = await parseJsonBody<{
         results?: (TmdbSearchItem & {
           overview?: string
@@ -327,18 +316,7 @@ export function createTvRouter(
               genre_ids?: number[]
               backdrop_path?: string | null
             }
-          ) => ({
-            id: item.id,
-            title: item.title || item.name || '',
-            year: (item.release_date || item.first_air_date || '').split('-')[0],
-            type: item.media_type || 'tv',
-            image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
-            backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
-            overview: item.overview || '',
-            vote_average: item.vote_average || 0,
-            adult: item.adult === true,
-            genre_ids: item.genre_ids || [],
-          })
+          ) => toSearchResult(item, item.media_type || 'tv')
         )
       const payload = {
         results,
@@ -346,19 +324,19 @@ export function createTvRouter(
         total_pages: d.total_pages || 0,
         page: d.page || page,
       }
-      apiCache.set(cacheKey, payload, 3600)
-      res.json(payload)
+      getApiCache().set(cacheKey, payload, 3600)
+      return c.json(payload)
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/genres', async (_req, res) => {
+  app.get('/api/tv/genres', async (c) => {
     const cacheKey = 'tv-genres-list'
-    const cached = apiCache.get(cacheKey)
-    if (cached) return res.json(cached)
+    const cached = getApiCache().get(cacheKey)
+    if (cached) return c.json(cached)
     const key = await getTmdbKey()
-    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    if (!key) return c.json({ error: 'No TMDB API key available' }, 500)
     try {
       const [tvRes, movieRes] = await Promise.all([
         fetch(`${TMDB_BASE}/genre/tv/list?api_key=${key}`, {
@@ -384,23 +362,24 @@ export function createTvRouter(
           name: g.name,
         })),
       }
-      apiCache.set(cacheKey, payload, 86400)
-      res.json(payload)
+      getApiCache().set(cacheKey, payload, 86400)
+      return c.json(payload)
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/details/:type/:id', async (req, res) => {
-    const { type, id } = req.params
+  app.get('/api/tv/details/:type/:id', async (c) => {
+    const type = c.req.param('type')
+    const id = c.req.param('id')
     const key = await getTmdbKey()
-    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    if (!key) return c.json({ error: 'No TMDB API key available' }, 500)
     try {
       const r = await fetch(
         `${TMDB_BASE}/${type}/${id}?api_key=${key}&append_to_response=external_ids`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
-      if (!r.ok) return res.status(500).json({ error: 'TMDB details failed' })
+      if (!r.ok) return c.json({ error: 'TMDB details failed' }, 500)
       const d = await parseJsonBody<TmdbDetailsBody>(r)
       const result: TmdbDetailsResult = {
         id: d.id,
@@ -422,21 +401,22 @@ export function createTvRouter(
           }))
         result.number_of_seasons = d.number_of_seasons
       }
-      res.json(result)
+      return c.json(result)
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/episodes/:id/:season', async (req, res) => {
-    const { id, season } = req.params
+  app.get('/api/tv/episodes/:id/:season', async (c) => {
+    const id = c.req.param('id')
+    const season = c.req.param('season')
     const key = await getTmdbKey()
-    if (!key) return res.status(500).json({ error: 'No TMDB API key available' })
+    if (!key) return c.json({ error: 'No TMDB API key available' }, 500)
     try {
       const r = await fetch(`${TMDB_BASE}/tv/${id}/season/${season}?api_key=${key}`, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
       })
-      if (!r.ok) return res.status(500).json({ error: 'TMDB episodes failed' })
+      if (!r.ok) return c.json({ error: 'TMDB episodes failed' }, 500)
       const d = await parseJsonBody<{ episodes?: TmdbEpisode[] }>(r)
       const episodes = (d.episodes || []).map((ep: TmdbEpisode) => ({
         episode_number: ep.episode_number,
@@ -445,21 +425,21 @@ export function createTvRouter(
         overview: ep.overview,
         still_path: ep.still_path,
       }))
-      res.json({ episodes })
+      return c.json({ episodes })
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/lookup/imdb-to-tmdb/:imdbId', async (req, res) => {
+  app.get('/api/tv/lookup/imdb-to-tmdb/:imdbId', async (c) => {
     const key = await getTmdbKey()
-    if (!key) return res.json({ tmdbId: null, error: 'No TMDB API key available' })
+    if (!key) return c.json({ tmdbId: null, error: 'No TMDB API key available' })
     try {
       const r = await fetch(
-        `${TMDB_BASE}/find/${req.params.imdbId}?api_key=${key}&external_source=imdb_id`,
+        `${TMDB_BASE}/find/${c.req.param('imdbId')}?api_key=${key}&external_source=imdb_id`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
-      if (!r.ok) return res.json({ tmdbId: null, error: `TMDB error ${r.status}` })
+      if (!r.ok) return c.json({ tmdbId: null, error: `TMDB error ${r.status}` })
       const d = await parseJsonBody<{
         movie_results?: TmdbSearchItem[]
         tv_results?: TmdbSearchItem[]
@@ -467,29 +447,29 @@ export function createTvRouter(
       const movie = d.movie_results?.[0]
       const tv = d.tv_results?.[0]
       const result = movie || tv
-      res.json({
+      return c.json({
         tmdbId: result?.id || null,
         type: movie ? 'movie' : tv ? 'tv' : null,
         title: result?.title || result?.name || null,
         year: (result?.release_date || result?.first_air_date || '').substring(0, 4) || null,
       })
     } catch (e) {
-      res.json({ tmdbId: null, error: (e as Error).message })
+      return c.json({ tmdbId: null, error: (e as Error).message })
     }
   })
 
-  router.get('/tv/search/imdb', async (req, res) => {
-    const query = (req.query.q as string) || ''
-    if (!query) return res.json([])
+  app.get('/api/tv/search/imdb', async (c) => {
+    const query = c.req.query('q') || ''
+    if (!query) return c.json([])
     const cacheKey = `tv-imdb-search-${query.toLowerCase()}`
-    const cached = apiCache.get(cacheKey)
-    if (cached) return res.json(cached)
+    const cached = getApiCache().get(cacheKey)
+    if (cached) return c.json(cached)
     try {
       const response = await fetch(
         `https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(query)}.json`,
         { headers: { 'User-Agent': 'Mozilla/5.0' } }
       )
-      if (!response.ok) return res.status(500).json({ error: 'IMDB search failed' })
+      if (!response.ok) return c.json({ error: 'IMDB search failed' }, 500)
       const data = await parseJsonBody<{ d?: ImdbSuggestion[] }>(response)
       const TV_TYPES = new Set(['tvSeries', 'tvMiniSeries', 'movie'])
       const matches = (data.d || [])
@@ -504,26 +484,27 @@ export function createTvRouter(
           type: entry.qid,
           image: entry.i?.imageUrl || '',
         }))
-      apiCache.set(cacheKey, matches, 3600)
-      res.json(matches)
+      getApiCache().set(cacheKey, matches, 3600)
+      return c.json(matches)
     } catch (e) {
-      res.status(500).json({ error: (e as Error).message })
+      return c.json({ error: (e as Error).message }, 500)
     }
   })
 
-  router.get('/tv/subtitles/:type/:tmdbId', async (req, res) => {
-    const { type, tmdbId } = req.params
+  app.get('/api/tv/subtitles/:type/:tmdbId', async (c) => {
+    const type = c.req.param('type')
+    const tmdbId = c.req.param('tmdbId')
     const numericTmdbId = parseInt(tmdbId, 10)
-    if (!numericTmdbId) return res.json({ subtitles: [] })
+    if (!numericTmdbId) return c.json({ subtitles: [] })
     const mediaType = type === 'movie' ? 'movie' : 'tv'
-    const season = String(req.query.season || '1')
-    const episode = String(req.query.episode || '1')
+    const season = String(c.req.query('season') || '1')
+    const episode = String(c.req.query('episode') || '1')
     const cacheKey =
       mediaType === 'tv'
         ? `tv-subs-${numericTmdbId}-${season}-${episode}`
         : `tv-subs-${numericTmdbId}-movie`
-    const cached = apiCache.get(cacheKey)
-    if (cached) return res.json(cached)
+    const cached = getApiCache().get(cacheKey)
+    if (cached) return c.json(cached)
     try {
       const searchUrl =
         mediaType === 'tv'
@@ -533,7 +514,7 @@ export function createTvRouter(
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(10000),
       })
-      if (!r.ok) return res.json({ subtitles: [] })
+      if (!r.ok) return c.json({ subtitles: [] })
       const items = (await parseJsonBody(r)) as {
         url?: string
         language?: string
@@ -565,30 +546,32 @@ export function createTvRouter(
         })
         .slice(0, 50)
       const payload = { subtitles }
-      apiCache.set(cacheKey, payload, 3600)
-      res.json(payload)
+      getApiCache().set(cacheKey, payload, 3600)
+      return c.json(payload)
     } catch {
-      res.json({ subtitles: [] })
+      return c.json({ subtitles: [] })
     }
   })
 
-  router.get('/tv/sources/:provider/:type/:tmdbId', async (req, res) => {
-    const { provider, type, tmdbId } = req.params
+  app.get('/api/tv/sources/:provider/:type/:tmdbId', async (c) => {
+    const provider = c.req.param('provider')
+    const type = c.req.param('type')
+    const tmdbId = c.req.param('tmdbId')
     const mediaType = type === 'movie' ? 'movie' : 'tv'
     const numericTmdbId = parseInt(tmdbId, 10)
-    if (!numericTmdbId) return res.json({ sources: [], audioTracks: [], error: 'Bad tmdb id' })
+    if (!numericTmdbId) return c.json({ sources: [], audioTracks: [], error: 'Bad tmdb id' })
     const mod = getTvProvider(String(provider).toLowerCase())
     if (!mod || typeof mod.getSources !== 'function') {
-      return res.json({ sources: [], audioTracks: [], error: `Unknown TV provider ${provider}` })
+      return c.json({ sources: [], audioTracks: [], error: `Unknown TV provider ${provider}` })
     }
-    const season = parseInt(String(req.query.season || '1'), 10) || 1
-    const episode = parseInt(String(req.query.episode || '1'), 10) || 1
-    const server = typeof req.query.server === 'string' ? req.query.server : undefined
+    const season = parseInt(String(c.req.query('season') || '1'), 10) || 1
+    const episode = parseInt(String(c.req.query('episode') || '1'), 10) || 1
+    const server = typeof c.req.query('server') === 'string' ? c.req.query('server') : undefined
     const meta = await resolveTvMeta(mediaType, numericTmdbId, {
-      title: String(req.query.title || ''),
-      year: String(req.query.year || ''),
-      imdbId: String(req.query.imdbId || ''),
-      totalSeasons: String(req.query.totalSeasons || '1'),
+      title: String(c.req.query('title') || ''),
+      year: String(c.req.query('year') || ''),
+      imdbId: String(c.req.query('imdbId') || ''),
+      totalSeasons: String(c.req.query('totalSeasons') || '1'),
     })
     const media: TvMediaRequest = {
       tmdbId: numericTmdbId,
@@ -603,7 +586,7 @@ export function createTvRouter(
     try {
       const result = await mod.getSources(media, server)
       if (!result || !Array.isArray(result.sources) || result.sources.length === 0) {
-        return res.json({
+        return c.json({
           provider: mod.name,
           server: result?.server || server,
           sources: [],
@@ -612,7 +595,7 @@ export function createTvRouter(
           error: 'No sources found',
         })
       }
-      res.json({
+      return c.json({
         provider: mod.name,
         server: result.server || server,
         sources: result.sources,
@@ -622,7 +605,7 @@ export function createTvRouter(
         valid: true,
       })
     } catch (e) {
-      res.json({
+      return c.json({
         provider: mod.name,
         sources: [],
         audioTracks: [],
@@ -632,20 +615,22 @@ export function createTvRouter(
     }
   })
 
-  router.get('/tv/embed/:provider/:type/:tmdbId', async (req, res) => {
-    const { provider, type, tmdbId } = req.params
+  app.get('/api/tv/embed/:provider/:type/:tmdbId', async (c) => {
+    const provider = c.req.param('provider')
+    const type = c.req.param('type')
+    const tmdbId = c.req.param('tmdbId')
     const mediaType = type === 'movie' ? 'movie' : 'tv'
     const numericTmdbId = parseInt(tmdbId, 10)
-    if (!numericTmdbId) return res.json({ url: null, error: 'Bad tmdb id' })
+    if (!numericTmdbId) return c.json({ url: null, error: 'Bad tmdb id' })
     const mod = getTvProvider(String(provider).toLowerCase())
     if (!mod || typeof mod.getEmbedUrl !== 'function') {
-      return res.json({ url: null, error: `Unknown TV provider ${provider}` })
+      return c.json({ url: null, error: `Unknown TV provider ${provider}` })
     }
     const media: TvMediaRequest = {
       tmdbId: numericTmdbId,
       type: mediaType,
-      season: parseInt(String(req.query.season || '1'), 10) || 1,
-      episode: parseInt(String(req.query.episode || '1'), 10) || 1,
+      season: parseInt(String(c.req.query('season') || '1'), 10) || 1,
+      episode: parseInt(String(c.req.query('episode') || '1'), 10) || 1,
       title: '',
       year: '',
       imdbId: '',
@@ -653,30 +638,33 @@ export function createTvRouter(
     }
     try {
       const url = await mod.getEmbedUrl(media)
-      if (!url) return res.json({ url: null, error: 'No embed url' })
-      res.json({ url })
+      if (!url) return c.json({ url: null, error: 'No embed url' })
+      return c.json({ url })
     } catch (e) {
-      res.json({ url: null, error: (e as Error).message })
+      return c.json({ url: null, error: (e as Error).message })
     }
   })
 
-  router.get('/tv/stream-proxy', async (req, res) => {
-    const { url, referer } = req.query
-    const urlStr = url as string
-    const refererStr = (referer as string) || ''
-    if (!urlStr) return res.status(400).send('URL required')
+  app.get('/api/tv/stream-proxy', async (c) => {
+    const urlStr = c.req.query('url') ?? ''
+    const refererStr = c.req.query('referer') || ''
+    if (!urlStr) return c.text('URL required', 400)
 
     const safeCheck = isSafeExternalUrl(urlStr)
     if (!safeCheck.safe) {
-      return res.status(400).send(safeCheck.error || 'Invalid URL')
+      return c.text(safeCheck.error || 'Invalid URL', 400)
     }
 
-    const abortController = new AbortController()
-    const timeout = setTimeout(() => abortController.abort(), 30000)
-    res.on('close', () => {
-      clearTimeout(timeout)
-      abortController.abort()
-    })
+    const abort = new AbortController()
+    const timeout = setTimeout(() => abort.abort(), 30000)
+    c.req.raw.signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout)
+        abort.abort()
+      },
+      { once: true }
+    )
 
     try {
       const headers: Record<string, string> = {
@@ -687,13 +675,13 @@ export function createTvRouter(
 
       const fetchResp = await fetch(urlStr, {
         headers,
-        signal: abortController.signal,
+        signal: abort.signal,
         redirect: 'follow',
       })
 
       const status = fetchResp.status
       if (status !== 200 && status !== 206) {
-        return res.status(status ?? 502).send('Upstream error')
+        return c.text('Upstream error', (status || 502) as 502)
       }
 
       const contentType = fetchResp.headers.get('content-type') || 'application/octet-stream'
@@ -701,61 +689,53 @@ export function createTvRouter(
       const contentRange = fetchResp.headers.get('content-range')
       const acceptRanges = fetchResp.headers.get('accept-ranges')
 
-      res.status(status)
-      res.set('Content-Type', contentType)
-      if (contentLength) res.set('Content-Length', contentLength)
-      if (contentRange) res.set('Content-Range', contentRange)
-      if (acceptRanges) res.set('Accept-Ranges', acceptRanges)
-      res.set('Access-Control-Allow-Origin', '*')
-      res.set('Connection', 'keep-alive')
+      const outHeaders = new Headers()
+      outHeaders.set('Content-Type', contentType)
+      if (contentLength) outHeaders.set('Content-Length', contentLength)
+      if (contentRange) outHeaders.set('Content-Range', contentRange)
+      if (acceptRanges) outHeaders.set('Accept-Ranges', acceptRanges)
+      outHeaders.set('Access-Control-Allow-Origin', '*')
+      outHeaders.set('Connection', 'keep-alive')
 
       if (urlStr.includes('.m3u8') || /mpegurl|m3u8/i.test(contentType)) {
         const body = await fetchResp.text()
         const baseUrl = new URL(fetchResp.url || urlStr)
-        sendRewrittenPlaylist(res, rewriteTvPlaylist(body, baseUrl, refererStr))
-      } else {
-        const chunks: Buffer[] = []
-        const reader = fetchResp.body?.getReader()
-        if (!reader) {
-          return res.status(500).send('No response body')
-        }
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            chunks.push(Buffer.from(value))
-          }
-          const body = Buffer.concat(chunks)
-          if (isPlaylistBody(body)) {
-            const baseUrl = new URL(fetchResp.url || urlStr)
-            sendRewrittenPlaylist(
-              res,
-              rewriteTvPlaylist(body.toString('utf8'), baseUrl, refererStr)
-            )
-            return
-          }
-          res.set('Content-Type', contentType)
-          if (contentLength) res.set('Content-Length', contentLength)
-          if (contentRange) res.set('Content-Range', contentRange)
-          if (acceptRanges) res.set('Accept-Ranges', acceptRanges)
-          res.set('Access-Control-Allow-Origin', '*')
-          res.set('Connection', 'keep-alive')
-          if (!res.headersSent) {
-            res.send(body)
-          }
-        } catch (e) {
-          if (!res.headersSent) {
-            res.status(500).send('Proxy error')
-          }
-        }
+        const rewritten = rewriteTvPlaylist(body, baseUrl, refererStr)
+        const bodyBuffer = Buffer.from(rewritten, 'utf8')
+        outHeaders.set('Content-Type', 'application/vnd.apple.mpegurl')
+        outHeaders.set('Content-Length', String(bodyBuffer.length))
+        return new Response(bodyBuffer as unknown as BodyInit, { status, headers: outHeaders })
       }
-    } catch (e) {
-      if (abortController.signal.aborted) return
-      if (!res.headersSent) {
-        res.status(500).send('Proxy error')
+
+      const chunks: Buffer[] = []
+      const reader = fetchResp.body?.getReader()
+      if (!reader) {
+        return c.text('No response body', 500)
       }
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          chunks.push(Buffer.from(value))
+        }
+        const body = Buffer.concat(chunks)
+        if (isPlaylistBody(body)) {
+          const baseUrl = new URL(fetchResp.url || urlStr)
+          const rewritten = rewriteTvPlaylist(body.toString('utf8'), baseUrl, refererStr)
+          const bodyBuffer = Buffer.from(rewritten, 'utf8')
+          outHeaders.set('Content-Type', 'application/vnd.apple.mpegurl')
+          outHeaders.set('Content-Length', String(bodyBuffer.length))
+          return new Response(bodyBuffer as unknown as BodyInit, { status, headers: outHeaders })
+        }
+        return new Response(body as unknown as BodyInit, { status, headers: outHeaders })
+      } catch {
+        return c.text('Proxy error', 500)
+      }
+    } catch {
+      if (abort.signal.aborted) return new Response(null, { status: 499 })
+      return c.text('Proxy error', 500)
+    } finally {
+      clearTimeout(timeout)
     }
   })
-
-  return router
 }

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express'
+import type { Hono } from 'hono'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
 import { parseJsonBody } from '../utils/http.utils.js'
@@ -15,6 +15,8 @@ export interface RadioStation {
   source: 'listen.moe' | 'radio-browser'
   gateway?: string
 }
+
+const radioCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
 
 const LISTEN_MOE_STATIONS: RadioStation[] = [
   {
@@ -124,29 +126,27 @@ function toStation(s: RbStation): RadioStation | null {
   }
 }
 
-export function createRadioRouter(apiCache: AppCache): Router {
-  const router = Router()
-
-  router.get('/radio/stations', async (_req, res) => {
+export function registerRadio(app: Hono) {
+  app.get('/api/radio/stations', async (c) => {
     try {
-      const cached = apiCache.get<RadioStation[]>('route-radio-stations')
-      if (cached) return res.json({ stations: cached })
+      const cached = radioCache.get<RadioStation[]>('route-radio-stations')
+      if (cached) return c.json({ stations: cached })
       const stations = [...LISTEN_MOE_STATIONS, ...FEATURED_STATIONS]
-      apiCache.set('route-radio-stations', stations, 3600)
-      res.json({ stations })
+      radioCache.set('route-radio-stations', stations, 3600)
+      return c.json({ stations })
     } catch (err) {
       logger.error({ err }, '[Radio] stations failed')
-      res.json({ stations: LISTEN_MOE_STATIONS })
+      return c.json({ stations: LISTEN_MOE_STATIONS })
     }
   })
 
-  router.get('/radio/search', async (req, res) => {
+  app.get('/api/radio/search', async (c) => {
     try {
-      const q = String(req.query.q || '').trim()
-      if (!q) return res.json({ stations: [] })
+      const q = String(c.req.query('q') || '').trim()
+      if (!q) return c.json({ stations: [] })
       const cacheKey = `route-radio-search-${q.toLowerCase()}`
-      const cached = apiCache.get<RadioStation[]>(cacheKey)
-      if (cached) return res.json({ stations: cached })
+      const cached = radioCache.get<RadioStation[]>(cacheKey)
+      if (cached) return c.json({ stations: cached })
       const raw = (await rbFetch(
         `/json/stations/search?name=${encodeURIComponent(q)}&hidebroken=true&order=clickcount&reverse=true&limit=25`
       )) as RbStation[]
@@ -154,13 +154,11 @@ export function createRadioRouter(apiCache: AppCache): Router {
         .map(toStation)
         .filter((s): s is RadioStation => s !== null)
         .slice(0, 25)
-      apiCache.set(cacheKey, stations, 300)
-      res.json({ stations })
+      radioCache.set(cacheKey, stations, 300)
+      return c.json({ stations })
     } catch (err) {
       logger.error({ err }, '[Radio] search failed')
-      res.json({ stations: [] })
+      return c.json({ stations: [] })
     }
   })
-
-  return router
 }

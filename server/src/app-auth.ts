@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import type { Request, Response, NextFunction } from 'express'
 import { CONFIG } from './config.js'
 
 export const LAN_AUTH_COOKIE = 'dango_lan_auth'
@@ -117,23 +116,24 @@ export function clearAllLanSessions() {
   saveSessions({})
 }
 
-function normalizeIp(ip: string | undefined): string {
+export function normalizeClientIp(ip: string | undefined): string {
   if (!ip) return ''
   if (ip.startsWith('::ffff:')) return ip.slice('::ffff:'.length)
   return ip
 }
 
-export function isLoopbackRequest(req: Request): boolean {
-  const candidates = [req.ip, req.socket?.remoteAddress].map((v) => normalizeIp(v as string))
-  return candidates.includes('127.0.0.1') || candidates.includes('::1')
+export function isLoopbackIp(ip: string | undefined): boolean {
+  const normalized = normalizeClientIp(ip)
+  return normalized === '127.0.0.1' || normalized === '::1'
 }
 
-export function getRequestToken(req: Request): string | null {
-  const auth = req.headers.authorization
-  if (auth && auth.toLowerCase().startsWith('bearer ')) {
-    return auth.slice(7).trim() || null
+export function getTokenFromHeaders(
+  authorization: string | undefined,
+  cookieHeader: string | undefined
+): string | null {
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    return authorization.slice(7).trim() || null
   }
-  const cookieHeader = req.headers.cookie
   if (cookieHeader) {
     const parts = cookieHeader.split(';')
     for (const part of parts) {
@@ -148,26 +148,12 @@ export function getRequestToken(req: Request): string | null {
   return null
 }
 
-export function isLanAuthenticated(req: Request): boolean {
-  if (!hasAppPassword()) return true
-  return validateLanSession(getRequestToken(req))
-}
-
-const PUBLIC_PATHS = new Set([
+export const LAN_AUTH_PUBLIC_PATHS = new Set([
   '/api/auth/app-status',
   '/api/auth/app-login',
   '/api/auth/app-logout',
   '/api/internal/shutdown',
 ])
-
-export function lanAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  if (!req.path.startsWith('/api/')) return next()
-  if (PUBLIC_PATHS.has(req.path)) return next()
-  if (req.path.startsWith('/api/internal/') && isLoopbackRequest(req)) return next()
-  if (!hasAppPassword()) return next()
-  if (validateLanSession(getRequestToken(req))) return next()
-  return res.status(401).json({ error: 'LAN_AUTH_REQUIRED' })
-}
 
 export function buildLanCookie(token: string, expiry: number): string {
   const maxAge = Math.max(1, Math.floor((expiry - Date.now()) / 1000))

@@ -1,50 +1,42 @@
-import { Request, Response } from 'express'
+import type { Hono } from 'hono'
 import logger from '../logger.js'
 import { googleDriveService } from '../google.js'
 import { githubSyncService } from '../github-sync.js'
-import { DatabaseWrapper } from '../db.js'
-import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync.js'
+import type { DatabaseWrapper } from '../db.js'
+import type { HonoDbs } from '../app-hono.js'
+import { initSyncProvider, getActiveProvider } from '../sync.js'
 import { CONFIG } from '../config.js'
 import { rcloneService } from '../rclone.js'
-import path from 'path'
+import { updateEnvFile } from '../utils/env.utils.js'
 
-export class AuthController {
-  private runSyncSequence: (
-    db: DatabaseWrapper,
-    mangaDb: DatabaseWrapper,
-    provider?: 'github' | 'google' | 'rclone' | 'none'
-  ) => Promise<void>
+export type RunSyncSequence = (
+  db: DatabaseWrapper,
+  mangaDb: DatabaseWrapper,
+  provider?: 'github' | 'google' | 'rclone' | 'none'
+) => Promise<void>
 
-  constructor(
-    runSyncSequence: (
-      db: DatabaseWrapper,
-      mangaDb: DatabaseWrapper,
-      provider?: 'github' | 'google' | 'rclone' | 'none'
-    ) => Promise<void>
-  ) {
-    this.runSyncSequence = runSyncSequence
-  }
-
-  getConfigStatus = (_req: Request, res: Response) => {
-    // New flow: Worker holds ID+secret, no local .env needed.
-    // Legacy fallback: user-owned GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET.
+export function registerAuth(app: Hono, getDbs: () => HonoDbs, runSync: RunSyncSequence) {
+  app.get('/api/auth/config-status', (c) => {
     const useWorker = !!CONFIG.GOOGLE_AUTH_WORKER_URL
     const hasLegacyConfig = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
-    res.json({ hasConfig: useWorker || hasLegacyConfig, useWorker })
-  }
+    return c.json({ hasConfig: useWorker || hasLegacyConfig, useWorker })
+  })
 
-  getGoogleAuthSettings = (_req: Request, res: Response) => {
-    res.json({
+  app.get('/api/auth/google-auth', (c) => {
+    return c.json({
       useWorker: !!CONFIG.GOOGLE_AUTH_WORKER_URL,
       hasCustomWorkerUrl: !!process.env.GOOGLE_AUTH_WORKER_URL,
       hasCustomClientId: !!process.env.GOOGLE_CLIENT_ID,
       hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
     })
-  }
+  })
 
-  updateGoogleAuthSettings = async (req: Request, res: Response) => {
-    const { clientId, clientSecret, workerUrl } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils.js')
+  app.post('/api/auth/google-auth', async (c) => {
+    const { clientId, clientSecret, workerUrl } = (await c.req.json()) as {
+      clientId?: unknown
+      clientSecret?: unknown
+      workerUrl?: unknown
+    }
 
     const updates: Record<string, string> = {}
 
@@ -72,35 +64,33 @@ export class AuthController {
         clientSecret || undefined
     }
     await initSyncProvider()
-    res.json({ success: true })
-  }
+    return c.json({ success: true })
+  })
 
-  getGitHubAuthOverride = (_req: Request, res: Response) => {
-    res.json({ hasCustomClientId: !!process.env.GITHUB_CLIENT_ID })
-  }
+  app.get('/api/auth/github/auth', (c) => {
+    return c.json({ hasCustomClientId: !!process.env.GITHUB_CLIENT_ID })
+  })
 
-  updateGitHubAuthSettings = async (req: Request, res: Response) => {
-    const { clientId } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils.js')
+  app.post('/api/auth/github/auth', async (c) => {
+    const { clientId } = (await c.req.json()) as { clientId?: unknown }
     if (typeof clientId !== 'string') {
-      return res.status(400).json({ error: 'clientId required' })
+      return c.json({ error: 'clientId required' }, 400)
     }
     await updateEnvFile({ GITHUB_CLIENT_ID: clientId })
-    res.json({ success: true })
-  }
+    return c.json({ success: true })
+  })
 
-  getRcloneSettings = async (_req: Request, res: Response) => {
+  app.get('/api/auth/settings/rclone', async (c) => {
     const remotes = await rcloneService.listRemotes()
-    res.json({
+    return c.json({
       remote: CONFIG.RCLONE_REMOTE || '',
       availableRemotes: remotes,
       activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
     })
-  }
+  })
 
-  getSyncSettings = async (_req: Request, res: Response) => {
-    const { getActiveProvider } = await import('../sync.js')
-    res.json({
+  app.get('/api/auth/settings/sync', async (c) => {
+    return c.json({
       activeProvider: process.env.SYNC_PROVIDER || 'default',
       actualActiveProvider: getActiveProvider(),
       authenticatedProviders: {
@@ -109,22 +99,21 @@ export class AuthController {
         rclone: rcloneService.isActive(),
       },
     })
-  }
+  })
 
-  updateSyncProvider = async (req: Request, res: Response) => {
-    const { provider } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils.js')
+  app.post('/api/auth/settings/sync', async (c) => {
+    const { provider } = (await c.req.json()) as { provider?: unknown }
 
-    const value = provider === 'default' ? '' : provider
+    const value = provider === 'default' ? '' : (provider as string)
     await updateEnvFile({ SYNC_PROVIDER: value })
     await initSyncProvider()
-    res.json({ success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' })
-  }
+    return c.json({ success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' })
+  })
 
-  getGitHubAuthStatus = async (_req: Request, res: Response) => {
+  app.get('/api/auth/github/status', async (c) => {
     try {
       const user = await githubSyncService.getUserProfile()
-      res.json({
+      return c.json({
         authenticated: !!user,
         user,
         device: githubSyncService.getDeviceState(),
@@ -132,85 +121,83 @@ export class AuthController {
       })
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch GitHub auth status')
-      res.json({
+      return c.json({
         authenticated: false,
         user: null,
         device: githubSyncService.getDeviceState(),
         hasCustomClientId: !!process.env.GITHUB_CLIENT_ID,
       })
     }
-  }
+  })
 
-  startGitHubDeviceAuth = async (req: Request, res: Response) => {
-    const mangaDb = req.mangaDb
-    const runSync = this.runSyncSequence
-    const state = await githubSyncService.startDeviceAuth(req.db, (db, provider) =>
-      runSync(db, mangaDb, provider)
+  app.post('/api/auth/github/start', async (c) => {
+    const dbs = getDbs()
+    const state = await githubSyncService.startDeviceAuth(dbs.db, (db, provider) =>
+      runSync(db, dbs.mangaDb, provider)
     )
-    res.json(state)
-  }
+    return c.json(state)
+  })
 
-  pollGitHubDeviceAuth = (_req: Request, res: Response) => {
-    res.json(githubSyncService.getDeviceState())
-  }
+  app.get('/api/auth/github/poll', (c) => {
+    return c.json(githubSyncService.getDeviceState())
+  })
 
-  logoutGitHub = async (_req: Request, res: Response) => {
+  app.post('/api/auth/github/logout', async (c) => {
     await githubSyncService.logout()
-    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
-    res.json({ success: true })
-  }
+    return c.json({ success: true })
+  })
 
-  updateRcloneSettings = async (req: Request, res: Response) => {
-    const { remote } = req.body
-    const { updateEnvFile } = await import('../utils/env.utils.js')
+  app.post('/api/auth/settings/rclone', async (c) => {
+    const { remote } = (await c.req.json()) as { remote?: unknown }
 
     await updateEnvFile({
-      RCLONE_REMOTE: remote,
+      RCLONE_REMOTE: remote as string,
       SYNC_PROVIDER: 'rclone',
     })
-    await this.runSyncSequence(req.db, req.mangaDb, 'rclone')
-    res.json({ success: true })
-  }
+    const dbs = getDbs()
+    await runSync(dbs.db, dbs.mangaDb, 'rclone')
+    return c.json({ success: true })
+  })
 
-  getAuthUrl = async (_req: Request, res: Response) => {
+  app.get('/api/auth/google', async (c) => {
     const url = await googleDriveService.getAuthUrl()
-    res.json({ url })
-  }
+    return c.json({ url })
+  })
 
-  loginGoogle = async (req: Request, res: Response) => {
+  app.post('/api/auth/google/login', async (c) => {
+    const dbs = getDbs()
     if (googleDriveService.isAuthenticated()) {
       const user = await googleDriveService.getUserProfile()
       if (user) {
-        const { updateEnvFile } = await import('../utils/env.utils.js')
         await updateEnvFile({ SYNC_PROVIDER: 'google' })
-        await this.runSyncSequence(req.db, req.mangaDb, 'google')
-        return res.json({ url: null, authenticated: true })
+        await runSync(dbs.db, dbs.mangaDb, 'google')
+        return c.json({ url: null, authenticated: true })
       } else {
         logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
         await googleDriveService.logout()
       }
     }
     const url = await googleDriveService.getAuthUrl()
-    res.json({ url, authenticated: false })
-  }
+    return c.json({ url, authenticated: false })
+  })
 
-  handleCallback = async (req: Request, res: Response) => {
-    const code = req.query.code as string
+  app.get('/api/auth/google/callback', async (c) => {
+    const code = c.req.query('code') as string
     if (!code) {
-      return res.status(400).send('No code provided')
+      return c.text('No code provided', 400)
     }
 
     await googleDriveService.handleCallback(code)
     const user = await googleDriveService.getUserProfile()
 
-    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: 'google' })
 
     logger.info('User logged in. Syncing database (please wait)...')
+    const dbs = getDbs()
     try {
-      await this.runSyncSequence(req.db, req.mangaDb, 'google')
+      await runSync(dbs.db, dbs.mangaDb, 'google')
     } catch (err) {
       logger.error({ err }, 'Post-login sync failed')
     }
@@ -247,19 +234,18 @@ export class AuthController {
             </body>
             </html>
             `
-    res.send(responseHtml)
-  }
+    return c.html(responseHtml)
+  })
 
-  getUserProfile = async (_req: Request, res: Response) => {
+  app.get('/api/auth/user', async (c) => {
     const user = await googleDriveService.getUserProfile()
-    res.json(user)
-  }
+    return c.json(user)
+  })
 
-  logout = async (_req: Request, res: Response) => {
+  app.post('/api/auth/logout', async (c) => {
     await googleDriveService.logout()
-    const { updateEnvFile } = await import('../utils/env.utils.js')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
-    res.json({ success: true })
-  }
+    return c.json({ success: true })
+  })
 }

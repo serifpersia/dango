@@ -1,18 +1,16 @@
 process.setMaxListeners(100)
 import { EventEmitter } from 'events'
 EventEmitter.defaultMaxListeners = 100
-import express from 'express'
 import path from 'path'
-import cors from 'cors'
-import compression from 'compression'
 import { AppCache } from './utils/cache.utils.js'
 import fs from 'fs'
 import crypto from 'crypto'
+import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { getConnInfo } from '@hono/node-server/conninfo'
 import { DatabaseWrapper } from './db.js'
 import logger from './logger.js'
 import { notifyServerExit } from './lib/ipc.js'
-import { crossSiteProtectionMiddleware, isAllowedOrigin } from './utils/security.utils.js'
-import { requestLogger } from './request-logger.js'
 
 import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
@@ -33,78 +31,48 @@ import {
   waitForSync,
   getActiveProvider,
 } from './sync.js'
-import { createAuthRouter } from './routes/auth.routes.js'
-import { createLanAuthRouter } from './routes/lan-auth.routes.js'
-import { lanAuthMiddleware } from './app-auth.js'
-import { createWatchlistRouter } from './routes/watchlist.routes.js'
-import { createDataRouter } from './routes/data.routes.js'
-import { createAsmrRouter, type JasmrApi } from './routes/asmr.routes.js'
-import { createAsmrLibraryRouter } from './routes/asmr-library.routes.js'
-import { createMangaRouter } from './routes/manga.routes.js'
-import { createMangaLibraryRouter } from './routes/manga-library.routes.js'
+import type { JasmrApi } from './hono/asmr.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
 import type { TvProvider } from './providers/tv.types.js'
-import { createRadioRouter } from './routes/radio.routes.js'
-import { createMusicRouter } from './routes/music.routes.js'
-import { createTvRouter } from './routes/tv.routes.js'
-import { createTvLibraryRouter } from './routes/tv-library.routes.js'
-import { createProxyRouter } from './routes/proxy.routes.js'
-import { createProvidersRouter } from './routes/providers.routes.js'
 import { loadRemoteProviders } from './providers/remote-loader.js'
 import type { ProviderCatalogItem } from './providers/remote-types.js'
 import type { Provider } from './providers/provider.interface.js'
-import { createSettingsRouter } from './routes/settings.routes.js'
-import { createInsightsRouter } from './routes/insights.routes.js'
-import { createTranslateRouter } from './routes/translate.routes.js'
-import { createDiscordGatewayRouter } from './routes/discord-gateway.routes.js'
-import { createTrackerRouter } from './routes/tracker.routes.js'
 import { discordRPCService } from './discord-rpc.js'
 import { discordGatewayService } from './discord-gateway.js'
 import { SettingsRepository } from './repositories/settings.repository.js'
-import { requestContext } from './utils/request-context.js'
+import { createHonoApp } from './app-hono.js'
+import { startWatchlistDiscovery, stopWatchlistDiscovery } from './hono/watchlist.js'
 import { checkAnilistStatus } from './lib/anilist.js'
 import { offlineDb } from './lib/offline-db.js'
 import { initDiscordRolesSync } from './lib/discord-roles-sync.service.js'
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    db: DatabaseWrapper
-    mangaDb: DatabaseWrapper
-    tvDb: DatabaseWrapper
-    asmrDb: DatabaseWrapper
+const app = createHonoApp(
+  () => ({ shuttingDown: isShuttingDown, dbReady: !!db }),
+  () => ({
+    shuttingDown: isShuttingDown,
+    dbsReady: !!db && !!mangaDb && !!tvDb && !!asmrDb,
+    bootSyncing,
+  }),
+  () => ({ db, mangaDb, tvDb, asmrDb }),
+  {
+    initializeDatabase,
+    setDb: (newDb) => {
+      db = newDb
+    },
+  },
+  {
+    getCatalog: getProviderCatalog,
+    refresh: refreshRemoteProviders,
+  },
+  runSyncSequence,
+  {
+    getApiCache: () => apiCache,
+    getProviders: () => providers,
+    getMangaProvider: (name) => mangaProviders[name],
+    getTvProvider: (name) => tvProviders[name],
+    getJasmr: () => providers['jasmr'] as unknown as JasmrApi | undefined,
   }
-}
-
-const app = express()
-
-app.use(requestLogger)
-
-app.get('/api/health', (_req, res) => {
-  if (isShuttingDown) {
-    return res.status(503).json({ status: 'shutting-down', ready: false })
-  }
-  if (!db) {
-    return res.status(503).json({ status: 'starting', ready: false })
-  }
-  res.json({ status: 'ok', ready: true })
-})
-
-app.use((req, res, next) => {
-  const store = new Map<string, string>()
-  if (req.headers['x-animepahe-ua']) {
-    store.set('ua', req.headers['x-animepahe-ua'] as string)
-  }
-  if (req.headers['x-animepahe-cookie']) {
-    store.set('cookie', req.headers['x-animepahe-cookie'] as string)
-  }
-  if (req.headers['x-jasmr-ua']) {
-    store.set('jasmr_ua', req.headers['x-jasmr-ua'] as string)
-  }
-  if (req.headers['x-jasmr-cookie']) {
-    store.set('jasmr_cookie', req.headers['x-jasmr-cookie'] as string)
-  }
-  requestContext.run(store, next)
-})
+)
 
 const apiCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
 
@@ -251,140 +219,24 @@ async function runSyncSequence(
   }
 }
 
-app.use((req, res, next) => {
-  if (isShuttingDown) {
-    return res.status(503).send('Server is shutting down...')
-  }
-  if (!db || !mangaDb || !tvDb || !asmrDb) {
-    return res.status(503).send('Database initializing...')
-  }
-  if (bootSyncing && req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
-    return res.status(503).send('Sync in progress...')
-  }
-  req.db = db
-  req.mangaDb = mangaDb
-  req.tvDb = tvDb
-  req.asmrDb = asmrDb
-  next()
-})
-
-app.use(
-  compression({
-    level: 2,
-    threshold: 1024,
-    filter: (req, res) => {
-      if (req.headers['x-no-compression']) {
-        return false
-      }
-      return compression.filter(req, res)
-    },
-  })
-)
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      callback(null, isAllowedOrigin(origin))
-    },
-    credentials: true,
-  })
-)
-app.use(crossSiteProtectionMiddleware)
-app.use(express.json({ limit: '10mb' }))
-
-app.use('/api/auth', createLanAuthRouter())
-app.use(lanAuthMiddleware)
-
-app.use(
-  '/api/auth',
-  createAuthRouter((database, mangaDatabase, preferred) =>
-    runSyncSequence(database, mangaDatabase, preferred)
-  )
-)
-
-const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(() => db)
-app.use('/api', watchlistRouter)
-app.use('/api', createDataRouter(apiCache, providers, getProviderCatalog))
-app.use(
-  '/api',
-  createAsmrRouter(apiCache, () => providers['jasmr'] as unknown as JasmrApi | undefined)
-)
-app.use('/api', createAsmrLibraryRouter())
-app.use(
-  '/api',
-  createMangaRouter(apiCache, (name) => mangaProviders[name])
-)
-app.use('/api', createMangaLibraryRouter())
-app.use('/api', createRadioRouter(apiCache))
-app.use('/api', createMusicRouter(apiCache))
-app.use(
-  '/api',
-  createTvRouter(apiCache, (name) => tvProviders[name])
-)
-app.use('/api', createTvLibraryRouter())
-app.use('/api', createProxyRouter())
-app.use('/api', createProvidersRouter(getProviderCatalog, refreshRemoteProviders))
-app.use('/api', createInsightsRouter())
-app.use('/api', createTranslateRouter())
-app.use('/api', createDiscordGatewayRouter())
-app.use('/api', createTrackerRouter())
-app.use(
-  '/api',
-  createSettingsRouter(
-    () => db,
-    initializeDatabase,
-    (newDb) => {
-      db = newDb
-    }
-  )
-)
+startWatchlistDiscovery(() => db)
 
 if (!CONFIG.IS_DEV) {
   const frontendPath = path.join(CONFIG.PACKAGE_ROOT, 'client', 'dist')
   logger.info(`Serving frontend from: ${frontendPath}`)
-  app.use(express.static(frontendPath))
+  app.use('/*', serveStatic({ root: frontendPath }))
 
-  app.get(/^(?!\/api).+/, (req, res) => {
-    res.sendFile('index.html', { root: frontendPath }, (err) => {
-      if (err) {
-        logger.error({ err }, `Failed to serve index.html from ${frontendPath}`)
-        if (!res.headersSent) {
-          res.status(500).send('Server Error: Frontend build not found.')
-        }
-      }
-    })
+  app.get('*', async (c) => {
+    if (c.req.path.startsWith('/api/')) return c.notFound()
+    try {
+      const html = await fs.promises.readFile(path.join(frontendPath, 'index.html'), 'utf8')
+      return c.html(html)
+    } catch (err) {
+      logger.error({ err }, `Failed to serve index.html from ${frontendPath}`)
+      return c.text('Server Error: Frontend build not found.', 500)
+    }
   })
 }
-
-app.use(
-  (
-    err: Error & { status?: number },
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    if (
-      err instanceof SyntaxError &&
-      'body' in err &&
-      req.headers['content-type']?.includes('application/json')
-    ) {
-      if (!res.headersSent) {
-        return res.status(400).json({ error: 'Invalid JSON', status: 400 })
-      }
-    }
-
-    logger.error({ err, url: req.url, method: req.method }, 'Unhandled error')
-
-    if (res.headersSent) {
-      return next(err)
-    }
-
-    res.status(err.status || 500).json({
-      error: err.message || 'Internal Server Error',
-      status: err.status || 500,
-    })
-  }
-)
 
 async function main() {
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
@@ -475,7 +327,7 @@ async function main() {
     }
   })
 
-  const expressServer = app.listen(CONFIG.PORT, () => {
+  const server = serve({ fetch: app.fetch, port: CONFIG.PORT }, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
   })
 
@@ -547,7 +399,7 @@ async function main() {
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
-    stopDiscovery()
+    stopWatchlistDiscovery()
     clearInterval(syncInterval)
     clearInterval(offlineDbInterval)
     discordRPCService.disconnect()
@@ -557,8 +409,8 @@ async function main() {
     await tvWatcher.close()
     await asmrWatcher.close()
 
-    if (expressServer) {
-      await new Promise<void>((resolve) => expressServer.close(() => resolve()))
+    if (server) {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
     }
 
     if (hasUnsyncedChanges) {
@@ -621,27 +473,35 @@ async function main() {
   process.on('SIGHUP', () => shutdown('SIGHUP'))
   process.once('SIGUSR2', () => shutdown('SIGUSR2'))
 
-  app.post('/api/internal/shutdown', (req, res) => {
-    const isLoopback = req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1'
+  app.post('/api/internal/shutdown', (c) => {
+    let remoteAddress: string
+    try {
+      remoteAddress = getConnInfo(c).remote.address ?? ''
+    } catch {
+      remoteAddress = ''
+    }
+    const isLoopback =
+      remoteAddress === '::1' ||
+      remoteAddress === '127.0.0.1' ||
+      remoteAddress === '::ffff:127.0.0.1'
     if (!isLoopback) {
-      res.status(403).json({ error: 'Forbidden' })
-      return
+      return c.json({ error: 'Forbidden' }, 403)
     }
 
     const expectedToken = process.env.INTERNAL_SHUTDOWN_TOKEN
-    const providedToken = req.headers['x-internal-token']
+    const providedToken = c.req.header('x-internal-token')
     if (expectedToken) {
       const expBuf = Buffer.from(expectedToken)
       const provBuf = Buffer.from(typeof providedToken === 'string' ? providedToken : '')
       if (expBuf.length !== provBuf.length || !crypto.timingSafeEqual(expBuf, provBuf)) {
         logger.warn('Unauthorized internal shutdown attempt rejected: invalid token')
-        res.status(403).json({ error: 'Forbidden' })
-        return
+        return c.json({ error: 'Forbidden' }, 403)
       }
     }
 
-    res.status(200).json({ message: 'Shutting down' })
+    const response = c.json({ message: 'Shutting down' })
     setTimeout(() => shutdown(), 500)
+    return response
   })
 }
 

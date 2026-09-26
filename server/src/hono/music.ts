@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import type { Hono } from 'hono'
 import { Readable } from 'node:stream'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
@@ -19,9 +19,10 @@ interface MusicTrack {
   album?: string
   duration?: string
   thumbnails: { url: string; width?: number; height?: number }[]
-  /** Present only on up-next results when signed in (from YTM's own toggle). */
   liked?: boolean | null
 }
+
+const musicCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
 
 const NAME_SUFFIXES = [
   /\s*(- topic)$/i,
@@ -119,9 +120,6 @@ function nodeType(node: unknown): string {
   return n?.constructor?.name ?? ''
 }
 
-/** Map a PlaylistPanel up-next entry (video or wrapper) to a MusicTrack.
- *  When trustLike is set (signed-in session), also read the current like
- *  state from YTM's own toggle (UNFAVORITE icon = currently liked). */
 function upnextToTrack(node: unknown, trustLike = false): MusicTrack | null {
   const kind = nodeType(node)
   if (kind === 'AutomixPreviewVideo') return null
@@ -198,10 +196,6 @@ function asMenuItems(menu: unknown): Record<string, unknown>[] {
   return Array.isArray(items) ? (items as Record<string, unknown>[]) : []
 }
 
-/** Find the YTM "liked songs" toggle for a track from its up-next menu.
- *  NOTE: default/toggled swap roles with the current state — when the song is
- *  already liked, default removes (status INDIFFERENT) and toggled re-adds
- *  (status LIKE). The payload `status` is the only reliable signal. */
 function findLikeToggle(
   item: unknown,
   videoId: string
@@ -253,6 +247,7 @@ async function fetchPlaylistTracks(
     for (const item of (page.items ?? page.contents ?? []).slice(0, cap - tracks.length)) {
       const track = toTrack(item)
       if (track) tracks.push(track)
+      if (tracks.length >= cap) break
     }
     if (tracks.length >= cap) break
     if (!page.has_continuation || typeof page.getContinuation !== 'function') break
@@ -403,38 +398,43 @@ async function decipherAudio(videoId: string): Promise<DecipheredAudio> {
 
 const PASSTHROUGH_HEADERS = ['content-type', 'content-length', 'content-range', 'accept-ranges']
 
-export class MusicController {
-  constructor(private cache: AppCache) {}
+export function registerMusic(app: Hono) {
+  app.get('/api/music/auth/status', (c) => {
+    return c.json(getMusicAuthStatus())
+  })
 
-  getAuthStatus = (_req: Request, res: Response) => {
-    res.json(getMusicAuthStatus())
-  }
-
-  startAuth = async (req: Request, res: Response) => {
+  app.post('/api/music/auth/start', async (c) => {
     try {
-      let cookie = String(req.body?.cookie || '').trim()
-      if (!cookie) return res.status(400).json({ error: 'Cookie is required' })
+      const body = (await c.req.json()) as { cookie?: unknown }
+      let cookie = String(body?.cookie || '').trim()
+      if (!cookie) return c.json({ error: 'Cookie is required' }, 400)
       cookie = cookie
         .replace(/^cookie\s*:\s*/i, '')
         .replace(/^["']+|["']+$/g, '')
         .trim()
       if (cookie.includes('…') || cookie.includes('...')) {
-        return res.status(400).json({
-          error: `Cookie looks truncated (${cookie.length} chars). In DevTools, right-click the Cookie header → Copy value (do not copy from the wrapped preview).`,
-        })
+        return c.json(
+          {
+            error: `Cookie looks truncated (${cookie.length} chars). In DevTools, right-click the Cookie header → Copy value (do not copy from the wrapped preview).`,
+          },
+          400
+        )
       }
       if (!cookie.includes('SID') && !cookie.includes('SAPISID')) {
-        return res.status(400).json({
-          error:
-            'That does not look like a YouTube cookie at all. Copy the full Cookie request header from a "browse" call on music.youtube.com in DevTools → Network.',
-        })
+        return c.json(
+          {
+            error:
+              'That does not look like a YouTube cookie at all. Copy the full Cookie request header from a "browse" call on music.youtube.com in DevTools → Network.',
+          },
+          400
+        )
       }
       await saveMusicCookie(cookie)
       const yt = await getAuthedInnertube()
       if (yt) {
         try {
           const lib = await readLibrary(yt)
-          return res.json({
+          return c.json({
             success: true,
             tracks: lib.tracks.length,
             playlists: lib.playlists.length,
@@ -443,32 +443,35 @@ export class MusicController {
           // ignore
         }
       }
-      res.json({ success: true, tracks: 0, playlists: 0 })
+      return c.json({ success: true, tracks: 0, playlists: 0 })
     } catch (err) {
       logger.error({ err }, '[music] cookie sign-in failed')
-      res.status(401).json({
-        error:
-          'Cookie rejected by YouTube Music. Copy a fresh Cookie header from music.youtube.com.',
-      })
+      return c.json(
+        {
+          error:
+            'Cookie rejected by YouTube Music. Copy a fresh Cookie header from music.youtube.com.',
+        },
+        401
+      )
     }
-  }
+  })
 
-  signOut = async (_req: Request, res: Response) => {
+  app.post('/api/music/auth/signout', async (c) => {
     try {
       await signOutMusic()
-      res.json({ success: true })
+      return c.json({ success: true })
     } catch (err) {
       logger.error({ err }, '[music] sign-out failed')
-      res.status(500).json({ error: 'Sign-out failed' })
+      return c.json({ error: 'Sign-out failed' }, 500)
     }
-  }
+  })
 
-  search = async (req: Request, res: Response) => {
-    const q = String(req.query.q || '').trim()
-    if (!q) return res.json({ tracks: [] })
+  app.get('/api/music/search', async (c) => {
+    const q = String(c.req.query('q') || '').trim()
+    if (!q) return c.json({ tracks: [] })
     const cacheKey = `music-search-${q.toLowerCase()}`
-    const cached = this.cache.get<MusicTrack[]>(cacheKey)
-    if (cached) return res.json({ tracks: cached })
+    const cached = musicCache.get<MusicTrack[]>(cacheKey)
+    if (cached) return c.json({ tracks: cached })
     try {
       const yt = await getInnertube()
       const result = await yt.music.search(q, { type: 'song' })
@@ -483,44 +486,40 @@ export class MusicController {
         }
         if (tracks.length >= 25) break
       }
-      this.cache.set(cacheKey, tracks, 300)
-      res.json({ tracks })
+      musicCache.set(cacheKey, tracks, 300)
+      return c.json({ tracks })
     } catch (err) {
       logger.error({ err }, '[music] search failed')
-      res.json({ tracks: [] })
+      return c.json({ tracks: [] })
     }
-  }
+  })
 
-  stream = async (req: Request, res: Response) => {
-    const videoId = String(req.query.videoId || req.query.id || '').trim()
-    if (!videoId) return res.status(400).json({ error: 'videoId is required' })
+  app.get('/api/music/stream', async (c) => {
+    const videoId = String(c.req.query('videoId') || c.req.query('id') || '').trim()
+    if (!videoId) return c.json({ error: 'videoId is required' }, 400)
     try {
       const entry = await decipherAudio(videoId)
-      res.json({ url: entry.url, mimeType: entry.mimeType })
+      return c.json({ url: entry.url, mimeType: entry.mimeType })
     } catch (err) {
       logger.error({ err }, '[music] stream failed')
-      res.status(502).json({ error: 'Stream lookup failed' })
+      return c.json({ error: 'Stream lookup failed' }, 502)
     }
-  }
+  })
 
-  audio = async (req: Request, res: Response) => {
-    const videoId = String(req.query.videoId || req.query.id || '').trim()
-    if (!videoId) return res.status(400).json({ error: 'videoId is required' })
-    const aborter = new AbortController()
-    res.on('close', () => {
-      if (!res.writableEnded) aborter.abort()
-    })
+  app.get('/api/music/audio', async (c) => {
+    const videoId = String(c.req.query('videoId') || c.req.query('id') || '').trim()
+    if (!videoId) return c.json({ error: 'videoId is required' }, 400)
     try {
       let entry: DecipheredAudio
       try {
         entry = await decipherAudio(videoId)
       } catch {
-        return res.status(502).json({ error: 'No stream available' })
+        return c.json({ error: 'No stream available' }, 502)
       }
-      const timeout = AbortSignal.timeout(30000)
-      const signal = aborter.signal.aborted
-        ? aborter.signal
-        : AbortSignal.any([aborter.signal, timeout])
+      const signal = c.req.raw.signal.aborted
+        ? c.req.raw.signal
+        : AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30000)])
+      if (c.req.raw.signal.aborted) return new Response(null, { status: 499 })
       let upstream: globalThis.Response
       try {
         upstream = await fetch(entry.url, {
@@ -528,15 +527,14 @@ export class MusicController {
             'User-Agent': UPSTREAM_UA,
             Referer: 'https://music.youtube.com/',
             Origin: 'https://music.youtube.com/',
-            Range: typeof req.headers.range === 'string' ? req.headers.range : 'bytes=0-',
+            Range: c.req.header('range') ?? 'bytes=0-',
           },
           signal,
         })
       } catch (err) {
-        if (aborter.signal.aborted) return
+        if (c.req.raw.signal.aborted) return new Response(null, { status: 499 })
         logger.error({ err }, '[music] audio upstream failed')
-        if (!res.headersSent) res.status(502).json({ error: 'Upstream error' })
-        return
+        return c.json({ error: 'Upstream error' }, 502)
       }
       if (upstream.status !== 200 && upstream.status !== 206) {
         try {
@@ -545,50 +543,33 @@ export class MusicController {
           // ignore
         }
         audioCache.delete(videoId)
-        if (!res.headersSent) res.status(502).json({ error: 'Upstream error' })
-        return
+        return c.json({ error: 'Upstream error' }, 502)
       }
-      res.status(upstream.status)
+      const headers = new Headers()
       for (const name of PASSTHROUGH_HEADERS) {
         const value = upstream.headers.get(name)
-        if (value) res.set(name === 'content-type' ? 'Content-Type' : name, value)
+        if (value) headers.set(name === 'content-type' ? 'Content-Type' : name, value)
       }
-      if (!res.get('Content-Type')) res.set('Content-Type', entry.mimeType || 'audio/webm')
-      res.set('Accept-Ranges', 'bytes')
-      res.set('Access-Control-Allow-Origin', '*')
+      if (!headers.get('Content-Type')) headers.set('Content-Type', entry.mimeType || 'audio/webm')
+      headers.set('Accept-Ranges', 'bytes')
+      headers.set('Access-Control-Allow-Origin', '*')
       if (!upstream.body) {
-        if (!res.headersSent) res.status(502).json({ error: 'Upstream error' })
-        return
+        return c.json({ error: 'Upstream error' }, 502)
       }
-      try {
-        const nodeStream = Readable.fromWeb(
-          upstream.body as unknown as import('node:stream/web').ReadableStream
-        )
-        nodeStream.on('error', () => {
-          try {
-            if (!res.writableEnded) res.destroy()
-          } catch {
-            // ignore
-          }
-        })
-        nodeStream.pipe(res)
-      } catch (err) {
-        logger.error({ err }, '[music] audio pipe failed')
-        if (!res.headersSent) res.status(502).json({ error: 'Upstream error' })
-      }
+      return new Response(upstream.body, { status: upstream.status, headers })
     } catch (err) {
-      if (aborter.signal.aborted) return
+      if (c.req.raw.signal.aborted) return new Response(null, { status: 499 })
       logger.error({ err }, '[music] audio failed')
-      if (!res.headersSent) res.status(502).json({ error: 'Stream lookup failed' })
+      return c.json({ error: 'Stream lookup failed' }, 502)
     }
-  }
+  })
 
-  track = async (req: Request, res: Response) => {
-    const id = String(req.query.id || '').trim()
-    if (!id) return res.status(400).json({ error: 'id is required', track: null })
+  app.get('/api/music/track', async (c) => {
+    const id = String(c.req.query('id') || '').trim()
+    if (!id) return c.json({ error: 'id is required', track: null }, 400)
     const cacheKey = `music-track-${id.toLowerCase()}`
-    const cached = this.cache.get<MusicTrack>(cacheKey)
-    if (cached) return res.json({ track: cached })
+    const cached = musicCache.get<MusicTrack>(cacheKey)
+    if (cached) return c.json({ track: cached })
     try {
       const yt = await getInnertube()
       const info = await yt.music.getInfo(id)
@@ -602,7 +583,7 @@ export class MusicController {
           }
         }
       ).basic_info
-      if (!basic?.title) return res.json({ track: null })
+      if (!basic?.title) return c.json({ track: null })
       const durationSec =
         typeof basic.duration === 'number' && Number.isFinite(basic.duration)
           ? Math.max(Math.round(basic.duration), 0)
@@ -616,91 +597,89 @@ export class MusicController {
           : undefined,
         thumbnails: Array.isArray(basic.thumbnail) ? basic.thumbnail : [],
       }
-      this.cache.set(cacheKey, track, 300)
-      res.json({ track })
+      musicCache.set(cacheKey, track, 300)
+      return c.json({ track })
     } catch (err) {
       logger.error({ err }, '[music] track lookup failed')
-      res.json({ track: null })
+      return c.json({ track: null })
     }
-  }
+  })
 
-  playlist = async (req: Request, res: Response) => {
-    const id = String(req.query.id || '').trim()
-    if (!id) return res.status(400).json({ error: 'id is required', tracks: [] })
+  app.get('/api/music/playlist', async (c) => {
+    const id = String(c.req.query('id') || '').trim()
+    if (!id) return c.json({ error: 'id is required', tracks: [] }, 400)
     const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
-      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [] })
+      return c.json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [] }, 401)
     }
     try {
-      res.json({ tracks: await fetchPlaylistTracks(yt, id) })
+      return c.json({ tracks: await fetchPlaylistTracks(yt, id) })
     } catch (err) {
       logger.warn({ err }, '[music] playlist failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
-      if (!fresh) return res.json({ tracks: [] })
+      if (!fresh) return c.json({ tracks: [] })
       try {
-        res.json({ tracks: await fetchPlaylistTracks(fresh, id) })
+        return c.json({ tracks: await fetchPlaylistTracks(fresh, id) })
       } catch (retryErr) {
         logger.warn({ err: retryErr }, '[music] playlist retry failed, returning empty')
-        res.json({ tracks: [] })
+        return c.json({ tracks: [] })
       }
     }
-  }
+  })
 
-  library = async (_req: Request, res: Response) => {
+  app.get('/api/music/library', async (c) => {
     const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
-      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [], playlists: [] })
+      return c.json({ error: 'MUSIC_AUTH_REQUIRED', tracks: [], playlists: [] }, 401)
     }
     try {
       const first = await readLibrary(yt)
-      if (first.tracks.length > 0 || first.playlists.length > 0) return res.json(first)
+      if (first.tracks.length > 0 || first.playlists.length > 0) return c.json(first)
       logger.warn('[music] library came back empty, retrying with a fresh saved-cookie session')
     } catch (err) {
       logger.warn({ err }, '[music] library failed, retrying with a fresh saved-cookie session')
     }
     const fresh = await refreshAuthedInnertube()
-    if (!fresh) return res.json({ tracks: [], playlists: [] })
+    if (!fresh) return c.json({ tracks: [], playlists: [] })
     try {
-      res.json(await readLibrary(fresh))
+      return c.json(await readLibrary(fresh))
     } catch (err) {
       logger.warn({ err }, '[music] library retry failed, returning empty')
-      res.json({ tracks: [], playlists: [] })
+      return c.json({ tracks: [], playlists: [] })
     }
-  }
+  })
 
-  home = async (_req: Request, res: Response) => {
+  app.get('/api/music/home', async (c) => {
     try {
       const yt = await getInnertube()
       const feed = await yt.music.getHomeFeed()
-      res.json(feed)
+      return c.json(feed)
     } catch (err) {
       logger.error({ err }, '[music] home feed failed')
-      res.json({ contents: [] })
+      return c.json({ contents: [] })
     }
-  }
+  })
 
-  upnext = async (req: Request, res: Response) => {
-    const id = String(req.query.id || '').trim()
-    if (!id) return res.status(400).json({ error: 'id is required', tracks: [] })
-    // Signed-in sessions get fresh results with per-track like state; public
-    // results are cacheable and carry no like state.
+  app.get('/api/music/upnext', async (c) => {
+    const id = String(c.req.query('id') || '').trim()
+    if (!id) return c.json({ error: 'id is required', tracks: [] }, 400)
     const authed = await getAuthedInnertube().catch(() => null)
     if (!authed) {
       const cacheKey = `music-upnext-${id.toLowerCase()}`
-      const cached = this.cache.get<{ tracks: MusicTrack[]; playlistId: string | null }>(cacheKey)
-      if (cached) return res.json(cached)
+      const cached = musicCache.get<{ tracks: MusicTrack[]; playlistId: string | null }>(cacheKey)
+      if (cached) return c.json(cached)
       try {
         const yt = await getInnertube()
         const payload = parseUpnext(await yt.music.getUpNext(id), false)
-        this.cache.set(cacheKey, payload, 300)
-        return res.json(payload)
+        musicCache.set(cacheKey, payload, 300)
+        return c.json(payload)
       } catch (err) {
         logger.error({ err }, '[music] upnext failed')
-        return res.json({ tracks: [], playlistId: null })
+        return c.json({ tracks: [], playlistId: null })
       }
     }
     try {
-      return res.json(parseUpnext(await authed.music.getUpNext(id), true))
+      return c.json(parseUpnext(await authed.music.getUpNext(id), true))
     } catch (err) {
       logger.warn(
         { err },
@@ -710,28 +689,28 @@ export class MusicController {
     const fresh = await refreshAuthedInnertube()
     if (fresh) {
       try {
-        return res.json(parseUpnext(await fresh.music.getUpNext(id), true))
+        return c.json(parseUpnext(await fresh.music.getUpNext(id), true))
       } catch (retryErr) {
         logger.warn({ err: retryErr }, '[music] upnext retry failed, falling back to public')
       }
     }
     try {
       const yt = await getInnertube()
-      return res.json(parseUpnext(await yt.music.getUpNext(id), false))
+      return c.json(parseUpnext(await yt.music.getUpNext(id), false))
     } catch (err) {
       logger.error({ err }, '[music] upnext failed')
-      return res.json({ tracks: [], playlistId: null })
+      return c.json({ tracks: [], playlistId: null })
     }
-  }
+  })
 
-  likedIds = async (_req: Request, res: Response) => {
+  app.get('/api/music/likes', async (c) => {
     const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
-      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED', likedIds: [] })
+      return c.json({ error: 'MUSIC_AUTH_REQUIRED', likedIds: [] }, 401)
     }
     const cacheKey = 'music-liked-ids'
-    const cached = this.cache.get<string[]>(cacheKey)
-    if (cached) return res.json({ likedIds: cached })
+    const cached = musicCache.get<string[]>(cacheKey)
+    if (cached) return c.json({ likedIds: cached })
     const fetchLikedIds = async (
       session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
     ): Promise<string[]> => {
@@ -740,30 +719,32 @@ export class MusicController {
     }
     try {
       const likedIds = await fetchLikedIds(yt)
-      this.cache.set(cacheKey, likedIds, 120)
-      res.json({ likedIds })
+      musicCache.set(cacheKey, likedIds, 120)
+      return c.json({ likedIds })
     } catch (err) {
       logger.warn({ err }, '[music] liked ids failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
-      if (!fresh) return res.json({ likedIds: [] })
+      if (!fresh) return c.json({ likedIds: [] })
       try {
         const likedIds = await fetchLikedIds(fresh)
-        this.cache.set(cacheKey, likedIds, 120)
-        res.json({ likedIds })
+        musicCache.set(cacheKey, likedIds, 120)
+        return c.json({ likedIds })
       } catch (retryErr) {
         logger.warn({ err: retryErr }, '[music] liked ids retry failed, returning empty')
-        res.json({ likedIds: [] })
+        return c.json({ likedIds: [] })
       }
     }
-  }
+  })
 
-  rate = async (req: Request, res: Response) => {
-    const id = String(req.body?.id ?? req.query.id ?? '').trim()
-    const like = req.body?.like === true || req.body?.like === 'true'
-    if (!id) return res.status(400).json({ error: 'id is required' })
+  app.post('/api/music/like', async (c) => {
+    const body = (await c.req.json().catch(() => undefined)) as
+      { id?: unknown; like?: unknown } | undefined
+    const id = String(body?.id ?? (c.req.query('id') as string | undefined) ?? '').trim()
+    const like = body?.like === true || body?.like === 'true'
+    if (!id) return c.json({ error: 'id is required' }, 400)
     const yt = await getAuthedInnertube().catch(() => null)
     if (!yt) {
-      return res.status(401).json({ error: 'MUSIC_AUTH_REQUIRED' })
+      return c.json({ error: 'MUSIC_AUTH_REQUIRED' }, 401)
     }
     const attempt = async (
       session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
@@ -772,10 +753,6 @@ export class MusicController {
         (session as unknown as { actions?: unknown; session?: { actions?: unknown } }).actions ??
         (session as unknown as { session?: { actions?: unknown } }).session?.actions
       if (!actions) throw new Error('Actions unavailable')
-      // Only ever call the toggle endpoints YouTube Music itself returns for
-      // this track (payload status LIKE/INDIFFERENT). No hand-built endpoints:
-      // raw video ids can differ from the canonical song id and a direct
-      // /like call would orphan entries in Liked Music.
       const panel = await session.music.getUpNext(id)
       const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
       let endpoint: MenuEndpoint | null = null
@@ -792,16 +769,16 @@ export class MusicController {
     } catch (err) {
       logger.warn({ err }, '[music] rate failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
-      if (!fresh) return res.status(502).json({ error: 'Like action failed' })
+      if (!fresh) return c.json({ error: 'Like action failed' }, 502)
       try {
         await attempt(fresh)
       } catch (retryErr) {
         logger.error({ err: retryErr }, '[music] rate retry failed')
-        return res.status(502).json({ error: 'Like action failed' })
+        return c.json({ error: 'Like action failed' }, 502)
       }
     }
-    this.cache.delete('music-liked-ids')
+    musicCache.delete('music-liked-ids')
     logger.info(`[music] rate id=${id} liked=${like} via=toggle`)
-    res.json({ success: true, liked: like })
-  }
+    return c.json({ success: true, liked: like })
+  })
 }
