@@ -399,13 +399,39 @@ const useVideoPlayer = ({
   }, [setKeyboardSpeedBoost, togglePlay, toggleFullscreen, toggleMute, seek])
 
   useEffect(() => {
+    const isBoostIgnoredTarget = (target: HTMLElement | null): boolean => {
+      if (!target) return true
+      return !!target.closest(
+        '[data-speed-boost-ignore="true"], [data-player-ui="true"], button, input, select, textarea, a, [role="button"], [role="slider"], [contenteditable="true"]'
+      )
+    }
+
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return
 
       const target = e.target as HTMLElement | null
       if (!target) return
 
-      if (target.closest('[data-speed-boost-ignore="true"]')) return
+      if (isBoostIgnoredTarget(target)) return
+
+      const container = playerContainerRef.current
+      if (!container || !container.contains(target)) return
+
+      if (mouseHoldTimerRef.current) {
+        clearTimeout(mouseHoldTimerRef.current)
+      }
+
+      mouseHoldTimerRef.current = window.setTimeout(() => {
+        mouseHoldTimerRef.current = null
+        setMouseSpeedBoost(true)
+      }, 180)
+    }
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target) return
+
+      if (isBoostIgnoredTarget(target)) return
 
       const container = playerContainerRef.current
       if (!container || !container.contains(target)) return
@@ -445,10 +471,20 @@ const useVideoPlayer = ({
 
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchend', handleMouseUp)
+    document.addEventListener('touchcancel', handleMouseUp)
+    document.addEventListener('pointerup', handleMouseUp)
+    document.addEventListener('pointercancel', handleMouseUp)
     window.addEventListener('blur', handleWindowBlur)
     return () => {
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchend', handleMouseUp)
+      document.removeEventListener('touchcancel', handleMouseUp)
+      document.removeEventListener('pointerup', handleMouseUp)
+      document.removeEventListener('pointercancel', handleMouseUp)
       window.removeEventListener('blur', handleWindowBlur)
       if (mouseHoldTimerRef.current) {
         clearTimeout(mouseHoldTimerRef.current)

@@ -32,7 +32,12 @@ const SettingsShell: React.FC<SettingsShellProps> = ({
 }) => {
   const TitleTag = titleTag
   return (
-    <div ref={panelRef} className={classes.panel} onClick={onPanelClick}>
+    <div
+      ref={panelRef}
+      className={classes.panel}
+      onClick={onPanelClick}
+      data-speed-boost-ignore="true"
+    >
       <div className={classes.header}>
         {showBack && (
           <button className={classes.backBtn} onClick={onBack}>

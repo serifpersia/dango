@@ -480,13 +480,19 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     </Suspense>
   )
 
+  const settingsNodeWithGuard = showSettings ? (
+    <div data-speed-boost-ignore="true" onClick={(e) => e.stopPropagation()}>
+      {settingsNode}
+    </div>
+  ) : null
+
   return (
     <UnifiedVideoShell
       player={player}
       topBar={topBar}
       centerControls={center}
       bottomBar={bottomBar}
-      settingsPanel={settingsNode}
+      settingsPanel={settingsNodeWithGuard}
       overlays={overlays}
       isInteracting={isInteractingExtra}
       className={className}

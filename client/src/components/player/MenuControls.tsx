@@ -38,7 +38,11 @@ export const MenuSlider: React.FC<MenuSliderProps> = ({
       step={step}
       value={value}
       aria-label={label}
+      data-speed-boost-ignore="true"
       onInput={(e) => onChange(Number((e.target as HTMLInputElement).value))}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
       onPointerUp={onCommit}
       onPointerCancel={onCommit}
       onTouchEnd={onCommit}
@@ -78,7 +82,11 @@ export const SwatchRow: React.FC<SwatchRowProps> = ({ label, colors, value, onCh
         aria-label={`Custom ${label.toLowerCase()}`}
         className={styles.colorInput}
         value={value}
+        data-speed-boost-ignore="true"
         onInput={(e) => onChange((e.target as HTMLInputElement).value)}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
       />
     </div>
   </div>
