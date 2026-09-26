@@ -31,12 +31,21 @@ import {
 } from '../hooks/useVirtualKeyboard'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { Alert } from '../components/common/Alert'
+import { useContentType } from '../contexts/ContentTypeContext'
+
+const LIST_TAB_LABELS = {
+  anime: 'Watchlist',
+  manga: 'Reading List',
+  tv: 'TV Watchlist',
+  asmr: 'Listening List',
+} as const
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database' | 'community'
 
 const Settings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { contentType } = useContentType()
   const initialTab = searchParams.get('tab') as SettingsTab | null
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     initialTab && ['general', 'sync', 'watchlist', 'database', 'community'].includes(initialTab)
@@ -705,7 +714,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
             onClick={() => selectTab('watchlist')}
           >
-            <Icon name="list" /> <span>Watchlist</span>
+            <Icon name="list" /> <span>{LIST_TAB_LABELS[contentType]}</span>
           </button>
           <button
             ref={(el) => {

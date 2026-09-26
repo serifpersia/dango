@@ -1798,7 +1798,7 @@ const Player: React.FC = () => {
                 },
               })
             }}
-            loadingVideo={state.loadingVideo}
+            loadingVideo={isVideoLoading}
             skipIntervals={state.skipIntervals}
             animeTitle={displayTitle}
             episodeNumber={state.currentEpisode}

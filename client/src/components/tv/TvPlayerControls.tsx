@@ -60,6 +60,7 @@ interface TvPlayerControlsProps {
   onSubtitleDelayChange?: (ms: number) => void
   showNextEpisodeButton?: boolean
   onNextEpisode?: () => void
+  isLoading?: boolean
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -90,6 +91,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   onSubtitleDelayChange,
   showNextEpisodeButton = false,
   onNextEpisode,
+  isLoading = false,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -518,14 +520,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     </div>
   )
 
-  const center = (
-    <CenterControls
-      isPlaying={state.isPlaying}
-      onTogglePlay={actions.togglePlay}
-      onSkipBack={() => actions.seek(-10)}
-      onSkipForward={() => actions.seek(10)}
-    />
-  )
+  const center =
+    !isLoading && !state.isBuffering && state.duration > 0 ? (
+      <CenterControls
+        isPlaying={state.isPlaying}
+        onTogglePlay={actions.togglePlay}
+        onSkipBack={() => actions.seek(-10)}
+        onSkipForward={() => actions.seek(10)}
+      />
+    ) : null
 
   const bottomBar = (
     <div
@@ -657,19 +660,37 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     </div>
   ) : null
 
-  const overlays = state.isSpeedBoostActive ? (
-    <div className={styles.speedBoostBadge} aria-hidden="true">
-      <span>2x</span>
-      <Icon name="forward" size={12} />
-    </div>
-  ) : null
+  const overlays = (
+    <>
+      {isLoading && (
+        <div className={styles.loadingOverlay} aria-hidden="true">
+          <div className={styles.loadingDots}>
+            <div className={styles.dot}></div>
+            <div className={styles.dot}></div>
+            <div className={styles.dot}></div>
+          </div>
+        </div>
+      )}
+      {state.isBuffering && !isLoading && (
+        <div className={styles.bufferingOverlay} aria-hidden="true">
+          <div className={styles.bufferingSpinner}></div>
+        </div>
+      )}
+      {state.isSpeedBoostActive && (
+        <div className={styles.speedBoostBadge} aria-hidden="true">
+          <span>2x</span>
+          <Icon name="forward" size={12} />
+        </div>
+      )}
+    </>
+  )
 
   return (
     <UnifiedVideoShell
       player={player}
       topBar={topBar}
       centerControls={center}
-      bottomBar={bottomBar}
+      bottomBar={!isLoading && !state.isBuffering && state.duration > 0 ? bottomBar : null}
       settingsPanel={settingsNode}
       overlays={overlays}
       isInteracting={!!settingsView}

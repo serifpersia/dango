@@ -1216,6 +1216,7 @@ const Tv: React.FC = () => {
     video.pause()
     video.removeAttribute('src')
     video.load()
+    player.actions.resetMediaState()
 
     const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(referer)}`
 
@@ -1369,6 +1370,7 @@ const Tv: React.FC = () => {
     episode,
     applyPendingSeek,
     suppressNativeSubtitles,
+    player.actions,
   ])
 
   useEffect(() => {
@@ -2020,11 +2022,6 @@ const Tv: React.FC = () => {
                 : undefined
             }
           >
-            {streamLoading && !isEmbedProvider && (
-              <div className={styles.statusMsg}>
-                <Icon name="spinner" className={styles.spinner} /> Loading stream...
-              </div>
-            )}
             {isEmbedProvider && iframeUrl ? (
               <iframe
                 src={iframeUrl}
@@ -2119,6 +2116,7 @@ const Tv: React.FC = () => {
                     !showCompleteModal
                   }
                   onNextEpisode={handleWatchNextEpisode}
+                  isLoading={streamLoading}
                 >
                   <video
                     ref={videoRef}
@@ -2138,6 +2136,8 @@ const Tv: React.FC = () => {
                     }}
                     onLoadedMetadata={handleVideoLoadedMetadata}
                     onVolumeChange={player.actions.onVolumeChange}
+                    onWaiting={player.actions.onWaiting}
+                    onPlaying={player.actions.onPlaying}
                     onContextMenu={(e) => e.preventDefault()}
                     onError={() => {
                       setStreamError('Video failed to load. Try another server or reload.')

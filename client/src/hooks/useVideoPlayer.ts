@@ -515,7 +515,14 @@ const useVideoPlayer = ({
     lastReportedTime.current = -1
     lastThrottledUpdateTime.current = 0
     sessionIdRef.current = Math.random().toString(36).substring(2)
+    setDuration(0)
+    setIsBuffering(false)
   }, [showId, episodeNumber])
+
+  const resetMediaState = useCallback(() => {
+    setDuration(0)
+    setIsBuffering(false)
+  }, [])
 
   useEffect(() => {
     const sessionId = sessionIdRef.current
@@ -659,6 +666,7 @@ const useVideoPlayer = ({
       onPlaying,
       sendProgressUpdate,
       setUseNativeControls,
+      resetMediaState,
     }),
     [
       togglePlay,
@@ -677,6 +685,7 @@ const useVideoPlayer = ({
       onPlaying,
       sendProgressUpdate,
       setUseNativeControls,
+      resetMediaState,
     ]
   )
 

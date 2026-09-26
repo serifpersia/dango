@@ -60,6 +60,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   selectedSource,
   selectedLink,
   onSourceChange,
+  loadingVideo,
   skipIntervals,
   animeTitle,
   episodeNumber,
@@ -230,14 +231,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     </div>
   )
 
-  const center = (
-    <CenterControls
-      isPlaying={state.isPlaying}
-      onTogglePlay={actions.togglePlay}
-      onSkipBack={() => actions.seek(-10)}
-      onSkipForward={() => actions.seek(10)}
-    />
-  )
+  const center =
+    !loadingVideo && !state.isBuffering && state.duration > 0 ? (
+      <CenterControls
+        isPlaying={state.isPlaying}
+        onTogglePlay={actions.togglePlay}
+        onSkipBack={() => actions.seek(-10)}
+        onSkipForward={() => actions.seek(10)}
+      />
+    ) : null
 
   const bottomBar = (
     <div
@@ -491,7 +493,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       player={player}
       topBar={topBar}
       centerControls={center}
-      bottomBar={bottomBar}
+      bottomBar={!loadingVideo && !state.isBuffering && state.duration > 0 ? bottomBar : null}
       settingsPanel={settingsNodeWithGuard}
       overlays={overlays}
       isInteracting={isInteractingExtra}
