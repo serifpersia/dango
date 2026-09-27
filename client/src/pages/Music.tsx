@@ -79,50 +79,54 @@ const Music: React.FC = () => {
   const handleExtractYtMusic = () => {
     if (extracting) return
     setExtracting(true)
+    const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
     const timer = window.setTimeout(() => {
       window.removeEventListener('dango:ytmusic-cookie', onReply)
       setExtracting(false)
       toast.error('Helper not detected — install the Dango Helper extension first.')
     }, 3000)
     const onReply = (e: Event) => {
+      let detail: {
+        ok?: boolean
+        cookie?: string
+        error?: string
+        storeId?: string
+        requestId?: string
+        count?: number
+        names?: string[]
+        dropped?: string[]
+      } | null
+      try {
+        detail = JSON.parse((e as CustomEvent<string>).detail)
+      } catch {
+        return
+      }
+      if (!detail || detail.requestId !== requestId) return
       window.clearTimeout(timer)
       window.removeEventListener('dango:ytmusic-cookie', onReply)
       setExtracting(false)
-      try {
-        const detail = JSON.parse((e as CustomEvent<string>).detail) as {
-          ok?: boolean
-          cookie?: string
-          error?: string
-          storeId?: string
-          count?: number
-          names?: string[]
-          dropped?: string[]
+      if (detail?.ok && detail.cookie) {
+        const raw = detail.cookie
+          .replace(/^cookie\s*:\s*/i, '')
+          .replace(/^["']+|["']+$/g, '')
+          .trim()
+        if (raw.includes('…') || raw.includes('...')) {
+          toast.error(
+            `Helper returned a truncated cookie (${raw.length} chars) — reload music.youtube.com and Extract again.`
+          )
+          return
         }
-        if (detail?.ok && detail.cookie) {
-          const raw = detail.cookie
-            .replace(/^cookie\s*:\s*/i, '')
-            .replace(/^["']+|["']+$/g, '')
-            .trim()
-          if (raw.includes('…') || raw.includes('...')) {
-            toast.error(
-              `Helper returned a truncated cookie (${raw.length} chars) — reload music.youtube.com and Extract again.`
-            )
-            return
-          }
-          setCookieInput(raw)
-          toast.success('Cookie extracted from helper — signing in…')
-          saveCookie.mutate({ cookie: raw })
-        } else if (detail?.error === 'NO_COOKIE') {
-          toast.error('Helper found no YouTube login — log in on a music.youtube.com tab first.')
-        } else {
-          toast.error('Helper request failed — try again.')
-        }
-      } catch {
+        setCookieInput(raw)
+        toast.success('Cookie extracted from helper — signing in…')
+        saveCookie.mutate({ cookie: raw })
+      } else if (detail?.error === 'NO_COOKIE') {
+        toast.error('Helper found no YouTube login — log in on a music.youtube.com tab first.')
+      } else {
         toast.error('Helper request failed — try again.')
       }
     }
     window.addEventListener('dango:ytmusic-cookie', onReply)
-    window.dispatchEvent(new CustomEvent('dango:get-ytmusic-cookie'))
+    window.dispatchEvent(new CustomEvent('dango:get-ytmusic-cookie', { detail: { requestId } }))
   }
   const { data: searchData, isLoading: searchLoading } = useMusicSearch(query)
   const {

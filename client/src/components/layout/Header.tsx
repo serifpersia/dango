@@ -75,12 +75,28 @@ const Header: React.FC = () => {
   const scrollRaf = useRef<number | null>(null)
   const mobileSearchRef = useRef<HTMLDivElement>(null)
   const mobileInputRef = useRef<HTMLInputElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
 
   const { data: user } = useQuery<UserProfile | null>({
     queryKey: ['sync-profile'],
     queryFn: fetchSyncProfile,
     staleTime: 30000,
   })
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const sync = () => {
+      headerRef.current?.style.setProperty('--vv-top', `${vv.offsetTop}px`)
+    }
+    sync()
+    vv.addEventListener('scroll', sync)
+    vv.addEventListener('resize', sync)
+    return () => {
+      vv.removeEventListener('scroll', sync)
+      vv.removeEventListener('resize', sync)
+    }
+  }, [])
 
   useEffect(() => {
     const clearTimer = () => {
@@ -111,7 +127,7 @@ const Header: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        searchInputRef.current?.focus()
+        searchInputRef.current?.focus({ preventScroll: true })
       } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
         searchInputRef.current?.blur()
       }
@@ -138,11 +154,11 @@ const Header: React.FC = () => {
   const handleSearchButtonClick = () => {
     if (isMobile()) {
       setMobileSearchOpen(true)
-      setTimeout(() => mobileInputRef.current?.focus(), 50)
+      setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
     } else if (document.activeElement === searchInputRef.current && query.trim()) {
       handleSearch()
     } else {
-      searchInputRef.current?.focus()
+      searchInputRef.current?.focus({ preventScroll: true })
     }
   }
 
@@ -189,6 +205,7 @@ const Header: React.FC = () => {
   return (
     <>
       <header
+        ref={headerRef}
         className={`${styles.header} ${!visible ? styles.hidden : ''} ${!isAtTop ? styles.scrolled : ''}`}
       >
         <div className={styles.headerInner}>
@@ -277,35 +294,35 @@ const Header: React.FC = () => {
             </Link>
           </div>
         </div>
-      </header>
-      {mobileSearchOpen && (
-        <div
-          className={styles.mobileSearchBar}
-          ref={mobileSearchRef}
-          onBlur={handleMobileSearchBlur}
-        >
-          <div className={styles.mobileSearchInner}>
-            <Icon name="search" className={styles.mobileSearchIcon} />
-            <input
-              ref={mobileInputRef}
-              type="text"
-              data-virtual-keyboard="true"
-              className={styles.mobileSearchInput}
-              placeholder={searchPlaceholder}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch()
-                  setMobileSearchOpen(false)
-                } else if (e.key === 'Escape') {
-                  setMobileSearchOpen(false)
-                }
-              }}
-            />
+        {mobileSearchOpen && (
+          <div
+            className={`${styles.mobileSearchBar} ${!visible ? styles.mobileSearchBarHidden : ''}`}
+            ref={mobileSearchRef}
+            onBlur={handleMobileSearchBlur}
+          >
+            <div className={styles.mobileSearchInner}>
+              <Icon name="search" className={styles.mobileSearchIcon} />
+              <input
+                ref={mobileInputRef}
+                type="text"
+                data-virtual-keyboard="true"
+                className={styles.mobileSearchInput}
+                placeholder={searchPlaceholder}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch()
+                    setMobileSearchOpen(false)
+                  } else if (e.key === 'Escape') {
+                    setMobileSearchOpen(false)
+                  }
+                }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </header>
     </>
   )
 }

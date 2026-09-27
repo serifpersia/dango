@@ -285,16 +285,16 @@ export const usePlayerData = (
     const matureProvider = matureSet.has(uiState.selectedProvider)
     if (hasForcedAdultProvider.current === showId) return
     if (showMeta.isAdult && !matureProvider) {
-      hasForcedAdultProvider.current = showId
       const fallback = animeOptions.find((o) => o.mature)
       if (!fallback) return
+      hasForcedAdultProvider.current = showId
       dispatch({ type: 'SET_PROVIDER', payload: fallback.value })
       localStorage.setItem('preferredProvider', fallback.value)
     }
     if (!showMeta.isAdult && matureProvider) {
-      hasForcedAdultProvider.current = showId
       const fallback = animeOptions.find((o) => !o.mature)
       if (!fallback) return
+      hasForcedAdultProvider.current = showId
       dispatch({ type: 'SET_PROVIDER', payload: fallback.value })
       localStorage.setItem('preferredProvider', fallback.value)
     }

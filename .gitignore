@@ -33,3 +33,4 @@ android-app/debs/
 /android-app/build-release.log
 /android-app/payload
 android-app/app/src/main/jniLibs/
+/android-app/__pycache__

@@ -563,6 +563,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveDownloadToUri(downloadUrl: String, destinationUri: Uri) {
+        val userAgent = try {
+            webView.settings.userAgentString
+        } catch (_: Exception) {
+            ""
+        }
         scope.launch {
             val saved = withContext(Dispatchers.IO) {
                 var conn: HttpURLConnection? = null
@@ -578,9 +583,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     } catch (_: Exception) {
                     }
-                    try {
-                        conn.setRequestProperty("User-Agent", webView.settings.userAgentString)
-                    } catch (_: Exception) {
+                    if (userAgent.isNotBlank()) {
+                        try {
+                            conn.setRequestProperty("User-Agent", userAgent)
+                        } catch (_: Exception) {
+                        }
                     }
                     conn.connect()
                     if (conn.responseCode !in 200..299) {
@@ -945,20 +952,49 @@ class MainActivity : AppCompatActivity() {
         customView = null
     }
 
+    override fun onResume() {
+        super.onResume()
+        try {
+            webView.onResume()
+        } catch (_: Exception) {
+        }
+        if (serverReady && webviewEnabled && !shuttingDown) {
+            scope.launch {
+                val healthUrl = if (devMode) "${startUrl.trimEnd('/')}/api/health" else HEALTH_URL
+                val ready = withContext(Dispatchers.IO) { isHealthReady(healthUrl) }
+                if (ready) {
+                    try {
+                        webView.evaluateJavascript(
+                            "window.dispatchEvent(new Event('online'));",
+                            null
+                        )
+                    } catch (_: Exception) {
+                    }
+                } else if (!devMode) {
+                    pollHealthOnce()
+                }
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+    }
+
     override fun onDestroy() {
         fileChooserCallback?.onReceiveValue(null)
         fileChooserCallback = null
         NodeService.onStatusChange = null
-        if (!devMode) {
-            NodeService.stop(this)
-        }
+        scope.cancel()
         try {
             webView.stopLoading()
             (webView.parent as? ViewGroup)?.removeView(webView)
             webView.destroy()
         } catch (_: Exception) {
         }
-        scope.cancel()
+        if (!devMode && (isFinishing || shuttingDown)) {
+            NodeService.stop(this)
+        }
         super.onDestroy()
     }
 }

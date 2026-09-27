@@ -11,6 +11,12 @@ import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TRPCProvider, trpcClient } from './lib/trpc'
 
+try {
+  window.history.scrollRestoration = 'manual'
+} catch {
+  // ignore
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

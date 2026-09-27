@@ -65,7 +65,7 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
     for (let i = -6; i <= 6; i++) {
-      const date = new Date()
+      const date = new Date(today)
       date.setDate(today.getDate() + i)
       days.push(date)
     }

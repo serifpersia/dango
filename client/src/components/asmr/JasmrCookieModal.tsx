@@ -14,6 +14,7 @@ interface HelperReply {
   cookie?: string
   error?: string
   storeId?: string
+  requestId?: string
   debug?: { stores?: string[]; names?: string[] }
 }
 
@@ -72,6 +73,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
   const handleExtract = () => {
     if (extracting) return
     setExtracting(true)
+    const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
     const timer = window.setTimeout(() => {
       setExtracting(false)
       if (replyRef.current) {
@@ -81,11 +83,12 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
       toast.error('Helper not detected — install it via about:debugging first.')
     }, 3000)
     const onReply = (e: Event) => {
+      const detail = parseReply(e)
+      if (!detail || detail.requestId !== requestId) return
       window.clearTimeout(timer)
       window.removeEventListener('dango:jasmr-cookie', onReply)
       replyRef.current = null
       setExtracting(false)
-      const detail = parseReply(e)
       if (detail?.ok && detail.cookie) {
         setCookie(detail.cookie)
         toast.success('Cookie extracted from helper!')
@@ -101,7 +104,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
     }
     replyRef.current = onReply
     window.addEventListener('dango:jasmr-cookie', onReply)
-    window.dispatchEvent(new CustomEvent('dango:get-jasmr-cookie'))
+    window.dispatchEvent(new CustomEvent('dango:get-jasmr-cookie', { detail: { requestId } }))
   }
 
   const handleSubmitCookie = async () => {

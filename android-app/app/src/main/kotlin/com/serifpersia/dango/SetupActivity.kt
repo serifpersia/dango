@@ -1,9 +1,13 @@
 package com.serifpersia.dango
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -47,6 +51,9 @@ class SetupActivity : AppCompatActivity() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var latestVersion: String? = null
     private var nodeProcess: Process? = null
+    private val logBuffer = mutableListOf<String>()
+    private var logFlushJob: Job? = null
+    private val maxLogViews = 300
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +85,7 @@ class SetupActivity : AppCompatActivity() {
             Log.i(TAG, "Update button clicked")
             startInstall(true)
         }
+        requestBatteryExemption()
         launchBtn.setOnClickListener {
             Log.i(TAG, "Launch button clicked")
             if (DevConfig.isEnabled(this)) {
@@ -234,16 +242,17 @@ class SetupActivity : AppCompatActivity() {
                 while (proc.isAlive) {
                     val line = reader.readLine() ?: break
                     lineCount++
-                    withContext(Dispatchers.Main) { appendLog(line) }
+                    appendLog(line)
                     if (lineCount % 50 == 0) {
                         Log.i(TAG, "npm output lines: $lineCount, last: $line")
                     }
                 }
                 val remaining = reader.readText()
                 if (remaining.isNotEmpty()) {
-                    withContext(Dispatchers.Main) { appendLog(remaining) }
+                    appendLog(remaining)
                 }
             }
+            withContext(Dispatchers.Main) { flushLogBuffer() }
 
             val exitCode = nodeProcess?.waitFor() ?: -1
             appendLog("npm exited with code $exitCode")
@@ -482,15 +491,61 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun appendLog(line: String) {
-        val tv = TextView(this).apply {
-            text = line
-            textSize = 11f
-            setTextColor(0xFF888888.toInt())
-            setPadding(0, 2, 0, 2)
-            typeface = android.graphics.Typeface.MONOSPACE
+        val lines = line.split("\n").filter { it.isNotBlank() }
+        if (lines.isEmpty()) return
+        synchronized(logBuffer) {
+            logBuffer.addAll(lines)
         }
-        logContainer.addView(tv)
+        scheduleLogFlush()
+    }
+
+    private fun scheduleLogFlush() {
+        if (logFlushJob?.isActive == true) return
+        logFlushJob = scope.launch {
+            delay(250)
+            flushLogBuffer()
+        }
+    }
+
+    private fun flushLogBuffer() {
+        val batch: List<String>
+        synchronized(logBuffer) {
+            if (logBuffer.isEmpty()) return
+            batch = logBuffer.toList()
+            logBuffer.clear()
+        }
+        for (l in batch) {
+            val tv = TextView(this).apply {
+                text = l
+                textSize = 11f
+                setTextColor(0xFF888888.toInt())
+                setPadding(0, 2, 0, 2)
+                typeface = android.graphics.Typeface.MONOSPACE
+            }
+            logContainer.addView(tv)
+        }
+        while (logContainer.childCount > maxLogViews) {
+            logContainer.removeViewAt(0)
+        }
         logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun requestBatteryExemption() {
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(packageName)) return
+            if (prefs.getBoolean("battery_exemption_asked", false)) return
+            prefs.edit().putBoolean("battery_exemption_asked", true).apply()
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            try {
+                startActivity(intent)
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }
+        } catch (_: Exception) {
+        }
     }
 
     private fun startInstall(isUpdate: Boolean) {

@@ -20,9 +20,10 @@ function OptionTabsInner<T extends string>(
 ) {
   const barRef = useRef<HTMLDivElement | null>(null)
   const btnRefs = useRef(new Map<string, HTMLButtonElement>())
+  const prevValueRef = useRef<T | null>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
 
-  const updateIndicator = useCallback((activeKey: string) => {
+  const updateIndicator = useCallback((activeKey: string, scroll: boolean) => {
     const el = btnRefs.current.get(activeKey)
     const bar = barRef.current
     if (el && bar) {
@@ -32,29 +33,31 @@ function OptionTabsInner<T extends string>(
         left: elRect.left - barRect.left + bar.scrollLeft,
         width: elRect.width,
       })
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
   }, [])
 
   useLayoutEffect(() => {
-    updateIndicator(value)
+    const changed = prevValueRef.current !== null && prevValueRef.current !== value
+    prevValueRef.current = value
+    updateIndicator(value, changed)
   }, [value, options.length, updateIndicator])
 
   useEffect(() => {
-    updateIndicator(value)
+    updateIndicator(value, false)
     if (typeof ResizeObserver === 'undefined') return
     let raf = 0
     const bar = barRef.current
     if (!bar) return
     const ro = new ResizeObserver(() => {
       cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => updateIndicator(value))
+      raf = requestAnimationFrame(() => updateIndicator(value, false))
     })
     ro.observe(bar)
     let cancelled = false
     if (document.fonts?.ready) {
       document.fonts.ready.then(() => {
-        if (!cancelled) updateIndicator(value)
+        if (!cancelled) updateIndicator(value, false)
       })
     }
     return () => {

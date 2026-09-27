@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, Suspense, lazy } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router'
+import { Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router'
 import toast from 'react-hot-toast'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -55,6 +55,8 @@ function App() {
     closeModal: closeLanAuthModal,
   } = useLanAuth()
   const location = useLocation()
+  const navigationType = useNavigationType()
+  const scrollPositions = useRef(new Map<string, number>())
   const virtualKeyboard = useVirtualKeyboard()
   const { showTelemetryModal, setShowTelemetryModal } = useTelemetry()
   useDiscordPageStatus()
@@ -103,8 +105,26 @@ function App() {
   }, [lanNoticeShown, setLanNoticeShown])
 
   useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [location.pathname])
+    try {
+      window.history.scrollRestoration = 'manual'
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    const key = location.key
+    const positions = scrollPositions.current
+    if (navigationType === 'POP') {
+      const y = positions.get(key) ?? 0
+      window.scrollTo({ top: y, behavior: 'instant' })
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+    return () => {
+      positions.set(key, window.scrollY)
+    }
+  }, [location.key, navigationType])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

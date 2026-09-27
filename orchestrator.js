@@ -341,7 +341,6 @@ const log = (prefix, color, data) => {
 const spawnOpts = (cwd, extraEnv, withIpc = false) => ({
   // It only works for directly spawned node processes (prod); under a
   // package-manager runner (dev) there is no IPC forwarding, so stdout tags remain the fallback signal.
-  stdio: withIpc ? ['pipe', 'pipe', 'pipe', 'ipc'] : 'pipe',
   stdio: withIpc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
   shell: false,
   cwd,

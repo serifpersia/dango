@@ -28,7 +28,7 @@
 .hero {
   position: relative;
   width: 100%;
-  height: clamp(480px, 72vh, 660px);
+  height: clamp(480px, 72svh, 660px);
   overflow: hidden;
   background-color: var(--bg-main);
 }

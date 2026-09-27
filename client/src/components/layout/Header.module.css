@@ -4,7 +4,7 @@
   background: transparent;
   border-bottom: 1px solid transparent;
   position: fixed;
-  top: 0;
+  top: var(--vv-top, 0px);
   left: 0;
   right: 0;
   z-index: var(--z-header);
@@ -108,7 +108,7 @@
 .searchWrapper {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 8px;
 }
 
 .searchInput {
@@ -134,12 +134,10 @@
   width: 200px;
   opacity: 1;
   padding: 0 var(--space-3);
-  margin-right: var(--space-1);
   pointer-events: auto;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: var(--radius-full);
-  padding-left: var(--space-3);
   color: #fff;
 }
 
@@ -259,14 +257,22 @@
 
   .mobileSearchBar {
     display: block;
-    position: fixed;
-    top: var(--header-height);
+    position: absolute;
+    top: 100%;
     left: 0;
     right: 0;
-    z-index: calc(var(--z-header) - 1);
-    background: rgba(12, 12, 15, 0.5);
+    background: rgba(12, 12, 15, 0.9);
     padding: var(--space-2) var(--space-3);
     animation: slideDown 0.2s ease;
+    transition:
+      transform var(--transition-base),
+      opacity var(--transition-base);
+  }
+
+  .mobileSearchBarHidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
   }
 
   @keyframes slideDown {
@@ -284,10 +290,16 @@
     display: flex;
     align-items: center;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: none;
     border-radius: var(--radius-full);
     padding: 0 var(--space-4);
     height: 40px;
+  }
+
+  .mobileSearchInner:focus-within {
+    border: none;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
   .mobileSearchIcon {
@@ -313,9 +325,12 @@
   }
 
   .mobileSearchInput:focus,
-  input.mobileSearchInput:focus {
-    outline: none;
-    box-shadow: none;
+  input.mobileSearchInput:focus,
+  .mobileSearchInput:focus-visible,
+  input.mobileSearchInput:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none;
   }
 }
 
@@ -359,10 +374,6 @@
   .profileBtn {
     width: 36px;
     height: 36px;
-  }
-
-  .mobileSearchBar {
-    top: 64px;
   }
 }
 

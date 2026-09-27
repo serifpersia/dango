@@ -5,7 +5,9 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import kotlinx.coroutines.*
 import java.io.BufferedReader
@@ -32,47 +34,85 @@ class NodeService : Service() {
         }
 
         fun stop(context: Context) {
-            context.stopService(Intent(context, NodeService::class.java))
+            try {
+                context.startService(Intent(context, NodeService::class.java).apply {
+                    action = "STOP"
+                })
+            } catch (_: Exception) {
+                try {
+                    context.stopService(Intent(context, NodeService::class.java))
+                } catch (_: Exception) {}
+            }
         }
     }
 
     private var nodeProcess: Process? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "dango:node_cpu_wakelock"
+        ).apply {
+            setReferenceCounted(false)
+            acquire(24 * 60 * 60 * 1000L)
+        }
+
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        wifiLock = wifiManager?.createWifiLock(
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+            "dango:node_wifi_lock"
+        )?.apply {
+            setReferenceCounted(false)
+            acquire()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "STOP" -> {
                 stopNode()
+                releaseLocks()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
             else -> {
                 startForeground(NOTIFICATION_ID, buildNotification("Starting server..."))
-                scope.launch { startDango() }
+                if (!isRunning) {
+                    scope.launch { startDango() }
+                }
             }
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    private fun releaseLocks() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (_: Exception) {}
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
         stopNode()
+        releaseLocks()
         stopForeground(STOP_FOREGROUND_REMOVE)
         scope.cancel()
         super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        stopNode()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 

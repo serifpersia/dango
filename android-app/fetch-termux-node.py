@@ -41,37 +41,32 @@ PACKAGES = [
     "libffi",
 ]
 
-SONAME_ALIASES = {
-    "libz.so": "libz.so.1.3.2",
-    "libz.so.1": "libz.so.1.3.2",
-    "libsqlite3.so": "libsqlite3.so.3.53.4",
-    "libsqlite3.so.0": "libsqlite3.so.3.53.4",
-    "libcrypto.so": "libcrypto.so.3",
-    "libssl.so": "libssl.so.3",
-    "libicui18n.so": "libicui18n.so.78.3",
-    "libicui18n.so.78": "libicui18n.so.78.3",
-    "libicuuc.so": "libicuuc.so.78.3",
-    "libicuuc.so.78": "libicuuc.so.78.3",
-    "libicudata.so": "libicudata.so.78.3",
-    "libicudata.so.78": "libicudata.so.78.3",
-    "libicuio.so": "libicuio.so.78.3",
-    "libicuio.so.78": "libicuio.so.78.3",
-    "libicutu.so": "libicutu.so.78.3",
-    "libicutu.so.78": "libicutu.so.78.3",
-    "libicutest.so": "libicutest.so.78.3",
-    "libicutest.so.78": "libicutest.so.78.3",
+SONAME_BASES = [
+    "libz",
+    "libsqlite3",
+    "libcrypto",
+    "libssl",
+    "libicui18n",
+    "libicuuc",
+    "libicudata",
+    "libicuio",
+    "libicutu",
+    "libicutest",
+]
+
+LEGACY_ALIASES = {
+    "libz": ["libz.so.1"],
+    "libsqlite3": ["libsqlite3.so.0"],
 }
 
-OBSOLETE_ALIASES = {
-    "libz.so.1",
-    "libsqlite3.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
-    "libicudata.so.78",
-    "libicuio.so.78",
-    "libicutu.so.78",
-    "libicutest.so.78",
-}
+
+def _version_key(name: str, base: str) -> tuple:
+    suffix = name[len(base) + 4:] if name.startswith(base + ".so.") else ""
+    parts = []
+    for chunk in suffix.split("."):
+        digits = "".join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts) if parts else (0,)
 
 
 def fetch_url(url: str) -> bytes:
@@ -298,27 +293,41 @@ def create_soname_aliases(abi_dir: Path):
         return
 
     removed = 0
-    for alias_name in OBSOLETE_ALIASES:
-        alias_path = lib_dir / alias_name
-        if alias_path.exists() or alias_path.is_symlink():
-            try:
-                alias_path.unlink()
-                removed += 1
-            except OSError as e:
-                print(f"  WARNING: Could not remove obsolete alias {alias_name}: {e}")
-
     created = 0
-    for alias_name, source_name in SONAME_ALIASES.items():
-        source_path = lib_dir / source_name
-        alias_path = lib_dir / alias_name
-        if not source_path.exists() or alias_path.exists():
+    for base in SONAME_BASES:
+        candidates = [p for p in lib_dir.glob(base + ".so*") if p.is_file() and not p.is_symlink()]
+        versioned = [p for p in candidates if p.name.startswith(base + ".so.")]
+        if not versioned:
             continue
-        try:
-            shutil.copy2(source_path, alias_path)
-            created += 1
-        except OSError as e:
-            print(f"  WARNING: Could not create alias {alias_name}: {e}")
-    print(f"  [{abi_dir.name}] Removed {removed} obsolete aliases, created {created} aliases")
+        versioned.sort(key=lambda p: (_version_key(p.name, base), p.stat().st_size))
+        canonical = versioned[-1]
+        major = _version_key(canonical.name, base)[0] if _version_key(canonical.name, base) else 0
+
+        wanted = {f"{base}.so", f"{base}.so.{major}"} if major else {f"{base}.so"}
+        for legacy in LEGACY_ALIASES.get(base, []):
+            wanted.add(legacy)
+
+        for alias_name in sorted(wanted):
+            if alias_name == canonical.name:
+                continue
+            alias_path = lib_dir / alias_name
+            try:
+                if alias_path.exists() or alias_path.is_symlink():
+                    alias_path.unlink()
+                    removed += 1
+                shutil.copy2(canonical, alias_path)
+                created += 1
+            except OSError as e:
+                print(f"  WARNING: Could not create alias {alias_name}: {e}")
+
+        for stale in versioned[:-1]:
+            if stale.name not in wanted:
+                try:
+                    stale.unlink()
+                    removed += 1
+                except OSError as e:
+                    print(f"  WARNING: Could not remove stale lib {stale.name}: {e}")
+    print(f"  [{abi_dir.name}] Removed {removed} stale libs, created {created} aliases")
 
 
 def clean_unneeded_dirs(abi_dir: Path):
