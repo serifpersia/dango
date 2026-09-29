@@ -228,7 +228,6 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
             persisted++
           }
         }
-        if (persisted > 0) db.scheduleSave()
       }
 
       if (finishedShowIds.size > 0) {
@@ -276,7 +275,6 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
               inserted = true
             }
           }
-          if (inserted) db.scheduleSave()
         }
       }
 
@@ -313,7 +311,6 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
             inserted = true
           }
         }
-        if (inserted) db.scheduleSave()
       }
 
       await NotificationsRepository.cleanupWatchedNotifications(db)
@@ -650,7 +647,6 @@ async function backfillMissingPosters(
       }
     })
   )
-  db.scheduleSave()
   await sweepOfflinePosters(db)
 }
 
@@ -677,7 +673,6 @@ async function sweepOfflinePosters(db: DatabaseWrapper): Promise<void> {
     const poster = resolveOfflinePoster(id)
     if (poster) await applyPoster(db, id, poster)
   }
-  db.scheduleSave()
 }
 
 function resolveOfflinePoster(id: string): string | null {

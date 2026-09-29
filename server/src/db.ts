@@ -37,10 +37,6 @@ export class DatabaseWrapper {
     return this.db
   }
 
-  public scheduleSave() {}
-
-  public async saveNow() {}
-
   public configure(option: string, value: unknown) {
     if (option === 'busyTimeout') {
       this.db.exec(`PRAGMA busy_timeout = ${value}`)

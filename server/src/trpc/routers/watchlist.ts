@@ -83,8 +83,6 @@ export const watchlistRouter = router({
       }
     })
 
-    await ctx.db.saveNow()
-
     if (input.name && !/^\d+$/.test(id)) {
       const db = ctx.db
       const name = input.name
@@ -93,7 +91,6 @@ export const watchlistRouter = router({
           const result = await searchAnilistByTitle(name)
           if (result?.id) {
             await ShowsMetaRepository.upsert(db, { id, anilistId: result.id })
-            db.scheduleSave()
             return
           }
         }
@@ -102,7 +99,6 @@ export const watchlistRouter = router({
           if (kitsuResults.length > 0) {
             const anilistId = Math.abs(kitsuResults[0].id)
             await ShowsMetaRepository.upsert(db, { id, anilistId })
-            db.scheduleSave()
           }
         } catch {
           // ignore
@@ -133,7 +129,6 @@ export const watchlistRouter = router({
         await NotificationsRepository.deleteByShow(tx, id)
       }
     })
-    ctx.db.scheduleSave()
     return { success: true, removed: ids.length }
   }),
 
@@ -152,7 +147,6 @@ export const watchlistRouter = router({
       await performWriteTransactionAsync(ctx.db, async (tx) => {
         await WatchlistRepository.updateStatusMany(tx, ids, input.status)
       })
-      ctx.db.scheduleSave()
       return { success: true, updated: ids.length }
     }),
 
@@ -660,7 +654,6 @@ async function backfillMissingPosters(
       }
     })
   )
-  db.scheduleSave()
   await sweepOfflinePosters(db)
 }
 
@@ -687,7 +680,6 @@ async function sweepOfflinePosters(db: DatabaseWrapper): Promise<void> {
     const poster = resolveOfflinePoster(id)
     if (poster) await applyPoster(db, id, poster)
   }
-  db.scheduleSave()
 }
 
 function resolveOfflinePoster(id: string): string | null {

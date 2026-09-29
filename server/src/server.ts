@@ -137,20 +137,11 @@ async function runSyncSequence(
   mangaDatabase: DatabaseWrapper,
   preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
 ) {
-  const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
-  const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
   await runFullSyncSequence(
     { db: database, mangaDb: mangaDatabase, tvDb, asmrDb },
-    {
-      dbPath,
-      remoteFolder,
-      preferredProvider,
-      onAnimeDownloaded: (newDb) => {
-        db = newDb
-      },
-    }
+    { remoteFolder, preferredProvider }
   )
 }
 

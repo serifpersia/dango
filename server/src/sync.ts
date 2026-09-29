@@ -334,9 +334,8 @@ async function getRemoteManifestVersion(
 export async function syncDownOnBoot(
   db: DatabaseWrapper,
   kind: MediaKind,
-  remoteFolderName: string,
-  opts?: { dbPath: string; closeMainDb: () => Promise<void> }
-): Promise<boolean> {
+  remoteFolderName: string
+): Promise<void> {
   const def = KIND_SYNC[kind]
   let localVersion = await getKindManifestVersion(kind)
 
@@ -351,12 +350,12 @@ export async function syncDownOnBoot(
     }
   }
 
-  if (activeProvider === 'none') return false
+  if (activeProvider === 'none') return
 
   await syncMutex.lock()
   if (isSyncing) {
     syncMutex.unlock()
-    return false
+    return
   }
   isSyncing = true
 
@@ -369,23 +368,23 @@ export async function syncDownOnBoot(
 
     if (remoteVersion > localVersion) {
       if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return false
+        if (!githubSyncService.isAuthenticated()) return
         notifySyncStart(`Importing GitHub ${def.mid}sync data (Remote v${remoteVersion})`)
         const importedVersion = await def.githubDown(db)
         await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
         log.info(`GitHub ${def.mid}sync down complete.`)
-        return false
+        return
       }
 
       if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return false
+        if (!googleDriveService.isAuthenticated()) return
         notifySyncStart(`Importing Google ${def.mid}sync data (Remote v${remoteVersion})`)
         const importedVersion = await def.googleDown(db)
         await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
         log.info(`Google ${def.mid}sync down complete.`)
-        return false
+        return
       }
 
       if (activeProvider === 'rclone') {
@@ -394,65 +393,14 @@ export async function syncDownOnBoot(
         await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
         log.info(`Rclone ${def.mid}sync down complete.`)
-        return false
-      }
-
-      if (opts) {
-        notifySyncStart(`Downloading remote database (Remote v${remoteVersion})`)
-        await opts.closeMainDb()
-
-        const backupPath = `${opts.dbPath}.bak`
-
-        try {
-          if (existsSync(opts.dbPath)) {
-            await fs.copyFile(opts.dbPath, backupPath)
-          }
-
-          try {
-            await fs.unlink(`${opts.dbPath}-wal`)
-          } catch (e) {
-            void e
-          }
-          try {
-            await fs.unlink(`${opts.dbPath}-shm`)
-          } catch (e) {
-            void e
-          }
-
-          log.warn('Legacy raw-db sync path reached with JSON providers. No action taken.')
-
-          if (existsSync(backupPath)) {
-            await fs.unlink(backupPath)
-          }
-
-          notifySyncEnd()
-          log.info('Sync down complete.')
-          return true
-        } catch (err) {
-          notifySyncEnd()
-          log.error({ err }, 'Sync down failed. Restoring backup.')
-          if (existsSync(backupPath)) {
-            try {
-              await fs.copyFile(backupPath, opts.dbPath)
-              log.info('Backup restored successfully after failed sync down.')
-            } catch (restoreErr) {
-              log.error({ err: restoreErr }, 'Critical: restore from backup also failed.')
-              throw new Error('Sync down and restore both failed. Database may be corrupt.', {
-                cause: restoreErr,
-              })
-            }
-          }
-          return true
-        }
+        return
       }
     } else {
       log.info(`Local ${def.mid}DB is up to date.`)
     }
-    return false
   } catch (err) {
     notifySyncEnd()
     log.error({ err }, `${cap(`${def.mid}sync`)} boot error.`)
-    return false
   } finally {
     isSyncing = false
     syncMutex.unlock()
@@ -512,10 +460,8 @@ export async function runFullSyncSequence(
     asmrDb: DatabaseWrapper
   },
   opts: {
-    dbPath: string
     remoteFolder: string
     preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
-    onAnimeDownloaded?: (db: DatabaseWrapper) => void
   }
 ): Promise<void> {
   await initSyncProvider(opts.preferredProvider)
@@ -528,29 +474,10 @@ export async function runFullSyncSequence(
     }
   }
 
-  const didDownload = await syncDownOnBoot(dbs.db, 'anime', opts.remoteFolder, {
-    dbPath: opts.dbPath,
-    closeMainDb: () => {
-      return new Promise<void>((resolve) => {
-        if (dbs.db && !dbs.db.isClosedCheck()) {
-          dbs.db.checkpoint()
-          dbs.db.close(() => resolve())
-        } else {
-          resolve()
-        }
-      })
-    },
-  })
-
-  let currentDb = dbs.db
-  if (didDownload) {
-    currentDb = await initializeDatabase(opts.dbPath)
-    opts.onAnimeDownloaded?.(currentDb)
-    logger.info('Database re-initialized after sync.')
-  }
+  await syncDownOnBoot(dbs.db, 'anime', opts.remoteFolder)
 
   try {
-    await syncUp(currentDb, 'anime', opts.remoteFolder)
+    await syncUp(dbs.db, 'anime', opts.remoteFolder)
   } catch (err) {
     logger.error({ err }, 'Sync up on boot failed')
   }
@@ -920,7 +847,6 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'isAdult', 'INTEGER')
     addCol('shows_meta', 'episodeDuration', 'INTEGER')
 
-    await db.saveNow()
     return db
   } catch (err) {
     log.error({ err }, 'Database opening error')

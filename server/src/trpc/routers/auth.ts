@@ -1,4 +1,3 @@
-import path from 'path'
 import logger from '../../logger.js'
 import { googleDriveService } from '../../google.js'
 import { githubSyncService } from '../../github-sync.js'
@@ -18,13 +17,11 @@ async function runSyncFromCtx(
   database: DatabaseWrapper,
   preferredProvider?: SyncProvider
 ) {
-  const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
-  const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
   await runFullSyncSequence(
     { db: database, mangaDb: ctx.mangaDb, tvDb: ctx.tvDb, asmrDb: ctx.asmrDb },
-    { dbPath, remoteFolder, preferredProvider }
+    { remoteFolder, preferredProvider }
   )
 }
 

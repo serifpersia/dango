@@ -48,7 +48,6 @@ export const queueRouter = router({
         await QueueRepository.addToEnd(tx, showId, episodeNumber)
       }
     })
-    ctx.db.scheduleSave()
     return { success: true, queued: !existing }
   }),
 
@@ -71,7 +70,6 @@ export const queueRouter = router({
         normalized.map((episodeNumber) => ({ showId, episodeNumber }))
       )
     })
-    ctx.db.scheduleSave()
     return { success: true, added: normalized.length }
   }),
 

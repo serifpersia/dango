@@ -159,8 +159,6 @@ export const progressRouter = router({
         await NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber)
       })
 
-      ctx.db.scheduleSave()
-
       return { success: true }
     }),
 })

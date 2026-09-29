@@ -841,7 +841,6 @@ export const dataRouter = router({
                   // ignore
                 }
               }
-              db.scheduleSave()
             }
           }
           if (/^(mal-\d+|-\d+)$/i.test(id) && meta?.anilistId && meta.anilistId > 0) {

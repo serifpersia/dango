@@ -26,7 +26,6 @@ export const continueWatchingRouter = router({
       }
     })
 
-    ctx.db.scheduleSave()
     return { success: true, removed: ids.length }
   }),
 
@@ -44,7 +43,6 @@ export const continueWatchingRouter = router({
           await NotificationsRepository.deleteByShow(tx, id)
         }
       })
-      ctx.db.scheduleSave()
     }
     return { success: true, removed: ids.length }
   }),

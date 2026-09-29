@@ -77,7 +77,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
           canonicalId,
         ])
       })
-      db.scheduleSave()
       return canonicalId
     }
 
@@ -92,7 +91,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
           numericId,
           canonicalId,
         ])
-        db.scheduleSave()
         logger.info({ aliasId: numericId, canonicalId }, 'Mapped numeric alias to canonical ID')
       }
       return canonicalId
@@ -167,7 +165,6 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
       numericId,
     ])
   })
-  db.scheduleSave()
   return numericId
 }
 
@@ -237,7 +234,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
           legacyId,
         ])
       })
-      db.scheduleSave()
       logger.info(
         { legacyId, previousId: mapping.numericId, newId: canonicalId },
         'Canonicalized migrated show ID'
@@ -344,7 +340,6 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [legacyId])
     })
 
-    db.scheduleSave()
     logger.info({ legacyId, newId, showName }, 'Successfully migrated legacy show ID to numeric ID')
     return newId
   } catch (err) {
