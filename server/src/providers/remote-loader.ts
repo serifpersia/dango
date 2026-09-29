@@ -99,8 +99,8 @@ async function readModuleBytes(entryUrl: string): Promise<Buffer> {
   return await fs.promises.readFile(filePath)
 }
 
-function resolveEntryUrl(entry: string, registryUrl: string): string {
-  const e = entry.trim()
+function resolveEntryUrl(entry: string | undefined, registryUrl: string): string {
+  const e = (entry ?? '').trim()
   if (isHttp(e) || e.startsWith('file://')) return e
   if (isHttp(registryUrl)) return new URL(e, registryUrl).href
   const baseDir = path.dirname(path.resolve(stripFilePrefix(registryUrl)))
@@ -219,6 +219,31 @@ function createCtx(cache: AppCache) {
       buildQueryVariants,
       pickBestMatch,
     },
+    resolveBestShowId: async (
+      title: string,
+      romaji: string | undefined,
+      searchFn: (variant: string) => Promise<Array<{ title: string; id: string }>>
+    ): Promise<string | null> => {
+      const targets = [title, romaji].filter(
+        (t): t is string => typeof t === 'string' && t.trim().length > 0
+      )
+      if (targets.length === 0) return null
+      for (const variant of buildQueryVariants(title, romaji)) {
+        let results
+        try {
+          results = await searchFn(variant)
+        } catch {
+          continue
+        }
+        if (!results || results.length === 0) continue
+        const match = pickBestMatch(
+          results.filter((r) => r && typeof r.id === 'string' && r.id.length > 0),
+          targets
+        )
+        if (match) return match.item.id
+      }
+      return null
+    },
     anilist: {
       request: <T>(query: string, vars?: Record<string, unknown>): Promise<AnilistResponse<T>> =>
         anilistRequest<T>(query, vars),
@@ -335,6 +360,19 @@ function isValidTvProvider(p: unknown): p is TvProvider {
   )
 }
 
+function makeEmbedProvider(id: string, base: string): TvProvider {
+  const root = base.trim().replace(/\/+$/, '')
+  return {
+    name: id,
+    getEmbedUrl: async (media) => {
+      const tmdbId = Number(media.tmdbId)
+      if (!tmdbId) return null
+      if (media.type === 'movie') return `${root}/movie/${tmdbId}`
+      return `${root}/tv/${tmdbId}/${media.season || 1}/${media.episode || 1}`
+    },
+  }
+}
+
 async function loadEntry(
   item: RemoteProviderEntry,
   registryUrl: string,
@@ -342,6 +380,11 @@ async function loadEntry(
   ctx: RemoteCtx,
   allowUnsigned: boolean
 ): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
+  if (item.embedBase) {
+    const provider = makeEmbedProvider(item.id, item.embedBase)
+    instanceCache.set(`${item.kind ?? 'anime'}:${item.id}-${item.version}-embed`, { provider })
+    return { provider }
+  }
   const entryUrl = resolveEntryUrl(item.entry, registryUrl)
   await fs.promises.mkdir(cacheDir, { recursive: true })
   const fileName = `${item.id}-${item.version}.mjs`

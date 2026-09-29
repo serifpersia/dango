@@ -18,7 +18,8 @@ export interface RemoteProviderEntry {
   id: string
   label: string
   version: string
-  entry: string
+  entry?: string
+  embedBase?: string
   sha256?: string
   minDango?: string
   mature: boolean
@@ -94,7 +95,13 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
   if (typeof version !== 'string' || !version.trim()) {
     throw new Error(`registry.providers[${index}].version must be a non-empty string`)
   }
-  if (typeof entry !== 'string' || !entry.trim()) {
+  const embedBase = p.embedBase
+  if (embedBase !== undefined) {
+    if (typeof embedBase !== 'string' || !/^https:\/\/[^/]+/i.test(embedBase.trim())) {
+      throw new Error(`registry.providers[${index}].embedBase must be an https URL`)
+    }
+  }
+  if ((typeof entry !== 'string' || !entry.trim()) && embedBase === undefined) {
     throw new Error(`registry.providers[${index}].entry must be a non-empty string`)
   }
   if (p.sha256 !== undefined && (typeof p.sha256 !== 'string' || !SHA_RE.test(p.sha256.trim()))) {
@@ -134,7 +141,8 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     id: id.trim(),
     label: (label as string).trim(),
     version: (version as string).trim(),
-    entry: (entry as string).trim(),
+    entry: typeof entry === 'string' ? entry.trim() : undefined,
+    embedBase: typeof embedBase === 'string' ? embedBase.trim().replace(/\/+$/, '') : undefined,
     sha256: typeof p.sha256 === 'string' ? p.sha256.trim().toLowerCase() : undefined,
     minDango: typeof p.minDango === 'string' ? p.minDango : undefined,
     mature: typeof p.mature === 'boolean' ? p.mature : false,
