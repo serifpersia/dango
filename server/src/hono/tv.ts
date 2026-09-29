@@ -275,7 +275,8 @@ export function registerTv(
       const chunks: Buffer[] = []
       const reader = fetchResp.body?.getReader()
       if (!reader) {
-        return c.text('No response body', 500)
+        logger.warn({ host: safeCheck.url?.hostname }, 'tv stream-proxy: upstream sent no body')
+        return c.text('Upstream sent no body', 502)
       }
       try {
         while (true) {
@@ -293,12 +294,17 @@ export function registerTv(
           return new Response(bodyBuffer as unknown as BodyInit, { status, headers: outHeaders })
         }
         return new Response(body as unknown as BodyInit, { status, headers: outHeaders })
-      } catch {
-        return c.text('Proxy error', 500)
+      } catch (err) {
+        logger.warn(
+          { err, host: safeCheck.url?.hostname },
+          'tv stream-proxy: upstream body stream failed'
+        )
+        return c.text('Upstream stream failed', 502)
       }
-    } catch {
+    } catch (err) {
       if (abort.signal.aborted) return new Response(null, { status: 499 })
-      return c.text('Proxy error', 500)
+      logger.warn({ err, host: safeCheck.url?.hostname }, 'tv stream-proxy: upstream fetch failed')
+      return c.text('Upstream fetch failed', 502)
     } finally {
       clearTimeout(timeout)
     }
