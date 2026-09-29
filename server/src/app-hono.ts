@@ -56,10 +56,9 @@ import {
   performMangaWriteTransactionAsync,
   performTvWriteTransactionAsync,
   performWriteTransactionAsync,
-  setLocalAsmrManifestVersion,
-  setLocalMangaManifestVersion,
-  setLocalManifestVersion,
-  setLocalTvManifestVersion,
+  KIND_SYNC,
+  setKindManifestVersion,
+  type MediaKind,
 } from './sync.js'
 import {
   ANIME_SYNC_TABLES,
@@ -225,6 +224,13 @@ async function restoreJsonBackup(c: Context, dbs: HonoDbs, buffer: Buffer) {
     return c.json({ error: 'Invalid backup file: missing databases.' }, 400)
   }
 
+  const kindDbs: Record<MediaKind, DatabaseWrapper> = {
+    anime: dbs.db,
+    manga: dbs.mangaDb,
+    tv: dbs.tvDb,
+    asmr: dbs.asmrDb,
+  }
+
   const targets: Array<{
     key: string
     db: DatabaseWrapper
@@ -232,40 +238,14 @@ async function restoreJsonBackup(c: Context, dbs: HonoDbs, buffer: Buffer) {
     libraryTables: readonly string[]
     backupName: string
     setVersion: (version: number) => Promise<void>
-  }> = [
-    {
-      key: 'anime',
-      db: dbs.db,
-      tables: ANIME_SYNC_TABLES,
-      libraryTables: ['watchlist', 'watched_episodes'],
-      backupName: 'pre-sync-backup.db',
-      setVersion: setLocalManifestVersion,
-    },
-    {
-      key: 'manga',
-      db: dbs.mangaDb,
-      tables: MANGA_SYNC_TABLES,
-      libraryTables: ['manga_library', 'manga_progress'],
-      backupName: 'pre-sync-manga-backup.db',
-      setVersion: setLocalMangaManifestVersion,
-    },
-    {
-      key: 'tv',
-      db: dbs.tvDb,
-      tables: TV_SYNC_TABLES,
-      libraryTables: ['tv_library', 'tv_progress'],
-      backupName: 'pre-sync-tv-backup.db',
-      setVersion: setLocalTvManifestVersion,
-    },
-    {
-      key: 'asmr',
-      db: dbs.asmrDb,
-      tables: ASMR_SYNC_TABLES,
-      libraryTables: ['asmr_library', 'asmr_progress'],
-      backupName: 'pre-sync-asmr-backup.db',
-      setVersion: setLocalAsmrManifestVersion,
-    },
-  ]
+  }> = (Object.keys(KIND_SYNC) as MediaKind[]).map((kind) => ({
+    key: kind,
+    db: kindDbs[kind],
+    tables: KIND_SYNC[kind].tables,
+    libraryTables: KIND_SYNC[kind].libraryTables,
+    backupName: KIND_SYNC[kind].backupName,
+    setVersion: (version: number) => setKindManifestVersion(kind, version),
+  }))
 
   const present = targets.filter((t) => databases[t.key] !== undefined)
   if (present.length === 0) {

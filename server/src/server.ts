@@ -12,24 +12,17 @@ import { DatabaseWrapper } from './db.js'
 import logger from './logger.js'
 import { notifyServerExit } from './lib/ipc.js'
 
-import { githubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import {
   initializeDatabase,
   initializeMangaDatabase,
   initializeTvDatabase,
   initializeAsmrDatabase,
-  syncDownOnBoot,
+  runFullSyncSequence,
   syncUp,
-  mangaSyncDownOnBoot,
-  mangaSyncUp,
-  tvSyncDownOnBoot,
-  tvSyncUp,
-  asmrSyncDownOnBoot,
-  asmrSyncUp,
-  initSyncProvider,
   waitForSync,
-  getActiveProvider,
+  KIND_SYNC,
+  type MediaKind,
 } from './sync.js'
 import type { JasmrApi } from './hono/asmr.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
@@ -148,75 +141,17 @@ async function runSyncSequence(
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
-  await initSyncProvider(preferredProvider)
-
-  if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
-    try {
-      await githubSyncService.migrateFromAniWebSync()
-    } catch (err) {
-      logger.error({ err }, 'GitHub sync migration from ani-web failed')
+  await runFullSyncSequence(
+    { db: database, mangaDb: mangaDatabase, tvDb, asmrDb },
+    {
+      dbPath,
+      remoteFolder,
+      preferredProvider,
+      onAnimeDownloaded: (newDb) => {
+        db = newDb
+      },
     }
-  }
-
-  const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
-    return new Promise<void>((resolve) => {
-      if (database && !database.isClosedCheck()) {
-        database.checkpoint()
-        database.close(() => resolve())
-      } else {
-        resolve()
-      }
-    })
-  })
-
-  let currentDb = database
-  if (didDownload) {
-    db = await initializeDatabase(dbPath)
-    currentDb = db
-    logger.info('Database re-initialized after sync.')
-  }
-
-  try {
-    await syncUp(currentDb, dbPath, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Sync up on boot failed')
-  }
-
-  try {
-    await mangaSyncDownOnBoot(mangaDatabase, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Manga sync down on boot failed')
-  }
-
-  try {
-    await mangaSyncUp(mangaDatabase, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Manga sync up on boot failed')
-  }
-
-  try {
-    await tvSyncDownOnBoot(tvDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'TV sync down on boot failed')
-  }
-
-  try {
-    await tvSyncUp(tvDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'TV sync up on boot failed')
-  }
-
-  try {
-    await asmrSyncDownOnBoot(asmrDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'ASMR sync down on boot failed')
-  }
-
-  try {
-    await asmrSyncUp(asmrDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'ASMR sync up on boot failed')
-  }
+  )
 }
 
 startWatchlistDiscovery(() => db)
@@ -285,47 +220,32 @@ async function main() {
     }, CONFIG.PROVIDER_REPO_REFRESH_MS).unref()
   }
 
-  if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
-    fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
-  }
-  if (!fs.existsSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH)) {
-    fs.writeFileSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
-  }
-  if (!fs.existsSync(CONFIG.TV_LOCAL_MANIFEST_PATH)) {
-    fs.writeFileSync(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
-  }
-  if (!fs.existsSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH)) {
-    fs.writeFileSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
-  }
-
-  let hasUnsyncedChanges = false
-  let hasMangaUnsyncedChanges = false
-  let hasTvUnsyncedChanges = false
-  let hasAsmrUnsyncedChanges = false
-
-  const watcher = fs.watch(CONFIG.LOCAL_MANIFEST_PATH, (eventType) => {
-    if (eventType === 'change' || eventType === 'rename') {
-      hasUnsyncedChanges = true
-    }
+  const kindDbs = (): Record<MediaKind, DatabaseWrapper> => ({
+    anime: db,
+    manga: mangaDb,
+    tv: tvDb,
+    asmr: asmrDb,
   })
 
-  const mangaWatcher = fs.watch(CONFIG.MANGA_LOCAL_MANIFEST_PATH, (eventType) => {
-    if (eventType === 'change' || eventType === 'rename') {
-      hasMangaUnsyncedChanges = true
+  for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
+    if (!fs.existsSync(KIND_SYNC[kind].manifestPath)) {
+      fs.writeFileSync(KIND_SYNC[kind].manifestPath, JSON.stringify({ version: 0 }))
     }
-  })
+  }
 
-  const tvWatcher = fs.watch(CONFIG.TV_LOCAL_MANIFEST_PATH, (eventType) => {
-    if (eventType === 'change' || eventType === 'rename') {
-      hasTvUnsyncedChanges = true
-    }
-  })
-
-  const asmrWatcher = fs.watch(CONFIG.ASMR_LOCAL_MANIFEST_PATH, (eventType) => {
-    if (eventType === 'change' || eventType === 'rename') {
-      hasAsmrUnsyncedChanges = true
-    }
-  })
+  const unsynced: Record<MediaKind, boolean> = {
+    anime: false,
+    manga: false,
+    tv: false,
+    asmr: false,
+  }
+  const watchers = (Object.keys(KIND_SYNC) as MediaKind[]).map((kind) =>
+    fs.watch(KIND_SYNC[kind].manifestPath, (eventType) => {
+      if (eventType === 'change' || eventType === 'rename') {
+        unsynced[kind] = true
+      }
+    })
+  )
 
   const server = serve({ fetch: app.fetch, port: CONFIG.PORT }, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
@@ -340,45 +260,23 @@ async function main() {
     logger.error({ err }, 'background providers refresh failed')
   )
 
+  const kindDbLabel: Record<MediaKind, string> = {
+    anime: 'database',
+    manga: 'manga database',
+    tv: 'TV database',
+    asmr: 'ASMR database',
+  }
+
   const syncInterval = setInterval(async () => {
-    if (hasUnsyncedChanges) {
-      logger.info('Uploading accumulated database changes...')
-      hasUnsyncedChanges = false
+    for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
+      if (!unsynced[kind]) continue
+      logger.info(`Uploading accumulated ${kindDbLabel[kind]} changes...`)
+      unsynced[kind] = false
       try {
-        await syncUp(db, dbPath, remoteFolder)
+        await syncUp(kindDbs()[kind], kind, remoteFolder)
       } catch (err) {
-        logger.error({ err }, 'Failed to upload database changes')
-        hasUnsyncedChanges = true
-      }
-    }
-    if (hasMangaUnsyncedChanges) {
-      logger.info('Uploading accumulated manga database changes...')
-      hasMangaUnsyncedChanges = false
-      try {
-        await mangaSyncUp(mangaDb, remoteFolder)
-      } catch (err) {
-        logger.error({ err }, 'Failed to upload manga database changes')
-        hasMangaUnsyncedChanges = true
-      }
-    }
-    if (hasTvUnsyncedChanges) {
-      logger.info('Uploading accumulated TV database changes...')
-      hasTvUnsyncedChanges = false
-      try {
-        await tvSyncUp(tvDb, remoteFolder)
-      } catch (err) {
-        logger.error({ err }, 'Failed to upload TV database changes')
-        hasTvUnsyncedChanges = true
-      }
-    }
-    if (hasAsmrUnsyncedChanges) {
-      logger.info('Uploading accumulated ASMR database changes...')
-      hasAsmrUnsyncedChanges = false
-      try {
-        await asmrSyncUp(asmrDb, remoteFolder)
-      } catch (err) {
-        logger.error({ err }, 'Failed to upload ASMR database changes')
-        hasAsmrUnsyncedChanges = true
+        logger.error({ err }, `Failed to upload ${kindDbLabel[kind]} changes`)
+        unsynced[kind] = true
       }
     }
   }, 300000)
@@ -404,52 +302,29 @@ async function main() {
     clearInterval(offlineDbInterval)
     discordRPCService.disconnect()
     discordGatewayService.shutdown()
-    await watcher.close()
-    await mangaWatcher.close()
-    await tvWatcher.close()
-    await asmrWatcher.close()
+    for (const watcher of watchers) {
+      await watcher.close()
+    }
 
     if (server) {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
 
-    if (hasUnsyncedChanges) {
-      logger.info('Sync on shutdown: uploading final database changes...')
-      hasUnsyncedChanges = false
-      try {
-        await syncUp(db, dbPath, remoteFolder)
-      } catch (e) {
-        logger.error({ err: e }, 'Final sync on shutdown failed')
-      }
+    const kindFinalError: Record<MediaKind, string> = {
+      anime: 'Final sync on shutdown failed',
+      manga: 'Final manga sync on shutdown failed',
+      tv: 'Final TV sync on shutdown failed',
+      asmr: 'Final ASMR sync on shutdown failed',
     }
 
-    if (hasMangaUnsyncedChanges) {
-      logger.info('Sync on shutdown: uploading final manga database changes...')
-      hasMangaUnsyncedChanges = false
+    for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
+      if (!unsynced[kind]) continue
+      logger.info(`Sync on shutdown: uploading final ${kindDbLabel[kind]} changes...`)
+      unsynced[kind] = false
       try {
-        await mangaSyncUp(mangaDb, remoteFolder)
+        await syncUp(kindDbs()[kind], kind, remoteFolder)
       } catch (e) {
-        logger.error({ err: e }, 'Final manga sync on shutdown failed')
-      }
-    }
-
-    if (hasTvUnsyncedChanges) {
-      logger.info('Sync on shutdown: uploading final TV database changes...')
-      hasTvUnsyncedChanges = false
-      try {
-        await tvSyncUp(tvDb, remoteFolder)
-      } catch (e) {
-        logger.error({ err: e }, 'Final TV sync on shutdown failed')
-      }
-    }
-
-    if (hasAsmrUnsyncedChanges) {
-      logger.info('Sync on shutdown: uploading final ASMR database changes...')
-      hasAsmrUnsyncedChanges = false
-      try {
-        await asmrSyncUp(asmrDb, remoteFolder)
-      } catch (e) {
-        logger.error({ err: e }, 'Final ASMR sync on shutdown failed')
+        logger.error({ err: e }, kindFinalError[kind])
       }
     }
 

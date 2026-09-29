@@ -38,48 +38,96 @@ export type MangaSyncPayload = SyncPayload<MangaSyncTable>
 export type TvSyncPayload = SyncPayload<TvSyncTable>
 export type AsmrSyncPayload = SyncPayload<AsmrSyncTable>
 
-async function exportSyncPayload(db: DatabaseWrapper): Promise<AnimeSyncPayload> {
-  return exportTables(db, SYNC_TABLES)
+export type MediaKind = 'anime' | 'manga' | 'tv' | 'asmr'
+
+export const MEDIA_KINDS: MediaKind[] = ['anime', 'manga', 'tv', 'asmr']
+
+export interface KindSyncDef {
+  mid: '' | 'manga ' | 'TV ' | 'ASMR '
+  Head: '' | 'Manga ' | 'TV ' | 'ASMR '
+  rcloneLabel: string
+  tables: readonly string[]
+  libraryTables: readonly string[]
+  backupName: string
+  manifestPath: string
+  rcloneFile: string
+  githubDown: (db: DatabaseWrapper) => Promise<number>
+  githubUp: (db: DatabaseWrapper) => Promise<void>
+  googleDown: (db: DatabaseWrapper) => Promise<number>
+  googleUp: (db: DatabaseWrapper) => Promise<void>
+  githubVersion: () => Promise<number>
+  googleVersion: () => Promise<number>
 }
 
-function importSyncPayload(db: DatabaseWrapper, payload: AnimeSyncPayload) {
-  importTables(db, SYNC_TABLES, payload, {
+function cap(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
+}
+
+export const KIND_SYNC: Record<MediaKind, KindSyncDef> = {
+  anime: {
+    mid: '',
+    Head: '',
+    rcloneLabel: 'rclone',
+    tables: SYNC_TABLES,
     libraryTables: ['watchlist', 'watched_episodes'],
     backupName: 'pre-sync-backup.db',
-  })
-}
-
-async function exportMangaSyncPayload(db: DatabaseWrapper): Promise<MangaSyncPayload> {
-  return exportTables(db, MANGA_SYNC_TABLES)
-}
-
-async function exportTvSyncPayload(db: DatabaseWrapper): Promise<TvSyncPayload> {
-  return exportTables(db, TV_SYNC_TABLES)
-}
-
-async function exportAsmrSyncPayload(db: DatabaseWrapper): Promise<AsmrSyncPayload> {
-  return exportTables(db, ASMR_SYNC_TABLES)
-}
-
-function importMangaSyncPayload(db: DatabaseWrapper, payload: MangaSyncPayload) {
-  importTables(db, MANGA_SYNC_TABLES, payload, {
+    manifestPath: CONFIG.LOCAL_MANIFEST_PATH,
+    rcloneFile: CONFIG.RCLONE_SYNC_FILENAME,
+    githubDown: (db) => githubSyncService.syncDown(db),
+    githubUp: (db) => githubSyncService.syncUp(db),
+    googleDown: (db) => googleDriveService.syncDown(db),
+    githubVersion: () => githubSyncService.getRemoteVersion(),
+    googleVersion: () => googleDriveService.getRemoteVersion(),
+    googleUp: (db) => googleDriveService.syncUp(db),
+  },
+  manga: {
+    mid: 'manga ',
+    Head: 'Manga ',
+    rcloneLabel: 'rclone manga',
+    tables: MANGA_SYNC_TABLES,
     libraryTables: ['manga_library', 'manga_progress'],
     backupName: 'pre-sync-manga-backup.db',
-  })
-}
-
-function importTvSyncPayload(db: DatabaseWrapper, payload: TvSyncPayload) {
-  importTables(db, TV_SYNC_TABLES, payload, {
+    manifestPath: CONFIG.MANGA_LOCAL_MANIFEST_PATH,
+    rcloneFile: CONFIG.MANGA_RCLONE_SYNC_FILENAME,
+    githubDown: (db) => githubSyncService.syncMangaDown(db),
+    githubUp: (db) => githubSyncService.syncMangaUp(db),
+    googleDown: (db) => googleDriveService.syncMangaDown(db),
+    githubVersion: () => githubSyncService.getMangaRemoteVersion(),
+    googleVersion: () => googleDriveService.getMangaRemoteVersion(),
+    googleUp: (db) => googleDriveService.syncMangaUp(db),
+  },
+  tv: {
+    mid: 'TV ',
+    Head: 'TV ',
+    rcloneLabel: 'rclone tv',
+    tables: TV_SYNC_TABLES,
     libraryTables: ['tv_library', 'tv_progress'],
     backupName: 'pre-sync-tv-backup.db',
-  })
-}
-
-function importAsmrSyncPayload(db: DatabaseWrapper, payload: AsmrSyncPayload) {
-  importTables(db, ASMR_SYNC_TABLES, payload, {
+    manifestPath: CONFIG.TV_LOCAL_MANIFEST_PATH,
+    rcloneFile: CONFIG.TV_RCLONE_SYNC_FILENAME,
+    githubDown: (db) => githubSyncService.syncTvDown(db),
+    githubUp: (db) => githubSyncService.syncTvUp(db),
+    googleDown: (db) => googleDriveService.syncTvDown(db),
+    githubVersion: () => githubSyncService.getTvRemoteVersion(),
+    googleVersion: () => googleDriveService.getTvRemoteVersion(),
+    googleUp: (db) => googleDriveService.syncTvUp(db),
+  },
+  asmr: {
+    mid: 'ASMR ',
+    Head: 'ASMR ',
+    rcloneLabel: 'rclone asmr',
+    tables: ASMR_SYNC_TABLES,
     libraryTables: ['asmr_library', 'asmr_progress'],
     backupName: 'pre-sync-asmr-backup.db',
-  })
+    manifestPath: CONFIG.ASMR_LOCAL_MANIFEST_PATH,
+    rcloneFile: CONFIG.ASMR_RCLONE_SYNC_FILENAME,
+    githubDown: (db) => githubSyncService.syncAsmrDown(db),
+    githubUp: (db) => githubSyncService.syncAsmrUp(db),
+    googleDown: (db) => googleDriveService.syncAsmrDown(db),
+    githubVersion: () => githubSyncService.getAsmrRemoteVersion(),
+    googleVersion: () => googleDriveService.getAsmrRemoteVersion(),
+    googleUp: (db) => googleDriveService.syncAsmrUp(db),
+  },
 }
 
 async function getRcloneRemotePayloadVersion(
@@ -103,14 +151,15 @@ async function getRcloneRemotePayloadVersion(
 
 async function rcloneSyncUp(
   db: DatabaseWrapper,
-  remoteFolder: string,
-  fileName: string = CONFIG.RCLONE_SYNC_FILENAME
+  kind: MediaKind,
+  remoteFolder: string
 ): Promise<void> {
-  const payload = await exportSyncPayload(db)
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_up.json`)
+  const def = KIND_SYNC[kind]
+  const payload = exportTables(db, def.tables)
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_${kind}_up.json`)
   try {
     await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, fileName)
+    await rcloneService.uploadFile(tempPath, remoteFolder, def.rcloneFile)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
   }
@@ -118,87 +167,19 @@ async function rcloneSyncUp(
 
 async function rcloneSyncDown(
   db: DatabaseWrapper,
-  remoteFolder: string,
-  fileName: string = CONFIG.RCLONE_SYNC_FILENAME
+  kind: MediaKind,
+  remoteFolder: string
 ): Promise<number> {
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_down.json`)
+  const def = KIND_SYNC[kind]
+  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_${kind}_down.json`)
   try {
-    await rcloneService.downloadFile(remoteFolder, fileName, tempPath)
+    await rcloneService.downloadFile(remoteFolder, def.rcloneFile, tempPath)
     const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = normalizePayload(JSON.parse(content), SYNC_TABLES, 'rclone') as AnimeSyncPayload
-    importSyncPayload(db, payload)
-    return readPayloadVersion(payload)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneMangaSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
-  const payload = await exportMangaSyncPayload(db)
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_up.json`)
-  try {
-    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.MANGA_RCLONE_SYNC_FILENAME)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneTvSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
-  const payload = await exportTvSyncPayload(db)
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_tv_up.json`)
-  try {
-    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneAsmrSyncUp(db: DatabaseWrapper, remoteFolder: string): Promise<void> {
-  const payload = await exportAsmrSyncPayload(db)
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_asmr_up.json`)
-  try {
-    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, CONFIG.ASMR_RCLONE_SYNC_FILENAME)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneMangaSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_manga_down.json`)
-  try {
-    await rcloneService.downloadFile(remoteFolder, CONFIG.MANGA_RCLONE_SYNC_FILENAME, tempPath)
-    const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = normalizePayload(JSON.parse(content), MANGA_SYNC_TABLES, 'rclone manga')
-    importMangaSyncPayload(db, payload)
-    return readPayloadVersion(payload)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneTvSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_tv_down.json`)
-  try {
-    await rcloneService.downloadFile(remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME, tempPath)
-    const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = normalizePayload(JSON.parse(content), TV_SYNC_TABLES, 'rclone tv')
-    importTvSyncPayload(db, payload)
-    return readPayloadVersion(payload)
-  } finally {
-    if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
-  }
-}
-
-async function rcloneAsmrSyncDown(db: DatabaseWrapper, remoteFolder: string): Promise<number> {
-  const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_asmr_down.json`)
-  try {
-    await rcloneService.downloadFile(remoteFolder, CONFIG.ASMR_RCLONE_SYNC_FILENAME, tempPath)
-    const content = await fs.readFile(tempPath, 'utf-8')
-    const payload = normalizePayload(JSON.parse(content), ASMR_SYNC_TABLES, 'rclone asmr')
-    importAsmrSyncPayload(db, payload)
+    const payload = normalizePayload(JSON.parse(content), def.tables, def.rcloneLabel)
+    importTables(db, def.tables, payload, {
+      libraryTables: def.libraryTables,
+      backupName: def.backupName,
+    })
     return readPayloadVersion(payload)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
@@ -299,10 +280,12 @@ export async function initSyncProvider(
   log.info('No sync provider available.')
 }
 
-export async function getLocalManifestVersion(): Promise<number> {
-  if (existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
+export async function getLocalManifestVersion(
+  manifestPath: string = CONFIG.LOCAL_MANIFEST_PATH
+): Promise<number> {
+  if (existsSync(manifestPath)) {
     try {
-      const content = await fs.readFile(CONFIG.LOCAL_MANIFEST_PATH, 'utf-8')
+      const content = await fs.readFile(manifestPath, 'utf-8')
       return JSON.parse(content).version || 0
     } catch {
       return 0
@@ -311,153 +294,51 @@ export async function getLocalManifestVersion(): Promise<number> {
   return 0
 }
 
-export async function setLocalManifestVersion(version: number): Promise<void> {
-  await fs.writeFile(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+export async function setLocalManifestVersion(
+  version: number,
+  manifestPath: string = CONFIG.LOCAL_MANIFEST_PATH
+): Promise<void> {
+  await fs.writeFile(manifestPath, JSON.stringify({ version }))
 }
 
-export async function getLocalMangaManifestVersion(): Promise<number> {
-  if (existsSync(CONFIG.MANGA_LOCAL_MANIFEST_PATH)) {
-    try {
-      const content = await fs.readFile(CONFIG.MANGA_LOCAL_MANIFEST_PATH, 'utf-8')
-      return JSON.parse(content).version || 0
-    } catch {
-      return 0
-    }
-  }
-  return 0
+export function getKindManifestVersion(kind: MediaKind): Promise<number> {
+  return getLocalManifestVersion(KIND_SYNC[kind].manifestPath)
 }
 
-export async function setLocalMangaManifestVersion(version: number): Promise<void> {
-  await fs.writeFile(CONFIG.MANGA_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
-}
-
-export async function getLocalTvManifestVersion(): Promise<number> {
-  if (existsSync(CONFIG.TV_LOCAL_MANIFEST_PATH)) {
-    try {
-      const content = await fs.readFile(CONFIG.TV_LOCAL_MANIFEST_PATH, 'utf-8')
-      return JSON.parse(content).version || 0
-    } catch {
-      return 0
-    }
-  }
-  return 0
-}
-
-export async function setLocalTvManifestVersion(version: number): Promise<void> {
-  await fs.writeFile(CONFIG.TV_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
-}
-
-export async function getLocalAsmrManifestVersion(): Promise<number> {
-  if (existsSync(CONFIG.ASMR_LOCAL_MANIFEST_PATH)) {
-    try {
-      const content = await fs.readFile(CONFIG.ASMR_LOCAL_MANIFEST_PATH, 'utf-8')
-      return JSON.parse(content).version || 0
-    } catch {
-      return 0
-    }
-  }
-  return 0
-}
-
-export async function setLocalAsmrManifestVersion(version: number): Promise<void> {
-  await fs.writeFile(CONFIG.ASMR_LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+export function setKindManifestVersion(kind: MediaKind, version: number): Promise<void> {
+  return setLocalManifestVersion(version, KIND_SYNC[kind].manifestPath)
 }
 
 async function getRemoteManifestVersion(
-  remoteFolder: string
+  remoteFolder: string,
+  kind: MediaKind = 'anime'
 ): Promise<{ version: number; fileId?: string }> {
+  const def = KIND_SYNC[kind]
+  const label = kind === 'anime' ? 'manifest' : `${def.mid.trim()} manifest`
   try {
     if (activeProvider === 'github') {
       if (!githubSyncService.isAuthenticated()) return { version: 0 }
-      return { version: await githubSyncService.getRemoteVersion() }
+      return { version: await def.githubVersion() }
     } else if (activeProvider === 'google') {
       if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      return { version: await googleDriveService.getRemoteVersion() }
+      return { version: await def.googleVersion() }
     } else if (activeProvider === 'rclone') {
-      return { version: await getRcloneRemotePayloadVersion(remoteFolder) }
+      return { version: await getRcloneRemotePayloadVersion(remoteFolder, def.rcloneFile) }
     }
   } catch (err) {
-    log.warn({ err }, 'Could not read remote manifest.')
-  }
-  return { version: 0 }
-}
-
-async function getMangaRemoteManifestVersion(
-  remoteFolder: string
-): Promise<{ version: number; fileId?: string }> {
-  try {
-    if (activeProvider === 'github') {
-      if (!githubSyncService.isAuthenticated()) return { version: 0 }
-      return { version: await githubSyncService.getMangaRemoteVersion() }
-    } else if (activeProvider === 'google') {
-      if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      return { version: await googleDriveService.getMangaRemoteVersion() }
-    } else if (activeProvider === 'rclone') {
-      return {
-        version: await getRcloneRemotePayloadVersion(
-          remoteFolder,
-          CONFIG.MANGA_RCLONE_SYNC_FILENAME
-        ),
-      }
-    }
-  } catch (err) {
-    log.warn({ err }, 'Could not read remote manga manifest.')
-  }
-  return { version: 0 }
-}
-
-async function getTvRemoteManifestVersion(
-  remoteFolder: string
-): Promise<{ version: number; fileId?: string }> {
-  try {
-    if (activeProvider === 'github') {
-      if (!githubSyncService.isAuthenticated()) return { version: 0 }
-      return { version: await githubSyncService.getTvRemoteVersion() }
-    } else if (activeProvider === 'google') {
-      if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      return { version: await googleDriveService.getTvRemoteVersion() }
-    } else if (activeProvider === 'rclone') {
-      return {
-        version: await getRcloneRemotePayloadVersion(remoteFolder, CONFIG.TV_RCLONE_SYNC_FILENAME),
-      }
-    }
-  } catch (err) {
-    log.warn({ err }, 'Could not read remote TV manifest.')
-  }
-  return { version: 0 }
-}
-
-async function getAsmrRemoteManifestVersion(
-  remoteFolder: string
-): Promise<{ version: number; fileId?: string }> {
-  try {
-    if (activeProvider === 'github') {
-      if (!githubSyncService.isAuthenticated()) return { version: 0 }
-      return { version: await githubSyncService.getAsmrRemoteVersion() }
-    } else if (activeProvider === 'google') {
-      if (!googleDriveService.isAuthenticated()) return { version: 0 }
-      return { version: await googleDriveService.getAsmrRemoteVersion() }
-    } else if (activeProvider === 'rclone') {
-      return {
-        version: await getRcloneRemotePayloadVersion(
-          remoteFolder,
-          CONFIG.ASMR_RCLONE_SYNC_FILENAME
-        ),
-      }
-    }
-  } catch (err) {
-    log.warn({ err }, 'Could not read remote ASMR manifest.')
+    log.warn({ err }, `Could not read remote ${label}.`)
   }
   return { version: 0 }
 }
 
 export async function syncDownOnBoot(
   db: DatabaseWrapper,
-  dbPath: string,
+  kind: MediaKind,
   remoteFolderName: string,
-  closeMainDb: () => Promise<void>
+  opts?: { dbPath: string; closeMainDb: () => Promise<void> }
 ): Promise<boolean> {
-  let localVersion = await getLocalManifestVersion()
+  const def = KIND_SYNC[kind]
+  let localVersion = await getKindManifestVersion(kind)
 
   if (localVersion === 0 && db) {
     const row = dbGet<{ value: number }>(
@@ -466,7 +347,7 @@ export async function syncDownOnBoot(
     )
     localVersion = row?.value ?? 0
     if (localVersion > 0) {
-      await setLocalManifestVersion(localVersion)
+      await setKindManifestVersion(kind, localVersion)
     }
   }
 
@@ -480,95 +361,97 @@ export async function syncDownOnBoot(
   isSyncing = true
 
   try {
-    notifySyncStart(`Initial sync check (${activeProvider})`)
-    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
+    notifySyncStart(`Initial ${def.mid}sync check (${activeProvider})`)
+    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName, kind)
     notifySyncEnd()
 
-    log.info(`Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
+    log.info(`${def.Head}Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
 
     if (remoteVersion > localVersion) {
       if (activeProvider === 'github') {
         if (!githubSyncService.isAuthenticated()) return false
-        notifySyncStart(`Importing GitHub sync data (Remote v${remoteVersion})`)
-        const importedVersion = await githubSyncService.syncDown(db)
-        await setLocalManifestVersion(importedVersion || remoteVersion)
+        notifySyncStart(`Importing GitHub ${def.mid}sync data (Remote v${remoteVersion})`)
+        const importedVersion = await def.githubDown(db)
+        await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
-        log.info('GitHub sync down complete.')
+        log.info(`GitHub ${def.mid}sync down complete.`)
         return false
       }
 
       if (activeProvider === 'google') {
         if (!googleDriveService.isAuthenticated()) return false
-        notifySyncStart(`Importing Google sync data (Remote v${remoteVersion})`)
-        const importedVersion = await googleDriveService.syncDown(db)
-        await setLocalManifestVersion(importedVersion || remoteVersion)
+        notifySyncStart(`Importing Google ${def.mid}sync data (Remote v${remoteVersion})`)
+        const importedVersion = await def.googleDown(db)
+        await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
-        log.info('Google sync down complete.')
+        log.info(`Google ${def.mid}sync down complete.`)
         return false
       }
 
       if (activeProvider === 'rclone') {
-        notifySyncStart(`Importing Rclone sync data (Remote v${remoteVersion})`)
-        const importedVersion = await rcloneSyncDown(db, remoteFolderName)
-        await setLocalManifestVersion(importedVersion || remoteVersion)
+        notifySyncStart(`Importing Rclone ${def.mid}sync data (Remote v${remoteVersion})`)
+        const importedVersion = await rcloneSyncDown(db, kind, remoteFolderName)
+        await setKindManifestVersion(kind, importedVersion || remoteVersion)
         notifySyncEnd()
-        log.info('Rclone sync down complete.')
+        log.info(`Rclone ${def.mid}sync down complete.`)
         return false
       }
 
-      notifySyncStart(`Downloading remote database (Remote v${remoteVersion})`)
-      await closeMainDb()
+      if (opts) {
+        notifySyncStart(`Downloading remote database (Remote v${remoteVersion})`)
+        await opts.closeMainDb()
 
-      const backupPath = `${dbPath}.bak`
-
-      try {
-        if (existsSync(dbPath)) {
-          await fs.copyFile(dbPath, backupPath)
-        }
+        const backupPath = `${opts.dbPath}.bak`
 
         try {
-          await fs.unlink(`${dbPath}-wal`)
-        } catch (e) {
-          void e
-        }
-        try {
-          await fs.unlink(`${dbPath}-shm`)
-        } catch (e) {
-          void e
-        }
-
-        log.warn('Legacy raw-db sync path reached with JSON providers. No action taken.')
-
-        if (existsSync(backupPath)) {
-          await fs.unlink(backupPath)
-        }
-
-        notifySyncEnd()
-        log.info('Sync down complete.')
-        return true
-      } catch (err) {
-        notifySyncEnd()
-        log.error({ err }, 'Sync down failed. Restoring backup.')
-        if (existsSync(backupPath)) {
-          try {
-            await fs.copyFile(backupPath, dbPath)
-            log.info('Backup restored successfully after failed sync down.')
-          } catch (restoreErr) {
-            log.error({ err: restoreErr }, 'Critical: restore from backup also failed.')
-            throw new Error('Sync down and restore both failed. Database may be corrupt.', {
-              cause: restoreErr,
-            })
+          if (existsSync(opts.dbPath)) {
+            await fs.copyFile(opts.dbPath, backupPath)
           }
+
+          try {
+            await fs.unlink(`${opts.dbPath}-wal`)
+          } catch (e) {
+            void e
+          }
+          try {
+            await fs.unlink(`${opts.dbPath}-shm`)
+          } catch (e) {
+            void e
+          }
+
+          log.warn('Legacy raw-db sync path reached with JSON providers. No action taken.')
+
+          if (existsSync(backupPath)) {
+            await fs.unlink(backupPath)
+          }
+
+          notifySyncEnd()
+          log.info('Sync down complete.')
+          return true
+        } catch (err) {
+          notifySyncEnd()
+          log.error({ err }, 'Sync down failed. Restoring backup.')
+          if (existsSync(backupPath)) {
+            try {
+              await fs.copyFile(backupPath, opts.dbPath)
+              log.info('Backup restored successfully after failed sync down.')
+            } catch (restoreErr) {
+              log.error({ err: restoreErr }, 'Critical: restore from backup also failed.')
+              throw new Error('Sync down and restore both failed. Database may be corrupt.', {
+                cause: restoreErr,
+              })
+            }
+          }
+          return true
         }
-        return true
       }
     } else {
-      log.info('Local DB is up to date.')
-      return false
+      log.info(`Local ${def.mid}DB is up to date.`)
     }
+    return false
   } catch (err) {
     notifySyncEnd()
-    log.error({ err }, 'Sync boot error.')
+    log.error({ err }, `${cap(`${def.mid}sync`)} boot error.`)
     return false
   } finally {
     isSyncing = false
@@ -578,9 +461,10 @@ export async function syncDownOnBoot(
 
 export async function syncUp(
   db: DatabaseWrapper,
-  dbPath: string,
+  kind: MediaKind,
   remoteFolderName: string
 ): Promise<void> {
+  const def = KIND_SYNC[kind]
   if (activeProvider === 'none') return
 
   await syncMutex.lock()
@@ -591,58 +475,110 @@ export async function syncUp(
   isSyncing = true
 
   try {
-    const localVersion = await getLocalManifestVersion()
-    notifySyncStart(`Syncing up (Local v${localVersion})`)
-
-    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
+    const localVersion = await getKindManifestVersion(kind)
+    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName, kind)
 
     if (localVersion > remoteVersion) {
+      notifySyncStart(`Syncing ${def.mid}up (Local v${localVersion})`)
       if (activeProvider === 'github') {
         if (!githubSyncService.isAuthenticated()) return
-        await githubSyncService.syncUp(db)
+        await def.githubUp(db)
       } else if (activeProvider === 'google') {
         if (!googleDriveService.isAuthenticated()) return
-        await googleDriveService.syncUp(db)
+        await def.googleUp(db)
       } else if (activeProvider === 'rclone') {
-        await rcloneSyncUp(db, remoteFolderName)
+        await rcloneSyncUp(db, kind, remoteFolderName)
       }
 
       notifySyncEnd()
-      log.info('Sync up complete.')
+      log.info(`${cap(`${def.mid}sync`)} up complete.`)
     } else {
-      notifySyncEnd()
-      log.info('No changes to sync up or remote is newer.')
+      log.info(`No ${def.mid}changes to sync up or remote is newer.`)
     }
   } catch (err) {
     notifySyncEnd()
-    log.error({ err }, 'Sync up failed.')
+    log.error({ err }, `${cap(`${def.mid}sync`)} up failed.`)
   } finally {
     isSyncing = false
     syncMutex.unlock()
   }
 }
 
-export async function performWriteTransaction(
-  db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => void
+export async function runFullSyncSequence(
+  dbs: {
+    db: DatabaseWrapper
+    mangaDb: DatabaseWrapper
+    tvDb: DatabaseWrapper
+    asmrDb: DatabaseWrapper
+  },
+  opts: {
+    dbPath: string
+    remoteFolder: string
+    preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
+    onAnimeDownloaded?: (db: DatabaseWrapper) => void
+  }
 ): Promise<void> {
-  db.serialize(() => {
-    runnable(db)
-    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+  await initSyncProvider(opts.preferredProvider)
+
+  if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
+    try {
+      await githubSyncService.migrateFromAniWebSync()
+    } catch (err) {
+      logger.error({ err }, 'GitHub sync migration from ani-web failed')
+    }
+  }
+
+  const didDownload = await syncDownOnBoot(dbs.db, 'anime', opts.remoteFolder, {
+    dbPath: opts.dbPath,
+    closeMainDb: () => {
+      return new Promise<void>((resolve) => {
+        if (dbs.db && !dbs.db.isClosedCheck()) {
+          dbs.db.checkpoint()
+          dbs.db.close(() => resolve())
+        } else {
+          resolve()
+        }
+      })
+    },
   })
 
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
+  let currentDb = dbs.db
+  if (didDownload) {
+    currentDb = await initializeDatabase(opts.dbPath)
+    opts.onAnimeDownloaded?.(currentDb)
+    logger.info('Database re-initialized after sync.')
+  }
 
-  await setLocalManifestVersion(newVersion)
+  try {
+    await syncUp(currentDb, 'anime', opts.remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'Sync up on boot failed')
+  }
+
+  const kinds: { kind: MediaKind; db: DatabaseWrapper }[] = [
+    { kind: 'manga', db: dbs.mangaDb },
+    { kind: 'tv', db: dbs.tvDb },
+    { kind: 'asmr', db: dbs.asmrDb },
+  ]
+  for (const { kind, db } of kinds) {
+    const def = KIND_SYNC[kind]
+    try {
+      await syncDownOnBoot(db, kind, opts.remoteFolder)
+    } catch (err) {
+      logger.error({ err }, `${def.Head}sync down on boot failed`)
+    }
+    try {
+      await syncUp(db, kind, opts.remoteFolder)
+    } catch (err) {
+      logger.error({ err }, `${def.Head}sync up on boot failed`)
+    }
+  }
 }
 
 export async function performWriteTransactionAsync(
   db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => Promise<void>
+  runnable: (tx: DatabaseWrapper) => Promise<void>,
+  setVersion: (version: number) => Promise<void> = (v) => setLocalManifestVersion(v)
 ): Promise<void> {
   await runTx(db, async (tx) => {
     await runnable(tx)
@@ -655,229 +591,28 @@ export async function performWriteTransactionAsync(
   )
   const newVersion = row?.value ?? 1
 
-  await setLocalManifestVersion(newVersion)
-}
-
-export async function performMangaWriteTransaction(
-  db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => void
-): Promise<void> {
-  db.serialize(() => {
-    runnable(db)
-    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalMangaManifestVersion(newVersion)
+  await setVersion(newVersion)
 }
 
 export async function performMangaWriteTransactionAsync(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => Promise<void>
 ): Promise<void> {
-  await runTx(db, async (tx) => {
-    await runnable(tx)
-    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalMangaManifestVersion(newVersion)
-}
-
-export async function performTvWriteTransaction(
-  db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => void
-): Promise<void> {
-  db.serialize(() => {
-    runnable(db)
-    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalTvManifestVersion(newVersion)
+  await performWriteTransactionAsync(db, runnable, (v) => setKindManifestVersion('manga', v))
 }
 
 export async function performTvWriteTransactionAsync(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => Promise<void>
 ): Promise<void> {
-  await runTx(db, async (tx) => {
-    await runnable(tx)
-    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalTvManifestVersion(newVersion)
-}
-
-export async function performAsmrWriteTransaction(
-  db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => void
-): Promise<void> {
-  db.serialize(() => {
-    runnable(db)
-    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalAsmrManifestVersion(newVersion)
+  await performWriteTransactionAsync(db, runnable, (v) => setKindManifestVersion('tv', v))
 }
 
 export async function performAsmrWriteTransactionAsync(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => Promise<void>
 ): Promise<void> {
-  await runTx(db, async (tx) => {
-    await runnable(tx)
-    tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-  })
-
-  const row = dbGet<{ value: number }>(
-    db,
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-  )
-  const newVersion = row?.value ?? 1
-
-  await setLocalAsmrManifestVersion(newVersion)
-}
-
-export async function mangaSyncDownOnBoot(
-  db: DatabaseWrapper,
-  remoteFolderName: string
-): Promise<void> {
-  let localVersion = await getLocalMangaManifestVersion()
-
-  if (localVersion === 0 && db) {
-    const row = dbGet<{ value: number }>(
-      db,
-      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-    )
-    localVersion = row?.value ?? 0
-    if (localVersion > 0) {
-      await setLocalMangaManifestVersion(localVersion)
-    }
-  }
-
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    notifySyncStart(`Initial manga sync check (${activeProvider})`)
-    const { version: remoteVersion } = await getMangaRemoteManifestVersion(remoteFolderName)
-    notifySyncEnd()
-
-    log.info(`Manga Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
-
-    if (remoteVersion > localVersion) {
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        notifySyncStart(`Importing GitHub manga sync data (Remote v${remoteVersion})`)
-        const importedVersion = await githubSyncService.syncMangaDown(db)
-        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('GitHub manga sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        notifySyncStart(`Importing Google manga sync data (Remote v${remoteVersion})`)
-        const importedVersion = await googleDriveService.syncMangaDown(db)
-        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Google manga sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'rclone') {
-        notifySyncStart(`Importing Rclone manga sync data (Remote v${remoteVersion})`)
-        const importedVersion = await rcloneMangaSyncDown(db, remoteFolderName)
-        await setLocalMangaManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Rclone manga sync down complete.')
-        return
-      }
-    } else {
-      log.info('Local manga DB is up to date.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'Manga sync boot error.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
-  }
-}
-
-export async function mangaSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    const localVersion = await getLocalMangaManifestVersion()
-    const { version: remoteVersion } = await getMangaRemoteManifestVersion(remoteFolderName)
-
-    if (localVersion > remoteVersion) {
-      notifySyncStart(`Syncing manga up (Local v${localVersion})`)
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        await githubSyncService.syncMangaUp(db)
-      } else if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        await googleDriveService.syncMangaUp(db)
-      } else if (activeProvider === 'rclone') {
-        await rcloneMangaSyncUp(db, remoteFolderName)
-      }
-
-      notifySyncEnd()
-      log.info('Manga sync up complete.')
-    } else {
-      log.info('No manga changes to sync up or remote is newer.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'Manga sync up failed.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
-  }
+  await performWriteTransactionAsync(db, runnable, (v) => setKindManifestVersion('asmr', v))
 }
 
 export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseWrapper> {
@@ -942,234 +677,6 @@ export async function initializeMangaDatabase(dbPath: string): Promise<DatabaseW
   } catch (err) {
     log.error({ err }, 'Manga database opening error')
     throw err
-  }
-}
-
-export async function tvSyncDownOnBoot(
-  db: DatabaseWrapper,
-  remoteFolderName: string
-): Promise<void> {
-  let localVersion = await getLocalTvManifestVersion()
-
-  if (localVersion === 0 && db) {
-    const row = dbGet<{ value: number }>(
-      db,
-      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-    )
-    localVersion = row?.value ?? 0
-    if (localVersion > 0) {
-      await setLocalTvManifestVersion(localVersion)
-    }
-  }
-
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    notifySyncStart(`Initial TV sync check (${activeProvider})`)
-    const { version: remoteVersion } = await getTvRemoteManifestVersion(remoteFolderName)
-    notifySyncEnd()
-
-    log.info(`TV Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
-
-    if (remoteVersion > localVersion) {
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        notifySyncStart(`Importing GitHub TV sync data (Remote v${remoteVersion})`)
-        const importedVersion = await githubSyncService.syncTvDown(db)
-        await setLocalTvManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('GitHub TV sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        notifySyncStart(`Importing Google TV sync data (Remote v${remoteVersion})`)
-        const importedVersion = await googleDriveService.syncTvDown(db)
-        await setLocalTvManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Google TV sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'rclone') {
-        notifySyncStart(`Importing Rclone TV sync data (Remote v${remoteVersion})`)
-        const importedVersion = await rcloneTvSyncDown(db, remoteFolderName)
-        await setLocalTvManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Rclone TV sync down complete.')
-        return
-      }
-    } else {
-      log.info('Local TV DB is up to date.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'TV sync boot error.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
-  }
-}
-
-export async function tvSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    const localVersion = await getLocalTvManifestVersion()
-    const { version: remoteVersion } = await getTvRemoteManifestVersion(remoteFolderName)
-
-    if (localVersion > remoteVersion) {
-      notifySyncStart(`Syncing TV up (Local v${localVersion})`)
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        await githubSyncService.syncTvUp(db)
-      } else if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        await googleDriveService.syncTvUp(db)
-      } else if (activeProvider === 'rclone') {
-        await rcloneTvSyncUp(db, remoteFolderName)
-      }
-
-      notifySyncEnd()
-      log.info('TV sync up complete.')
-    } else {
-      log.info('No TV changes to sync up or remote is newer.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'TV sync up failed.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
-  }
-}
-
-export async function asmrSyncDownOnBoot(
-  db: DatabaseWrapper,
-  remoteFolderName: string
-): Promise<void> {
-  let localVersion = await getLocalAsmrManifestVersion()
-
-  if (localVersion === 0 && db) {
-    const row = dbGet<{ value: number }>(
-      db,
-      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
-    )
-    localVersion = row?.value ?? 0
-    if (localVersion > 0) {
-      await setLocalAsmrManifestVersion(localVersion)
-    }
-  }
-
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    notifySyncStart(`Initial ASMR sync check (${activeProvider})`)
-    const { version: remoteVersion } = await getAsmrRemoteManifestVersion(remoteFolderName)
-    notifySyncEnd()
-
-    log.info(`ASMR Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
-
-    if (remoteVersion > localVersion) {
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        notifySyncStart(`Importing GitHub ASMR sync data (Remote v${remoteVersion})`)
-        const importedVersion = await githubSyncService.syncAsmrDown(db)
-        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('GitHub ASMR sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        notifySyncStart(`Importing Google ASMR sync data (Remote v${remoteVersion})`)
-        const importedVersion = await googleDriveService.syncAsmrDown(db)
-        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Google ASMR sync down complete.')
-        return
-      }
-
-      if (activeProvider === 'rclone') {
-        notifySyncStart(`Importing Rclone ASMR sync data (Remote v${remoteVersion})`)
-        const importedVersion = await rcloneAsmrSyncDown(db, remoteFolderName)
-        await setLocalAsmrManifestVersion(importedVersion || remoteVersion)
-        notifySyncEnd()
-        log.info('Rclone ASMR sync down complete.')
-        return
-      }
-    } else {
-      log.info('Local ASMR DB is up to date.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'ASMR sync boot error.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
-  }
-}
-
-export async function asmrSyncUp(db: DatabaseWrapper, remoteFolderName: string): Promise<void> {
-  if (activeProvider === 'none') return
-
-  await syncMutex.lock()
-  if (isSyncing) {
-    syncMutex.unlock()
-    return
-  }
-  isSyncing = true
-
-  try {
-    const localVersion = await getLocalAsmrManifestVersion()
-    const { version: remoteVersion } = await getAsmrRemoteManifestVersion(remoteFolderName)
-
-    if (localVersion > remoteVersion) {
-      notifySyncStart(`Syncing ASMR up (Local v${localVersion})`)
-      if (activeProvider === 'github') {
-        if (!githubSyncService.isAuthenticated()) return
-        await githubSyncService.syncAsmrUp(db)
-      } else if (activeProvider === 'google') {
-        if (!googleDriveService.isAuthenticated()) return
-        await googleDriveService.syncAsmrUp(db)
-      } else if (activeProvider === 'rclone') {
-        await rcloneAsmrSyncUp(db, remoteFolderName)
-      }
-
-      notifySyncEnd()
-      log.info('ASMR sync up complete.')
-    } else {
-      log.info('No ASMR changes to sync up or remote is newer.')
-    }
-  } catch (err) {
-    notifySyncEnd()
-    log.error({ err }, 'ASMR sync up failed.')
-  } finally {
-    isSyncing = false
-    syncMutex.unlock()
   }
 }
 

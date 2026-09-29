@@ -3,19 +3,7 @@ import logger from '../../logger.js'
 import { googleDriveService } from '../../google.js'
 import { githubSyncService } from '../../github-sync.js'
 import type { DatabaseWrapper } from '../../db.js'
-import {
-  initSyncProvider,
-  getActiveProvider,
-  syncDownOnBoot,
-  syncUp,
-  mangaSyncDownOnBoot,
-  mangaSyncUp,
-  tvSyncDownOnBoot,
-  tvSyncUp,
-  asmrSyncDownOnBoot,
-  asmrSyncUp,
-  initializeDatabase,
-} from '../../sync.js'
+import { initSyncProvider, getActiveProvider, runFullSyncSequence } from '../../sync.js'
 import { CONFIG } from '../../config.js'
 import { rcloneService } from '../../rclone.js'
 import { updateEnvFile } from '../../utils/env.utils.js'
@@ -34,74 +22,10 @@ async function runSyncFromCtx(
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
-  await initSyncProvider(preferredProvider)
-
-  if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
-    try {
-      await githubSyncService.migrateFromAniWebSync()
-    } catch (err) {
-      logger.error({ err }, 'GitHub sync migration from ani-web failed')
-    }
-  }
-
-  const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
-    return new Promise<void>((resolve) => {
-      if (database && !database.isClosedCheck()) {
-        database.checkpoint()
-        database.close(() => resolve())
-      } else {
-        resolve()
-      }
-    })
-  })
-
-  let currentDb = database
-  if (didDownload) {
-    currentDb = await initializeDatabase(dbPath)
-    logger.info('Database re-initialized after sync.')
-  }
-
-  try {
-    await syncUp(currentDb, dbPath, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Sync up on boot failed')
-  }
-
-  try {
-    await mangaSyncDownOnBoot(ctx.mangaDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Manga sync down on boot failed')
-  }
-
-  try {
-    await mangaSyncUp(ctx.mangaDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'Manga sync up on boot failed')
-  }
-
-  try {
-    await tvSyncDownOnBoot(ctx.tvDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'TV sync down on boot failed')
-  }
-
-  try {
-    await tvSyncUp(ctx.tvDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'TV sync up on boot failed')
-  }
-
-  try {
-    await asmrSyncDownOnBoot(ctx.asmrDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'ASMR sync down on boot failed')
-  }
-
-  try {
-    await asmrSyncUp(ctx.asmrDb, remoteFolder)
-  } catch (err) {
-    logger.error({ err }, 'ASMR sync up on boot failed')
-  }
+  await runFullSyncSequence(
+    { db: database, mangaDb: ctx.mangaDb, tvDb: ctx.tvDb, asmrDb: ctx.asmrDb },
+    { dbPath, remoteFolder, preferredProvider }
+  )
 }
 
 const googleAuthSaveInput = () =>
