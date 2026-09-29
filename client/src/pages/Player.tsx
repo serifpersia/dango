@@ -1941,6 +1941,7 @@ const Player: React.FC = () => {
                     onVolumeChange={actions.onVolumeChange}
                     onWaiting={actions.onWaiting}
                     onPlaying={actions.onPlaying}
+                    onCanPlay={actions.onCanPlay}
                     onError={handleVideoSourceError}
                     onContextMenu={(e) => e.preventDefault()}
                     className={canvasPresentationActive ? styles.videoElementHidden : ''}

@@ -82,7 +82,6 @@ import {
 } from './lib/mal-import.js'
 import { registerMusic } from './hono/music.js'
 import { registerAuth, type RunSyncSequence } from './hono/auth.js'
-import { registerWatchlist } from './hono/watchlist.js'
 import { type JasmrApi } from './hono/asmr.js'
 import { registerTv } from './hono/tv.js'
 import { registerProxy } from './hono/proxy.js'
@@ -812,7 +811,6 @@ export function createHonoApp(
 
   registerMusic(app)
   registerAuth(app, getDbs, runSync)
-  registerWatchlist(app, getDbs)
   registerTv(app, media.getApiCache, media.getTvProvider)
   registerProxy(app)
 

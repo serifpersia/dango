@@ -12,6 +12,7 @@ import {
 } from '../../hooks/useAsmrLibrary'
 import { buildAsmrId } from '../../lib/asmr'
 import { trpcClient } from '../../lib/trpc'
+import { clearDiscordPresence } from '../../lib/trpcBeacon'
 import { formatTime } from '../../lib/utils'
 import { loadHls } from '../../lib/hls'
 import type Hls from 'hls.js'
@@ -311,33 +312,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
 
   useEffect(() => {
     const sid = sessionIdRef.current
-    const clearAsmrPresence = () => {
-      if (!sid) return
-      const payload = JSON.stringify({ sessionId: sid })
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          '/api/discord/clear',
-          new Blob([payload], { type: 'application/json' })
-        )
-        navigator.sendBeacon(
-          '/api/discord/heartbeat',
-          new Blob([JSON.stringify({ sessionId: sid, bye: true })], { type: 'application/json' })
-        )
-      } else {
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {})
-        fetch('/api/discord/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sid, bye: true }),
-          keepalive: true,
-        }).catch(() => {})
-      }
-    }
+    const clearAsmrPresence = () => clearDiscordPresence(sid)
 
     const handlePageHide = () => clearAsmrPresence()
     const handleVisibility = () => {

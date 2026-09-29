@@ -2,8 +2,8 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 import { formatTime } from '../lib/utils'
-import { fetchApi } from '../lib/fetchApi'
-import { useTRPC } from '../lib/trpc'
+import { trpcClient, useTRPC } from '../lib/trpc'
+import { clearDiscordPresence, trpcKeepalive } from '../lib/trpcBeacon'
 import { loadSubtitleStyle, type SubtitleEdge } from '../lib/subtitleStyle'
 import {
   toggleFullscreen as toggleFullscreenCrossBrowser,
@@ -165,10 +165,7 @@ const useVideoPlayer = ({
 
       const saveProgress = async () => {
         try {
-          await fetchApi('/api/update-progress', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          })
+          await trpcClient.progress.updateProgress.mutate(payload)
           queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
           queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
           queryClient.invalidateQueries({ queryKey: ['thisWeekSchedule'] })
@@ -181,11 +178,9 @@ const useVideoPlayer = ({
       if (isFinalUpdate) {
         saveProgress()
       } else {
-        fetchApi('/api/update-progress', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch((err) => console.error('Failed to update progress:', err))
+        trpcKeepalive('progress.updateProgress', payload).catch((err) =>
+          console.error('Failed to update progress:', err)
+        )
       }
 
       return true
@@ -502,16 +497,49 @@ const useVideoPlayer = ({
     setTimeout(() => sendProgressUpdate(false, true), 50)
   }, [sendProgressUpdate])
   const onPlaying = useCallback(() => {
+    setIsPlaying(true)
     setIsBuffering(false)
   }, [])
   const onWaiting = useCallback(() => {
+    const video = videoRef.current
+    if (video && !video.paused && video.readyState >= 3 && !video.seeking) return
     setIsBuffering(true)
+  }, [])
+  const onCanPlay = useCallback(() => {
+    setIsBuffering(false)
   }, [])
   const onPause = useCallback(() => {
     setIsPlaying(false)
+    setIsBuffering(false)
     setShowControls(true)
     setTimeout(() => sendProgressUpdate(false, true), 50)
   }, [sendProgressUpdate])
+
+  const isBufferingRef = useRef(false)
+  isBufferingRef.current = isBuffering
+
+  useEffect(() => {
+    if (!isBuffering) return
+    let lastTime = videoRef.current?.currentTime ?? 0
+    let checks = 0
+    const timer = window.setInterval(() => {
+      const video = videoRef.current
+      if (!video) return
+      checks += 1
+      const current = video.currentTime
+      const advanced = current !== lastTime
+      lastTime = current
+      if (video.paused || video.seeking) return
+      if (advanced || video.readyState >= 3) {
+        setIsBuffering(false)
+        return
+      }
+      if (checks >= 24 && video.readyState >= 2 && !video.ended) {
+        setIsBuffering(false)
+      }
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [isBuffering])
 
   useEffect(() => {
     hasEnded.current = false
@@ -530,9 +558,7 @@ const useVideoPlayer = ({
   useEffect(() => {
     const sessionId = sessionIdRef.current
     return () => {
-      const payload = JSON.stringify({ sessionId })
-      const blob = new Blob([payload], { type: 'application/json' })
-      navigator.sendBeacon('/api/discord/clear', blob)
+      clearDiscordPresence(sessionId)
     }
   }, [showId, episodeNumber])
 
@@ -568,6 +594,9 @@ const useVideoPlayer = ({
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current
     if (!video) return
+    if (isBufferingRef.current && !video.paused && !video.seeking) {
+      setIsBuffering(false)
+    }
     const time = video.currentTime || 0
     const now = Date.now()
     if (now - lastThrottledUpdateTime.current > 60000) {
@@ -596,10 +625,8 @@ const useVideoPlayer = ({
 
     payload.currentTime = payload.duration
 
-    fetchApi('/api/update-progress', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    trpcClient.progress.updateProgress
+      .mutate(payload)
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
         queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
@@ -613,7 +640,7 @@ const useVideoPlayer = ({
   }, [reportFinalProgress])
 
   useEffect(() => {
-    const handleDocumentMouseUp = () => {
+    const handleScrubEnd = () => {
       if (isScrubbing) {
         setIsScrubbing(false)
         setHoverTime({ time: 0, position: null })
@@ -624,10 +651,18 @@ const useVideoPlayer = ({
       }
     }
     if (isScrubbing) {
-      document.addEventListener('mouseup', handleDocumentMouseUp)
+      document.addEventListener('mouseup', handleScrubEnd)
+      document.addEventListener('pointerup', handleScrubEnd)
+      document.addEventListener('touchend', handleScrubEnd)
+      document.addEventListener('pointercancel', handleScrubEnd)
+      document.addEventListener('touchcancel', handleScrubEnd)
     }
     return () => {
-      document.removeEventListener('mouseup', handleDocumentMouseUp)
+      document.removeEventListener('mouseup', handleScrubEnd)
+      document.removeEventListener('pointerup', handleScrubEnd)
+      document.removeEventListener('touchend', handleScrubEnd)
+      document.removeEventListener('pointercancel', handleScrubEnd)
+      document.removeEventListener('touchcancel', handleScrubEnd)
     }
   }, [isScrubbing, sendProgressUpdate])
 
@@ -667,6 +702,7 @@ const useVideoPlayer = ({
       setIsFullscreen,
       onWaiting,
       onPlaying,
+      onCanPlay,
       sendProgressUpdate,
       setUseNativeControls,
       resetMediaState,
@@ -686,6 +722,7 @@ const useVideoPlayer = ({
       setIsFullscreen,
       onWaiting,
       onPlaying,
+      onCanPlay,
       sendProgressUpdate,
       setUseNativeControls,
       resetMediaState,

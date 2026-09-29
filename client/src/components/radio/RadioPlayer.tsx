@@ -4,6 +4,7 @@ import Icon from '../common/Icon'
 import type { RadioStation, ListenMoeNowPlaying } from '../../hooks/useRadio'
 import { songArt, songArtist } from '../../hooks/useRadio'
 import { trpcClient } from '../../lib/trpc'
+import { clearDiscordPresence } from '../../lib/trpcBeacon'
 import styles from '../asmr/Asmr.module.css'
 import radioStyles from './Radio.module.css'
 
@@ -128,33 +129,7 @@ const RadioPlayer: React.FC<RadioPlayerProps> = ({
 
   useEffect(() => {
     const sid = sessionIdRef.current
-    const clearPresence = () => {
-      if (!sid) return
-      const payload = JSON.stringify({ sessionId: sid })
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          '/api/discord/clear',
-          new Blob([payload], { type: 'application/json' })
-        )
-        navigator.sendBeacon(
-          '/api/discord/heartbeat',
-          new Blob([JSON.stringify({ sessionId: sid, bye: true })], { type: 'application/json' })
-        )
-      } else {
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {})
-        fetch('/api/discord/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sid, bye: true }),
-          keepalive: true,
-        }).catch(() => {})
-      }
-    }
+    const clearPresence = () => clearDiscordPresence(sid)
 
     const handlePageHide = () => clearPresence()
     const handleVisibility = () => {

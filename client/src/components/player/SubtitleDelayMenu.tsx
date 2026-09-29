@@ -14,8 +14,8 @@ interface SubtitleDelayMenuProps {
   onDelayChange: (ms: number) => void
 }
 
-const SUBTITLE_DELAY_MIN_MS = -10000
-const SUBTITLE_DELAY_MAX_MS = 10000
+const SUBTITLE_DELAY_MIN_MS = -60000
+const SUBTITLE_DELAY_MAX_MS = 60000
 const SUBTITLE_DELAY_STEP_MS = 500
 
 const SubtitleDelayMenu: React.FC<SubtitleDelayMenuProps> = ({

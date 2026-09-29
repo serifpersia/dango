@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 import { useSetting } from './useSettings'
 import { trpcClient } from '../lib/trpc'
+import { trpcBeacon } from '../lib/trpcBeacon'
 
 export function useDiscordPageStatus() {
   const location = useLocation()
@@ -24,10 +25,7 @@ export function useDiscordPageStatus() {
     const interval = setInterval(heartbeat, 15000)
 
     const handlePageHide = () => {
-      navigator.sendBeacon(
-        '/api/discord/heartbeat',
-        new Blob([JSON.stringify({ sessionId, bye: true })], { type: 'application/json' })
-      )
+      trpcBeacon('discord.heartbeat', { sessionId, bye: true })
     }
     window.addEventListener('pagehide', handlePageHide)
 

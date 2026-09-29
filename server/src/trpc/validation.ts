@@ -51,6 +51,19 @@ export function optStr(obj: Record<string, unknown>, name: string): string | und
   return String(value)
 }
 
+export function optNum(obj: Record<string, unknown>, name: string): number | undefined {
+  const value = obj[name]
+  if (value === undefined || value === null || value === '') return undefined
+  const num = Number(value)
+  return Number.isFinite(num) ? num : undefined
+}
+
+export function optBool(obj: Record<string, unknown>, name: string): boolean | undefined {
+  const value = obj[name]
+  if (typeof value !== 'boolean') return undefined
+  return value
+}
+
 function reqEpNum(obj: Record<string, unknown>, name: string): string {
   const value = obj[name]
   if ((typeof value !== 'string' && typeof value !== 'number') || String(value).length === 0) {
@@ -225,6 +238,65 @@ export const setSettingInput = () =>
   defineSchema<{ key: string; value: unknown }, { key: string; value: unknown }>((value) => {
     if (typeof value !== 'object' || value === null) throw new Error('Expected an object')
     return { key: readKey(value), value: (value as Record<string, unknown>).value }
+  })
+
+export type ProgressUpdateInput = {
+  showId: string
+  episodeNumber: string
+  currentTime?: number
+  duration?: number
+  showName?: string
+  showThumbnail?: string
+  nativeName?: string
+  englishName?: string
+  genres?: string | string[]
+  popularityScore?: number
+  type?: string
+  status?: string
+  episodeCount?: number
+  isPlaying?: boolean
+  sessionId?: string
+  isAdult?: boolean
+}
+
+export const progressUpdateInput = () =>
+  defineSchema<ProgressUpdateInput, ProgressUpdateInput>((value) => {
+    const obj = reqObj(value)
+    const out: ProgressUpdateInput = {
+      showId: reqStr(obj, 'showId'),
+      episodeNumber: reqEpNum(obj, 'episodeNumber'),
+    }
+    const currentTime = optNum(obj, 'currentTime')
+    if (currentTime !== undefined) out.currentTime = currentTime
+    const duration = optNum(obj, 'duration')
+    if (duration !== undefined) out.duration = duration
+    const showName = optStr(obj, 'showName')
+    if (showName !== undefined) out.showName = showName
+    const showThumbnail = optStr(obj, 'showThumbnail')
+    if (showThumbnail !== undefined) out.showThumbnail = showThumbnail
+    const nativeName = optStr(obj, 'nativeName')
+    if (nativeName !== undefined) out.nativeName = nativeName
+    const englishName = optStr(obj, 'englishName')
+    if (englishName !== undefined) out.englishName = englishName
+    const genres = obj['genres']
+    if (typeof genres === 'string' || Array.isArray(genres)) {
+      out.genres = (Array.isArray(genres) ? genres : [genres]).map(String)
+    }
+    const popularityScore = optNum(obj, 'popularityScore')
+    if (popularityScore !== undefined) out.popularityScore = popularityScore
+    const type = optStr(obj, 'type')
+    if (type !== undefined) out.type = type
+    const status = optStr(obj, 'status')
+    if (status !== undefined) out.status = status
+    const episodeCount = optNum(obj, 'episodeCount')
+    if (episodeCount !== undefined) out.episodeCount = episodeCount
+    const isPlaying = optBool(obj, 'isPlaying')
+    if (isPlaying !== undefined) out.isPlaying = isPlaying
+    const sessionId = optStr(obj, 'sessionId')
+    if (sessionId !== undefined) out.sessionId = sessionId
+    const isAdult = optBool(obj, 'isAdult')
+    if (isAdult !== undefined) out.isAdult = isAdult
+    return out
   })
 
 export type NotificationDismissInput = { showId: string; episodeNumber: string }

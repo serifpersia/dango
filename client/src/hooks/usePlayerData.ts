@@ -9,7 +9,6 @@ import type {
   PlayerState,
 } from '../types/player'
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
-import { fetchApi } from '../lib/fetchApi'
 import { trpcClient, useTRPC } from '../lib/trpc'
 import { normalizeScore } from '../lib/utils'
 import { useShowMeta } from './useShowMeta'
@@ -411,25 +410,21 @@ export const usePlayerData = (
       showMeta: DetailedShowMeta
       episodes: string[]
     }) => {
-      await fetchApi('/api/update-progress', {
-        method: 'POST',
-        body: JSON.stringify({
-          showId,
-          episodeNumber,
-          currentTime: duration,
-          duration: duration,
-          showName: showMeta.name,
-          showThumbnail: showMeta.thumbnail,
-          nativeName: showMeta.names?.native,
-          englishName: showMeta.names?.english,
-          genres: showMeta.genres?.map((genre) => genre.name),
-          popularityScore: normalizeScore(showMeta.score ?? showMeta.stats?.averageScore),
-          type: showMeta.type,
-          status: showMeta.status,
-          episodeCount: episodes.length,
-          isAdult: showMeta.isAdult,
-        }),
-        keepalive: true,
+      await trpcClient.progress.updateProgress.mutate({
+        showId,
+        episodeNumber,
+        currentTime: duration,
+        duration: duration,
+        showName: showMeta.name,
+        showThumbnail: showMeta.thumbnail,
+        nativeName: showMeta.names?.native,
+        englishName: showMeta.names?.english,
+        genres: showMeta.genres?.map((genre) => genre.name),
+        popularityScore: normalizeScore(showMeta.score ?? showMeta.stats?.averageScore),
+        type: showMeta.type,
+        status: showMeta.status,
+        episodeCount: episodes.length,
+        isAdult: showMeta.isAdult,
       })
     },
     onSuccess: (data, variables) => {

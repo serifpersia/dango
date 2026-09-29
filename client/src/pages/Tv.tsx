@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpcClient } from '../lib/trpc'
+import { clearDiscordPresence } from '../lib/trpcBeacon'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
@@ -250,7 +251,7 @@ const Tv: React.FC = () => {
   const [subtitleDelayMs, setSubtitleDelayMs] = useState<number>(() => {
     try {
       const stored = Number(localStorage.getItem('tvSubtitleDelayMs'))
-      if (Number.isFinite(stored) && stored >= -10000 && stored <= 10000) return Math.round(stored)
+      if (Number.isFinite(stored) && stored >= -60000 && stored <= 60000) return Math.round(stored)
     } catch {
       // ignore
     }
@@ -259,7 +260,7 @@ const Tv: React.FC = () => {
   const subtitleDelayMsRef = useRef(subtitleDelayMs)
   subtitleDelayMsRef.current = subtitleDelayMs
   const handleSubtitleDelayChange = useCallback((ms: number) => {
-    const clamped = Math.max(-10000, Math.min(10000, Math.round(ms)))
+    const clamped = Math.max(-60000, Math.min(60000, Math.round(ms)))
     if (subtitleDelayMsRef.current === clamped) return
     subtitleDelayMsRef.current = clamped
     setSubtitleDelayMs(clamped)
@@ -1945,26 +1946,7 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     const sid = discordSessionRef.current
-    const clearTvPresence = () => {
-      const payload = JSON.stringify({ sessionId: sid })
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          '/api/discord/clear',
-          new Blob([payload], { type: 'application/json' })
-        )
-        navigator.sendBeacon(
-          '/api/discord/heartbeat',
-          new Blob([JSON.stringify({ sessionId: sid, bye: true })], { type: 'application/json' })
-        )
-      } else {
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {})
-      }
-    }
+    const clearTvPresence = () => clearDiscordPresence(sid)
     const handlePageHide = () => clearTvPresence()
     window.addEventListener('pagehide', handlePageHide)
     window.addEventListener('beforeunload', handlePageHide)
@@ -2166,6 +2148,7 @@ const Tv: React.FC = () => {
                     onVolumeChange={player.actions.onVolumeChange}
                     onWaiting={player.actions.onWaiting}
                     onPlaying={player.actions.onPlaying}
+                    onCanPlay={player.actions.onCanPlay}
                     onContextMenu={(e) => e.preventDefault()}
                     onError={() => {
                       setStreamError('Video failed to load. Try another server or reload.')

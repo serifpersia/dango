@@ -3,6 +3,7 @@ import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
 import type { MusicTrack } from '../../hooks/useMusic'
 import { trpcClient } from '../../lib/trpc'
+import { clearDiscordPresence } from '../../lib/trpcBeacon'
 import styles from '../asmr/Asmr.module.css'
 import radioStyles from '../radio/Radio.module.css'
 
@@ -70,35 +71,38 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const src = `/api/music/audio?videoId=${encodeURIComponent(track.id)}`
 
-  const cancelRetry = () => {
+  const cancelRetry = React.useCallback(() => {
     if (retryTimerRef.current) {
       window.clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
     }
-  }
+  }, [])
 
-  const loadSrc = (resumePos: number) => {
-    const audio = audioRef.current
-    if (!audio) return
-    cancelRetry()
-    setLoading(true)
-    setFailed(false)
-    const onMeta = () => {
-      audio.removeEventListener('loadedmetadata', onMeta)
-      if (resumePos > 5 && Number.isFinite(audio.duration) && resumePos < audio.duration - 5) {
-        try {
-          audio.currentTime = resumePos
-        } catch {
-          // ignore
+  const loadSrc = React.useCallback(
+    (resumePos: number) => {
+      const audio = audioRef.current
+      if (!audio) return
+      cancelRetry()
+      setLoading(true)
+      setFailed(false)
+      const onMeta = () => {
+        audio.removeEventListener('loadedmetadata', onMeta)
+        if (resumePos > 5 && Number.isFinite(audio.duration) && resumePos < audio.duration - 5) {
+          try {
+            audio.currentTime = resumePos
+          } catch {
+            // ignore
+          }
         }
       }
-    }
-    audio.addEventListener('loadedmetadata', onMeta)
-    audio.src = src
-    audio.load()
-    audio.volume = volumeRef.current
-    audio.play().catch(() => {})
-  }
+      audio.addEventListener('loadedmetadata', onMeta)
+      audio.src = src
+      audio.load()
+      audio.volume = volumeRef.current
+      audio.play().catch(() => {})
+    },
+    [src, cancelRetry]
+  )
 
   const giveUp = () => {
     setLoading(false)
@@ -137,8 +141,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
       cancelRetry()
       if (audio) audio.removeAttribute('src')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src])
+  }, [loadSrc, cancelRetry])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -183,33 +186,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   useEffect(() => {
     const sid = sessionIdRef.current
-    const clearPresence = () => {
-      if (!sid) return
-      const payload = JSON.stringify({ sessionId: sid })
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          '/api/discord/clear',
-          new Blob([payload], { type: 'application/json' })
-        )
-        navigator.sendBeacon(
-          '/api/discord/heartbeat',
-          new Blob([JSON.stringify({ sessionId: sid, bye: true })], { type: 'application/json' })
-        )
-      } else {
-        fetch('/api/discord/clear', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {})
-        fetch('/api/discord/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sid, bye: true }),
-          keepalive: true,
-        }).catch(() => {})
-      }
-    }
+    const clearPresence = () => clearDiscordPresence(sid)
 
     const handlePageHide = () => clearPresence()
     const handleVisibility = () => {

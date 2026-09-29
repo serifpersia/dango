@@ -1,8 +1,5 @@
-import type { Hono } from 'hono'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
-import type { HonoDbs } from '../app-hono.js'
-import { performWriteTransactionAsync } from '../sync.js'
 import { WatchlistRepository } from '../repositories/watchlist.repository.js'
 import {
   WatchedEpisodesRepository,
@@ -11,10 +8,8 @@ import {
 } from '../repositories/watched-episodes.repository.js'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
 import { NotificationsRepository } from '../repositories/notifications.repository.js'
-import { QueueRepository } from '../repositories/queue.repository.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
-import { discordRPCService } from '../discord-rpc.js'
-import { dbAll, dbGet } from '../utils/db-utils.js'
+import { dbAll } from '../utils/db-utils.js'
 import {
   searchAnilist,
   searchAnilistByTitle,
@@ -25,7 +20,6 @@ import {
   batchGetShowStatuses,
 } from '../lib/anilist.js'
 import { kitsuSearchAnime } from '../lib/kitsu.js'
-import { getMigratedId } from '../lib/migration.js'
 import { offlineDb } from '../lib/offline-db.js'
 import { parseJsonBody } from '../utils/http.utils.js'
 import { pickBestMatch } from '../providers/title-matching.js'
@@ -839,147 +833,4 @@ export async function getDlsitePoster(rjCode: string): Promise<string | null> {
   } catch {
     return null
   }
-}
-
-interface ProgressBody {
-  showId?: unknown
-  episodeNumber?: unknown
-  currentTime?: unknown
-  duration?: unknown
-  showName?: unknown
-  showThumbnail?: unknown
-  nativeName?: unknown
-  englishName?: unknown
-  genres?: unknown
-  popularityScore?: unknown
-  type?: unknown
-  status?: unknown
-  episodeCount?: unknown
-  isPlaying?: unknown
-  sessionId?: unknown
-  isAdult?: unknown
-}
-
-export function registerWatchlist(app: Hono, getDbs: () => HonoDbs) {
-  const db = () => getDbs().db
-
-  app.post('/api/update-progress', async (c) => {
-    const {
-      showId: showIdRaw,
-      episodeNumber,
-      currentTime,
-      duration,
-      showName,
-      showThumbnail,
-      nativeName,
-      englishName,
-      genres,
-      popularityScore,
-      type,
-      status,
-      episodeCount,
-      isPlaying,
-      sessionId,
-      isAdult,
-    } = (await c.req.json()) as ProgressBody
-
-    const showId = await getMigratedId(db(), showIdRaw as string)
-
-    const titlePreferenceRow = await SettingsRepository.getByKey(db(), 'titlePreference')
-    const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
-
-    let displayName = showName
-    if (titlePreference === 'englishName' && englishName) {
-      displayName = englishName
-    } else if (titlePreference === 'nativeName' && nativeName) {
-      displayName = nativeName
-    }
-
-    discordRPCService.updatePresence({
-      title: displayName as string,
-      episode: String(episodeNumber),
-      totalEpisodes: episodeCount ? String(episodeCount) : undefined,
-      currentTime: (currentTime as number) || 0,
-      duration: (duration as number) || 0,
-      thumbnail: (showThumbnail as string) || '',
-      isPlaying: isPlaying !== false,
-      sessionId: sessionId as string | undefined,
-      isAdult: isAdult as boolean | undefined,
-    })
-
-    const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
-    const anilistId = /^\d+$/.test(showId)
-      ? (dbGet<{ anilistId: number }>(
-          db(),
-          'SELECT anilistId FROM shows_meta WHERE id = ? AND anilistId IS NOT NULL',
-          [showId]
-        )?.anilistId ?? parseInt(showId))
-      : undefined
-
-    const metaCandidate = {
-      name: showName as string | undefined,
-      thumbnail: showThumbnail as string | undefined,
-      nativeName: nativeName as string | undefined,
-      englishName: englishName as string | undefined,
-      genres: genresStr as string | undefined,
-      popularityScore: popularityScore as number | undefined,
-      status: status as string | undefined,
-      episodeCount: episodeCount as number | undefined,
-      type: type as string | undefined,
-      anilistId,
-      isAdult: typeof isAdult === 'boolean' ? (isAdult ? 1 : 0) : null,
-      episodeDuration: (duration as number) > 0 ? Math.round((duration as number) / 60) : undefined,
-    }
-
-    const metaChanged = await showsMetaChanged(db(), showId, metaCandidate)
-
-    if (metaChanged) {
-      await performWriteTransactionAsync(db(), async (tx) => {
-        await ShowsMetaRepository.upsert(tx, {
-          id: showId,
-          ...metaCandidate,
-        })
-      })
-    }
-
-    await performWriteTransactionAsync(db(), async (tx) => {
-      await WatchedEpisodesRepository.upsert(tx, {
-        showId,
-        episodeNumber: episodeNumber as string,
-        currentTime: currentTime as number,
-        duration: duration as number,
-      })
-
-      await NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber as string)
-      await NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber as string)
-    })
-
-    db().scheduleSave()
-
-    return c.json({ success: true })
-  })
-
-  app.post('/api/discord/clear', async (c) => {
-    const { sessionId } = (await c.req.json()) as { sessionId?: unknown }
-    if (!discordRPCService.isServiceEnabled) {
-      return c.json({ success: true })
-    }
-    discordRPCService.clearPresence(sessionId as string)
-    return c.json({ success: true })
-  })
-
-  app.post('/api/discord/heartbeat', async (c) => {
-    const body = (await c.req.json().catch(() => undefined)) as
-      { sessionId?: unknown; bye?: unknown } | undefined
-    const { sessionId, bye } = body ?? {}
-    if (typeof sessionId !== 'string' || !discordRPCService.isServiceEnabled) {
-      return c.json({ success: true })
-    }
-    if (bye) {
-      discordRPCService.removeHeartbeat(sessionId)
-    } else {
-      discordRPCService.heartbeat(sessionId)
-    }
-    return c.json({ success: true })
-  })
 }

@@ -76,6 +76,15 @@ export const discordRouter = router({
     return { success: true }
   }),
 
+  clear: protectedProcedure.input(presenceInput()).mutation(async ({ input }) => {
+    const sessionId = optUnknown(input, 'sessionId')
+    if (!discordRPCService.isServiceEnabled) {
+      return { success: true }
+    }
+    discordRPCService.clearPresence(typeof sessionId === 'string' ? sessionId : undefined)
+    return { success: true }
+  }),
+
   asmrPresence: protectedProcedure.input(presenceInput()).mutation(async ({ input }) => {
     if (!discordRPCService.isServiceEnabled) return { success: true }
     const sessionId = optUnknown(input, 'sessionId')

@@ -640,7 +640,8 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.progressBarContainer:hover .timeBubble {
+.progressBarContainer:hover .timeBubble,
+.progressBarContainer.scrubbing .timeBubble {
   opacity: 1;
 }
 

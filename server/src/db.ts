@@ -33,6 +33,10 @@ export class DatabaseWrapper {
     }
   }
 
+  public getClient(): DatabaseSync {
+    return this.db
+  }
+
   public scheduleSave() {}
 
   public async saveNow() {}
