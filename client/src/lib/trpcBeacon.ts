@@ -1,5 +1,5 @@
 function batchBody(input: unknown): string {
-  return JSON.stringify({ 0: { json: input ?? {} } })
+  return JSON.stringify({ 0: input ?? {} })
 }
 
 function batchUrl(path: string): string {
