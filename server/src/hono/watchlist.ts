@@ -10,6 +10,7 @@ import { ShowsMetaRepository } from '../repositories/shows-meta.repository.js'
 import { NotificationsRepository } from '../repositories/notifications.repository.js'
 import { SettingsRepository } from '../repositories/settings.repository.js'
 import { dbAll } from '../utils/db-utils.js'
+import { AppCache } from '../utils/cache.utils.js'
 import {
   searchAnilist,
   searchAnilistByTitle,
@@ -752,14 +753,14 @@ async function resolveAvailableEpisodes(db: DatabaseWrapper, showId: string): Pr
   return episodes
 }
 
-const dlsitePosterCache = new Map<string, { url: string; ts: number }>()
-const mangadexCoverCache = new Map<string, { url: string | null; ts: number }>()
+const dlsitePosterCache = new AppCache({ ttlSeconds: 3600, maxKeys: 2000 })
+const mangadexCoverCache = new AppCache({ ttlSeconds: 3600, maxKeys: 2000 })
 
 export async function getMangadexCover(title: string): Promise<string | null> {
   const key = title.trim().toLowerCase()
   if (!key) return null
-  const cached = mangadexCoverCache.get(key)
-  if (cached && Date.now() - cached.ts < 3600_000) return cached.url
+  const cached = mangadexCoverCache.get<string | null>(key)
+  if (cached !== undefined) return cached
   try {
     const params = new URLSearchParams({
       title: title.trim(),
@@ -797,7 +798,7 @@ export async function getMangadexCover(title: string): Promise<string | null> {
     }
     const match = pickBestMatch(candidates, [title])
     const url = match ? match.item.cover : null
-    mangadexCoverCache.set(key, { url, ts: Date.now() })
+    mangadexCoverCache.set(key, url)
     return url
   } catch {
     return null
@@ -807,8 +808,8 @@ export async function getMangadexCover(title: string): Promise<string | null> {
 export async function getDlsitePoster(rjCode: string): Promise<string | null> {
   const key = String(rjCode).trim().toUpperCase()
   if (!/^RJ\d{5,}$/.test(key)) return null
-  const cached = dlsitePosterCache.get(key)
-  if (cached && Date.now() - cached.ts < 3600_000) return cached.url
+  const cached = dlsitePosterCache.get<string>(key)
+  if (cached !== undefined) return cached
   try {
     const res = await fetch(`https://www.dlsite.com/maniax/product/info/ajax?product_id=${key}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
@@ -823,7 +824,7 @@ export async function getDlsitePoster(rjCode: string): Promise<string | null> {
       typeof entry?.work_image === 'string' ? entry.work_image : undefined
     if (!img) return null
     const url = img.startsWith('//') ? `https:${img}` : img
-    dlsitePosterCache.set(key, { url, ts: Date.now() })
+    dlsitePosterCache.set(key, url)
     return url
   } catch {
     return null
