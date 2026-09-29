@@ -183,7 +183,6 @@ const Trackers: React.FC = () => {
     },
     onSuccess: (summary) => {
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
       setMangaSyncSummary(summary)
       const warningSuffix =
@@ -207,7 +206,6 @@ const Trackers: React.FC = () => {
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
       toast.success(`Imported ${count} manga entries from AniList`)
       setMangaUsername('')
@@ -236,7 +234,6 @@ const Trackers: React.FC = () => {
     },
     onSuccess: ({ imported, skipped }) => {
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
       toast.success(
         `Imported ${imported} manga entries from MAL${skipped > 0 ? `, skipped ${skipped}` : ''}`
@@ -264,7 +261,6 @@ const Trackers: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Import failed')
       setMalMangaXmlResult({ imported: data.imported ?? 0, skipped: data.skipped ?? 0 })
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
     } catch (err: unknown) {
       setMalMangaXmlError((err as Error).message)

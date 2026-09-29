@@ -53,13 +53,10 @@ const ClearDatabaseSettings: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
       queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-      queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
       queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
       queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
       queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
       setShowModal(false)
     } catch (err) {

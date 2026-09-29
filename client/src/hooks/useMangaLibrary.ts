@@ -91,10 +91,7 @@ export const useLinkMangaAnilist = () => {
         )
         void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
         queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-check'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-entry'] })
       },
       onError: (error) => {
         toast.error(`Failed to link: ${error.message}`)
@@ -125,13 +122,6 @@ export const useAddMangaBookmark = () => {
         if (!variables.silent) toast.success('Bookmarked')
         void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
         queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
-        queryClient.invalidateQueries({
-          queryKey: [
-            'manga-library-check',
-            mangaLibraryId(variables.provider ?? '', variables.mangaId ?? ''),
-          ],
-        })
       },
       onError: (error) => {
         toast.error(`Failed to bookmark: ${error.message}`)
@@ -145,13 +135,11 @@ export const useRemoveMangaBookmark = () => {
   const queryClient = useQueryClient()
   return useMutation(
     trpc.mangaLibrary.remove.mutationOptions({
-      onSuccess: (_data, id) => {
+      onSuccess: () => {
         toast.success('Bookmark removed')
         void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
         queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-check', id] })
       },
       onError: (error) => {
         toast.error(`Failed to remove: ${error.message}`)
@@ -187,7 +175,6 @@ export const useSaveMangaProgress = () => {
         queryClient.invalidateQueries({ queryKey: ['manga-progress', variables.mangaId] })
         queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
         queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
         void queryClient.invalidateQueries(trpc.mangaProgress.pathFilter())
       },
     })
@@ -241,7 +228,6 @@ export const useBatchRemoveManga = () => {
         toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from reading list`)
         void queryClient.invalidateQueries(trpc.mangaLibrary.pathFilter())
         queryClient.invalidateQueries({ queryKey: ['manga-library'] })
-        queryClient.invalidateQueries({ queryKey: ['manga-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] })
       },
       onError: (error) => {

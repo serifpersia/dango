@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router'
 import Icon from '../components/common/Icon'
 import { Button } from '../components/common/Button'
@@ -8,6 +8,7 @@ import AnilistLinkPanel from '../components/manga/AnilistLinkPanel'
 import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
 import { resolveMangaTitle, parseSyntheticChapterId, findChapterByNumber } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 import {
   mangaLibraryId,
   useAddMangaBookmark,
@@ -24,19 +25,7 @@ export default function MangaInfoPage() {
   const { provider = '', id = '' } = useParams<{ provider: string; id: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [hasConsent, setHasConsent] = useState(
-    () => localStorage.getItem('agreedToViewMature') === 'true'
-  )
-
-  useEffect(() => {
-    const sync = () => setHasConsent(localStorage.getItem('agreedToViewMature') === 'true')
-    window.addEventListener('focus', sync)
-    window.addEventListener('storage', sync)
-    return () => {
-      window.removeEventListener('focus', sync)
-      window.removeEventListener('storage', sync)
-    }
-  }, [])
+  const { hasConsent } = useMatureConsent()
 
   const rating = searchParams.get('rating') || 'safe'
   const activeRating = hasConsent ? rating : 'safe'

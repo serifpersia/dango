@@ -108,10 +108,6 @@ export const useAddAsmrBookmark = () => {
     onSuccess: (_data, variables) => {
       if (!variables.silent) toast.success('Added to listening list')
       queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-      queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
-      queryClient.invalidateQueries({
-        queryKey: ['asmr-library-check', asmrLibraryId(variables.rjCode)],
-      })
       void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
     },
     onError: (error: Error) => {
@@ -125,12 +121,10 @@ export const useRemoveAsmrBookmark = () => {
   const queryClient = useQueryClient()
   return useMutation(
     trpc.asmrLibrary.remove.mutationOptions({
-      onSuccess: (_data, variables) => {
+      onSuccess: () => {
         toast.success('Removed from listening list')
         queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
-        queryClient.invalidateQueries({ queryKey: ['asmr-library-check', variables.id] })
         void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
       },
@@ -169,7 +163,6 @@ export const useSaveAsmrProgress = () => {
         queryClient.invalidateQueries({ queryKey: ['asmr-progress', variables.workId] })
         queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
         queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
         void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())
       },
@@ -225,7 +218,6 @@ export const useBatchRemoveAsmr = () => {
         const count = data.removed ?? 0
         toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from listening list`)
         queryClient.invalidateQueries({ queryKey: ['asmr-library'] })
-        queryClient.invalidateQueries({ queryKey: ['asmr-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['asmr-continue-listening'] })
         void queryClient.invalidateQueries(trpc.asmrLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.asmrProgress.pathFilter())

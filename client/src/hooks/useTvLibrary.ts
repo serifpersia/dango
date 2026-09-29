@@ -118,10 +118,6 @@ export const useAddTvBookmark = () => {
     onSuccess: (_data, variables) => {
       if (!variables.silent) toast.success('Added to TV watchlist')
       queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-      queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
-      queryClient.invalidateQueries({
-        queryKey: ['tv-library-check', tvLibraryId(variables.mediaType, variables.tmdbId)],
-      })
       void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
     },
     onError: (error: Error) => {
@@ -135,12 +131,10 @@ export const useRemoveTvBookmark = () => {
   const queryClient = useQueryClient()
   return useMutation(
     trpc.tvLibrary.remove.mutationOptions({
-      onSuccess: (_data, id) => {
+      onSuccess: () => {
         toast.success('Removed from TV watchlist')
         queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
-        queryClient.invalidateQueries({ queryKey: ['tv-library-check', id] })
         void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
       },
@@ -177,10 +171,8 @@ export const useSaveTvProgress = () => {
     trpc.tvProgress.save.mutationOptions({
       onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tv-progress', variables.mediaId] })
-        queryClient.invalidateQueries({ queryKey: ['tv-progress-latest', variables.mediaId] })
         queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
         queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
         void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())
       },
@@ -236,7 +228,6 @@ export const useBatchRemoveTv = () => {
         const count = data.removed ?? 0
         toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from TV watchlist`)
         queryClient.invalidateQueries({ queryKey: ['tv-library'] })
-        queryClient.invalidateQueries({ queryKey: ['tv-library-ids'] })
         queryClient.invalidateQueries({ queryKey: ['tv-continue-watching'] })
         void queryClient.invalidateQueries(trpc.tvLibrary.pathFilter())
         void queryClient.invalidateQueries(trpc.tvProgress.pathFilter())

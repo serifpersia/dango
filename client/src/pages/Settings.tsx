@@ -32,6 +32,7 @@ import {
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { Alert } from '../components/common/Alert'
 import { useContentType } from '../contexts/ContentTypeContext'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 
 const LIST_TAB_LABELS = {
   anime: 'Watchlist',
@@ -58,6 +59,7 @@ const Settings: React.FC = () => {
   const tabBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const [sidebarIndicator, setSidebarIndicator] = useState({ top: 0, height: 0, left: 0, width: 0 })
   const { lowEndMode, setLowEndMode } = useLowEndMode()
+  const { hasConsent: hasMatureConsent, revoke: revokeMatureConsent } = useMatureConsent()
   const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState<string>('')
   const [telemetryEnabled, setTelemetryEnabled] = useState(
     localStorage.getItem('telemetry_enabled') !== 'false'
@@ -569,7 +571,7 @@ const Settings: React.FC = () => {
                 </div>
               </div>
 
-              {localStorage.getItem('agreedToViewMature') === 'true' && (
+              {hasMatureConsent && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                   <div className={styles.settingRow}>
                     <div style={{ minWidth: 0 }}>
@@ -589,7 +591,7 @@ const Settings: React.FC = () => {
                       isChecked={true}
                       onChange={(e) => {
                         if (!e.target.checked) {
-                          localStorage.removeItem('agreedToViewMature')
+                          revokeMatureConsent()
                           window.location.reload()
                         }
                       }}

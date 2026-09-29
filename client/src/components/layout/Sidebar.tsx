@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
+import { useMatureConsent } from '../../hooks/useMatureConsent'
 import { useContentType } from '../../contexts/ContentTypeContext'
 import styles from './Sidebar.module.css'
 import Icon from '../common/Icon'
@@ -10,19 +11,7 @@ import packageJson from '../../../package.json'
 const Sidebar: React.FC = () => {
   const { isOpen, setIsOpen } = useSidebar()
   const { contentType } = useContentType()
-  const [hasMatureConsent, setHasMatureConsent] = useState(
-    () => localStorage.getItem('agreedToViewMature') === 'true'
-  )
-
-  useEffect(() => {
-    const sync = () => setHasMatureConsent(localStorage.getItem('agreedToViewMature') === 'true')
-    window.addEventListener('storage', sync)
-    window.addEventListener('focus', sync)
-    return () => {
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('focus', sync)
-    }
-  }, [])
+  const { hasConsent: hasMatureConsent } = useMatureConsent()
 
   const handleNavLinkClick = () => {
     setIsOpen(false)

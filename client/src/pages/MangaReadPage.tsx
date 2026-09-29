@@ -5,6 +5,7 @@ import MangaReader from '../components/manga/MangaReader'
 import { useMangaDetail, type MangaChapter } from '../hooks/useManga'
 import { resolveMangaTitle, parseSyntheticChapterId, findChapterByNumber } from '../lib/manga'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 import { mangaLibraryId, useMangaProgress, useSaveMangaProgress } from '../hooks/useMangaLibrary'
 import { trpcClient } from '../lib/trpc'
 import styles from '../components/manga/Manga.module.css'
@@ -18,8 +19,7 @@ export default function MangaReadPage() {
   const navigate = useNavigate()
   const chapterId = searchParams.get('chapter') || ''
   const rating = searchParams.get('rating') || 'safe'
-  const hasConsent =
-    typeof localStorage !== 'undefined' && localStorage.getItem('agreedToViewMature') === 'true'
+  const { hasConsent } = useMatureConsent()
   const activeRating = hasConsent ? rating : 'safe'
 
   const libId = provider && id ? mangaLibraryId(provider, id) : ''
