@@ -4,6 +4,7 @@ import { setProxyHeaders } from '../utils/http.utils.js'
 import {
   getInnertube,
   getAuthedInnertube,
+  getMusicCookie,
   refreshAuthedInnertube,
   type YtPlayerSession,
   type YtStreamingData,
@@ -19,6 +20,16 @@ const UPSTREAM_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 const audioCache = new Map<string, DecipheredAudio>()
 const AUDIO_CACHE_MS = 5 * 60 * 1000
+
+const AUDIO_CHUNK_BYTES = 262144
+
+function capUpstreamRange(range: string | null): string {
+  const m = /^bytes=(\d+)-(\d*)$/.exec((range ?? '').trim())
+  if (!m) return `bytes=0-${AUDIO_CHUNK_BYTES - 1}`
+  if (m[2] !== '') return m[0]
+  const start = Number(m[1])
+  return `bytes=${start}-${start + AUDIO_CHUNK_BYTES - 1}`
+}
 
 async function decipherWith(
   yt: Awaited<ReturnType<typeof getInnertube>>,
@@ -103,12 +114,14 @@ export function registerMusic(app: Hono) {
       if (c.req.raw.signal.aborted) return new Response(null, { status: 499 })
       let upstream: globalThis.Response
       try {
+        const cookie = getMusicCookie()
         upstream = await fetch(entry.url, {
           headers: {
             'User-Agent': UPSTREAM_UA,
             Referer: 'https://music.youtube.com/',
             Origin: 'https://music.youtube.com/',
-            Range: c.req.header('range') ?? 'bytes=0-',
+            Range: capUpstreamRange(c.req.header('range') ?? null),
+            ...(cookie ? { Cookie: cookie } : {}),
           },
           signal,
         })
@@ -123,6 +136,10 @@ export function registerMusic(app: Hono) {
         } catch {
           // ignore
         }
+        logger.warn(
+          { videoId, status: upstream.status },
+          '[music] audio upstream rejected range request'
+        )
         audioCache.delete(videoId)
         return c.json({ error: 'Upstream error' }, 502)
       }
