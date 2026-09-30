@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
-import { defineSchema, optStr, reqObj } from '../validation.js'
+import { badRequest, defineSchema, failed, optStr, reqObj } from '../validation.js'
 import logger from '../../logger.js'
 import {
   getInnertube,
@@ -317,16 +317,8 @@ async function readLibrary(yt: Awaited<ReturnType<typeof getAuthedInnertube>> & 
   return { tracks, playlists }
 }
 
-function badRequest(message: string): TRPCError {
-  return new TRPCError({ code: 'BAD_REQUEST', message })
-}
-
 function unauthorized(message: string): TRPCError {
   return new TRPCError({ code: 'UNAUTHORIZED', message })
-}
-
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
 }
 
 export type MusicSearchInput = { q?: string }

@@ -25,6 +25,7 @@ import {
   defineSchema,
   idInput,
   idsInput,
+  optNum,
   optStr,
   reqObj,
   showIdInput,
@@ -369,13 +370,6 @@ export type ContinueWatchingAllInput = {
   excludeGenres?: string
   sortBy?: string
   titlePreference?: string
-}
-
-function optNum(obj: Record<string, unknown>, name: string): number | undefined {
-  const value = obj[name]
-  if (value === undefined || value === null || value === '') return undefined
-  const num = Number(value)
-  return Number.isFinite(num) ? num : undefined
 }
 
 function readFilterFields(

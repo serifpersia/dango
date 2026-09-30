@@ -1,106 +1,9 @@
 import type { Hono } from 'hono'
 import type { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
-import { parseJsonBody } from '../utils/http.utils.js'
-import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import { URL } from 'url'
 import { isSafeExternalUrl } from '../utils/security.utils.js'
 import type { TvMediaRequest, TvProvider } from '../providers/tv.types.js'
-
-async function resolveTvMeta(
-  mediaType: 'movie' | 'tv',
-  numericTmdbId: number,
-  partial: { title: string; year: string; imdbId: string; totalSeasons: string }
-): Promise<{ title: string; year: string; imdbId: string; totalSeasons: string }> {
-  const meta = { ...partial }
-  if (meta.title && meta.imdbId && meta.year) return meta
-  try {
-    const tmdbKey = await getTmdbKey()
-    if (tmdbKey) {
-      const tmdbRes = await fetch(
-        `${TMDB_BASE}/${mediaType}/${numericTmdbId}?api_key=${tmdbKey}&append_to_response=external_ids`,
-        { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) }
-      )
-      if (tmdbRes.ok) {
-        const d = await parseJsonBody<TmdbMetaBody>(tmdbRes)
-        if (!meta.title) meta.title = d.title || d.name || ''
-        if (!meta.year) meta.year = (d.release_date || d.first_air_date || '').split('-')[0] || ''
-        if (!meta.imdbId) meta.imdbId = d.external_ids?.imdb_id || d.imdb_id || ''
-        if (mediaType === 'tv' && d.number_of_seasons)
-          meta.totalSeasons = String(d.number_of_seasons)
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return meta
-}
-
-interface TmdbSearchItem {
-  id: number
-  title?: string
-  name?: string
-  release_date?: string
-  first_air_date?: string
-  media_type?: string
-  poster_path?: string | null
-  vote_average?: number
-  adult?: boolean
-}
-
-interface TmdbSeason {
-  season_number: number
-  episode_count: number
-}
-
-interface TmdbEpisode {
-  episode_number: number
-  name?: string
-  vote_average?: number
-  overview?: string
-  still_path?: string | null
-}
-
-interface TmdbDetailsResult {
-  id: number
-  imdb_id: string | null
-  title?: string
-  overview?: string
-  vote_average?: number
-  year: string
-  poster: string
-  backdrop: string
-  adult: boolean
-  seasons?: TmdbSeason[]
-  number_of_seasons?: number
-}
-
-interface TmdbMetaBody {
-  title?: string
-  name?: string
-  release_date?: string
-  first_air_date?: string
-  imdb_id?: string | null
-  external_ids?: { imdb_id?: string | null }
-  number_of_seasons?: number
-}
-
-interface TmdbDetailsBody {
-  id: number
-  title?: string
-  name?: string
-  overview?: string
-  vote_average?: number
-  release_date?: string
-  first_air_date?: string
-  poster_path?: string | null
-  backdrop_path?: string | null
-  adult?: boolean
-  imdb_id?: string | null
-  external_ids?: { imdb_id?: string | null }
-  seasons?: TmdbSeason[]
-  number_of_seasons?: number
-}
 
 function proxiedMediaUrl(targetUrl: string, refererStr: string): string {
   return `/api/tv/stream-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}`
@@ -134,45 +37,6 @@ export function isPlaylistBody(body: Buffer): boolean {
       .trimStart()
       .startsWith('#EXTM3U')
   )
-}
-
-interface ImdbSuggestion {
-  id?: string
-  l?: string
-  y?: number
-  qid?: string
-  i?: { imageUrl?: string }
-}
-
-type SearchResultItem = {
-  id: number
-  title: string
-  year: string
-  type: string
-  image: string
-  backdrop: string
-  overview: string
-  vote_average: number
-  adult: boolean
-  genre_ids: number[]
-}
-
-function toSearchResult(
-  item: TmdbSearchItem & { overview?: string; genre_ids?: number[]; backdrop_path?: string | null },
-  type: string
-): SearchResultItem {
-  return {
-    id: item.id,
-    title: item.title || item.name || '',
-    year: (item.release_date || item.first_air_date || '').split('-')[0],
-    type,
-    image: item.poster_path ? `${TMDB_IMAGE}/w500${item.poster_path}` : '',
-    backdrop: item.backdrop_path ? `${TMDB_IMAGE}/w780${item.backdrop_path}` : '',
-    overview: item.overview || '',
-    vote_average: item.vote_average || 0,
-    adult: item.adult === true,
-    genre_ids: item.genre_ids || [],
-  }
 }
 
 export function registerTv(

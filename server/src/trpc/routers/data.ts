@@ -1,6 +1,15 @@
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
-import { defineSchema, optStr, reqObj, reqStr } from '../validation.js'
+import {
+  badRequest,
+  defineSchema,
+  failed,
+  optNum,
+  optStr,
+  readCount,
+  reqObj,
+  reqStr,
+} from '../validation.js'
 import { parseJsonBody } from '../../utils/http.utils.js'
 import {
   getTrending,
@@ -37,27 +46,6 @@ import type { Show } from '../../providers/provider.interface.js'
 import type { BrowseCaps } from '../../providers/remote-types.js'
 import type { TrpcContext } from '../context.js'
 import logger from '../../logger.js'
-
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
-}
-
-function badRequest(message: string): TRPCError {
-  return new TRPCError({ code: 'BAD_REQUEST', message })
-}
-
-function optInt(obj: Record<string, unknown>, name: string, fallback: number): number {
-  const value = obj[name]
-  if (value === undefined || value === null || value === '') return fallback
-  return parseInt(String(value), 10) || fallback
-}
-
-function optIntOrUndefined(obj: Record<string, unknown>, name: string): number | undefined {
-  const value = obj[name]
-  if (value === undefined || value === null || value === '') return undefined
-  const parsed = parseInt(String(value), 10)
-  return Number.isFinite(parsed) ? parsed : undefined
-}
 
 async function cached<T>(
   ctx: TrpcContext,
@@ -97,8 +85,8 @@ const dataLatestReleasesInput = () =>
     const out: DataLatestReleasesInput = {}
     const format = optStr(obj, 'format')
     if (format !== undefined) out.format = format
-    if (obj.page !== undefined) out.page = optInt(obj, 'page', 1)
-    if (obj.size !== undefined) out.size = optInt(obj, 'size', 12)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
+    if (obj.size !== undefined) out.size = readCount(obj, 'size', 12)
     return out
   })
 
@@ -144,8 +132,8 @@ const dataSearchInput = () =>
     const out: DataSearchParsed = {}
     const query = optStr(obj, 'query')
     if (query !== undefined) out.query = query
-    if (obj.page !== undefined) out.page = optInt(obj, 'page', 1)
-    if (obj.limit !== undefined) out.limit = optInt(obj, 'limit', 14)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
+    if (obj.limit !== undefined) out.limit = readCount(obj, 'limit', 14)
     const sortBy = optStr(obj, 'sortBy')
     if (sortBy !== undefined) out.sortBy = sortBy
     const type = optStr(obj, 'type')
@@ -154,7 +142,7 @@ const dataSearchInput = () =>
     if (status !== undefined) out.status = status
     const season = optStr(obj, 'season')
     if (season !== undefined) out.season = season
-    const year = optIntOrUndefined(obj, 'year')
+    const year = optNum(obj, 'year')
     if (year !== undefined) out.year = year
     const country = optStr(obj, 'country')
     if (country !== undefined) out.country = country
@@ -164,9 +152,9 @@ const dataSearchInput = () =>
     if (excludeGenres !== undefined) out.excludeGenres = excludeGenres
     const excludeTags = optStr(obj, 'excludeTags')
     if (excludeTags !== undefined) out.excludeTags = excludeTags
-    const minScore = optIntOrUndefined(obj, 'minScore')
+    const minScore = optNum(obj, 'minScore')
     if (minScore !== undefined) out.minScore = minScore
-    const minEpisodes = optIntOrUndefined(obj, 'minEpisodes')
+    const minEpisodes = optNum(obj, 'minEpisodes')
     if (minEpisodes !== undefined) out.minEpisodes = minEpisodes
     const adult = optStr(obj, 'adult')
     if (adult !== undefined) out.adult = adult
@@ -203,8 +191,8 @@ const dataSeasonalInput = () =>
   defineSchema<DataSeasonalInput, DataSeasonalInput>((value) => {
     const obj = reqObj(value)
     const out: DataSeasonalInput = {}
-    if (obj.page !== undefined) out.page = optInt(obj, 'page', 1)
-    if (obj.size !== undefined) out.size = optInt(obj, 'size', 14)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
+    if (obj.size !== undefined) out.size = readCount(obj, 'size', 14)
     const format = optStr(obj, 'format')
     if (format !== undefined) out.format = format
     return out
@@ -218,8 +206,8 @@ const dataPopularListInput = () =>
     const out: DataPopularListInput = {}
     const sort = optStr(obj, 'sort')
     if (sort !== undefined) out.sort = sort
-    if (obj.page !== undefined) out.page = optInt(obj, 'page', 1)
-    if (obj.size !== undefined) out.size = optInt(obj, 'size', 20)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
+    if (obj.size !== undefined) out.size = readCount(obj, 'size', 20)
     return out
   })
 
@@ -324,13 +312,13 @@ const dataMatureSearchInput = () =>
       const v = optStr(obj, k)
       if (v !== undefined) out[k] = v
     }
-    if (obj.page !== undefined) out.page = optInt(obj, 'page', 1)
-    if (obj.limit !== undefined) out.limit = optInt(obj, 'limit', 14)
-    const year = optIntOrUndefined(obj, 'year')
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
+    if (obj.limit !== undefined) out.limit = readCount(obj, 'limit', 14)
+    const year = optNum(obj, 'year')
     if (year !== undefined) out.year = year
-    const minScore = optIntOrUndefined(obj, 'minScore')
+    const minScore = optNum(obj, 'minScore')
     if (minScore !== undefined) out.minScore = minScore
-    const minEpisodes = optIntOrUndefined(obj, 'minEpisodes')
+    const minEpisodes = optNum(obj, 'minEpisodes')
     if (minEpisodes !== undefined) out.minEpisodes = minEpisodes
     return out
   })

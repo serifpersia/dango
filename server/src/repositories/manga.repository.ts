@@ -3,15 +3,9 @@ import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
 import { mangaLibrary, mangaProgress } from '../db/schema-manga.js'
 
-export type MangaStatus = 'Reading' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
+export const MANGA_STATUSES: string[] = ['Reading', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export const MANGA_STATUSES: MangaStatus[] = [
-  'Reading',
-  'Completed',
-  'On-Hold',
-  'Dropped',
-  'Planned',
-]
+export type MangaStatus = (typeof MANGA_STATUSES)[number]
 
 export interface MangaLibraryRow {
   id: string
@@ -56,13 +50,6 @@ export const MangaLibraryRepository = {
       sql`SELECT * FROM manga_library WHERE id = ${id}`
     )
     return rows[0]
-  },
-
-  exists: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<{ inLibrary: number }>(
-      sql`SELECT EXISTS(SELECT 1 FROM manga_library WHERE id = ${id}) as inLibrary`
-    )
-    return !!(rows[0] && rows[0].inLibrary)
   },
 
   getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {

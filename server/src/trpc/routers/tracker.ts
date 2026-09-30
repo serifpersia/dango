@@ -13,18 +13,10 @@ import {
   importFromUsernameManga,
   importMangaFromMalUsername,
 } from '../../lib/tracker/manga-sync.service.js'
-import { defineSchema, reqObj } from '../validation.js'
+import { badRequest, defineSchema, failed, reqObj } from '../validation.js'
 
 const TRACKER_TOKEN_KEY = 'tracker_anilist_token'
 const TRACKER_USER_KEY = 'tracker_anilist_user'
-
-function badRequest(message: string): TRPCError {
-  return new TRPCError({ code: 'BAD_REQUEST', message })
-}
-
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
-}
 
 function unavailable(message: string): TRPCError {
   return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message })

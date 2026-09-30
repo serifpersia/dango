@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
-import { defineSchema, optStr, reqObj, reqStr } from '../validation.js'
+import { defineSchema, failed, optStr, readCount, reqId, reqObj, reqStr } from '../validation.js'
 import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../../lib/tmdb.js'
 import { parseJsonBody } from '../../utils/http.utils.js'
 import type { TvMediaRequest } from '../../providers/tv.types.js'
@@ -157,24 +157,6 @@ type TvSubtitlesPayload = {
   }[]
 }
 
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
-}
-
-function optNum(obj: Record<string, unknown>, name: string, fallback: number): number {
-  const value = obj[name]
-  if (value === undefined || value === null || value === '') return fallback
-  return parseInt(String(value), 10) || fallback
-}
-
-function reqId(obj: Record<string, unknown>, name: string): string {
-  const value = obj[name]
-  if ((typeof value !== 'string' && typeof value !== 'number') || String(value).length === 0) {
-    throw new Error(`${name} must be a string`)
-  }
-  return String(value)
-}
-
 export type TvSearchInput = {
   q?: string
   page?: number
@@ -190,7 +172,7 @@ const tvSearchInput = () =>
     const out: TvSearchInput = {}
     const q = optStr(obj, 'q')
     if (q !== undefined) out.q = q
-    if (obj.page !== undefined) out.page = optNum(obj, 'page', 1)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
     const type = optStr(obj, 'type')
     if (type !== undefined) out.type = type
     const genre = optStr(obj, 'genre')
@@ -212,7 +194,7 @@ const tvTrendingInput = () =>
     if (mediaType !== undefined) out.mediaType = mediaType
     const timeWindow = optStr(obj, 'timeWindow')
     if (timeWindow !== undefined) out.timeWindow = timeWindow
-    if (obj.page !== undefined) out.page = optNum(obj, 'page', 1)
+    if (obj.page !== undefined) out.page = readCount(obj, 'page', 1)
     return out
   })
 
@@ -284,8 +266,8 @@ const tvSourcesInput = () =>
       type: reqStr(obj, 'type'),
       tmdbId: reqId(obj, 'tmdbId'),
     }
-    if (obj.season !== undefined) out.season = optNum(obj, 'season', 1)
-    if (obj.episode !== undefined) out.episode = optNum(obj, 'episode', 1)
+    if (obj.season !== undefined) out.season = readCount(obj, 'season', 1)
+    if (obj.episode !== undefined) out.episode = readCount(obj, 'episode', 1)
     const server = optStr(obj, 'server')
     if (server !== undefined) out.server = server
     const title = optStr(obj, 'title')

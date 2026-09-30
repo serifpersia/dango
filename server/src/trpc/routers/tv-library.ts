@@ -7,7 +7,7 @@ import {
   TvLibraryRepository,
   TvProgressRepository,
 } from '../../repositories/tv.repository.js'
-import { defineSchema, reqObj, reqStr, optStr, reqStrArray } from '../validation.js'
+import { defineSchema, reqObj, reqStr, optStr, reqStrArray, readPageLimit } from '../validation.js'
 
 function normalizeMediaType(raw: unknown): 'movie' | 'tv' {
   return String(raw).toLowerCase() === 'movie' ? 'movie' : 'tv'
@@ -18,17 +18,9 @@ export type TvLibraryListInput = { status?: string; page?: number; limit?: numbe
 const tvLibraryListInput = () =>
   defineSchema<TvLibraryListInput, TvLibraryListInput>((value) => {
     const obj = reqObj(value)
-    const out: TvLibraryListInput = {}
+    const out: TvLibraryListInput = { ...readPageLimit(obj) }
     const status = optStr(obj, 'status')
     if (status !== undefined) out.status = status
-    if (obj.page !== undefined && obj.page !== null && obj.page !== '') {
-      const page = Number(obj.page)
-      if (Number.isFinite(page)) out.page = page
-    }
-    if (obj.limit !== undefined && obj.limit !== null && obj.limit !== '') {
-      const limit = Number(obj.limit)
-      if (Number.isFinite(limit)) out.limit = limit
-    }
     return out
   })
 
@@ -130,7 +122,7 @@ export const tvLibraryRouter = router({
         ? String(input.id)
         : buildTvId(mediaType, tmdbIdNum)
     const cleanStatus =
-      typeof input.status === 'string' && (TV_STATUSES as string[]).includes(input.status)
+      typeof input.status === 'string' && TV_STATUSES.includes(input.status)
         ? input.status
         : 'Watching'
     await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
@@ -159,7 +151,7 @@ export const tvLibraryRouter = router({
   }),
 
   setStatus: protectedProcedure.input(tvLibraryStatusInput()).mutation(async ({ ctx, input }) => {
-    if (!input.id || !(TV_STATUSES as string[]).includes(input.status)) {
+    if (!input.id || !TV_STATUSES.includes(input.status)) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'id and a valid status are required' })
     }
     await performTvWriteTransactionAsync(ctx.tvDb, async (tx) => {
@@ -171,7 +163,7 @@ export const tvLibraryRouter = router({
   batchStatus: protectedProcedure
     .input(tvLibraryBatchStatusInput())
     .mutation(async ({ ctx, input }) => {
-      if (!input.status || !(TV_STATUSES as string[]).includes(input.status)) {
+      if (!input.status || !TV_STATUSES.includes(input.status)) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'a valid status is required' })
       }
       const ids = input.ids.map((id) => String(id))

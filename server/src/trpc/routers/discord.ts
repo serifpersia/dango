@@ -1,20 +1,11 @@
-import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
-import { defineSchema, optStr, reqObj } from '../validation.js'
+import { badRequest, defineSchema, failed, optStr, reqObj } from '../validation.js'
 import { discordRPCService } from '../../discord-rpc.js'
 import { discordGatewayService } from '../../discord-gateway.js'
 import { getDlsitePoster, getMangadexCover } from '../../hono/watchlist.js'
 import { updateEnvFile } from '../../utils/env.utils.js'
 import { CONFIG } from '../../config.js'
 import logger from '../../logger.js'
-
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
-}
-
-function badRequest(message: string): TRPCError {
-  return new TRPCError({ code: 'BAD_REQUEST', message })
-}
 
 function maskToken(t: string | undefined | null): string {
   if (!t) return 'none'

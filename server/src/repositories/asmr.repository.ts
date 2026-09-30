@@ -3,15 +3,9 @@ import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
 import { asmrLibrary, asmrProgress } from '../db/schema-asmr.js'
 
-export type AsmrStatus = 'Listening' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
+export const ASMR_STATUSES: string[] = ['Listening', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export const ASMR_STATUSES: AsmrStatus[] = [
-  'Listening',
-  'Completed',
-  'On-Hold',
-  'Dropped',
-  'Planned',
-]
+export type AsmrStatus = (typeof ASMR_STATUSES)[number]
 
 export interface AsmrLibraryRow {
   id: string
@@ -50,13 +44,6 @@ export const AsmrLibraryRepository = {
       sql`SELECT * FROM asmr_library WHERE id = ${id}`
     )
     return rows[0]
-  },
-
-  exists: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<{ inLibrary: number }>(
-      sql`SELECT EXISTS(SELECT 1 FROM asmr_library WHERE id = ${id}) as inLibrary`
-    )
-    return !!(rows[0] && rows[0].inLibrary)
   },
 
   getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {

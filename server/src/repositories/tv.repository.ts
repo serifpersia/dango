@@ -3,9 +3,9 @@ import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
 import { tvLibrary, tvProgress } from '../db/schema-tv.js'
 
-export type TvStatus = 'Watching' | 'Completed' | 'On-Hold' | 'Dropped' | 'Planned'
+export const TV_STATUSES: string[] = ['Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export const TV_STATUSES: TvStatus[] = ['Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned']
+export type TvStatus = (typeof TV_STATUSES)[number]
 
 export interface TvLibraryRow {
   id: string
@@ -60,13 +60,6 @@ export const TvLibraryRepository = {
       sql`SELECT * FROM tv_library WHERE id = ${id}`
     )
     return rows[0]
-  },
-
-  exists: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<{ inLibrary: number }>(
-      sql`SELECT EXISTS(SELECT 1 FROM tv_library WHERE id = ${id}) as inLibrary`
-    )
-    return !!(rows[0] && rows[0].inLibrary)
   },
 
   getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {

@@ -7,24 +7,16 @@ import {
   AsmrLibraryRepository,
   AsmrProgressRepository,
 } from '../../repositories/asmr.repository.js'
-import { defineSchema, reqObj, reqStr, optStr, reqStrArray } from '../validation.js'
+import { defineSchema, reqObj, reqStr, optStr, reqStrArray, readPageLimit } from '../validation.js'
 
 export type AsmrLibraryListInput = { status?: string; page?: number; limit?: number }
 
 const asmrLibraryListInput = () =>
   defineSchema<AsmrLibraryListInput, AsmrLibraryListInput>((value) => {
     const obj = reqObj(value)
-    const out: AsmrLibraryListInput = {}
+    const out: AsmrLibraryListInput = { ...readPageLimit(obj) }
     const status = optStr(obj, 'status')
     if (status !== undefined) out.status = status
-    if (obj.page !== undefined && obj.page !== null && obj.page !== '') {
-      const page = Number(obj.page)
-      if (Number.isFinite(page)) out.page = page
-    }
-    if (obj.limit !== undefined && obj.limit !== null && obj.limit !== '') {
-      const limit = Number(obj.limit)
-      if (Number.isFinite(limit)) out.limit = limit
-    }
     return out
   })
 
@@ -106,7 +98,7 @@ export const asmrLibraryRouter = router({
     }
     const id = input.id && input.id.trim() ? buildAsmrId(input.id) : buildAsmrId(rawCode)
     const cleanStatus =
-      typeof input.status === 'string' && (ASMR_STATUSES as string[]).includes(input.status)
+      typeof input.status === 'string' && ASMR_STATUSES.includes(input.status)
         ? input.status
         : 'Listening'
     await performAsmrWriteTransactionAsync(ctx.asmrDb, async (tx) => {
@@ -131,7 +123,7 @@ export const asmrLibraryRouter = router({
   }),
 
   setStatus: protectedProcedure.input(asmrLibraryStatusInput()).mutation(async ({ ctx, input }) => {
-    if (!input.id || !(ASMR_STATUSES as string[]).includes(input.status)) {
+    if (!input.id || !ASMR_STATUSES.includes(input.status)) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'id and a valid status are required' })
     }
     await performAsmrWriteTransactionAsync(ctx.asmrDb, async (tx) => {
@@ -143,7 +135,7 @@ export const asmrLibraryRouter = router({
   batchStatus: protectedProcedure
     .input(asmrLibraryBatchStatusInput())
     .mutation(async ({ ctx, input }) => {
-      if (!input.status || !(ASMR_STATUSES as string[]).includes(input.status)) {
+      if (!input.status || !ASMR_STATUSES.includes(input.status)) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'a valid status is required' })
       }
       const ids = input.ids.map((id) => String(id))

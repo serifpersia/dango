@@ -8,7 +8,15 @@ import {
   MangaLibraryRepository,
   MangaProgressRepository,
 } from '../../repositories/manga.repository.js'
-import { defineSchema, optStr, reqObj } from '../validation.js'
+import {
+  badRequest,
+  defineSchema,
+  failed,
+  optStr,
+  readCount,
+  reqObj,
+  reqStr,
+} from '../validation.js'
 
 function mangaDb(ctx: { mangaDb: DatabaseWrapper }): DatabaseWrapper {
   const db = ctx.mangaDb
@@ -19,21 +27,6 @@ function mangaDb(ctx: { mangaDb: DatabaseWrapper }): DatabaseWrapper {
 function normalizeId(provider: string, mangaId: string, idRaw?: string): string {
   if (idRaw && idRaw.includes(':')) return idRaw
   return buildMangaId(provider, mangaId || idRaw || '')
-}
-
-function badRequest(message: string): TRPCError {
-  return new TRPCError({ code: 'BAD_REQUEST', message })
-}
-
-function failed(message: string): TRPCError {
-  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
-}
-
-function readCount(obj: Record<string, unknown>, name: string, fallback: number): number {
-  const raw = obj[name]
-  if (raw === undefined || raw === null || raw === '') return fallback
-  const n = Math.floor(Number(raw))
-  return Number.isFinite(n) ? n : fallback
 }
 
 const mangaLibraryListInput = () =>
@@ -49,12 +42,9 @@ const mangaLibraryListInput = () =>
   })
 
 const mangaLibraryIdInput = () =>
-  defineSchema<{ id: string }, { id: string }>((value) => {
-    const obj = reqObj(value)
-    const id = obj.id
-    if (typeof id !== 'string') throw new Error('id must be a string')
-    return { id }
-  })
+  defineSchema<{ id: string }, { id: string }>((value) => ({
+    id: reqStr(reqObj(value), 'id'),
+  }))
 
 export type MangaLibraryAddInput = {
   provider?: string
@@ -176,7 +166,7 @@ export const mangaLibraryRouter = router({
       idRaw ? String(idRaw) : undefined
     )
     const cleanStatus =
-      typeof input.status === 'string' && (MANGA_STATUSES as string[]).includes(input.status)
+      typeof input.status === 'string' && MANGA_STATUSES.includes(input.status)
         ? input.status
         : 'Reading'
     try {
@@ -217,7 +207,7 @@ export const mangaLibraryRouter = router({
   setStatus: protectedProcedure
     .input(mangaLibraryStatusInput())
     .mutation(async ({ ctx, input }) => {
-      if (!input.id || !(MANGA_STATUSES as string[]).includes(input.status as string)) {
+      if (!input.id || !input.status || !MANGA_STATUSES.includes(input.status)) {
         throw badRequest('id and a valid status are required')
       }
       try {
@@ -278,7 +268,7 @@ export const mangaLibraryRouter = router({
       if (!Array.isArray(input.ids) || input.ids.length === 0) {
         throw badRequest('ids must be a non-empty array')
       }
-      if (!input.status || !(MANGA_STATUSES as string[]).includes(input.status as string)) {
+      if (!input.status || !MANGA_STATUSES.includes(input.status)) {
         throw badRequest('a valid status is required')
       }
       const ids = input.ids.map((id) => String(id))

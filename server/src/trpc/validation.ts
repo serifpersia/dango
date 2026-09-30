@@ -1,3 +1,5 @@
+import { TRPCError } from '@trpc/server'
+
 type StandardIssue = { message: string }
 
 type StandardResult<T> = { value: T } | { issues: StandardIssue[] }
@@ -62,6 +64,38 @@ export function optBool(obj: Record<string, unknown>, name: string): boolean | u
   const value = obj[name]
   if (typeof value !== 'boolean') return undefined
   return value
+}
+
+export function badRequest(message: string): TRPCError {
+  return new TRPCError({ code: 'BAD_REQUEST', message })
+}
+
+export function failed(message: string): TRPCError {
+  return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message })
+}
+
+export function reqId(obj: Record<string, unknown>, name: string): string {
+  const value = obj[name]
+  if ((typeof value !== 'string' && typeof value !== 'number') || String(value).length === 0) {
+    throw new Error(`${name} must be a string`)
+  }
+  return String(value)
+}
+
+export function readCount(obj: Record<string, unknown>, name: string, fallback: number): number {
+  const raw = obj[name]
+  if (raw === undefined || raw === null || raw === '') return fallback
+  const n = Math.floor(Number(raw))
+  return Number.isFinite(n) ? n : fallback
+}
+
+export function readPageLimit(obj: Record<string, unknown>): { page?: number; limit?: number } {
+  const out: { page?: number; limit?: number } = {}
+  const page = optNum(obj, 'page')
+  if (page !== undefined) out.page = page
+  const limit = optNum(obj, 'limit')
+  if (limit !== undefined) out.limit = limit
+  return out
 }
 
 function reqEpNum(obj: Record<string, unknown>, name: string): string {
