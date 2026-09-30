@@ -1,25 +1,22 @@
 import { protectedProcedure, router } from '../index.js'
 import type { DatabaseWrapper } from '../../db.js'
 import { performAsmrWriteTransactionAsync } from '../../sync.js'
-import { dbAll } from '../../utils/db-utils.js'
+import { adultNonListIds } from '../../utils/db-utils.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import {
   AsmrLibraryRepository,
   AsmrProgressRepository,
 } from '../../repositories/asmr.repository.js'
-import { defineSchema, reqObj, reqStr, reqStrArray } from '../validation.js'
+import { defineSchema, reqObj, reqStr, reqStrArray, strOrNull } from '../validation.js'
 
-async function getAdultNonListWorkIds(db: DatabaseWrapper): Promise<string[]> {
-  const rows = await dbAll<{ workId: string }>(
+const getAdultNonListWorkIds = (db: DatabaseWrapper) =>
+  adultNonListIds(
     db,
-    `SELECT DISTINCT p.workId as workId
-       FROM asmr_progress p
-       LEFT JOIN asmr_library l ON l.id = p.workId
-       WHERE COALESCE(l.isAdult, p.isAdult) = 1
-         AND l.id IS NULL`
+    'asmr_progress',
+    'asmr_library',
+    'workId',
+    'COALESCE(l.isAdult, p.isAdult) = 1'
   )
-  return rows.map((r) => r.workId)
-}
 
 export type AsmrProgressIdsInput = { ids: string[] }
 
@@ -41,9 +38,9 @@ export type AsmrProgressSaveInput = {
   trackLabel?: unknown
   currentTime?: unknown
   duration?: unknown
-  title?: unknown
-  thumbnail?: unknown
-  rjCode?: unknown
+  title?: string | null
+  thumbnail?: string | null
+  rjCode?: string | null
   isAdult?: unknown
 }
 
@@ -56,9 +53,9 @@ const asmrProgressSaveInput = () =>
       trackLabel: obj.trackLabel,
       currentTime: obj.currentTime,
       duration: obj.duration,
-      title: obj.title ?? null,
-      thumbnail: obj.thumbnail ?? null,
-      rjCode: obj.rjCode ?? null,
+      title: strOrNull(obj, 'title'),
+      thumbnail: strOrNull(obj, 'thumbnail'),
+      rjCode: strOrNull(obj, 'rjCode'),
       isAdult: obj.isAdult ?? null,
     }
   })
@@ -106,9 +103,9 @@ export const asmrProgressRouter = router({
         trackLabel: String(input.trackLabel || ''),
         currentTime: timeNum,
         duration: durationNum,
-        title: (input.title ?? null) as string | null,
-        thumbnail: (input.thumbnail ?? null) as string | null,
-        rjCode: (input.rjCode ?? null) as string | null,
+        title: input.title ?? null,
+        thumbnail: input.thumbnail ?? null,
+        rjCode: input.rjCode ?? null,
         isAdult: input.isAdult != null ? Number(input.isAdult) : null,
       })
       await AsmrLibraryRepository.touchProgress(tx, String(input.workId), {
@@ -143,12 +140,11 @@ export const asmrProgressRouter = router({
     .input(asmrContinueListeningInput())
     .query(async ({ ctx, input }) => {
       const limit = Math.min(Math.max(parseInt(String(input.limit ?? 24)) || 24, 1), 100)
-      const ignoreAdultRow = await SettingsRepository.getByKey(ctx.db, 'asmrIgnoreAdultContent')
-      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
-      const listOnlyRow = await SettingsRepository.getByKey(ctx.db, 'asmrCwWatchlistOnly')
-      const listOnly = listOnlyRow
-        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
-        : false
+      const { ignoreAdult, listOnly } = await SettingsRepository.readContinueFlags(
+        ctx.db,
+        'asmrIgnoreAdultContent',
+        'asmrCwWatchlistOnly'
+      )
       const rows = (await AsmrProgressRepository.getContinueListening(ctx.asmrDb, limit)).filter(
         (row) => {
           if (ignoreAdult && row.isAdult === 1) return false

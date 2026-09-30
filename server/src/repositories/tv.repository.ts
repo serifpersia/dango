@@ -1,7 +1,8 @@
 import { eq, inArray, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
-import { tvLibrary, tvProgress } from '../db/schema-tv.js'
+import { tvProgress } from '../db/schema-tv.js'
+import { makeLibraryRepo } from './library.repository.js'
 
 export const TV_STATUSES: string[] = ['Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
@@ -55,42 +56,7 @@ export function normalizeTvMediaId(raw: unknown): string {
 }
 
 export const TvLibraryRepository = {
-  getById: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<TvLibraryRow>(
-      sql`SELECT * FROM tv_library WHERE id = ${id}`
-    )
-    return rows[0]
-  },
-
-  getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
-    const q = sql`SELECT * FROM tv_library`
-    if (status && status !== 'All') {
-      q.append(sql` WHERE status = ${status}`)
-    }
-    q.append(sql` ORDER BY updatedAt DESC`)
-    if (limit !== undefined && offset !== undefined) {
-      q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
-    }
-    return getDrizzle(db).all<TvLibraryRow>(q)
-  },
-
-  getCount: async (db: DatabaseWrapper, status?: string) => {
-    if (status && status !== 'All') {
-      const rows = await getDrizzle(db).all<{ total: number }>(
-        sql`SELECT COUNT(*) as total FROM tv_library WHERE status = ${status}`
-      )
-      return rows[0]?.total || 0
-    }
-    const rows = await getDrizzle(db).all<{ total: number }>(
-      sql`SELECT COUNT(*) as total FROM tv_library`
-    )
-    return rows[0]?.total || 0
-  },
-
-  getIds: async (db: DatabaseWrapper) => {
-    const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM tv_library`)
-    return rows.map((r) => r.id)
-  },
+  ...makeLibraryRepo<TvLibraryRow>('tv_library'),
 
   upsert: (
     db: DatabaseWrapper,
@@ -122,30 +88,9 @@ export const TvLibraryRepository = {
          adult = COALESCE(EXCLUDED.adult, tv_library.adult),
          updatedAt = strftime('%s', 'now')`),
 
-  updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
-    getDrizzle(db).run(sql`
-      UPDATE tv_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).run(sql`
-      UPDATE tv_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
-        ids.map((id) => sql`${id}`),
-        sql`, `
-      )})`)
-  },
-
   touchProgress: (db: DatabaseWrapper, id: string, progress: { season: number; episode: number }) =>
     getDrizzle(db).run(sql`
       UPDATE tv_library SET lastSeason = ${progress.season}, lastEpisode = ${progress.episode}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  delete: (db: DatabaseWrapper, id: string) =>
-    getDrizzle(db).delete(tvLibrary).where(eq(tvLibrary.id, id)),
-
-  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).delete(tvLibrary).where(inArray(tvLibrary.id, ids))
-  },
 }
 
 export const TvProgressRepository = {

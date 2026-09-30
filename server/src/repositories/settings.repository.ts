@@ -20,6 +20,19 @@ export const SettingsRepository = {
   deleteByKey: (db: DatabaseWrapper, key: string) =>
     getDrizzle(db).delete(settings).where(eq(settings.key, key)),
 
+  readContinueFlags: async (
+    db: DatabaseWrapper,
+    ignoreKey: string,
+    listOnlyKey: string
+  ): Promise<{ ignoreAdult: boolean; listOnly: boolean }> => {
+    const ignoreRow = await SettingsRepository.getByKey(db, ignoreKey)
+    const listOnlyRow = await SettingsRepository.getByKey(db, listOnlyKey)
+    return {
+      ignoreAdult: ignoreRow ? ignoreRow.value !== 'false' : true,
+      listOnly: listOnlyRow ? listOnlyRow.value === 'true' || listOnlyRow.value === '1' : false,
+    }
+  },
+
   clearWatchlist: (db: DatabaseWrapper) => getDrizzle(db).delete(watchlist),
 
   upsertWatchlistBatch: (

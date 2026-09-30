@@ -55,6 +55,72 @@ async function clearTables(db: DatabaseWrapper, tables: readonly string[]): Prom
   }
 }
 
+export function makeLibraryRepo<Row>(table: 'tv_library' | 'manga_library' | 'asmr_library') {
+  const t = sql.raw(`"${table}"`)
+  return {
+    getById: async (db: DatabaseWrapper, id: string) => {
+      const rows = await getDrizzle(db).all<Row>(sql`SELECT * FROM ${t} WHERE id = ${id}`)
+      return rows[0]
+    },
+
+    getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
+      const q = sql`SELECT * FROM ${t}`
+      if (status && status !== 'All') {
+        q.append(sql` WHERE status = ${status}`)
+      }
+      q.append(sql` ORDER BY updatedAt DESC`)
+      if (limit !== undefined && offset !== undefined) {
+        q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
+      }
+      return getDrizzle(db).all<Row>(q)
+    },
+
+    getCount: async (db: DatabaseWrapper, status?: string) => {
+      if (status && status !== 'All') {
+        const rows = await getDrizzle(db).all<{ total: number }>(
+          sql`SELECT COUNT(*) as total FROM ${t} WHERE status = ${status}`
+        )
+        return rows[0]?.total || 0
+      }
+      const rows = await getDrizzle(db).all<{ total: number }>(
+        sql`SELECT COUNT(*) as total FROM ${t}`
+      )
+      return rows[0]?.total || 0
+    },
+
+    getIds: async (db: DatabaseWrapper) => {
+      const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM ${t}`)
+      return rows.map((r) => r.id)
+    },
+
+    updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
+      getDrizzle(db).run(sql`
+      UPDATE ${t} SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
+
+    updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
+      if (ids.length === 0) return Promise.resolve()
+      return getDrizzle(db).run(sql`
+      UPDATE ${t} SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `
+      )})`)
+    },
+
+    delete: (db: DatabaseWrapper, id: string) =>
+      getDrizzle(db).run(sql`DELETE FROM ${t} WHERE id = ${id}`),
+
+    deleteMany: (db: DatabaseWrapper, ids: string[]) => {
+      if (ids.length === 0) return Promise.resolve()
+      return getDrizzle(db).run(
+        sql`DELETE FROM ${t} WHERE id IN (${sql.join(
+          ids.map((id) => sql`${id}`),
+          sql`, `
+        )})`
+      )
+    },
+  }
+}
+
 export const LibraryRepository = {
   countAll: (db: DatabaseWrapper): Promise<LibraryCounts> => countTables(db, LIBRARY_TABLES),
 

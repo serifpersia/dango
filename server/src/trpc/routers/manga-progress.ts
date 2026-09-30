@@ -1,7 +1,7 @@
 import { protectedProcedure, router } from '../index.js'
 import { defineSchema, optStr, reqObj, reqStr, reqStrArray } from '../validation.js'
 import { performMangaWriteTransactionAsync } from '../../sync.js'
-import { dbAll } from '../../utils/db-utils.js'
+import { adultNonListIds } from '../../utils/db-utils.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import {
   MangaLibraryRepository,
@@ -14,17 +14,14 @@ const MANGA_ADULT_RATINGS = ['erotica', 'pornographic']
 const isMangaContinueAdult = (row: { contentRating?: string | null }) =>
   !!row.contentRating && MANGA_ADULT_RATINGS.includes(row.contentRating)
 
-async function getAdultNonListMangaIds(db: DatabaseWrapper): Promise<string[]> {
-  const rows = await dbAll<{ mangaId: string }>(
+const getAdultNonListMangaIds = (db: DatabaseWrapper) =>
+  adultNonListIds(
     db,
-    `SELECT DISTINCT p.mangaId as mangaId
-       FROM manga_progress p
-       LEFT JOIN manga_library l ON l.id = p.mangaId
-       WHERE COALESCE(l.contentRating, p.contentRating) IN ('erotica', 'pornographic')
-         AND l.id IS NULL`
+    'manga_progress',
+    'manga_library',
+    'mangaId',
+    "COALESCE(l.contentRating, p.contentRating) IN ('erotica', 'pornographic')"
   )
-  return rows.map((r) => r.mangaId)
-}
 
 export type MangaIdInput = { mangaId: string }
 
@@ -134,11 +131,11 @@ export const mangaProgressRouter = router({
         chapterNumber: String(input.chapterNumber || ''),
         page: pageNum,
         pageCount: pageCountNum,
-        title: (input.title ?? null) as string | null,
-        cover: (input.cover ?? null) as string | null,
-        provider: (input.provider ?? null) as string | null,
-        altTitle: (input.altTitle ?? null) as string | null,
-        contentRating: (input.contentRating ?? null) as string | null,
+        title: input.title ?? null,
+        cover: input.cover ?? null,
+        provider: input.provider ?? null,
+        altTitle: input.altTitle ?? null,
+        contentRating: input.contentRating ?? null,
       })
       await MangaLibraryRepository.touchProgress(tx, String(input.mangaId), {
         chapterId: String(input.chapterId),
@@ -179,12 +176,11 @@ export const mangaProgressRouter = router({
     .query(async ({ ctx, input }) => {
       try {
         const limit = Math.min(Math.max(parseInt(String(input.limit)) || 24, 1), 100)
-        const ignoreAdultRow = await SettingsRepository.getByKey(ctx.db, 'mangaIgnoreAdultContent')
-        const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
-        const listOnlyRow = await SettingsRepository.getByKey(ctx.db, 'mangaCwWatchlistOnly')
-        const listOnly = listOnlyRow
-          ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
-          : false
+        const { ignoreAdult, listOnly } = await SettingsRepository.readContinueFlags(
+          ctx.db,
+          'mangaIgnoreAdultContent',
+          'mangaCwWatchlistOnly'
+        )
         const rows = (await MangaProgressRepository.getContinueReading(ctx.mangaDb, limit)).filter(
           (row) => {
             if (ignoreAdult && isMangaContinueAdult(row)) return false

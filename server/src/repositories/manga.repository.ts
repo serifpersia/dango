@@ -2,6 +2,7 @@ import { eq, inArray, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
 import { mangaLibrary, mangaProgress } from '../db/schema-manga.js'
+import { makeLibraryRepo } from './library.repository.js'
 
 export const MANGA_STATUSES: string[] = ['Reading', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
@@ -45,42 +46,7 @@ export function buildMangaId(provider: string, mangaId: string): string {
 }
 
 export const MangaLibraryRepository = {
-  getById: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<MangaLibraryRow>(
-      sql`SELECT * FROM manga_library WHERE id = ${id}`
-    )
-    return rows[0]
-  },
-
-  getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
-    const q = sql`SELECT * FROM manga_library`
-    if (status && status !== 'All') {
-      q.append(sql` WHERE status = ${status}`)
-    }
-    q.append(sql` ORDER BY updatedAt DESC`)
-    if (limit !== undefined && offset !== undefined) {
-      q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
-    }
-    return getDrizzle(db).all<MangaLibraryRow>(q)
-  },
-
-  getCount: async (db: DatabaseWrapper, status?: string) => {
-    if (status && status !== 'All') {
-      const rows = await getDrizzle(db).all<{ total: number }>(
-        sql`SELECT COUNT(*) as total FROM manga_library WHERE status = ${status}`
-      )
-      return rows[0]?.total || 0
-    }
-    const rows = await getDrizzle(db).all<{ total: number }>(
-      sql`SELECT COUNT(*) as total FROM manga_library`
-    )
-    return rows[0]?.total || 0
-  },
-
-  getIds: async (db: DatabaseWrapper) => {
-    const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM manga_library`)
-    return rows.map((r) => r.id)
-  },
+  ...makeLibraryRepo<MangaLibraryRow>('manga_library'),
 
   upsert: (
     db: DatabaseWrapper,
@@ -126,19 +92,6 @@ export const MangaLibraryRepository = {
       sql`SELECT * FROM manga_library WHERE anilistId = ${anilistId}`
     ),
 
-  updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
-    getDrizzle(db).run(sql`
-      UPDATE manga_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).run(sql`
-      UPDATE manga_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
-        ids.map((id) => sql`${id}`),
-        sql`, `
-      )})`)
-  },
-
   touchProgress: (
     db: DatabaseWrapper,
     id: string,
@@ -150,14 +103,6 @@ export const MangaLibraryRepository = {
   setProgressPointer: (db: DatabaseWrapper, id: string, chapterNumber: string) =>
     getDrizzle(db).run(sql`
       UPDATE manga_library SET lastChapterNumber = ${chapterNumber}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  delete: (db: DatabaseWrapper, id: string) =>
-    getDrizzle(db).delete(mangaLibrary).where(eq(mangaLibrary.id, id)),
-
-  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).delete(mangaLibrary).where(inArray(mangaLibrary.id, ids))
-  },
 }
 
 export const MangaProgressRepository = {

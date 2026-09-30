@@ -89,6 +89,11 @@ export function readCount(obj: Record<string, unknown>, name: string, fallback: 
   return Number.isFinite(n) ? n : fallback
 }
 
+export function strOrNull(obj: Record<string, unknown>, name: string): string | null {
+  const value = obj[name]
+  return typeof value === 'string' ? value : null
+}
+
 export function readPageLimit(obj: Record<string, unknown>): { page?: number; limit?: number } {
   const out: { page?: number; limit?: number } = {}
   const page = optNum(obj, 'page')

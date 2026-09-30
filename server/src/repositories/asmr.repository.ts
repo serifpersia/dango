@@ -1,7 +1,8 @@
 import { eq, inArray, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
-import { asmrLibrary, asmrProgress } from '../db/schema-asmr.js'
+import { asmrProgress } from '../db/schema-asmr.js'
+import { makeLibraryRepo } from './library.repository.js'
 
 export const ASMR_STATUSES: string[] = ['Listening', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
@@ -39,42 +40,7 @@ export function buildAsmrId(rjCode: string): string {
 }
 
 export const AsmrLibraryRepository = {
-  getById: async (db: DatabaseWrapper, id: string) => {
-    const rows = await getDrizzle(db).all<AsmrLibraryRow>(
-      sql`SELECT * FROM asmr_library WHERE id = ${id}`
-    )
-    return rows[0]
-  },
-
-  getAll: (db: DatabaseWrapper, status?: string, limit?: number, offset?: number) => {
-    const q = sql`SELECT * FROM asmr_library`
-    if (status && status !== 'All') {
-      q.append(sql` WHERE status = ${status}`)
-    }
-    q.append(sql` ORDER BY updatedAt DESC`)
-    if (limit !== undefined && offset !== undefined) {
-      q.append(sql` LIMIT ${limit} OFFSET ${offset}`)
-    }
-    return getDrizzle(db).all<AsmrLibraryRow>(q)
-  },
-
-  getCount: async (db: DatabaseWrapper, status?: string) => {
-    if (status && status !== 'All') {
-      const rows = await getDrizzle(db).all<{ total: number }>(
-        sql`SELECT COUNT(*) as total FROM asmr_library WHERE status = ${status}`
-      )
-      return rows[0]?.total || 0
-    }
-    const rows = await getDrizzle(db).all<{ total: number }>(
-      sql`SELECT COUNT(*) as total FROM asmr_library`
-    )
-    return rows[0]?.total || 0
-  },
-
-  getIds: async (db: DatabaseWrapper) => {
-    const rows = await getDrizzle(db).all<{ id: string }>(sql`SELECT id FROM asmr_library`)
-    return rows.map((r) => r.id)
-  },
+  ...makeLibraryRepo<AsmrLibraryRow>('asmr_library'),
 
   upsert: (
     db: DatabaseWrapper,
@@ -98,19 +64,6 @@ export const AsmrLibraryRepository = {
          isAdult = COALESCE(EXCLUDED.isAdult, asmr_library.isAdult),
          updatedAt = strftime('%s', 'now')`),
 
-  updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
-    getDrizzle(db).run(sql`
-      UPDATE asmr_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).run(sql`
-      UPDATE asmr_library SET status = ${status}, updatedAt = strftime('%s', 'now') WHERE id IN (${sql.join(
-        ids.map((id) => sql`${id}`),
-        sql`, `
-      )})`)
-  },
-
   touchProgress: (
     db: DatabaseWrapper,
     id: string,
@@ -118,14 +71,6 @@ export const AsmrLibraryRepository = {
   ) =>
     getDrizzle(db).run(sql`
       UPDATE asmr_library SET lastTrackIndex = ${progress.trackIndex}, lastTrackLabel = ${progress.trackLabel}, lastPosition = ${progress.position}, updatedAt = strftime('%s', 'now') WHERE id = ${id}`),
-
-  delete: (db: DatabaseWrapper, id: string) =>
-    getDrizzle(db).delete(asmrLibrary).where(eq(asmrLibrary.id, id)),
-
-  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
-    if (ids.length === 0) return Promise.resolve()
-    return getDrizzle(db).delete(asmrLibrary).where(inArray(asmrLibrary.id, ids))
-  },
 }
 
 export const AsmrProgressRepository = {

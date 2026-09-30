@@ -2,29 +2,20 @@ import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
 import type { DatabaseWrapper } from '../../db.js'
 import { performTvWriteTransactionAsync } from '../../sync.js'
-import { dbAll } from '../../utils/db-utils.js'
+import { adultNonListIds } from '../../utils/db-utils.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import {
   normalizeTvMediaId,
   TvLibraryRepository,
   TvProgressRepository,
 } from '../../repositories/tv.repository.js'
-import { defineSchema, reqObj, reqStr } from '../validation.js'
+import { defineSchema, reqObj, reqStr, strOrNull } from '../validation.js'
 
 const isTvContinueAdult = (row: { adult?: boolean | number | null }) =>
   row.adult === true || row.adult === 1
 
-async function getAdultNonListMediaIds(db: DatabaseWrapper): Promise<string[]> {
-  const rows = await dbAll<{ mediaId: string }>(
-    db,
-    `SELECT DISTINCT p.mediaId as mediaId
-       FROM tv_progress p
-       LEFT JOIN tv_library l ON l.id = p.mediaId
-       WHERE COALESCE(l.adult, p.adult) = 1
-         AND l.id IS NULL`
-  )
-  return rows.map((r) => r.mediaId)
-}
+const getAdultNonListMediaIds = (db: DatabaseWrapper) =>
+  adultNonListIds(db, 'tv_progress', 'tv_library', 'mediaId', 'COALESCE(l.adult, p.adult) = 1')
 
 export type TvProgressMediaInput = { mediaId: string }
 
@@ -48,13 +39,13 @@ export type TvProgressSaveInput = {
   currentTime?: unknown
   duration?: unknown
   completed?: unknown
-  title?: unknown
-  poster?: unknown
-  backdrop?: unknown
-  year?: unknown
-  overview?: unknown
+  title?: string | null
+  poster?: string | null
+  backdrop?: string | null
+  year?: string | null
+  overview?: string | null
   tmdbId?: unknown
-  mediaType?: unknown
+  mediaType?: string | null
   adult?: unknown
 }
 
@@ -68,13 +59,13 @@ const tvProgressSaveInput = () =>
       currentTime: obj.currentTime,
       duration: obj.duration,
       completed: obj.completed,
-      title: obj.title ?? null,
-      poster: obj.poster ?? null,
-      backdrop: obj.backdrop ?? null,
-      year: obj.year ?? null,
-      overview: obj.overview ?? null,
+      title: strOrNull(obj, 'title'),
+      poster: strOrNull(obj, 'poster'),
+      backdrop: strOrNull(obj, 'backdrop'),
+      year: strOrNull(obj, 'year'),
+      overview: strOrNull(obj, 'overview'),
       tmdbId: obj.tmdbId ?? null,
-      mediaType: obj.mediaType ?? null,
+      mediaType: strOrNull(obj, 'mediaType'),
       adult: obj.adult ?? null,
     }
   })
@@ -147,13 +138,13 @@ export const tvProgressRouter = router({
         currentTime: storedTime,
         duration: durationNum,
         completed: completedNow,
-        title: (input.title ?? null) as string | null,
-        poster: (input.poster ?? null) as string | null,
-        backdrop: (input.backdrop ?? null) as string | null,
-        year: (input.year ?? null) as string | null,
-        overview: (input.overview ?? null) as string | null,
+        title: input.title ?? null,
+        poster: input.poster ?? null,
+        backdrop: input.backdrop ?? null,
+        year: input.year ?? null,
+        overview: input.overview ?? null,
         tmdbId: input.tmdbId != null ? Number(input.tmdbId) : null,
-        mediaType: (input.mediaType ?? null) as string | null,
+        mediaType: input.mediaType ?? null,
         adult: input.adult != null ? Number(input.adult) : null,
       })
       await TvLibraryRepository.touchProgress(tx, String(mediaId), {
@@ -198,12 +189,11 @@ export const tvProgressRouter = router({
     .input(tvContinueWatchingInput())
     .query(async ({ ctx, input }) => {
       const limit = Math.min(Math.max(parseInt(String(input.limit ?? 24)) || 24, 1), 100)
-      const ignoreAdultRow = await SettingsRepository.getByKey(ctx.db, 'tvIgnoreAdultContent')
-      const ignoreAdult = ignoreAdultRow ? ignoreAdultRow.value !== 'false' : true
-      const listOnlyRow = await SettingsRepository.getByKey(ctx.db, 'tvCwWatchlistOnly')
-      const listOnly = listOnlyRow
-        ? listOnlyRow.value === 'true' || listOnlyRow.value === '1'
-        : false
+      const { ignoreAdult, listOnly } = await SettingsRepository.readContinueFlags(
+        ctx.db,
+        'tvIgnoreAdultContent',
+        'tvCwWatchlistOnly'
+      )
       const rows = (await TvProgressRepository.getContinueWatching(ctx.tvDb, limit)).filter(
         (row) => {
           if (ignoreAdult && isTvContinueAdult(row)) return false
