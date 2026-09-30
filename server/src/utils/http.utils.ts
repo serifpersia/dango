@@ -33,6 +33,22 @@ export async function parseJsonBody<T = unknown>(res: Response): Promise<T> {
   }
 }
 
+export function linkAbort(signal: AbortSignal, abort: AbortController): void {
+  signal.addEventListener('abort', () => abort.abort(), { once: true })
+}
+
+export function setProxyHeaders(
+  out: Headers,
+  get: (name: string) => string | string[] | null | undefined
+): void {
+  for (const name of ['content-length', 'content-range', 'accept-ranges'] as const) {
+    const raw = get(name)
+    const value = Array.isArray(raw) ? raw[0] : raw
+    if (value) out.set(name, value)
+  }
+  out.set('Access-Control-Allow-Origin', '*')
+}
+
 export function isAbortError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
   const name = (err as { name?: string }).name

@@ -17,6 +17,12 @@ import {
   searchAnilistByTitle,
 } from '../anilist.js'
 import { kitsuSearchAnime } from '../kitsu.js'
+import {
+  readTrackerSyncState,
+  resolveStatus,
+  TrackerSyncState,
+  TrackerSyncStateEntry,
+} from './sync-state.js'
 
 const TOKEN_KEY = 'tracker_anilist_token'
 const USER_KEY = 'tracker_anilist_user'
@@ -30,23 +36,6 @@ export interface SyncSummary {
   errors: string[]
 }
 
-interface SyncStateEntry {
-  lastSyncedAt: number
-  remoteUpdatedAt: number
-}
-
-type SyncState = Record<string, SyncStateEntry>
-
-async function readSyncState(db: DatabaseWrapper): Promise<SyncState> {
-  const row = await SettingsRepository.getByKey(db, SYNC_STATE_KEY)
-  if (!row?.value) return {}
-  try {
-    return JSON.parse(row.value) as SyncState
-  } catch {
-    return {}
-  }
-}
-
 async function getWatchedCount(db: DatabaseWrapper, showId: string): Promise<number> {
   const row = await dbGet<{ total: number }>(
     db,
@@ -54,21 +43,6 @@ async function getWatchedCount(db: DatabaseWrapper, showId: string): Promise<num
     [showId]
   )
   return row?.total ?? 0
-}
-
-function resolveStatus(
-  localStatus: string,
-  remoteStatus: string,
-  remoteUpdated: number,
-  localLastSync: number
-): { status: string; pull: boolean } {
-  if (remoteUpdated > localLastSync && remoteStatus !== localStatus) {
-    return { status: remoteStatus, pull: true }
-  }
-  if (remoteStatus !== localStatus) {
-    return { status: localStatus, pull: false }
-  }
-  return { status: localStatus, pull: false }
 }
 
 export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
@@ -81,7 +55,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
   const remoteEntries = await tracker.fetchUserAnimeList(viewer.id)
 
   const localItems = await WatchlistRepository.getAll(db)
-  const syncState = await readSyncState(db)
+  const syncState = await readTrackerSyncState(db, SYNC_STATE_KEY)
 
   const remoteByMediaId = new Map<number, RemoteMediaEntry>()
   for (const entry of remoteEntries) remoteByMediaId.set(entry.mediaId, entry)
@@ -131,7 +105,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
     episodeDuration?: number
   }[] = []
   const watchedInserts: { showId: string; from: number; to: number; updatedAt?: number }[] = []
-  const stateUpdates: Record<string, SyncStateEntry | undefined> = {}
+  const stateUpdates: Record<string, TrackerSyncStateEntry | undefined> = {}
   const watchlistDeletes: string[] = []
   const pushUpdates: { mediaId: number; status: string | undefined; progress: number }[] = []
   const remoteDeleteEntryIds: { showId: string; entryId: number }[] = []
@@ -343,7 +317,7 @@ export async function syncAniList(db: DatabaseWrapper): Promise<SyncSummary> {
         await WatchedEpisodesRepository.deleteByShow(tx, id)
         await NotificationsRepository.deleteByShow(tx, id)
       }
-      const mergedState: SyncState = { ...syncState }
+      const mergedState: TrackerSyncState = { ...syncState }
       for (const [k, v] of Object.entries(stateUpdates)) {
         if (v === undefined) delete mergedState[k]
         else mergedState[k] = v
@@ -386,7 +360,7 @@ export async function importFromUsername(
   if (entries.length === 0) return 0
 
   const now = Math.floor(Date.now() / 1000)
-  const syncState = await readSyncState(db)
+  const syncState = await readTrackerSyncState(db, SYNC_STATE_KEY)
 
   await performWriteTransactionAsync(db, async (tx) => {
     if (erase) await SettingsRepository.clearWatchlist(tx)

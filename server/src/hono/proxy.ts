@@ -7,7 +7,7 @@ import fs from 'fs'
 import logger from '../logger.js'
 import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils.js'
 import { isSafeExternalUrl } from '../utils/security.utils.js'
-import { fetchWithRetry } from '../utils/http.utils.js'
+import { fetchWithRetry, linkAbort, setProxyHeaders } from '../utils/http.utils.js'
 import {
   MEGAPLAY_ORIGIN,
   isNexabloomMasterUrl,
@@ -311,10 +311,6 @@ function placeholderSvg(): Response | null {
 
 const PROXY_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0'
 
-function linkAbort(signal: AbortSignal, abort: AbortController) {
-  signal.addEventListener('abort', () => abort.abort(), { once: true })
-}
-
 export function registerProxy(app: Hono) {
   app.get('/api/proxy', async (c) => {
     const url = c.req.query('url')
@@ -481,14 +477,8 @@ export function registerProxy(app: Hono) {
             'Content-Type',
             isVtt ? 'text/vtt; charset=utf-8' : ct || 'application/octet-stream'
           )
-          const cl = resp.headers['content-length']
-          if (cl) outHeaders.set('Content-Length', cl)
-          const cr = resp.headers['content-range']
-          if (cr) outHeaders.set('Content-Range', cr)
-          const ar = resp.headers['accept-ranges']
-          if (ar) outHeaders.set('Accept-Ranges', ar)
-          outHeaders.set('Access-Control-Allow-Origin', '*')
-          return new Response(resp.body as unknown as BodyInit, {
+          setProxyHeaders(outHeaders, (name) => resp.headers[name])
+          return new Response(resp.body as BodyInit, {
             status: resp.statusCode as 200,
             headers: outHeaders,
           })
@@ -532,13 +522,7 @@ export function registerProxy(app: Hono) {
             'Content-Type',
             isVtt ? 'text/vtt; charset=utf-8' : ct || 'application/octet-stream'
           )
-          const cl = upstream.headers.get('content-length')
-          if (cl) outHeaders.set('Content-Length', cl)
-          const cr = upstream.headers.get('content-range')
-          if (cr) outHeaders.set('Content-Range', cr)
-          const ar = upstream.headers.get('accept-ranges')
-          if (ar) outHeaders.set('Accept-Ranges', ar)
-          outHeaders.set('Access-Control-Allow-Origin', '*')
+          setProxyHeaders(outHeaders, (name) => upstream.headers.get(name))
           if (!upstream.body) {
             return c.text('Upstream error', 502)
           }
@@ -868,7 +852,7 @@ export function registerProxy(app: Hono) {
         outHeaders.set('Cache-Control', 'public, max-age=604800, immutable')
         outHeaders.set('Content-Type', contentType)
         outHeaders.set('Access-Control-Allow-Origin', '*')
-        return new Response(body as unknown as BodyInit, { headers: outHeaders })
+        return new Response(body as BodyInit, { headers: outHeaders })
       }
       const placeholder = placeholderSvg()
       if (placeholder) return placeholder

@@ -1,6 +1,7 @@
 import type { Hono } from 'hono'
 import type { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
+import { linkAbort, setProxyHeaders } from '../utils/http.utils.js'
 import { URL } from 'url'
 import { isSafeExternalUrl } from '../utils/security.utils.js'
 import type { TvMediaRequest, TvProvider } from '../providers/tv.types.js'
@@ -86,14 +87,7 @@ export function registerTv(
 
     const abort = new AbortController()
     const timeout = setTimeout(() => abort.abort(), 30000)
-    c.req.raw.signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timeout)
-        abort.abort()
-      },
-      { once: true }
-    )
+    linkAbort(c.req.raw.signal, abort)
 
     try {
       const headers: Record<string, string> = {
@@ -114,16 +108,10 @@ export function registerTv(
       }
 
       const contentType = fetchResp.headers.get('content-type') || 'application/octet-stream'
-      const contentLength = fetchResp.headers.get('content-length')
-      const contentRange = fetchResp.headers.get('content-range')
-      const acceptRanges = fetchResp.headers.get('accept-ranges')
 
       const outHeaders = new Headers()
       outHeaders.set('Content-Type', contentType)
-      if (contentLength) outHeaders.set('Content-Length', contentLength)
-      if (contentRange) outHeaders.set('Content-Range', contentRange)
-      if (acceptRanges) outHeaders.set('Accept-Ranges', acceptRanges)
-      outHeaders.set('Access-Control-Allow-Origin', '*')
+      setProxyHeaders(outHeaders, (name) => fetchResp.headers.get(name))
       outHeaders.set('Connection', 'keep-alive')
 
       if (urlStr.includes('.m3u8') || /mpegurl|m3u8/i.test(contentType)) {
@@ -133,7 +121,7 @@ export function registerTv(
         const bodyBuffer = Buffer.from(rewritten, 'utf8')
         outHeaders.set('Content-Type', 'application/vnd.apple.mpegurl')
         outHeaders.set('Content-Length', String(bodyBuffer.length))
-        return new Response(bodyBuffer as unknown as BodyInit, { status, headers: outHeaders })
+        return new Response(bodyBuffer, { status, headers: outHeaders })
       }
 
       const chunks: Buffer[] = []
@@ -155,9 +143,9 @@ export function registerTv(
           const bodyBuffer = Buffer.from(rewritten, 'utf8')
           outHeaders.set('Content-Type', 'application/vnd.apple.mpegurl')
           outHeaders.set('Content-Length', String(bodyBuffer.length))
-          return new Response(bodyBuffer as unknown as BodyInit, { status, headers: outHeaders })
+          return new Response(bodyBuffer, { status, headers: outHeaders })
         }
-        return new Response(body as unknown as BodyInit, { status, headers: outHeaders })
+        return new Response(body, { status, headers: outHeaders })
       } catch (err) {
         logger.warn(
           { err, host: safeCheck.url?.hostname },

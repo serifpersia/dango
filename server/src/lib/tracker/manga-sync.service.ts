@@ -9,6 +9,12 @@ import { DatabaseWrapper } from '../../db.js'
 import logger from '../../logger.js'
 import { searchAnilistMangaByTitle, getMangaMetaById, getMangaMetaByMalId } from '../anilist.js'
 import { fetchMalMangaList, mapMalMangaStatusCode } from '../mal.js'
+import {
+  readTrackerSyncState,
+  resolveStatus,
+  TrackerSyncState,
+  TrackerSyncStateEntry,
+} from './sync-state.js'
 
 const TOKEN_KEY = 'tracker_anilist_token'
 const MANGA_SYNC_STATE_KEY = 'tracker_anilist_manga_sync_state'
@@ -59,38 +65,6 @@ export type MangaSyncDirection = 'two-way' | 'pull-only'
 
 export interface MangaSyncOptions {
   direction?: MangaSyncDirection
-}
-
-interface MangaSyncStateEntry {
-  lastSyncedAt: number
-  remoteUpdatedAt: number
-}
-
-type MangaSyncState = Record<string, MangaSyncStateEntry>
-
-async function readMangaSyncState(db: DatabaseWrapper): Promise<MangaSyncState> {
-  const row = await SettingsRepository.getByKey(db, MANGA_SYNC_STATE_KEY)
-  if (!row?.value) return {}
-  try {
-    return JSON.parse(row.value) as MangaSyncState
-  } catch {
-    return {}
-  }
-}
-
-function resolveStatus(
-  localStatus: string,
-  remoteStatus: string,
-  remoteUpdated: number,
-  localLastSync: number
-): { status: string; pull: boolean } {
-  if (remoteUpdated > localLastSync && remoteStatus !== localStatus) {
-    return { status: remoteStatus, pull: true }
-  }
-  if (remoteStatus !== localStatus) {
-    return { status: localStatus, pull: false }
-  }
-  return { status: localStatus, pull: false }
 }
 
 function parseChapterProgress(value: unknown): number {
@@ -207,7 +181,7 @@ export async function syncAniListManga(
   const remoteEntries = await tracker.fetchUserMangaList(viewer.id)
 
   const localItems = await MangaLibraryRepository.getAll(mangaDb)
-  const syncState = await readMangaSyncState(db)
+  const syncState = await readTrackerSyncState(db, MANGA_SYNC_STATE_KEY)
 
   const remoteByMediaId = new Map<number, RemoteMangaEntry>()
   for (const entry of remoteEntries) remoteByMediaId.set(entry.mediaId, entry)
@@ -360,7 +334,7 @@ export async function syncAniListManga(
     provider: string
   }[] = []
   const libraryDeletes: string[] = []
-  const stateUpdates: Record<string, MangaSyncStateEntry | undefined> = {}
+  const stateUpdates: Record<string, TrackerSyncStateEntry | undefined> = {}
   const pushUpdates: { mediaId: number; status: string | undefined; progress: number }[] = []
   const remoteDeleteEntryIds: { showId: string; entryId: number }[] = []
 
@@ -719,7 +693,7 @@ export async function syncAniListManga(
 
   if (Object.keys(stateUpdates).length > 0) {
     try {
-      const mergedState: MangaSyncState = { ...syncState }
+      const mergedState: TrackerSyncState = { ...syncState }
       for (const [k, v] of Object.entries(stateUpdates)) {
         if (v === undefined) delete mergedState[k]
         else mergedState[k] = v
@@ -766,7 +740,7 @@ export async function insertMangaImportEntries(
   if (items.length === 0) return 0
 
   const now = Math.floor(Date.now() / 1000)
-  const syncState = await readMangaSyncState(db)
+  const syncState = await readTrackerSyncState(db, MANGA_SYNC_STATE_KEY)
 
   await performMangaWriteTransactionAsync(mangaDb, async (tx) => {
     if (eraseAnilistRows) {

@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import logger from '../logger.js'
+import { setProxyHeaders } from '../utils/http.utils.js'
 import { getInnertube, getAuthedInnertube, refreshAuthedInnertube } from '../lib/ytmusic.js'
 
 interface DecipheredAudio {
@@ -79,8 +80,6 @@ async function decipherAudio(videoId: string): Promise<DecipheredAudio> {
   return decipherWith(await getInnertube(), videoId)
 }
 
-const PASSTHROUGH_HEADERS = ['content-type', 'content-length', 'content-range', 'accept-ranges']
-
 export function registerMusic(app: Hono) {
   app.get('/api/music/stream', async (c) => {
     const videoId = String(c.req.query('videoId') || c.req.query('id') || '').trim()
@@ -134,13 +133,11 @@ export function registerMusic(app: Hono) {
         return c.json({ error: 'Upstream error' }, 502)
       }
       const headers = new Headers()
-      for (const name of PASSTHROUGH_HEADERS) {
-        const value = upstream.headers.get(name)
-        if (value) headers.set(name === 'content-type' ? 'Content-Type' : name, value)
-      }
-      if (!headers.get('Content-Type')) headers.set('Content-Type', entry.mimeType || 'audio/webm')
+      const upstreamType = upstream.headers.get('content-type')
+      if (upstreamType) headers.set('Content-Type', upstreamType)
+      else headers.set('Content-Type', entry.mimeType || 'audio/webm')
+      setProxyHeaders(headers, (name) => upstream.headers.get(name))
       headers.set('Accept-Ranges', 'bytes')
-      headers.set('Access-Control-Allow-Origin', '*')
       if (!upstream.body) {
         return c.json({ error: 'Upstream error' }, 502)
       }
