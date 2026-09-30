@@ -671,7 +671,7 @@ export class GoogleDriveService {
       exportedAt: string
       tables: Record<string, Array<Record<string, string | number | null>>>
     }
-    this.importDatabase(db, payload as never)
+    this.importDatabase(db, payload)
     const row = (
       payload.tables?.sync_metadata as Array<{ key: string; value: number }> | undefined
     )?.find((r) => r.key === 'db_version')

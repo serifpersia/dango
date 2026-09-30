@@ -1,4 +1,3 @@
-import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
 import { getWatchInsights, getGenreCards } from '../../lib/insights.js'
 import {
@@ -7,15 +6,25 @@ import {
   getLinkedDiscordUser,
   setLinkedDiscordUser,
   syncDiscordRoles,
+  type LinkedDiscordUser,
 } from '../../lib/discord-roles-sync.service.js'
-import { defineSchema, reqObj } from '../validation.js'
+import { defineSchema, optStr, reqObj, reqStr } from '../validation.js'
 
-export type DiscordUserInput = { user?: unknown }
+export type DiscordUserInput = { user?: LinkedDiscordUser | null }
 
 const discordUserInput = () =>
   defineSchema<DiscordUserInput, DiscordUserInput>((value) => {
     if (value === undefined || value === null) return {}
-    return { user: reqObj(value).user }
+    const raw = reqObj(value).user
+    if (raw === undefined || raw === null) return { user: null }
+    const obj = reqObj(raw)
+    return {
+      user: {
+        id: reqStr(obj, 'id'),
+        username: optStr(obj, 'username') ?? '',
+        avatar: optStr(obj, 'avatar') ?? null,
+      },
+    }
   })
 
 export const insightsRouter = router({
@@ -40,21 +49,9 @@ export const insightsRouter = router({
   }),
 
   setDiscordUser: protectedProcedure.input(discordUserInput()).mutation(async ({ ctx, input }) => {
-    const { user } = input
-    if (
-      user !== null &&
-      user !== undefined &&
-      (typeof user !== 'object' ||
-        typeof (user as { id?: unknown }).id !== 'string' ||
-        !(user as { id: string }).id)
-    ) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Invalid user payload: expected { id, ... } or null',
-      })
-    }
-    await setLinkedDiscordUser(ctx.db, (user as never) || null)
-    return { success: true, user: user || null }
+    const user = input.user ?? null
+    await setLinkedDiscordUser(ctx.db, user)
+    return { success: true, user }
   }),
 
   discordSyncNow: protectedProcedure.mutation(async ({ ctx }) => {

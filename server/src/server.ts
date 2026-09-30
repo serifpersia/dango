@@ -24,7 +24,7 @@ import {
   KIND_SYNC,
   type MediaKind,
 } from './sync.js'
-import type { JasmrApi } from './hono/asmr.js'
+import { isJasmrApi } from './hono/asmr.js'
 import type { MangaProvider } from './providers/manga/manga.types.js'
 import type { TvProvider } from './providers/tv.types.js'
 import { loadRemoteProviders } from './providers/remote-loader.js'
@@ -63,7 +63,10 @@ const app = createHonoApp(
     getProviders: () => providers,
     getMangaProvider: (name) => mangaProviders[name],
     getTvProvider: (name) => tvProviders[name],
-    getJasmr: () => providers['jasmr'] as unknown as JasmrApi | undefined,
+    getJasmr: () => {
+      const mod = providers['jasmr']
+      return isJasmrApi(mod) ? mod : undefined
+    },
   }
 )
 

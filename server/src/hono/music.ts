@@ -1,7 +1,13 @@
 import type { Hono } from 'hono'
 import logger from '../logger.js'
 import { setProxyHeaders } from '../utils/http.utils.js'
-import { getInnertube, getAuthedInnertube, refreshAuthedInnertube } from '../lib/ytmusic.js'
+import {
+  getInnertube,
+  getAuthedInnertube,
+  refreshAuthedInnertube,
+  type YtPlayerSession,
+  type YtStreamingData,
+} from '../lib/ytmusic.js'
 
 interface DecipheredAudio {
   url: string
@@ -19,24 +25,12 @@ async function decipherWith(
   videoId: string
 ): Promise<DecipheredAudio> {
   const info = await yt.music.getInfo(videoId)
-  const streaming = (
-    info as unknown as {
-      streaming_data?: {
-        adaptive_formats?: {
-          mime_type?: string
-          bitrate?: number
-          has_audio?: boolean
-          has_video?: boolean
-          decipher: (player: unknown) => Promise<string>
-        }[]
-      }
-    }
-  ).streaming_data
+  const streaming = (info as YtStreamingData).streaming_data
   const formats = streaming?.adaptive_formats ?? []
   const sorted = [...formats]
     .filter((f) => f.has_audio && !f.has_video)
     .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))
-  const player = (yt.session as unknown as { player?: unknown }).player
+  const player = (yt.session as YtPlayerSession).player
   for (const fmt of sorted) {
     try {
       const url = await fmt.decipher(player)

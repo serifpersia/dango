@@ -10,6 +10,41 @@ export interface YTMusicAuthStatus {
   authenticated: boolean
 }
 
+export interface YtPanel {
+  contents?: unknown[]
+  playlist_id?: string
+}
+
+export interface YtBasicInfo {
+  basic_info?: {
+    title?: string
+    author?: string
+    duration?: number
+    thumbnail?: { url: string; width?: number; height?: number }[]
+  }
+}
+
+export interface YtSessionActions {
+  actions?: unknown
+  session?: { actions?: unknown }
+}
+
+export interface YtStreamingData {
+  streaming_data?: {
+    adaptive_formats?: {
+      mime_type?: string
+      bitrate?: number
+      has_audio?: boolean
+      has_video?: boolean
+      decipher: (player: unknown) => Promise<string>
+    }[]
+  }
+}
+
+export interface YtPlayerSession {
+  player?: unknown
+}
+
 let publicTube: Innertube | null = null
 let publicPromise: Promise<Innertube> | null = null
 let publicFailedAt = 0

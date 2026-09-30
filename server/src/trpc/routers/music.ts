@@ -10,6 +10,9 @@ import {
   getMusicAuthStatus,
   signOutMusic,
   isParserVariantError,
+  type YtBasicInfo,
+  type YtPanel,
+  type YtSessionActions,
 } from '../../lib/ytmusic.js'
 
 interface MusicTrack {
@@ -178,13 +181,14 @@ function parseUpnext(
   trustLike: boolean
 ): { tracks: MusicTrack[]; playlistId: string | null } {
   const tracks: MusicTrack[] = []
-  const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+  const shaped = panel as YtPanel
+  const contents = shaped.contents ?? []
   for (const item of contents) {
     const track = upnextToTrack(item, trustLike)
     if (track) tracks.push(track)
     if (tracks.length >= 50) break
   }
-  const playlistId = (panel as unknown as { playlist_id?: string }).playlist_id ?? null
+  const playlistId = shaped.playlist_id ?? null
   return { tracks, playlistId }
 }
 
@@ -439,9 +443,9 @@ export const musicRouter = router({
       const yt = await getInnertube()
       const result = await yt.music.search(q, { type: 'song' })
       const tracks: MusicTrack[] = []
-      const contents = (result as unknown as { contents?: unknown[] }).contents ?? []
+      const contents = (result as YtPanel).contents ?? []
       for (const section of contents) {
-        const items = (section as { contents?: unknown[] }).contents ?? [section]
+        const items = (section as YtPanel).contents ?? [section]
         for (const item of items) {
           const track = toTrack(item)
           if (track) tracks.push(track)
@@ -465,16 +469,7 @@ export const musicRouter = router({
     try {
       const yt = await getInnertube()
       const info = await yt.music.getInfo(id)
-      const basic = (
-        info as unknown as {
-          basic_info?: {
-            title?: string
-            author?: string
-            duration?: number
-            thumbnail?: { url: string; width?: number; height?: number }[]
-          }
-        }
-      ).basic_info
+      const basic = (info as YtBasicInfo).basic_info
       if (!basic?.title) return { track: null as MusicTrack | null }
       const durationSec =
         typeof basic.duration === 'number' && Number.isFinite(basic.duration)
@@ -637,12 +632,11 @@ export const musicRouter = router({
     const attempt = async (
       session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
     ): Promise<void> => {
-      const actions =
-        (session as unknown as { actions?: unknown; session?: { actions?: unknown } }).actions ??
-        (session as unknown as { session?: { actions?: unknown } }).session?.actions
+      const shaped = session as YtSessionActions
+      const actions = shaped.actions ?? shaped.session?.actions
       if (!actions) throw new Error('Actions unavailable')
       const panel = await session.music.getUpNext(id)
-      const contents = (panel as unknown as { contents?: unknown[] }).contents ?? []
+      const contents = (panel as YtPanel).contents ?? []
       let endpoint: MenuEndpoint | null = null
       for (const item of contents) {
         const toggle = findLikeToggle(item, id)

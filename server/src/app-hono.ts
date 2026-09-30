@@ -1,4 +1,5 @@
-import { Hono, type Context } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { compress } from 'hono/compress'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import path from 'path'
@@ -166,21 +167,15 @@ function maskToken(t: string | undefined | null): string {
   return t.slice(0, 8) + '...' + t.slice(-4)
 }
 
-export function getHonoClientIp(c: {
-  req: { header: (name: string) => string | undefined }
-  env: unknown
-}): string | undefined {
+export function getHonoClientIp(c: Context): string | undefined {
   try {
-    return getConnInfo(c as never).remote.address
+    return getConnInfo(c).remote.address
   } catch {
     return c.req.header('x-dango-client-ip') ?? undefined
   }
 }
 
-export async function honoRequestLogger(
-  c: { req: { method: string; url: string }; res: Response },
-  next: () => Promise<void>
-) {
+export async function honoRequestLogger(c: Context, next: Next) {
   const start = process.hrtime.bigint()
   const url = new URL(c.req.url)
   const loggedUrl = `${url.pathname}${url.search}`
@@ -195,10 +190,7 @@ export async function honoRequestLogger(
   }
 }
 
-export async function honoRequestContextMiddleware(
-  c: { req: { header: (name: string) => string | undefined } },
-  next: () => Promise<void>
-) {
+export async function honoRequestContextMiddleware(c: Context, next: Next) {
   const store = new Map<string, string>()
   const ua = c.req.header('x-animepahe-ua')
   if (ua) store.set('ua', ua)
@@ -268,7 +260,8 @@ async function restoreJsonBackup(c: Context, dbs: HonoDbs, buffer: Buffer) {
   const restored: string[] = []
   try {
     for (const target of present) {
-      const section = sections.get(target.key)!
+      const section = sections.get(target.key)
+      if (!section) continue
       importTables(target.db, target.tables, section, {
         libraryTables: target.libraryTables,
         backupName: target.backupName,
@@ -356,8 +349,8 @@ export function createHonoApp(
 ): Hono {
   const app = new Hono()
 
-  app.use(honoRequestLogger as never)
-  app.use(honoRequestContextMiddleware as never)
+  app.use(honoRequestLogger)
+  app.use(honoRequestContextMiddleware)
 
   app.get('/api/health', (c) => {
     const state = getState()
@@ -495,43 +488,32 @@ export function createHonoApp(
     }
   })
 
-  app.use(
-    async (
-      c: {
-        req: { path: string; header: (name: string) => string | undefined }
-        json: (body: object, status: number) => Response
-        env: unknown
-      },
-      next: () => Promise<void>
-    ) => {
-      const path = c.req.path
-      if (!path.startsWith('/api/')) {
-        await next()
-        return
-      }
-      if (LAN_AUTH_PUBLIC_PATHS.has(path)) {
-        await next()
-        return
-      }
-      if (path.startsWith('/api/internal/') && isLoopbackIp(getHonoClientIp(c))) {
-        await next()
-        return
-      }
-      if (!hasAppPassword()) {
-        await next()
-        return
-      }
-      if (
-        validateLanSession(
-          getTokenFromHeaders(c.req.header('authorization'), c.req.header('cookie'))
-        )
-      ) {
-        await next()
-        return
-      }
-      return c.json({ error: 'LAN_AUTH_REQUIRED' }, 401)
+  app.use(async (c: Context, next: Next) => {
+    const path = c.req.path
+    if (!path.startsWith('/api/')) {
+      await next()
+      return
     }
-  )
+    if (LAN_AUTH_PUBLIC_PATHS.has(path)) {
+      await next()
+      return
+    }
+    if (path.startsWith('/api/internal/') && isLoopbackIp(getHonoClientIp(c))) {
+      await next()
+      return
+    }
+    if (!hasAppPassword()) {
+      await next()
+      return
+    }
+    if (
+      validateLanSession(getTokenFromHeaders(c.req.header('authorization'), c.req.header('cookie')))
+    ) {
+      await next()
+      return
+    }
+    return c.json({ error: 'LAN_AUTH_REQUIRED' }, 401)
+  })
 
   app.all('/api/trpc/*', (c) =>
     fetchRequestHandler({
@@ -797,7 +779,10 @@ export function createHonoApp(
   app.onError((err: Error & { status?: number }, c) => {
     logger.error({ err, url: c.req.path, method: c.req.method }, 'Unhandled error')
     const status = err.status || 500
-    return c.json({ error: err.message || 'Internal Server Error', status }, status as never)
+    return c.json(
+      { error: err.message || 'Internal Server Error', status },
+      status as ContentfulStatusCode
+    )
   })
 
   return app

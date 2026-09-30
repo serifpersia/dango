@@ -111,8 +111,8 @@ function sha256Hex(data: Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex')
 }
 
-function base64UrlEncode(input: crypto.BinaryLike): string {
-  return Buffer.from(input as unknown as Uint8Array)
+function base64UrlEncode(input: Uint8Array): string {
+  return Buffer.from(input)
     .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -291,11 +291,8 @@ function createCtx(cache: AppCache) {
             : urlOrOptions
         ) as Record<string, unknown>
         const { url, ...rest } = opts
-        const res = await (
-          gotScraping as unknown as (
-            ...args: unknown[]
-          ) => Promise<{ statusCode: number; body: unknown; headers: unknown }>
-        )(url as string, {
+        const res = await gotScraping({
+          url: url as string,
           method: 'GET',
           responseType: 'text',
           throwHttpErrors: false,
@@ -415,17 +412,17 @@ async function loadEntry(
       bytes = await readModuleBytes(entryUrl)
     } catch (err) {
       return {
-        provider: null as unknown as Provider,
+        provider: null,
         error: `download failed: ${(err as Error).message}`,
       }
     }
     if (item.sha256) {
       const actual = sha256Hex(bytes)
       if (actual !== item.sha256) {
-        return { provider: null as unknown as Provider, error: `sha256 mismatch for ${item.id}` }
+        return { provider: null, error: `sha256 mismatch for ${item.id}` }
       }
     } else if (!allowUnsigned) {
-      return { provider: null as unknown as Provider, error: `missing sha256 for ${item.id}` }
+      return { provider: null, error: `missing sha256 for ${item.id}` }
     }
     await fs.promises.writeFile(filePath, bytes)
   }
@@ -474,13 +471,13 @@ async function instantiateModule(
     >
   } catch (err) {
     return {
-      provider: null as unknown as Provider,
+      provider: null,
       error: `import failed: ${(err as Error).message}`,
     }
   }
   const factory = mod.default
   if (typeof factory !== 'function') {
-    return { provider: null as unknown as Provider, error: 'missing default factory export' }
+    return { provider: null, error: 'missing default factory export' }
   }
   let provider: unknown
   try {
@@ -491,7 +488,7 @@ async function instantiateModule(
     )
   } catch (err) {
     return {
-      provider: null as unknown as Provider,
+      provider: null,
       error: `factory failed: ${(err as Error).message}`,
     }
   }
@@ -502,7 +499,7 @@ async function instantiateModule(
         ? !isValidTvProvider(provider)
         : !isValidVideoProvider(provider)
   ) {
-    return { provider: null as unknown as Provider, error: 'invalid provider shape' }
+    return { provider: null, error: 'invalid provider shape' }
   }
   return { provider, facets: extractBrowseFacets(mod) }
 }
@@ -513,16 +510,16 @@ async function loadCachedFallback(
   cacheDir: string,
   ctx: RemoteCtx
 ): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
-  if (!prev.sha256) return { provider: null as unknown as Provider, error: 'no verified fallback' }
+  if (!prev.sha256) return { provider: null, error: 'no verified fallback' }
   const filePath = path.join(cacheDir, `${prev.id}-${prev.version}.mjs`)
   let bytes: Buffer
   try {
     bytes = await fs.promises.readFile(filePath)
   } catch {
-    return { provider: null as unknown as Provider, error: 'no cached fallback file' }
+    return { provider: null, error: 'no cached fallback file' }
   }
   if (sha256Hex(bytes) !== prev.sha256) {
-    return { provider: null as unknown as Provider, error: 'cached fallback failed verification' }
+    return { provider: null, error: 'cached fallback failed verification' }
   }
   const cacheBuster = `${prev.version}-${prev.sha256.slice(0, 12)}`
   return instantiateModule(filePath, cacheBuster, ctx, { ...item, version: prev.version })

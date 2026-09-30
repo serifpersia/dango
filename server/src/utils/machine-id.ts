@@ -30,8 +30,9 @@ export function getMachineId(): string {
     const interfaces = os.networkInterfaces()
     const macs = Object.values(interfaces)
       .flat()
-      .filter((iface) => iface && !iface.internal && iface.mac !== '00:00:00:00:00:00')
-      .map((iface) => iface!.mac)
+      .flatMap((iface) =>
+        iface && !iface.internal && iface.mac !== '00:00:00:00:00:00' ? [iface.mac] : []
+      )
       .sort()
     hardwareId = macs.length > 0 ? macs.join('-') : os.hostname()
   }

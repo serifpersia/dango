@@ -5,3 +5,15 @@ export interface JasmrApi {
   getImages(showId: string): Promise<unknown>
   getChapters(showId: string): Promise<unknown>
 }
+
+export function isJasmrApi(mod: unknown): mod is JasmrApi {
+  if (!mod || typeof mod !== 'object') return false
+  const m = mod as Record<string, unknown>
+  return (
+    typeof m.browse === 'function' &&
+    typeof m.getEpisodes === 'function' &&
+    typeof m.getStreamUrls === 'function' &&
+    typeof m.getImages === 'function' &&
+    typeof m.getChapters === 'function'
+  )
+}

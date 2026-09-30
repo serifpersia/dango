@@ -713,8 +713,9 @@ export async function malSearchMedia(
   } = options
 
   const params = new URLSearchParams()
-  const hasQuery = !!query?.trim()
-  if (hasQuery) params.set('q', query!.trim())
+  const trimmedQuery = query?.trim()
+  const hasQuery = !!trimmedQuery
+  if (trimmedQuery) params.set('q', trimmedQuery)
   params.set('cat', 'anime')
   if (page > 1) params.set('show', String((page - 1) * 50))
   const clientFormat = isAdult ? format : undefined

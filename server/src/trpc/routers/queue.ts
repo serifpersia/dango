@@ -83,7 +83,7 @@ export const queueRouter = router({
 
   removeMany: protectedProcedure.input(queueRemoveManyInput()).mutation(async ({ ctx, input }) => {
     const showId = await getMigratedId(ctx.db, input.showId)
-    let removed: string[]
+    let removed: string[] = []
     await performWriteTransactionAsync(ctx.db, async (tx) => {
       removed = ((await QueueRepository.getByShow(tx, showId)) || []).map((ep) => ep.episodeNumber)
       const toRemove =
@@ -92,7 +92,7 @@ export const queueRouter = router({
           : removed
       await QueueRepository.removeMany(tx, showId, toRemove)
     })
-    return { success: true, removed: removed!.length }
+    return { success: true, removed: removed.length }
   }),
 
   clear: protectedProcedure.mutation(async ({ ctx }) => {

@@ -202,12 +202,9 @@ class Mutex {
   }
 
   unlock() {
-    if (this._waiting.length > 0) {
-      const resolve = this._waiting.shift()!
-      resolve()
-    } else {
-      this._locked = false
-    }
+    const resolve = this._waiting.shift()
+    if (resolve) resolve()
+    else this._locked = false
   }
 }
 
