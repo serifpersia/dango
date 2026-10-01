@@ -7,11 +7,7 @@ import layoutStyles from './PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
 import { fixThumbnailUrl } from '../lib/utils'
-import {
-  isProgressCompleted,
-  isShowFinale,
-  storeAutoplayEnabled,
-} from '../lib/playbackCompletion'
+import { isProgressCompleted, isShowFinale, storeAutoplayEnabled } from '../lib/playbackCompletion'
 import { loadHls } from '../lib/hls'
 import { trpcClient } from '../lib/trpc'
 import { pickSubtitleIndex } from '../lib/subtitles'
