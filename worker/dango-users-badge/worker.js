@@ -84,13 +84,13 @@ async function handleStatusPage(sheetUrl) {
     .join('')
 
   const html = `<!doctype html><html><head><meta charset="utf-8">
-  <title>ani-web Provider Status</title>
+  <title>dango Provider Status</title>
   <style>body{background:#0d0d0d;color:#eee;font-family:sans-serif;padding:2rem}
   table{border-collapse:collapse;width:100%;max-width:600px}
   td,th{text-align:left;padding:.6rem;border-bottom:1px solid #222}
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5rem}
   h1{color:#8b5cf6}</style></head>
-  <body><h1>ani-web Provider Status</h1>
+  <body><h1>dango Provider Status</h1>
   <table><tr><th>Provider</th><th>Status</th><th>Note</th></tr>${rows}</table>
   </body></html>`
 
