@@ -190,10 +190,6 @@ export interface KitsuSearchOptions {
   sort?: string
 }
 
-export interface KitsuListOptions extends KitsuSearchOptions {
-  sortValue?: string
-}
-
 function mappingItem(entry: KitsuEntry, included: KitsuEntry[]): KitsuEntry | undefined {
   const rel = entry.relationships?.item?.data
   if (!rel) return undefined

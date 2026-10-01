@@ -10,7 +10,7 @@ function proxiedMediaUrl(targetUrl: string, refererStr: string): string {
   return `/api/tv/stream-proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}`
 }
 
-export function rewriteTvPlaylist(body: string, baseUrl: URL, refererStr: string): string {
+function rewriteTvPlaylist(body: string, baseUrl: URL, refererStr: string): string {
   return body
     .split('\n')
     .map((line: string) => {
@@ -28,7 +28,7 @@ export function rewriteTvPlaylist(body: string, baseUrl: URL, refererStr: string
     .join('\n')
 }
 
-export function isPlaylistBody(body: Buffer): boolean {
+function isPlaylistBody(body: Buffer): boolean {
   return (
     body.length >= 7 &&
     body

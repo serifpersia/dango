@@ -87,11 +87,6 @@ export const MangaLibraryRepository = {
           .where(eq(mangaLibrary.id, id))
       : getDrizzle(db).update(mangaLibrary).set({ anilistId }).where(eq(mangaLibrary.id, id)),
 
-  getByAnilistId: (db: DatabaseWrapper, anilistId: number) =>
-    getDrizzle(db).all<MangaLibraryRow>(
-      sql`SELECT * FROM manga_library WHERE anilistId = ${anilistId}`
-    ),
-
   touchProgress: (
     db: DatabaseWrapper,
     id: string,

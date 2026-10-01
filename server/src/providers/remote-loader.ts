@@ -10,6 +10,7 @@ import logger from '../logger.js'
 import { CONFIG } from '../config.js'
 import { requestContext } from '../utils/request-context.js'
 import { sanitizeCfClearance, buildCfClearanceCookie } from '../utils/cookie.utils.js'
+import { base64UrlEncode } from '../utils/megaplay.utils.js'
 import { decodeMaybeGzip, parseJsonBody } from '../utils/http.utils.js'
 import { buildQueryVariants, pickBestMatch } from './title-matching.js'
 import { anilistRequest, parseMalId, searchAnilistByTitle } from '../lib/anilist.js'
@@ -109,14 +110,6 @@ function resolveEntryUrl(entry: string | undefined, registryUrl: string): string
 
 function sha256Hex(data: Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex')
-}
-
-function base64UrlEncode(input: Uint8Array): string {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
 }
 
 function aes256CbcDecryptJson(b64url: string, keyUtf8: string, ivUtf8: string): unknown | null {
@@ -325,36 +318,29 @@ function createCtx(cache: AppCache) {
 
 export type RemoteCtx = ReturnType<typeof createCtx>
 
-function isValidVideoProvider(p: unknown): p is Provider {
-  if (!p || typeof p !== 'object') return false
+function shapeOf(p: unknown): Record<string, unknown> | null {
+  if (!p || typeof p !== 'object') return null
   const o = p as Record<string, unknown>
-  return (
-    typeof o.name === 'string' &&
-    typeof o.search === 'function' &&
-    typeof o.getEpisodes === 'function' &&
-    typeof o.getStreamUrls === 'function'
-  )
+  return typeof o.name === 'string' ? o : null
+}
+
+function hasFns(o: Record<string, unknown>, fns: string[]): boolean {
+  return fns.every((f) => typeof o[f] === 'function')
+}
+
+function isValidVideoProvider(p: unknown): p is Provider {
+  const o = shapeOf(p)
+  return !!o && hasFns(o, ['search', 'getEpisodes', 'getStreamUrls'])
 }
 
 function isValidMangaProvider(p: unknown): p is MangaProvider {
-  if (!p || typeof p !== 'object') return false
-  const o = p as Record<string, unknown>
-  return (
-    typeof o.name === 'string' &&
-    typeof o.search === 'function' &&
-    typeof o.getDetail === 'function' &&
-    typeof o.getChapters === 'function' &&
-    typeof o.getPages === 'function'
-  )
+  const o = shapeOf(p)
+  return !!o && hasFns(o, ['search', 'getDetail', 'getChapters', 'getPages'])
 }
 
 function isValidTvProvider(p: unknown): p is TvProvider {
-  if (!p || typeof p !== 'object') return false
-  const o = p as Record<string, unknown>
-  return (
-    typeof o.name === 'string' &&
-    (typeof o.getSources === 'function' || typeof o.getEmbedUrl === 'function')
-  )
+  const o = shapeOf(p)
+  return !!o && (typeof o.getSources === 'function' || typeof o.getEmbedUrl === 'function')
 }
 
 function makeEmbedProvider(id: string, base: string): TvProvider {

@@ -266,14 +266,6 @@ class OfflineDb {
     return this.anilistToEntry.get(anilistId) ?? null
   }
 
-  getAnilistIdByMal(malId: number): number | null {
-    return this.malToEntry.get(malId)?.anilistId ?? null
-  }
-
-  getMalIdByAnilist(anilistId: number): number | null {
-    return this.anilistToMal.get(anilistId) ?? null
-  }
-
   async getOfflineDbInfo(db: DatabaseWrapper): Promise<OfflineDbInfo> {
     const get = async (key: string) => (await SettingsRepository.getByKey(db, key))?.value ?? null
     const autoUpdate = await get('offlineDbAutoUpdateEnabled')

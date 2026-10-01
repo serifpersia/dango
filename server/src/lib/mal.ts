@@ -7,23 +7,6 @@ export interface MalCacheStore {
   put(key: string, payload: string, ttlSeconds?: number): void
 }
 
-export interface DonorEntry {
-  malId?: number
-  url?: string
-  title?: string
-  titleEnglish?: string | null
-  titleJapanese?: string | null
-  imageUrl?: string
-  images?: { small?: string; medium?: string; large?: string }
-  synopsis?: string | null
-  type?: string | null
-  episodes?: number | null
-  status?: string
-  score?: number | null
-  rating?: string
-  genres?: Array<string | { name?: string }>
-}
-
 export interface ScrapedSearchEntry {
   id: number
   idMal: number
@@ -214,44 +197,6 @@ function detailToSearchEntry(d: ScrapedDetail): ScrapedSearchEntry {
     type: d.type,
     episodes: d.episodes,
     score: d.score,
-  }
-}
-
-export function toSearchEntry(e: DonorEntry): Record<string, unknown> | null {
-  if (!e || !e.malId || !e.title) return null
-  return {
-    id: -e.malId,
-    idMal: e.malId,
-    url: e.url ?? `https://myanimelist.net/anime/${e.malId}`,
-    title: e.title,
-    imageUrl: e.imageUrl ?? null,
-    synopsis: e.synopsis ?? null,
-    type: e.type ?? null,
-    episodes: e.episodes ?? null,
-    score: e.score ?? null,
-  }
-}
-
-export function toDetail(e: DonorEntry, malId: number): Record<string, unknown> | null {
-  if (!e || !e.title) return null
-  const genres = (Array.isArray(e.genres) ? e.genres : [])
-    .map((g) => (typeof g === 'string' ? g : g?.name))
-    .filter((g): g is string => !!g)
-  return {
-    id: -malId,
-    idMal: malId,
-    url: e.url ?? `https://myanimelist.net/anime/${malId}`,
-    title: e.title,
-    titleEnglish: e.titleEnglish ?? null,
-    titleJapanese: e.titleJapanese ?? null,
-    imageUrl: e.imageUrl ?? e.images?.medium ?? null,
-    synopsis: e.synopsis ?? null,
-    type: e.type ?? null,
-    episodes: e.episodes ?? null,
-    status: e.status ?? null,
-    score: e.score ?? null,
-    rating: e.rating ?? null,
-    genres,
   }
 }
 

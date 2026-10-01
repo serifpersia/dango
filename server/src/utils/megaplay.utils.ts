@@ -5,9 +5,8 @@ const MEGAPLAY_CDN_TOKEN_KEY = 'MpCdnT0k3n!9f2K#xQ7vL5mR8wN1pY4s'
 export const MEGAPLAY_CDN_TOKEN_TTL_SECONDS = 120
 
 export const MEGAPLAY_ORIGIN = 'https://megaplay.buzz'
-export const MEGAPLAY_REFERER = 'https://megaplay.buzz/'
 
-function base64UrlEncode(input: Buffer | string): string {
+export function base64UrlEncode(input: Buffer | string): string {
   return Buffer.from(input)
     .toString('base64')
     .replace(/\+/g, '-')

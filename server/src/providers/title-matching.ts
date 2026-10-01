@@ -2,11 +2,11 @@ export interface MatchCandidate {
   title: string
 }
 
-export function normalizeCompact(s: string): string {
+function normalizeCompact(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-export function tokenize(s: string): string[] {
+function tokenize(s: string): string[] {
   return s
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -14,7 +14,7 @@ export function tokenize(s: string): string[] {
     .filter((w) => w.length >= 2)
 }
 
-export function bigramDice(a: string, b: string): number {
+function bigramDice(a: string, b: string): number {
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0
   const grams = (s: string) => {
     const map = new Map<string, number>()
@@ -143,11 +143,11 @@ function detectSeasonMarker(s: string): string {
   return ''
 }
 
-export function distinctiveTokens(s: string): string[] {
+function distinctiveTokens(s: string): string[] {
   return [...new Set(tokenize(s).filter((w) => !STOPWORDS.has(w)))]
 }
 
-export function titleSimilarity(query: string, candidate: string): number {
+function titleSimilarity(query: string, candidate: string): number {
   const q = normalizeCompact(query)
   const c = normalizeCompact(candidate)
   if (!q || !c) return 0

@@ -198,6 +198,23 @@ function nexabloomFallbackUrls(urlStr: string): string[] {
   return urls
 }
 
+async function fetchNexabloomFallback<T>(
+  urlStr: string,
+  signal: AbortSignal,
+  attempt: (candidate: string) => Promise<T | null>,
+  isOk: (r: T) => boolean
+): Promise<T | null> {
+  let last: T | null = null
+  for (const candidate of nexabloomFallbackUrls(urlStr)) {
+    if (signal.aborted) break
+    const r = await attempt(candidate).catch(() => null)
+    if (!r) continue
+    if (isOk(r)) return r
+    last = r
+  }
+  return last
+}
+
 function isGotScrapingHost(urlStr: string): boolean {
   try {
     const host = new URL(urlStr).hostname.toLowerCase()
@@ -423,10 +440,11 @@ export function registerProxy(app: Hono) {
           return new Response(cached, { headers })
         }
 
-        const resp = await (async () => {
-          let last = null
-          for (const candidate of nexabloomFallbackUrls(urlStr)) {
-            const attempt = await gotScraping({
+        const resp = await fetchNexabloomFallback(
+          urlStr,
+          abort.signal,
+          (candidate) =>
+            gotScraping({
               url: isNexabloomMasterUrl(candidate) ? signNexabloomMasterUrl(candidate) : candidate,
               method: 'GET',
               headers,
@@ -434,12 +452,9 @@ export function registerProxy(app: Hono) {
               timeout: { request: 30000 },
               followRedirect: true,
               throwHttpErrors: false,
-            })
-            last = attempt
-            if (attempt.statusCode === 200 || attempt.statusCode === 206) return attempt
-          }
-          return last
-        })()
+            }),
+          (attempt) => attempt.statusCode === 200 || attempt.statusCode === 206
+        )
 
         if (!resp || (resp.statusCode !== 200 && resp.statusCode !== 206)) {
           return c.text('Upstream error', (resp?.statusCode || 502) as 502)
@@ -491,20 +506,21 @@ export function registerProxy(app: Hono) {
         if (isGotScrapingHost(urlStr)) {
           if (range) headers['Range'] = range
 
-          let resp = null
-          for (const candidate of nexabloomFallbackUrls(urlStr)) {
-            const attempt = await gotScraping({
-              url: candidate,
-              method: 'GET',
-              headers,
-              responseType: 'buffer',
-              timeout: { request: 30000 },
-              followRedirect: true,
-              throwHttpErrors: false,
-            })
-            resp = attempt
-            if (attempt.statusCode === 200 || attempt.statusCode === 206) break
-          }
+          const resp = await fetchNexabloomFallback(
+            urlStr,
+            abort.signal,
+            (candidate) =>
+              gotScraping({
+                url: candidate,
+                method: 'GET',
+                headers,
+                responseType: 'buffer',
+                timeout: { request: 30000 },
+                followRedirect: true,
+                throwHttpErrors: false,
+              }),
+            (attempt) => attempt.statusCode === 200 || attempt.statusCode === 206
+          )
 
           if (!resp || (resp.statusCode !== 200 && resp.statusCode !== 206)) {
             return c.text('Upstream error', (resp?.statusCode || 502) as 502)
@@ -523,26 +539,26 @@ export function registerProxy(app: Hono) {
             headers: outHeaders,
           })
         } else {
-          let upstream = null
-          for (const candidate of nexabloomFallbackUrls(urlStr)) {
-            if (abort.signal.aborted) break
-            try {
+          const upstream = await fetchNexabloomFallback(
+            urlStr,
+            abort.signal,
+            async (candidate) => {
               const attempt = await fetchWithRetry(
                 candidate,
                 { method: 'GET', headers },
                 { retries: 3, timeoutMs: 30000, signal: abort.signal }
               )
-              upstream = attempt
-              if (attempt.status === 200 || attempt.status === 206) break
-              try {
-                await attempt.body?.cancel()
-              } catch {
-                // ignore
+              if (attempt.status !== 200 && attempt.status !== 206) {
+                try {
+                  await attempt.body?.cancel()
+                } catch {
+                  // ignore
+                }
               }
-            } catch {
-              // ignore
-            }
-          }
+              return attempt
+            },
+            (attempt) => attempt.status === 200 || attempt.status === 206
+          )
           if (!upstream) {
             return c.text('Upstream error', 502)
           }
@@ -726,6 +742,13 @@ export function registerProxy(app: Hono) {
       return headers
     }
 
+    const subtitleError = (text: string) => {
+      const headers = new Headers()
+      headers.set('Access-Control-Allow-Origin', '*')
+      headers.set('Cache-Control', 'no-store')
+      return new Response(text, { status: 502, headers })
+    }
+
     try {
       const headers = buildHeaders()
 
@@ -736,10 +759,7 @@ export function registerProxy(app: Hono) {
         if (abort.signal.aborted) return new Response(null, { status: 499 })
       }
       if (!result || !result.body) {
-        const headers = new Headers()
-        headers.set('Access-Control-Allow-Origin', '*')
-        headers.set('Cache-Control', 'no-store')
-        return new Response('Subtitle upstream error', { status: 502, headers })
+        return subtitleError('Subtitle upstream error')
       }
       const body = result.body
       const baseForSegments = innerRawUrl || subUrl
@@ -782,10 +802,7 @@ export function registerProxy(app: Hono) {
           }
         }
         if (parts.length === 0) {
-          const headers = new Headers()
-          headers.set('Access-Control-Allow-Origin', '*')
-          headers.set('Cache-Control', 'no-store')
-          return new Response('Subtitle playlist empty', { status: 502, headers })
+          return subtitleError('Subtitle playlist empty')
         }
         return new Response(rewrapVttCues(`WEBVTT\n\n${parts.join('\n\n')}\n`), {
           headers: vttHeaders('public, max-age=86400'),
@@ -811,10 +828,7 @@ export function registerProxy(app: Hono) {
     } catch {
       if (abort.signal.aborted) return new Response(null, { status: 499 })
       logger.warn({ url: subUrl }, '[subtitle-proxy] failed')
-      const headers = new Headers()
-      headers.set('Access-Control-Allow-Origin', '*')
-      headers.set('Cache-Control', 'no-store')
-      return new Response('Subtitle upstream error', { status: 502, headers })
+      return subtitleError('Subtitle upstream error')
     }
   })
 
@@ -843,12 +857,7 @@ export function registerProxy(app: Hono) {
     try {
       if (targetUrl.includes('animepahe')) {
         refererValue = 'https://animepahe.pw/'
-        const rawCookie = cookie || ''
-        let sanitized = rawCookie.trim()
-        sanitized = sanitized.replace(/^cf_clearance/i, '')
-        sanitized = sanitized.replace(/^[:=]\s*/, '')
-        sanitized = sanitized.replace(/["']/g, '').trim()
-        headers['Cookie'] = `cf_clearance=${sanitized}`
+        headers['Cookie'] = `cf_clearance=${sanitizeCfClearance(cookie)}`
       } else if (targetUrl.includes('anilist.co')) {
         refererValue = 'https://anilist.co/'
       } else if (targetUrl.includes('gogocdn.net')) {
@@ -859,12 +868,8 @@ export function registerProxy(app: Hono) {
         refererValue = 'https://oppai.stream/'
       } else if (targetUrl.includes('weeabo0.xyz')) {
         refererValue = 'https://japaneseasmr.com/'
-        const rawCookie = cookie || ''
-        let sanitized = rawCookie.trim()
-        sanitized = sanitized.replace(/^cf_clearance/i, '')
-        sanitized = sanitized.replace(/^[:=]\s*/, '')
-        sanitized = sanitized.replace(/["']/g, '').trim()
-        if (sanitized) headers['Cookie'] = `cf_clearance=${sanitized}`
+        const jasmrCookieHeader = buildCfClearanceCookie(cookie)
+        if (jasmrCookieHeader) headers['Cookie'] = jasmrCookieHeader
         const uaParam = ua || ''
         if (uaParam) headers['User-Agent'] = uaParam
       }

@@ -136,11 +136,4 @@ export const WatchedEpisodesRepository = {
       ORDER BY we.watchedAt DESC
       ${sql.raw(limitClause)}`)
   },
-
-  getEpisodesForShows: (db: DatabaseWrapper, showIds: string[]) =>
-    getDrizzle(db).all<WatchedEpisode>(sql`
-      SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId IN (${sql.join(
-        showIds.map((id) => sql`${id}`),
-        sql`, `
-      )})`),
 }
