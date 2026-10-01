@@ -82,6 +82,46 @@ function assToVtt(body: string): string | null {
   return `WEBVTT\n\n${cues.join('\n\n')}\n`
 }
 
+const SUB_WRAP_AT = 50
+
+function splitBalancedCueLine(line: string): string[] {
+  const words = line.split(/\s+/).filter((w) => w.length > 0)
+  if (words.length < 2) return [line]
+  const total = words.join(' ').length
+  if (total <= SUB_WRAP_AT) return [line]
+  const target = total / 2
+  let acc = words[0]?.length ?? 0
+  let best = 1
+  let bestDiff = Math.abs(acc - target)
+  for (let i = 1; i < words.length; i++) {
+    acc += 1 + (words[i]?.length ?? 0)
+    const diff = Math.abs(acc - target)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = i + 1
+    }
+  }
+  if (best <= 0 || best >= words.length) return [line]
+  return [words.slice(0, best).join(' '), words.slice(best).join(' ')]
+}
+
+function rewrapVttCues(vtt: string): string {
+  const blocks = vtt.replace(/\r\n/g, '\n').split(/\n\n+/)
+  return blocks
+    .map((block, idx) => {
+      if (idx === 0 && /^\s*WEBVTT/i.test(block)) return block
+      const lines = block.split('\n')
+      const tIdx = lines.findIndex((l) => l.includes('-->'))
+      if (tIdx < 0) return block
+      const payload = lines.slice(tIdx + 1).filter((l) => l.trim() !== '')
+      if (payload.length !== 1) return block
+      const split = splitBalancedCueLine((payload[0] ?? '').trim())
+      if (split.length < 2) return block
+      return [...lines.slice(0, tIdx + 1), ...split].join('\n')
+    })
+    .join('\n\n')
+}
+
 const KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
 const ANIMEPAHE_URL = 'https://animepahe.pw/'
 const VAULT_CDN_HOSTS = new Set(['uwucdn.top', 'owocdn.top'])
@@ -747,19 +787,25 @@ export function registerProxy(app: Hono) {
           headers.set('Cache-Control', 'no-store')
           return new Response('Subtitle playlist empty', { status: 502, headers })
         }
-        return new Response(`WEBVTT\n\n${parts.join('\n\n')}\n`, {
+        return new Response(rewrapVttCues(`WEBVTT\n\n${parts.join('\n\n')}\n`), {
           headers: vttHeaders('public, max-age=86400'),
         })
       }
       if (/^\s*WEBVTT/i.test(body)) {
-        return new Response(body, { headers: vttHeaders('public, max-age=86400') })
+        return new Response(rewrapVttCues(body), {
+          headers: vttHeaders('public, max-age=86400'),
+        })
       }
       const vttFromAss = assToVtt(body)
       if (vttFromAss) {
-        return new Response(vttFromAss, { headers: vttHeaders('public, max-age=86400') })
+        return new Response(rewrapVttCues(vttFromAss), {
+          headers: vttHeaders('public, max-age=86400'),
+        })
       }
       return new Response(
-        `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`,
+        rewrapVttCues(
+          `WEBVTT\n\n${body.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')}`
+        ),
         { headers: vttHeaders('public, max-age=86400') }
       )
     } catch {
