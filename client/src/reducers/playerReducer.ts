@@ -1,4 +1,4 @@
-import type { PlayerState, VideoSource, VideoLink } from '../types/player'
+import type { PlayerState } from '../types/player'
 import { loadAutoplayEnabled } from '../lib/playbackCompletion'
 
 export type Action =
@@ -8,7 +8,6 @@ export type Action =
       type: 'SET_PROVIDER'
       payload: string
     }
-  | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
 const getPreferredMode = (): 'sub' | 'dub' => {
   return localStorage.getItem('preferredMode') === 'dub' ? 'dub' : 'sub'
@@ -33,7 +32,6 @@ export const createInitialState = (): PlayerState => ({
   videoSources: [],
   selectedSource: null,
   selectedLink: null,
-  forceNativePlayer: localStorage.getItem('forceNativePlayer') === 'true',
   isAutoplayEnabled: loadAutoplayEnabled(),
   showResumeModal: true,
   resumeTime: 0,
@@ -42,14 +40,10 @@ export const createInitialState = (): PlayerState => ({
   selectedProvider: getPreferredProvider(),
   loadingShowData: true,
   loadingVideo: false,
-  loadingDetails: false,
   error: null,
-  detailsError: null,
   showCookieModal: false,
   cookieProvider: null,
 })
-
-export const initialState: PlayerState = createInitialState()
 
 export function playerReducer(state: PlayerState, action: Action): PlayerState {
   switch (action.type) {
@@ -65,12 +59,6 @@ export function playerReducer(state: PlayerState, action: Action): PlayerState {
       }
     case 'SET_PROVIDER':
       return { ...state, selectedProvider: action.payload }
-    case 'SET_OVERRIDE_SOURCE':
-      return {
-        ...state,
-        selectedSource: action.payload?.source ?? null,
-        selectedLink: action.payload?.link ?? null,
-      }
     default:
       return state
   }

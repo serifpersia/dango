@@ -28,6 +28,7 @@ import {
   storeAutoplayEnabled,
 } from '../lib/playbackCompletion'
 import { loadHls, canPlayHlsNatively } from '../lib/hls'
+import { formatTime } from '../lib/utils'
 import { bindHlsAudioTracks } from '../lib/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
 import {
@@ -49,6 +50,7 @@ import EpisodeDrawer from '../components/player/EpisodeDrawer'
 import PlayerStatusArea from '../components/player/PlayerStatusArea'
 import SynopsisText from '../components/anime/SynopsisText'
 import type Hls from 'hls.js'
+import type { SkipInterval } from '../types/player'
 import styles from './Tv.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
 import playerStyles from './Player.module.css'
@@ -125,6 +127,65 @@ interface TvProviderOption {
 
 const NO_TV_PROVIDERS: TvProviderOption[] = []
 
+const NO_SKIP_INTERVALS: SkipInterval[] = []
+
+function TvStreamError({
+  error,
+  servers,
+  selectedServer,
+  onRetry,
+  onSelect,
+}: {
+  error: string
+  servers: string[]
+  selectedServer: string
+  onRetry: () => void
+  onSelect: (server: string) => void
+}) {
+  return (
+    <div
+      className={`${styles.statusMsg} ${styles.error}`}
+      style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ flex: 1 }}>{error}</span>
+        <button className={styles.retryButton} onClick={onRetry}>
+          Retry
+        </button>
+      </div>
+      {servers.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            alignItems: 'center',
+            marginTop: 4,
+          }}
+        >
+          <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>Servers:</span>
+          {servers.map((city) => (
+            <button
+              key={city}
+              onClick={() => onSelect(city)}
+              className={styles.retryButton}
+              style={{
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                textTransform: 'capitalize',
+                background: selectedServer === city ? 'var(--accent)' : undefined,
+                color: selectedServer === city ? 'white' : undefined,
+              }}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const Tv: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
@@ -135,7 +196,6 @@ const Tv: React.FC = () => {
   const typeParam = searchParams.get('type') as MediaType | null
 
   const [details, setDetails] = useState<TvDetails | null>(null)
-  const [_detailsLoading, setDetailsLoading] = useState(false)
   const [season, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
@@ -175,7 +235,6 @@ const Tv: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number>(0)
   const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([])
   const [selectedSubtitle, setSelectedSubtitle] = useState<number>(-1)
-  const [sourceTypeFilter, setSourceTypeFilter] = useState('all')
   const [qualityIdx, setQualityIdx] = useState(0)
   const [referer, setReferer] = useState('')
   const [iframeUrl, setIframeUrl] = useState('')
@@ -204,8 +263,7 @@ const Tv: React.FC = () => {
   useEffect(() => {
     selectedSubtitleRef.current = selectedSubtitle
   }, [selectedSubtitle])
-  const tvSkipIntervals = useMemo(() => [], [])
-  const player = useVideoPlayer({ skipIntervals: tvSkipIntervals })
+  const player = useVideoPlayer({ skipIntervals: NO_SKIP_INTERVALS })
   const videoRef = player.refs.videoRef
   const hlsRef = useRef<Hls | null>(null)
   const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
@@ -449,14 +507,6 @@ const Tv: React.FC = () => {
   useEffect(() => {
     resumeCheckedRef.current = resumeChecked
   }, [resumeChecked])
-
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = Math.floor(seconds % 60)
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    return `${m}:${String(s).padStart(2, '0')}`
-  }
 
   const saveVideoProgress = useCallback(
     (currentTime: number, duration: number) => {
@@ -967,7 +1017,6 @@ const Tv: React.FC = () => {
 
     const itemId = Number(id)
     const mediaType = typeParam || 'tv'
-    setDetailsLoading(true)
     setDetails(null)
     setStreams([])
     setStreamsEpisodeKey('')
@@ -996,13 +1045,11 @@ const Tv: React.FC = () => {
           number_of_seasons: d.number_of_seasons,
         }
         setDetails(mapped)
-        setDetailsLoading(false)
         if (mapped.seasons && mapped.seasons.length > 0 && isNaN(sParam)) {
           setSeason(mapped.seasons[0].season_number)
         }
       })
       .catch(() => {
-        setDetailsLoading(false)
         // ignore
       })
   }, [id, typeParam])
@@ -1026,38 +1073,17 @@ const Tv: React.FC = () => {
           still_path: ep.still_path || '',
         }))
         setEpisodes(eps)
-        if (eps.length > 0) {
-          const wanted =
-            !isNaN(eParam) && eps.find((ep) => ep.episode_number === eParam)
-              ? eParam
-              : eps[0].episode_number
-          setEpisode(wanted)
-        }
+        if (eps.length === 0) return
+        setEpisode((prev) => {
+          if (!isNaN(eParam) && eps.some((ep) => ep.episode_number === eParam)) return eParam
+          if (eps.some((ep) => ep.episode_number === prev)) return prev
+          return eps[0].episode_number
+        })
       })
       .catch(() => {
         // ignore
       })
   }, [details, id, season, searchParams])
-
-  useEffect(() => {
-    if (!details || !id || isMovie) return
-    trpcClient.tv.episodes
-      .query({ id: String(id), season: String(season) })
-      .then((d) => {
-        const eps: Episode[] = (d.episodes || []).map((ep) => ({
-          episode_number: ep.episode_number,
-          name: ep.name || '',
-          vote_average: ep.vote_average,
-          overview: ep.overview || '',
-          still_path: ep.still_path || '',
-        }))
-        setEpisodes(eps)
-        if (eps.length > 0 && !eps.find((ep) => ep.episode_number === episode)) {
-          setEpisode(eps[0].episode_number)
-        }
-      })
-      .catch(() => {})
-  }, [season, details, id, isMovie, episode])
 
   useEffect(() => {
     if (!isEmbedProvider || !details || !id) return
@@ -1113,7 +1139,6 @@ const Tv: React.FC = () => {
       }
       setStreams(data.sources)
       setStreamsEpisodeKey(episodeKey)
-      setSourceTypeFilter('all')
       setQualityIdx(0)
       if (data.referer) setReferer(data.referer)
       const tracks = data.audioTracks || []
@@ -1223,10 +1248,8 @@ const Tv: React.FC = () => {
       }
     }
 
-    const filtered =
-      sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
     const currentUrl =
-      streamsEpisodeKey === `${mediaId}:${season}:${episode}` ? filtered[qualityIdx]?.url || '' : ''
+      streamsEpisodeKey === `${mediaId}:${season}:${episode}` ? streams[qualityIdx]?.url || '' : ''
     if (!currentUrl) {
       try {
         videoRef.current?.pause()
@@ -1255,7 +1278,7 @@ const Tv: React.FC = () => {
 
     const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(referer)}`
 
-    if (filtered[qualityIdx]?.type === 'hls') {
+    if (streams[qualityIdx]?.type === 'hls') {
       void (async () => {
         const HlsClass = await loadHls()
         if (cancelled) return
@@ -1394,7 +1417,6 @@ const Tv: React.FC = () => {
     streams,
     streamsEpisodeKey,
     qualityIdx,
-    sourceTypeFilter,
     source,
     referer,
     isEmbedProvider,
@@ -1957,9 +1979,6 @@ const Tv: React.FC = () => {
     }
   }, [])
 
-  const filteredStreams =
-    sourceTypeFilter === 'all' ? streams : streams.filter((s) => s.type === sourceTypeFilter)
-
   useEffect(() => {
     if (!details) {
       document.title = 'TV & Movies - dango'
@@ -2039,53 +2058,16 @@ const Tv: React.FC = () => {
                 allow="autoplay; fullscreen"
                 allowFullScreen
               />
-            ) : !isEmbedProvider && (filteredStreams.length > 0 || streamLoading) ? (
+            ) : !isEmbedProvider && (streams.length > 0 || streamLoading) ? (
               <>
                 {streamError && (
-                  <div
-                    className={`${styles.statusMsg} ${styles.error}`}
-                    style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
-                  >
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
-                    >
-                      <span style={{ flex: 1 }}>{streamError}</span>
-                      <button className={styles.retryButton} onClick={loadStreams}>
-                        Retry
-                      </button>
-                    </div>
-                    {activeServers.length > 0 && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 6,
-                          alignItems: 'center',
-                          marginTop: 4,
-                        }}
-                      >
-                        <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
-                          Servers:
-                        </span>
-                        {activeServers.map((city) => (
-                          <button
-                            key={city}
-                            onClick={() => handleMovyServerSelect(city)}
-                            className={styles.retryButton}
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '0.75rem',
-                              textTransform: 'capitalize',
-                              background: selectedMovyServer === city ? 'var(--accent)' : undefined,
-                              color: selectedMovyServer === city ? 'white' : undefined,
-                            }}
-                          >
-                            {city}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <TvStreamError
+                    error={streamError}
+                    servers={activeServers}
+                    selectedServer={selectedMovyServer}
+                    onRetry={loadStreams}
+                    onSelect={handleMovyServerSelect}
+                  />
                 )}
                 <TvPlayerControls
                   player={player}
@@ -2097,7 +2079,7 @@ const Tv: React.FC = () => {
                   subtitles={subtitles}
                   selectedSubtitle={selectedSubtitle}
                   onSubtitleChange={handleSubtitleChange}
-                  streams={filteredStreams}
+                  streams={streams}
                   qualityIdx={qualityIdx}
                   onQualityChange={setQualityIdx}
                   onBack={handleBack}
@@ -2174,48 +2156,13 @@ const Tv: React.FC = () => {
                 </TvPlayerControls>
               </>
             ) : streamError && !isEmbedProvider ? (
-              <div
-                className={`${styles.statusMsg} ${styles.error}`}
-                style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ flex: 1 }}>{streamError}</span>
-                  <button className={styles.retryButton} onClick={loadStreams}>
-                    Retry
-                  </button>
-                </div>
-                {activeServers.length > 0 && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 6,
-                      alignItems: 'center',
-                      marginTop: 4,
-                    }}
-                  >
-                    <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 600 }}>
-                      Servers:
-                    </span>
-                    {activeServers.map((city) => (
-                      <button
-                        key={city}
-                        onClick={() => handleMovyServerSelect(city)}
-                        className={styles.retryButton}
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '0.75rem',
-                          textTransform: 'capitalize',
-                          background: selectedMovyServer === city ? 'var(--accent)' : undefined,
-                          color: selectedMovyServer === city ? 'white' : undefined,
-                        }}
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <TvStreamError
+                error={streamError}
+                servers={activeServers}
+                selectedServer={selectedMovyServer}
+                onRetry={loadStreams}
+                onSelect={handleMovyServerSelect}
+              />
             ) : null}
           </div>
         )}

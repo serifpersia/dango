@@ -7,7 +7,11 @@ import layoutStyles from './PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
 import { fixThumbnailUrl } from '../lib/utils'
-import { isProgressCompleted, storeAutoplayEnabled } from '../lib/playbackCompletion'
+import {
+  isProgressCompleted,
+  isShowFinale,
+  storeAutoplayEnabled,
+} from '../lib/playbackCompletion'
 import { loadHls } from '../lib/hls'
 import { trpcClient } from '../lib/trpc'
 import { pickSubtitleIndex } from '../lib/subtitles'
@@ -310,10 +314,6 @@ const Player: React.FC = () => {
     showResumeModalRef.current = state.showResumeModal
   }, [state.resumeTime, state.showResumeModal])
 
-  const [skipIndicator, _setSkipIndicator] = useState<{
-    side: 'left' | 'right'
-    visible: boolean
-  } | null>(null)
   const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false)
   const [hasReachedEpisodeEnd, setHasReachedEpisodeEnd] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
@@ -430,19 +430,11 @@ const Player: React.FC = () => {
       ? state.episodes[currentEpisodeIndex + 1]
       : null
   const hasNextEpisode = currentEpisodeIndex > -1 && currentEpisodeIndex < state.episodes.length - 1
-  const isLastEpisode =
-    state.episodes.length > 0 &&
-    !!state.currentEpisode &&
-    state.episodes[state.episodes.length - 1] === state.currentEpisode
-  const normalizedShowStatus = String(state.showMeta.status || '')
-    .trim()
-    .toLowerCase()
-  const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
-    normalizedShowStatus.includes(status)
-  )
   const isCompleted = isProgressCompleted(state.resumeTime, state.resumeDuration)
   const effectiveIsCompleted = isCompleted || hasReachedEpisodeEnd
-  const isShowCompleted = isLastEpisode && isFinishedShow && effectiveIsCompleted
+  const isShowCompleted =
+    effectiveIsCompleted &&
+    isShowFinale(state.episodes, state.currentEpisode, state.showMeta.status)
   const shouldShowModal = state.showResumeModal && (isShowCompleted || !effectiveIsCompleted)
   const isEpisodeCompleted = effectiveIsCompleted && !isShowCompleted
   const shouldShowNextEpisodeModal =
@@ -835,17 +827,7 @@ const Player: React.FC = () => {
       !pendingQueueTransition &&
       !hasDismissedShowCompletedRef.current
     ) {
-      const isLast =
-        state.episodes.length > 0 &&
-        !!state.currentEpisode &&
-        state.episodes[state.episodes.length - 1] === state.currentEpisode
-      const normalized = String(state.showMeta.status || '')
-        .trim()
-        .toLowerCase()
-      const finishedShow = ['finished', 'completed', 'complete', 'ended'].some((s) =>
-        normalized.includes(s)
-      )
-      if (isLast && finishedShow) {
+      if (isShowFinale(state.episodes, state.currentEpisode, state.showMeta.status)) {
         dispatch({ type: 'SET_STATE', payload: { showResumeModal: true } })
       }
     }
@@ -1847,23 +1829,6 @@ const Player: React.FC = () => {
               </>
             }
           >
-            {skipIndicator && (
-              <div
-                className={`${styles.skipIndicatorContainer} ${skipIndicator.side === 'left' ? styles.leftSkip : styles.rightSkip} `}
-              >
-                <div className={styles.skipBubble}>
-                  <div className={styles.skipIcon}>
-                    {skipIndicator.side === 'left' ? (
-                      <Icon name="backward" />
-                    ) : (
-                      <Icon name="forward" />
-                    )}
-                  </div>
-                  <div className={styles.skipText}>15s</div>
-                </div>
-              </div>
-            )}
-
             {isVideoLoading && (
               <div className={styles.loadingOverlay}>
                 <div className={styles.loadingDots}>

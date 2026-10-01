@@ -14,14 +14,6 @@ export async function loadHls(): Promise<typeof import('hls.js').default | null>
   return loadPromise
 }
 
-export function isHlsSupported(Hls: { isSupported: () => boolean } | null): boolean {
-  try {
-    return !!Hls && Hls.isSupported()
-  } catch {
-    return false
-  }
-}
-
 export function canPlayHlsNatively(video: HTMLMediaElement): boolean {
   return (
     video.canPlayType('application/vnd.apple.mpegurl') !== '' ||

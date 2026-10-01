@@ -3,6 +3,7 @@ import {
   COMPLETION_THRESHOLD,
   isProgressCompleted,
   hasResumableProgress,
+  isShowFinale,
   loadAutoplayEnabled,
   storeAutoplayEnabled,
   decideEpisodeEnd,
@@ -48,6 +49,17 @@ describe('autoplay setting', () => {
     expect(loadAutoplayEnabled()).toBe(false)
     storeAutoplayEnabled(true)
     expect(loadAutoplayEnabled()).toBe(true)
+  })
+})
+
+describe('isShowFinale', () => {
+  it('requires the last episode plus a finished status', () => {
+    expect(isShowFinale(['1', '2'], '2', 'FINISHED')).toBe(true)
+    expect(isShowFinale(['1', '2'], '1', 'FINISHED')).toBe(false)
+    expect(isShowFinale(['1', '2'], '2', 'RELEASING')).toBe(false)
+    expect(isShowFinale([], undefined, 'FINISHED')).toBe(false)
+    expect(isShowFinale(['1'], '1', 'Complete')).toBe(true)
+    expect(isShowFinale(['1'], '1', 'ended')).toBe(true)
   })
 })
 

@@ -28,6 +28,18 @@ export const storeAutoplayEnabled = (value: boolean): void => {
   }
 }
 
+const FINISHED_STATUSES = ['finished', 'completed', 'complete', 'ended']
+
+export const isShowFinale = (
+  episodes: string[],
+  currentEpisode: string | undefined,
+  status: unknown
+): boolean =>
+  episodes.length > 0 &&
+  !!currentEpisode &&
+  episodes[episodes.length - 1] === currentEpisode &&
+  FINISHED_STATUSES.some((s) => String(status || '').trim().toLowerCase().includes(s))
+
 export type EpisodeEndAction = 'advance' | 'prompt-next' | 'prompt-complete' | 'none'
 
 export const decideEpisodeEnd = (options: {

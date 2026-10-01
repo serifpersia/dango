@@ -112,7 +112,6 @@ export interface PlayerState {
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
   selectedLink: null | VideoLink
-  forceNativePlayer: boolean
   isAutoplayEnabled: boolean
   showResumeModal: boolean
   resumeTime: number
@@ -121,9 +120,7 @@ export interface PlayerState {
   selectedProvider: string
   loadingShowData: boolean
   loadingVideo: boolean
-  loadingDetails: boolean
   error: string | null
-  detailsError: string | null
   fetchedEpisodeNumber?: string
   showCookieModal?: boolean
   cookieProvider?: 'animepahe' | null

@@ -42,5 +42,3 @@ export const TIER_LABEL: Record<ProviderTier, string> = {
 }
 
 export const TIER_ORDER: ProviderTier[] = ['direct', 'cookie', 'embed']
-
-export const PROVIDER_OPTIONS: ProviderOption[] = []

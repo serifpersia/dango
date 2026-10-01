@@ -329,8 +329,6 @@ export const usePlayerData = (
       !(uiState.showMeta?.isAdult === true && !options?.hasMatureConsent),
   })
 
-  const loadingDetails = false
-
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
     mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
       if (!showId) throw new Error('Missing showId')
@@ -487,7 +485,6 @@ export const usePlayerData = (
       skipIntervals: videoDataForEpisode?.skipIntervals || [],
       loadingShowData,
       loadingVideo: loadingVideo || videoDataMismatched,
-      loadingDetails,
       error: finalError,
       fetchedEpisodeNumber: videoDataForEpisode?.fetchedEpisodeNumber,
     }
@@ -498,7 +495,6 @@ export const usePlayerData = (
     videoData,
     loadingShowData,
     loadingVideo,
-    loadingDetails,
     showDataError,
     videoError,
     currentEpisode,
