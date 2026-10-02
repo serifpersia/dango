@@ -9,6 +9,7 @@ import { useMatureConsent } from '../hooks/useMatureConsent'
 import { mangaLibraryId, useMangaProgress, useSaveMangaProgress } from '../hooks/useMangaLibrary'
 import { trpcClient } from '../lib/trpc'
 import styles from '../components/manga/Manga.module.css'
+import pageStyles from '../components/common/page.module.css'
 
 const SAVE_DEBOUNCE_MS = 800
 const SAVE_CHECKPOINT_MS = 5000
@@ -206,7 +207,7 @@ export default function MangaReadPage() {
   if (isAnilistEntry) return null
 
   return (
-    <div className={styles.page}>
+    <div className={pageStyles.page}>
       {detailQuery.isLoading || isResolvingChapter ? (
         <div className={styles.readerPages} aria-hidden>
           {Array.from({ length: 3 }).map((_, i) => (
@@ -241,7 +242,6 @@ export default function MangaReadPage() {
           onOpenChapter={openChapter}
           initialPage={savedPageIndex}
           onProgress={handleProgress}
-          savedPage={savedPage}
         />
       )}
     </div>

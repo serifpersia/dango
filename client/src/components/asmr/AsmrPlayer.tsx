@@ -79,8 +79,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   const saveProgress = useSaveAsmrProgress()
   const addBookmark = useAddAsmrBookmark()
   const { data: progressData } = useAsmrProgress(workId || undefined)
-  const [showResumeModal, setShowResumeModal] = useState(false)
-  const [resumeTime, setResumeTime] = useState(0)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
   const hasResumedRef = useRef('')
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -101,6 +99,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   }, [progressData, trackIndex])
 
   const trackMetaRef = useRef({ workId: '', trackIndex: 0, trackLabel: '' })
+  const progressDataRef = useRef(progressData)
+  progressDataRef.current = progressData
   trackMetaRef.current = {
     workId,
     trackIndex,
@@ -180,6 +180,11 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     lastSavedTimeRef.current = 0
     destroyHls()
 
+    const knownRow = progressDataRef.current?.progress?.find((r) => r.trackIndex === trackIndex)
+    const knownCt = knownRow?.currentTime || 0
+    const knownDur = knownRow?.duration || 0
+    const holdForResume = knownCt >= 10 && knownDur - knownCt >= 15
+
     if (trackIsHls) {
       let cancelled = false
       void (async () => {
@@ -190,12 +195,12 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
           hlsRef.current = hls
           hls.loadSource(trackLink)
           hls.attachMedia(audio)
-          audio.play().catch(() => setIsPlaying(false))
+          if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
         } else {
           audio.src = trackLink
           audio.load()
           audio.volume = volumeRef.current
-          audio.play().catch(() => setIsPlaying(false))
+          if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
         }
       })()
       return () => {
@@ -210,7 +215,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
 
     audio.load()
     audio.volume = volumeRef.current
-    audio.play().catch(() => setIsPlaying(false))
+    if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
 
     return () => {
       destroyHls()
@@ -239,13 +244,14 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     if (!(duration > 0)) return
     const ct = savedRow.currentTime || 0
     const dur = savedRow.duration || duration
-    if (ct >= 10 && dur - ct >= 15 && timeRef.current < ct) {
-      hasResumedRef.current = trackKey
-      setResumeTime(ct)
-      setShowResumeModal(true)
-    } else {
-      hasResumedRef.current = trackKey
-    }
+    hasResumedRef.current = trackKey
+    if (!(ct >= 10 && dur - ct >= 15 && timeRef.current < ct)) return
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = ct
+    timeRef.current = ct
+    setCurrentTime(ct)
+    audio.play().catch(() => {})
   }, [savedRow, duration, trackKey])
 
   useEffect(() => {
@@ -407,20 +413,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     durationRef.current = Number.isFinite(d) ? d : 0
     setDuration(e.currentTarget.duration)
   }
-
-  const handleResume = useCallback(() => {
-    const audio = audioRef.current
-    if (audio && resumeTime > 0) {
-      audio.currentTime = resumeTime
-      timeRef.current = resumeTime
-      audio.play().catch(() => {})
-    }
-    setShowResumeModal(false)
-  }, [resumeTime])
-
-  const handleSkipResume = useCallback(() => {
-    setShowResumeModal(false)
-  }, [])
 
   const handleCompleteAndHome = useCallback(() => {
     if (workId) {
@@ -625,30 +617,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     />
   )
 
-  const resumeModal = (
-    <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Listening">
-      <div style={{ padding: '1rem', textAlign: 'center' }}>
-        <p>
-          You were at <strong>{formatTime(resumeTime)}</strong>
-          {track?.resolutionStr ? ` in ${track.resolutionStr}` : ''}
-        </p>
-        <div
-          style={{
-            marginTop: '1rem',
-            display: 'flex',
-            gap: '10px',
-            justifyContent: 'center',
-          }}
-        >
-          <Button variant="secondary" onClick={handleSkipResume}>
-            Start from Beginning
-          </Button>
-          <Button onClick={handleResume}>Resume</Button>
-        </div>
-      </div>
-    </Modal>
-  )
-
   const completeModal = (
     <Modal isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)} title="Finished!">
       <div style={{ padding: '1rem', textAlign: 'center' }}>
@@ -681,7 +649,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       <>
         {audioEl}
         <div className={styles.playerBar}>{barContent}</div>
-        {resumeModal}
         {completeModal}
       </>,
       document.body
@@ -695,7 +662,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   return createPortal(
     <>
       {audioEl}
-      {resumeModal}
       {completeModal}
       <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
         <div
