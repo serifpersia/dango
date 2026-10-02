@@ -38,6 +38,7 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
   }, [data?.description, work.description])
 
   const tracks = data?.tracks || []
+  const cover = work.thumbnail || data?.images?.[0]
   const latestProgress = useMemo(() => {
     const rows = progressData?.progress ?? []
     return rows.length > 0 ? rows.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b)) : null
@@ -53,13 +54,8 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
         </button>
 
         <div className={styles.detailHeader}>
-          {work.thumbnail ? (
-            <img
-              className={styles.detailCover}
-              src={work.thumbnail}
-              alt={work.name}
-              decoding="async"
-            />
+          {cover ? (
+            <img className={styles.detailCover} src={cover} alt={work.name} decoding="async" />
           ) : (
             <div className={`${styles.detailCover} ${styles.thumbPlaceholder}`} />
           )}
