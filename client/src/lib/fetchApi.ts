@@ -2,12 +2,17 @@ import { emitAuthRequired } from './auth-bus'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export const fetchApi = async (url: string, init?: RequestInit) => {
+export const fetchWithLocalHeaders = async (
+  url: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
+  const target = typeof url === 'string' ? url : url.toString()
   const isLocalEndpoint =
-    url.startsWith('/') || (typeof window !== 'undefined' && url.startsWith(window.location.origin))
+    target.startsWith('/') ||
+    (typeof window !== 'undefined' && target.startsWith(window.location.origin))
 
   if (isLocalEndpoint) {
     const animepaheUa = localStorage.getItem('animepahe_ua')
@@ -33,6 +38,12 @@ export const fetchApi = async (url: string, init?: RequestInit) => {
       headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
     })
   }
+
+  return response
+}
+
+export const fetchApi = async (url: string, init?: RequestInit) => {
+  const response = await fetchWithLocalHeaders(url, init)
 
   if (!response.ok) {
     const text = await response.text().catch(() => '')

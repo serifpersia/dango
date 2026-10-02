@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react'
+import { cx } from '../../lib/utils'
 import './Button.css'
 
 interface Props extends React.HTMLAttributes<HTMLButtonElement> {
@@ -13,15 +14,13 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
     { variant = 'primary', size = 'md', loading, children, className = '', disabled, ...props },
     ref
   ) => {
-    const classes = [
+    const classes = cx(
       'btn',
       `btn-${variant}`,
       size !== 'md' && `btn-${size}`,
       loading && 'btn-loading',
-      className,
-    ]
-      .filter(Boolean)
-      .join(' ')
+      className
+    )
 
     return (
       <button className={classes} disabled={disabled || loading} ref={ref} {...props}>

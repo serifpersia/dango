@@ -19,6 +19,7 @@ import { useMangaPopup } from '../hooks/useMangaPopup'
 import { useProviders } from '../hooks/useProviders'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from '../components/manga/Manga.module.css'
+import pageStyles from '../components/common/page.module.css'
 
 const DEX_SORTS = [
   { value: 'popular', label: 'Popular' },
@@ -186,20 +187,20 @@ export default function Manga() {
   const showRatingSelect = provider === 'mangadex'
 
   return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.pageTitle}>
+    <div className={pageStyles.page}>
+      <div className={pageStyles.header}>
+        <h1 className={pageStyles.pageTitle}>
           <Icon name="book" /> Manga
         </h1>
-        <form className={styles.searchForm} onSubmit={handleSearch}>
+        <form className={pageStyles.searchForm} onSubmit={handleSearch}>
           <input
-            className={styles.searchInput}
+            className={pageStyles.searchInput}
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
             placeholder="Search manga titles..."
             aria-label="Search manga"
           />
-          <button className={styles.searchBtn} type="submit" aria-label="Search">
+          <button className={pageStyles.searchBtn} type="submit" aria-label="Search">
             <Icon name="search" size={14} />
           </button>
         </form>
@@ -233,7 +234,7 @@ export default function Manga() {
         </select>
         {mangaProviders.length === 0 && !providersLoading && (
           <button
-            className={styles.searchBtn}
+            className={pageStyles.searchBtn}
             type="button"
             onClick={() => refetchProviders()}
             aria-label="Retry loading providers"

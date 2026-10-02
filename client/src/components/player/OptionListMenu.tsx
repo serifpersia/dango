@@ -6,6 +6,10 @@ export interface OptionListMenuClasses {
   active: string
 }
 
+export interface MenuNoteClasses extends OptionListMenuClasses {
+  note: string
+}
+
 export interface OptionListItem {
   key: string
   label: React.ReactNode

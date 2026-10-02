@@ -2,42 +2,10 @@ import { createTRPCClient, httpBatchLink } from '@trpc/client'
 import { createTRPCContext } from '@trpc/tanstack-react-query'
 import type { AppRouter } from '../../../server/src/trpc/router.js'
 import { emitAuthRequired } from './auth-bus'
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+import { fetchWithLocalHeaders } from './fetchApi'
 
 async function trpcFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  const target = typeof url === 'string' ? url : url.toString()
-  const isLocalEndpoint =
-    target.startsWith('/') ||
-    (typeof window !== 'undefined' && target.startsWith(window.location.origin))
-
-  if (isLocalEndpoint) {
-    const animepaheUa = localStorage.getItem('animepahe_ua')
-    const animepaheCookie = localStorage.getItem('animepahe_cookie')
-    const jasmrUa = localStorage.getItem('jasmr_ua')
-    const jasmrCookie = localStorage.getItem('jasmr_cookie')
-
-    if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
-    if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
-    if (jasmrUa) headers['x-jasmr-ua'] = jasmrUa
-    if (jasmrCookie) headers['x-jasmr-cookie'] = jasmrCookie
-  }
-
-  let response = await fetch(url, {
-    ...init,
-    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
-  })
-
-  for (let attempt = 0; response.status === 503 && attempt < 8; attempt++) {
-    await sleep(Math.min(500 * 2 ** attempt, 4000))
-    response = await fetch(url, {
-      ...init,
-      headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
-    })
-  }
+  const response = await fetchWithLocalHeaders(url, init)
 
   if (response.status === 401) {
     try {

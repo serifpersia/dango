@@ -9,6 +9,7 @@ import {
   type RadioStation,
 } from '../hooks/useRadio'
 import asmrStyles from '../components/asmr/Asmr.module.css'
+import pageStyles from '../components/common/page.module.css'
 import styles from '../components/radio/Radio.module.css'
 
 const Radio: React.FC = () => {
@@ -84,26 +85,26 @@ const Radio: React.FC = () => {
   }
 
   return (
-    <div className={`${asmrStyles.page} ${selected ? asmrStyles.pageWithPlayer : ''}`}>
-      <div className={asmrStyles.header}>
-        <h1 className={asmrStyles.pageTitle}>
+    <div className={`${pageStyles.page} ${selected ? pageStyles.pageWithPlayer : ''}`}>
+      <div className={pageStyles.header}>
+        <h1 className={pageStyles.pageTitle}>
           <Icon name="broadcast-tower" /> Radio
         </h1>
         <form
-          className={asmrStyles.searchForm}
+          className={pageStyles.searchForm}
           onSubmit={(e) => {
             e.preventDefault()
             setQuery(queryInput)
           }}
         >
           <input
-            className={asmrStyles.searchInput}
+            className={pageStyles.searchInput}
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
             placeholder="Search stations (anime, j-pop, k-pop…)"
             aria-label="Search radio stations"
           />
-          <button className={asmrStyles.searchBtn} type="submit" aria-label="Search">
+          <button className={pageStyles.searchBtn} type="submit" aria-label="Search">
             <Icon name="search" />
           </button>
         </form>

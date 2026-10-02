@@ -1,10 +1,11 @@
 import React from 'react'
 import Icon from '../common/Icon'
 import { MenuSlider } from './MenuControls'
+import type { MenuNoteClasses } from './OptionListMenu'
 import { AMBIENT_DEFAULTS, type AmbientLightSettings } from '../../hooks/useAmbientLight'
 
 interface AmbientLightMenuProps {
-  classes: { item: string; active: string; note: string }
+  classes: MenuNoteClasses
   values: AmbientLightSettings
   onChange: (patch: Partial<AmbientLightSettings>) => void
 }

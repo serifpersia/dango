@@ -121,3 +121,6 @@ export function normalizeScore(score: number | null | undefined): number | null 
   if (score == null) return score
   return score > 10 ? Number((score / 10).toFixed(1)) : score
 }
+
+export const cx = (...parts: Array<string | false | null | undefined>): string =>
+  parts.filter(Boolean).join(' ')

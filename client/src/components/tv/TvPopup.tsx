@@ -6,14 +6,7 @@ import { useToggleTvBookmark } from '../../hooks/useTvLibrary'
 import { trpcClient } from '../../lib/trpc'
 import MediaPopupShell from '../common/MediaPopupShell'
 import styles from '../common/MediaPopup.module.css'
-
-interface TvPopupItem {
-  id: number
-  title: string
-  year: string
-  type: string
-  image: string
-}
+import type { TvItem } from './TvCard'
 
 interface TvPopupDetails {
   overview?: string
@@ -26,7 +19,7 @@ interface TvPopupDetails {
 }
 
 interface TvPopupProps {
-  item: TvPopupItem
+  item: TvItem
   anchorRect: DOMRect
   onMouseEnter: () => void
   onMouseLeave: () => void

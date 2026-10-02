@@ -20,6 +20,7 @@ import {
   type MangaProgressItem,
 } from '../hooks/useMangaLibrary'
 import styles from '../components/manga/Manga.module.css'
+import pageStyles from '../components/common/page.module.css'
 
 export default function MangaInfoPage() {
   const { provider = '', id = '' } = useParams<{ provider: string; id: string }>()
@@ -118,7 +119,7 @@ export default function MangaInfoPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={pageStyles.page}>
       {detailQuery.isLoading ? (
         <div aria-hidden>
           <div

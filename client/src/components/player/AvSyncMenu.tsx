@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import Icon from '../common/Icon'
 import { MenuSlider } from './MenuControls'
-
-export interface AvSyncMenuClasses {
-  item: string
-  active: string
-  note: string
-}
+import type { MenuNoteClasses } from './OptionListMenu'
 
 interface AvSyncMenuProps {
-  classes: AvSyncMenuClasses
+  classes: MenuNoteClasses
   enabled: boolean
   delayMs: number
   onToggle: (enabled: boolean) => void

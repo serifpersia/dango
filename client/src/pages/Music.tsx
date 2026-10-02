@@ -20,6 +20,7 @@ import {
 } from '../hooks/useMusic'
 import { trpcClient } from '../lib/trpc'
 import asmrStyles from '../components/asmr/Asmr.module.css'
+import pageStyles from '../components/common/page.module.css'
 import radioStyles from '../components/radio/Radio.module.css'
 import musicStyles from '../components/music/Music.module.css'
 
@@ -442,13 +443,13 @@ const Music: React.FC = () => {
   }
 
   return (
-    <div className={`${asmrStyles.page} ${selected ? asmrStyles.pageWithPlayer : ''}`}>
-      <div className={asmrStyles.header}>
-        <h1 className={asmrStyles.pageTitle}>
+    <div className={`${pageStyles.page} ${selected ? pageStyles.pageWithPlayer : ''}`}>
+      <div className={pageStyles.header}>
+        <h1 className={pageStyles.pageTitle}>
           <Icon name="headphones" /> Music
         </h1>
         <form
-          className={asmrStyles.searchForm}
+          className={pageStyles.searchForm}
           onSubmit={(e) => {
             e.preventDefault()
             const direct = extractVideoId(queryInput)
@@ -461,13 +462,13 @@ const Music: React.FC = () => {
           }}
         >
           <input
-            className={asmrStyles.searchInput}
+            className={pageStyles.searchInput}
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
             placeholder="Search YouTube Music…"
             aria-label="Search music"
           />
-          <button className={asmrStyles.searchBtn} type="submit" aria-label="Search">
+          <button className={pageStyles.searchBtn} type="submit" aria-label="Search">
             <Icon name="search" />
           </button>
         </form>

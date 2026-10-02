@@ -1,15 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { formatSubtitleDelay } from '../../lib/subtitleStyle'
 import { MenuSlider } from './MenuControls'
-
-export interface SubtitleDelayMenuClasses {
-  item: string
-  active: string
-  note: string
-}
+import type { MenuNoteClasses } from './OptionListMenu'
 
 interface SubtitleDelayMenuProps {
-  classes: SubtitleDelayMenuClasses
+  classes: MenuNoteClasses
   delayMs: number
   onDelayChange: (ms: number) => void
 }

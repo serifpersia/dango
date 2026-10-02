@@ -4,7 +4,7 @@ import MediaCard from '../common/MediaCard'
 import TvPopup from './TvPopup'
 import { isTvAdult, tvDetailPath } from '../../lib/tv'
 
-interface TvItem {
+export interface TvItem {
   id: number
   title: string
   year: string

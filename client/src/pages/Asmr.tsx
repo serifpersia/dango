@@ -18,6 +18,7 @@ import { asmrWorkId, isAsmrAdult } from '../lib/asmr'
 import { useTranslate } from '../hooks/useTranslate'
 import type { AsmrTrack, AsmrWork } from '../hooks/useAsmr'
 import styles from '../components/asmr/Asmr.module.css'
+import pageStyles from '../components/common/page.module.css'
 
 const SORT_GROUPS = [
   {
@@ -233,24 +234,24 @@ const Asmr: React.FC = () => {
   }, [])
 
   return (
-    <div className={`${styles.page} ${player ? styles.pageWithPlayer : ''}`}>
+    <div className={`${pageStyles.page} ${player ? pageStyles.pageWithPlayer : ''}`}>
       {!(player && playerExpanded) && (
         <>
-          <header className={styles.header}>
-            <h1 className={styles.pageTitle}>
+          <header className={pageStyles.header}>
+            <h1 className={pageStyles.pageTitle}>
               <Icon name="headphones" /> ASMR
             </h1>
 
-            <form className={styles.searchForm} onSubmit={handleSearch}>
+            <form className={pageStyles.searchForm} onSubmit={handleSearch}>
               <input
-                className={styles.searchInput}
+                className={pageStyles.searchInput}
                 type="text"
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
                 placeholder="Search works, circles, CV… (-word excludes)"
                 aria-label="Search ASMR works"
               />
-              <button className={styles.searchBtn} type="submit" aria-label="Search">
+              <button className={pageStyles.searchBtn} type="submit" aria-label="Search">
                 <Icon name="search" />
               </button>
             </form>

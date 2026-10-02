@@ -1,4 +1,5 @@
 import React from 'react'
+import { cx } from '../../lib/utils'
 import './Layout.css'
 
 interface Props {
@@ -28,16 +29,14 @@ export function Flex({
   direction?: 'row' | 'col'
   wrap?: boolean
 }) {
-  const classes = [
+  const classes = cx(
     'flex',
     direction === 'col' && 'flex-col',
     wrap && 'flex-wrap',
     align && `items-${align}`,
     justify && `justify-${justify}`,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
+    className
+  )
 
   return (
     <div className={classes} style={{ gap }}>
