@@ -15,7 +15,6 @@ interface MangaReaderProps {
   onOpenChapter: (chapter: MangaChapter) => void
   initialPage?: number
   onProgress?: (page: number, pageCount: number) => void
-  savedPage?: number
 }
 
 type ReadMode = 'strip' | 'page'
@@ -49,7 +48,6 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   onOpenChapter,
   initialPage = 0,
   onProgress,
-  savedPage = 0,
 }) => {
   const [mode, setMode] = useState<ReadMode>(loadMode)
   const [fit, setFit] = useState<FitMode>(loadFit)
@@ -105,6 +103,18 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   const onProgressRef = useRef(onProgress)
   onProgressRef.current = onProgress
   const scrolledToInitial = useRef('')
+  const spyTickRef = useRef<(() => void) | null>(null)
+  const pageViewRef = useRef<HTMLDivElement | null>(null)
+  const [ribbonInset, setRibbonInset] = useState(0)
+
+  const measureRibbon = useCallback(() => {
+    const container =
+      mode === 'strip' ? stripRefs.current[pageIndexRef.current] : pageViewRef.current
+    const img = container?.querySelector('img')
+    if (!container || !img) return
+    const next = Math.max(0, (container.clientWidth - img.clientWidth) / 2) + 8
+    setRibbonInset((prev) => (Math.abs(prev - next) < 1 ? prev : next))
+  }, [mode])
 
   useEffect(() => {
     pageIndexRef.current = pageIndex
@@ -173,23 +183,50 @@ const MangaReader: React.FC<MangaReaderProps> = ({
 
   useEffect(() => {
     if (mode !== 'strip' || pages.length === 0) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const i = Number((entry.target as HTMLElement).dataset.pageIndex)
-            if (!Number.isNaN(i)) {
-              if (i !== pageIndexRef.current) userMovedRef.current = true
-              setPageIndex(i)
-            }
-          }
-        }
-      },
-      { rootMargin: '-45% 0px -45% 0px', threshold: 0 }
-    )
-    stripRefs.current.forEach((el) => el && observer.observe(el))
-    return () => observer.disconnect()
-  }, [mode, pages.length, data])
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const line = window.innerHeight * 0.3
+      const refs = stripRefs.current
+      let cur = -1
+      let measurable = 0
+      for (let i = 0; i < refs.length; i++) {
+        const el = refs[i]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.height > 4) measurable++
+        if (rect.top <= line) cur = i
+        else break
+      }
+      if (cur < 0 || measurable < Math.min(3, refs.length)) return
+      if (cur !== pageIndexRef.current) {
+        userMovedRef.current = true
+        pageIndexRef.current = cur
+        setPageIndex(cur)
+      }
+      measureRibbon()
+    }
+    const tick = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    spyTickRef.current = tick
+    tick()
+    window.addEventListener('scroll', tick, { passive: true })
+    window.addEventListener('resize', tick)
+    return () => {
+      window.removeEventListener('scroll', tick)
+      window.removeEventListener('resize', tick)
+      if (raf) cancelAnimationFrame(raf)
+      spyTickRef.current = null
+    }
+  }, [mode, pages.length, data, measureRibbon])
+
+  useEffect(() => {
+    if (mode !== 'page' || pages.length === 0) return
+    measureRibbon()
+    window.addEventListener('resize', measureRibbon)
+    return () => window.removeEventListener('resize', measureRibbon)
+  }, [mode, pageIndex, pages.length, measureRibbon])
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchX.current = e.touches[0].clientX
@@ -242,7 +279,6 @@ const MangaReader: React.FC<MangaReaderProps> = ({
   )
 
   const fitHeight = fit === 'height'
-  const savedIndex = savedPage > 0 ? savedPage - 1 : -1
 
   return (
     <div className={styles.readerShell}>
@@ -344,13 +380,16 @@ const MangaReader: React.FC<MangaReaderProps> = ({
               ref={(el) => {
                 stripRefs.current[i] = el
               }}
-              data-page-index={i}
               className={styles.readerPageWrap}
             >
-              {i === savedIndex && (
-                <div className={styles.saveMarker} role="note" aria-label="Saved reading position">
+              {i === pageIndex && (
+                <div
+                  key={pageIndex}
+                  className={styles.ribbon}
+                  style={ribbonInset > 0 ? { right: ribbonInset } : undefined}
+                  aria-hidden="true"
+                >
                   <Icon name="bookmark" size={12} />
-                  <span>Saved · p. {savedPage}</span>
                 </div>
               )}
               {deadPages.has(i) ? (
@@ -363,6 +402,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
                   loading={i < 3 ? 'eager' : 'lazy'}
                   decoding="async"
                   draggable={false}
+                  onLoad={() => spyTickRef.current?.()}
                   onError={() => handleImgError(i)}
                 />
               )}
@@ -372,10 +412,19 @@ const MangaReader: React.FC<MangaReaderProps> = ({
       ) : (
         <>
           <div
+            ref={pageViewRef}
             className={`${styles.pageView} ${fitHeight ? styles.pageViewTall : ''}`}
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
+            <div
+              key={pageIndex}
+              className={styles.ribbon}
+              style={ribbonInset > 0 ? { right: ribbonInset } : undefined}
+              aria-hidden="true"
+            >
+              <Icon name="bookmark" size={12} />
+            </div>
             <button
               className={`${styles.tapZone} ${styles.tapZoneLeft}`}
               onClick={() => goPage(-1)}
@@ -395,6 +444,7 @@ const MangaReader: React.FC<MangaReaderProps> = ({
                 alt={`Page ${pageIndex + 1} of ${pages.length}`}
                 decoding="async"
                 draggable={false}
+                onLoad={() => measureRibbon()}
                 onError={() => handleImgError(pageIndex)}
               />
             )}
