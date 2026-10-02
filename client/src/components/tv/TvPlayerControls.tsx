@@ -11,6 +11,8 @@ import SettingsShell from '../player/SettingsShell'
 import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
 import SubtitleDelayMenu from '../player/SubtitleDelayMenu'
 import AvSyncMenu from '../player/AvSyncMenu'
+import AmbientLightMenu from '../player/AmbientLightMenu'
+import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 import AudioTrackMenu from '../player/AudioTrackMenu'
 import OptionListMenu from '../player/OptionListMenu'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
@@ -30,6 +32,7 @@ type SettingsView =
   | 'audio'
   | 'server'
   | 'av-sync'
+  | 'ambient'
   | null
 
 interface TvPlayerControlsProps {
@@ -61,6 +64,10 @@ interface TvPlayerControlsProps {
   showNextEpisodeButton?: boolean
   onNextEpisode?: () => void
   isLoading?: boolean
+  isTheaterMode: boolean
+  onTheaterModeToggle: () => void
+  ambientSettings?: AmbientLightSettings
+  onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -92,6 +99,10 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   showNextEpisodeButton = false,
   onNextEpisode,
   isLoading = false,
+  isTheaterMode,
+  onTheaterModeToggle,
+  ambientSettings,
+  onAmbientChange,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -405,6 +416,12 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
           {videoDelayEnabled ? `${videoDelayMs}ms` : 'Off'}
         </span>
       </button>
+      {ambientSettings && onAmbientChange && (
+        <button className={styles.menuItem} onClick={() => setSettingsView('ambient')}>
+          <span>Ambient Light</span>
+          <span className={styles.currentValue}>{ambientSettings.enabled ? 'On' : 'Off'}</span>
+        </button>
+      )}
     </>
   )
 
@@ -493,6 +510,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       }}
     />
   )
+
+  const renderAmbientSettings = () =>
+    ambientSettings && onAmbientChange ? (
+      <AmbientLightMenu
+        classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
+        values={ambientSettings}
+        onChange={onAmbientChange}
+      />
+    ) : null
 
   const volumeIcon = state.isMuted ? (
     <Icon name="volume-mute" />
@@ -609,6 +635,17 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
               <Icon name="cog" />
             </button>
             <button
+              className={`${styles.controlBtn} ${isTheaterMode ? styles.active : ''}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onTheaterModeToggle()
+              }}
+              title={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
+              aria-label={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
+            >
+              <Icon name="tv" />
+            </button>
+            <button
               className={styles.controlBtn}
               onClick={actions.toggleFullscreen}
               aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
@@ -644,7 +681,9 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
                     ? 'Movy Server'
                     : settingsView === 'av-sync'
                       ? 'A/V Sync'
-                      : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
+                      : settingsView === 'ambient'
+                        ? 'Ambient Light'
+                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
         }
         onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
       >
@@ -656,6 +695,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
         {settingsView === 'audio' && renderAudioSettings()}
         {settingsView === 'server' && renderServerSettings()}
         {settingsView === 'av-sync' && renderAvSyncSettings()}
+        {settingsView === 'ambient' && renderAmbientSettings()}
       </SettingsShell>
     </div>
   ) : null

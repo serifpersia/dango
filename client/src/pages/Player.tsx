@@ -40,6 +40,8 @@ import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAutoRotateFullscreen from '../hooks/useAutoRotateFullscreen'
 import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
 import useDelayCanvas from '../hooks/useDelayCanvas'
+import { useAmbientLight } from '../hooks/useAmbientLight'
+import AmbientLightCanvas from '../components/player/AmbientLightCanvas'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
 import { usePlayerData } from '../hooks/usePlayerData'
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
@@ -979,6 +981,13 @@ const Player: React.FC = () => {
 
   const { titlePreference } = useTitlePreference()
   const { lowEndMode } = useLowEndMode()
+  const { settings: ambientSettings, update: updateAmbient } = useAmbientLight()
+  const ambientActive =
+    isTheaterMode &&
+    ambientSettings.enabled &&
+    !lowEndMode &&
+    state.selectedSource?.type !== 'iframe' &&
+    !!state.selectedLink
   const displayTitle = useMemo(() => {
     if (!state.showMeta || state.loadingShowData) return 'Loading...'
     const { name, names } = state.showMeta
@@ -1610,6 +1619,13 @@ const Player: React.FC = () => {
       className={`${layoutStyles.playerPageLayout} ${isTheaterMode ? layoutStyles.theaterMode : ''}`}
       onClick={handleLayoutClick}
     >
+      {isTheaterMode && (
+        <AmbientLightCanvas
+          videoRef={refs.videoRef}
+          active={ambientActive}
+          settings={ambientSettings}
+        />
+      )}
       <Modal
         isOpen={shouldShowModal}
         onClose={handleCloseModal}
@@ -1757,6 +1773,8 @@ const Player: React.FC = () => {
             onAutoplayChange={handleAutoplayChange}
             fallbackChoice={fallbackChoice}
             onFallbackChoiceChange={updateFallbackChoice}
+            ambientSettings={ambientSettings}
+            onAmbientChange={updateAmbient}
             showNextEpisodeButton={
               !shouldPauseForModal && showNextEpisodePrompt && queue.length === 0
             }

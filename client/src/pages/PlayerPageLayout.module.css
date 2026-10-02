@@ -303,6 +303,19 @@
   margin: auto !important;
   padding: 0 !important;
   animation: scaleUpIn 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.theaterAmbient {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  transform: scale(1.15) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
 }
 
 .theaterMode .videoPlayerWrapper {
@@ -345,6 +358,10 @@
 :global(body.theater-mode) {
   overflow: hidden !important;
   background: #000 !important;
+}
+
+:global(body.low-end) .theaterAmbient {
+  display: none !important;
 }
 
 @media (max-width: 768px) {

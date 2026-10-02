@@ -10,6 +10,7 @@ import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
 import { pickSubtitleIndex, subtitleKey } from '../../lib/subtitles'
 import type { FallbackChoice } from '../../lib/fallbackChoice'
+import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 
 const PlayerSettings = lazy(() => import('./PlayerSettings'))
 
@@ -43,6 +44,8 @@ interface PlayerControlsProps {
   onCalibrateAvSync: () => void
   fallbackChoice: FallbackChoice
   onFallbackChoiceChange: (value: FallbackChoice) => void
+  ambientSettings: AmbientLightSettings
+  onAmbientChange: (patch: Partial<AmbientLightSettings>) => void
   children?: React.ReactNode
   overlays?: React.ReactNode
   isInteractingExtra?: boolean
@@ -80,6 +83,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onCalibrateAvSync,
   fallbackChoice,
   onFallbackChoiceChange,
+  ambientSettings,
+  onAmbientChange,
   children,
   overlays,
   isInteractingExtra = false,
@@ -478,6 +483,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         onAutoplayChange={onAutoplayChange}
         fallbackChoice={fallbackChoice}
         onFallbackChoiceChange={onFallbackChoiceChange}
+        isTheaterMode={isTheaterMode}
+        ambientSettings={ambientSettings}
+        onAmbientChange={onAmbientChange}
       />
     </Suspense>
   )

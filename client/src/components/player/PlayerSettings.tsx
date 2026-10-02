@@ -7,8 +7,10 @@ import { type SubtitleEdge } from '../../lib/subtitleStyle'
 import SettingsShell from './SettingsShell'
 import SubtitleStyleMenu from './SubtitleStyleMenu'
 import AvSyncMenu from './AvSyncMenu'
+import AmbientLightMenu from './AmbientLightMenu'
 import OptionListMenu from './OptionListMenu'
 import type { FallbackChoice } from '../../lib/fallbackChoice'
+import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 
 interface PlayerSettingsProps {
@@ -54,10 +56,20 @@ interface PlayerSettingsProps {
   onAutoplayChange: (value: boolean) => void
   fallbackChoice: FallbackChoice
   onFallbackChoiceChange: (value: FallbackChoice) => void
+  isTheaterMode?: boolean
+  ambientSettings?: AmbientLightSettings
+  onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
 }
 
 type SettingsView =
-  'main' | 'quality' | 'subtitles' | 'subtitle-style' | 'upscaler' | 'av-sync' | 'playback'
+  | 'main'
+  | 'quality'
+  | 'subtitles'
+  | 'subtitle-style'
+  | 'upscaler'
+  | 'av-sync'
+  | 'playback'
+  | 'ambient'
 
 const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
   const {
@@ -92,6 +104,9 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onAutoplayChange,
     fallbackChoice,
     onFallbackChoiceChange,
+    isTheaterMode,
+    ambientSettings,
+    onAmbientChange,
   } = props
   const { lowEndMode } = useLowEndMode()
   const [view, setView] = useState<SettingsView>('main')
@@ -159,6 +174,12 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
             .join(' • ') || 'Off'}
         </span>
       </button>
+      {isTheaterMode && ambientSettings && onAmbientChange && (
+        <button className={styles.menuItem} onClick={() => setView('ambient')}>
+          <span>Ambient Light</span>
+          <span className={styles.currentValue}>{ambientSettings.enabled ? 'On' : 'Off'}</span>
+        </button>
+      )}
     </div>
   )
 
@@ -364,6 +385,17 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     </div>
   )
 
+  const renderAmbient = () =>
+    ambientSettings && onAmbientChange ? (
+      <div className={styles.menuContent}>
+        <AmbientLightMenu
+          classes={{ item: styles.menuItem, active: styles.selected, note: styles.menuNote }}
+          values={ambientSettings}
+          onChange={onAmbientChange}
+        />
+      </div>
+    ) : null
+
   if (!isOpen) return null
 
   return (
@@ -378,7 +410,9 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       title={
         view === 'main'
           ? 'Settings'
-          : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')
+          : view === 'ambient'
+            ? 'Ambient Light'
+            : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')
       }
       titleTag="h3"
       showBack={view !== 'main'}
@@ -393,6 +427,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       {view === 'upscaler' && renderUpscaler()}
       {view === 'av-sync' && renderAvSync()}
       {view === 'playback' && renderPlayback()}
+      {view === 'ambient' && renderAmbient()}
     </SettingsShell>
   )
 }

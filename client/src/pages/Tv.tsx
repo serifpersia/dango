@@ -40,6 +40,8 @@ import {
   type SubtitleStyleSettings,
 } from '../lib/subtitleStyle'
 import useDelayCanvas from '../hooks/useDelayCanvas'
+import { useAmbientLight } from '../hooks/useAmbientLight'
+import AmbientLightCanvas from '../components/player/AmbientLightCanvas'
 import useIsMobile from '../hooks/useIsMobile'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAutoRotateFullscreen from '../hooks/useAutoRotateFullscreen'
@@ -374,6 +376,7 @@ const Tv: React.FC = () => {
   })
   const delayCanvasActive = videoDelayEnabled
   const subtitleOverlayActive = delayCanvasActive || subtitleDelayMs !== 0
+  const { settings: ambientSettings, update: updateAmbient } = useAmbientLight()
   const subtitleOverlayActiveRef = useRef(subtitleOverlayActive)
   subtitleOverlayActiveRef.current = subtitleOverlayActive
   const suppressNativeSubtitles = useCallback(() => {
@@ -472,9 +475,75 @@ const Tv: React.FC = () => {
   const [completeTitle, setCompleteTitle] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
+  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('playerTheaterMode') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const toggleTheaterMode = useCallback(() => {
+    setIsTheaterMode((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('playerTheaterMode', next.toString())
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (isTheaterMode) {
+        document.body.classList.add('theater-mode')
+      } else {
+        document.body.classList.remove('theater-mode')
+      }
+    } catch (e) {
+      console.error(e)
+    }
+    return () => {
+      try {
+        document.body.classList.remove('theater-mode')
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }, [isTheaterMode])
+
+  useEffect(() => {
+    const handleTheaterKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
+        )
+      )
+        return
+      if (e.key.toLowerCase() === 't') toggleTheaterMode()
+    }
+    document.addEventListener('keydown', handleTheaterKey)
+    return () => {
+      document.removeEventListener('keydown', handleTheaterKey)
+    }
+  }, [toggleTheaterMode])
+
+  const handleLayoutClick = (e: React.MouseEvent) => {
+    if (isTheaterMode && e.target === e.currentTarget) {
+      setIsTheaterMode(false)
+      try {
+        localStorage.setItem('playerTheaterMode', 'false')
+      } catch {
+        // ignore
+      }
+    }
+  }
   useAutoRotateFullscreen(
     player,
     (streams.length > 0 || iframeUrl !== '') &&
+      !isTheaterMode &&
       !showResumeModal &&
       !showWatchedModal &&
       !showCompleteModal
@@ -2004,41 +2073,59 @@ const Tv: React.FC = () => {
   }, [details, isMovie, season, episode, searchParams, navigate])
 
   return (
-    <div className={layoutStyles.playerPageLayout}>
-      <aside className={layoutStyles.episodeSidebar}>
-        {details ? (
-          isMovie ? (
-            <div className={styles.sidebarPosterCard}>
-              {details.poster && (
-                <img
-                  src={`https://image.tmdb.org/t/p/w342${details.poster}`}
-                  alt={details.title}
-                  loading="lazy"
-                  decoding="async"
-                />
-              )}
-              <div className={styles.sidebarPosterMeta}>
-                <strong>{details.title}</strong>
-                <span>{details.year}</span>
+    <div
+      className={`${layoutStyles.playerPageLayout} ${isTheaterMode ? layoutStyles.theaterMode : ''}`}
+      onClick={handleLayoutClick}
+    >
+      {isTheaterMode && (
+        <AmbientLightCanvas
+          videoRef={videoRef}
+          active={
+            ambientSettings.enabled &&
+            !isEmbedProvider &&
+            streams.length > 0 &&
+            !streamError &&
+            !(details?.adult && !hasMatureConsent)
+          }
+          settings={ambientSettings}
+        />
+      )}
+      {!isTheaterMode && (
+        <aside className={layoutStyles.episodeSidebar}>
+          {details ? (
+            isMovie ? (
+              <div className={styles.sidebarPosterCard}>
+                {details.poster && (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w342${details.poster}`}
+                    alt={details.title}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                <div className={styles.sidebarPosterMeta}>
+                  <strong>{details.title}</strong>
+                  <span>{details.year}</span>
+                </div>
               </div>
+            ) : (
+              <EpisodeList
+                episodes={tvEpisodeItems}
+                currentEpisode={String(episode)}
+                watchedEpisodes={watchedEpisodeIds}
+                onEpisodeClick={handleTvEpisodeClick}
+                header={seasonSelectNode}
+              />
+            )
+          ) : isMovie ? (
+            <div className={styles.statusMsg}>
+              <Icon name="spinner" className={styles.spinner} /> Loading...
             </div>
           ) : (
-            <EpisodeList
-              episodes={tvEpisodeItems}
-              currentEpisode={String(episode)}
-              watchedEpisodes={watchedEpisodeIds}
-              onEpisodeClick={handleTvEpisodeClick}
-              header={seasonSelectNode}
-            />
-          )
-        ) : isMovie ? (
-          <div className={styles.statusMsg}>
-            <Icon name="spinner" className={styles.spinner} /> Loading...
-          </div>
-        ) : (
-          <EpisodeListSkeleton variant="sidebar" />
-        )}
-      </aside>
+            <EpisodeListSkeleton variant="sidebar" />
+          )}
+        </aside>
+      )}
 
       <div className={layoutStyles.playerMain}>
         {details && (
@@ -2109,6 +2196,10 @@ const Tv: React.FC = () => {
                   }
                   onNextEpisode={handleWatchNextEpisode}
                   isLoading={streamLoading}
+                  isTheaterMode={isTheaterMode}
+                  onTheaterModeToggle={toggleTheaterMode}
+                  ambientSettings={ambientSettings}
+                  onAmbientChange={updateAmbient}
                 >
                   <video
                     ref={videoRef}
@@ -2167,11 +2258,13 @@ const Tv: React.FC = () => {
           </div>
         )}
 
-        {details && <PlayerStatusArea showTheater={false} />}
+        {!isTheaterMode && details && <PlayerStatusArea />}
 
-        {seasonSelectNode && <div className={styles.mobileSeasonRow}>{seasonSelectNode}</div>}
+        {!isTheaterMode && seasonSelectNode && (
+          <div className={styles.mobileSeasonRow}>{seasonSelectNode}</div>
+        )}
 
-        {details && (
+        {!isTheaterMode && details && (
           <div className={styles.providerSelectWrap}>
             <label className={styles.controlLabel}>
               Source
@@ -2212,7 +2305,7 @@ const Tv: React.FC = () => {
           </div>
         )}
 
-        {details && (
+        {!isTheaterMode && details && (
           <div className={layoutStyles.playerInfoContainer}>
             <div className={layoutStyles.playerInfoHeader}>
               <div className={layoutStyles.playerAnimeCard}>
