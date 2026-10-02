@@ -13,7 +13,6 @@ import SubtitleDelayMenu from '../player/SubtitleDelayMenu'
 import AvSyncMenu from '../player/AvSyncMenu'
 import AmbientLightMenu from '../player/AmbientLightMenu'
 import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
-import AudioTrackMenu from '../player/AudioTrackMenu'
 import OptionListMenu from '../player/OptionListMenu'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import {
@@ -327,7 +326,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     if (!video) return
     video.volume = newVolume
     video.muted = newVolume === 0
-    localStorage.setItem('playerVolume', newVolume.toString())
   }
 
   const toggleMute = () => {
@@ -477,11 +475,14 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   )
 
   const renderAudioSettings = () => (
-    <AudioTrackMenu
+    <OptionListMenu
       classes={{ item: styles.menuItem, active: styles.active }}
-      tracks={audioTracks}
-      selected={selectedAudioTrack}
-      onChange={onAudioTrackChange}
+      options={audioTracks.map((track, i) => ({
+        key: String(i),
+        label: track.label || track.language,
+        selected: i === selectedAudioTrack,
+      }))}
+      onSelect={(key) => onAudioTrackChange(Number(key))}
     />
   )
 

@@ -8,6 +8,7 @@ import Icon from '../components/common/Icon'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
+import ResumeModal from '../components/common/ResumeModal'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useProviders } from '../hooks/useProviders'
 import {
@@ -40,6 +41,8 @@ import {
   type SubtitleStyleSettings,
 } from '../lib/subtitleStyle'
 import useDelayCanvas from '../hooks/useDelayCanvas'
+import { useAvSync } from '../hooks/useAvSync'
+import { useTheaterMode } from '../hooks/useTheaterMode'
 import { useAmbientLight } from '../hooks/useAmbientLight'
 import AmbientLightCanvas from '../components/player/AmbientLightCanvas'
 import useIsMobile from '../hooks/useIsMobile'
@@ -271,43 +274,21 @@ const Tv: React.FC = () => {
   const manualTrackElsRef = useRef<HTMLTrackElement[]>([])
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
   const subtitleOverlayRef = useRef<HTMLDivElement>(null)
-  const [videoDelayMs, setVideoDelayMs] = useState<number>(() => {
-    try {
-      const stored = Number(localStorage.getItem('playerVideoDelayMs'))
-      if (Number.isFinite(stored) && stored >= 0 && stored <= 500) return Math.round(stored)
-    } catch {
-      // ignore
-    }
-    return 180
-  })
-  const [videoDelayEnabled, setVideoDelayEnabled] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('playerVideoDelayEnabled') === 'true'
-    } catch {
-      return false
-    }
-  })
-  const [isCalibrating, setIsCalibrating] = useState(false)
-  const [testClipActive, setTestClipActive] = useState(false)
-  const calibSnapshotRef = useRef<{ enabled: boolean; ms: number } | null>(null)
-  const calibReturnRef = useRef<number | null>(null)
-  const persistVideoDelay = (ms: number, enabled: boolean) => {
-    try {
-      localStorage.setItem('playerVideoDelayMs', String(ms))
-      localStorage.setItem('playerVideoDelayEnabled', String(enabled))
-    } catch {
-      // ignore
-    }
-  }
-  const handleVideoDelayChange = (ms: number) => {
-    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-    setVideoDelayMs(clamped)
-    try {
-      localStorage.setItem('playerVideoDelayMs', String(clamped))
-    } catch {
-      // ignore
-    }
-  }
+  const {
+    videoDelayMs,
+    videoDelayEnabled,
+    setDelayEnabled,
+    handleVideoDelayChange,
+    isCalibrating,
+    testClipActive,
+    stopCalibration,
+    openAvSyncCalibrator,
+    cancelAvSyncCalibrator,
+    applyAvSyncCalibrator,
+    toggleTestClip,
+    calibReturnRef,
+    effectiveVideoDelayMs,
+  } = useAvSync(videoRef)
   const [subtitleDelayMs, setSubtitleDelayMs] = useState<number>(() => {
     try {
       const stored = Number(localStorage.getItem('tvSubtitleDelayMs'))
@@ -330,44 +311,6 @@ const Tv: React.FC = () => {
       // ignore
     }
   }, [])
-  const openAvSyncCalibrator = () => {
-    calibSnapshotRef.current = { enabled: videoDelayEnabled, ms: videoDelayMs }
-    setVideoDelayEnabled(true)
-    try {
-      localStorage.setItem('playerVideoDelayEnabled', 'true')
-    } catch {
-      // ignore
-    }
-    setIsCalibrating(true)
-  }
-  const cancelAvSyncCalibrator = () => {
-    const snap = calibSnapshotRef.current
-    calibSnapshotRef.current = null
-    if (snap) {
-      setVideoDelayMs(snap.ms)
-      setVideoDelayEnabled(snap.enabled)
-      persistVideoDelay(snap.ms, snap.enabled)
-    }
-    setTestClipActive(false)
-    setIsCalibrating(false)
-  }
-  const applyAvSyncCalibrator = () => {
-    calibSnapshotRef.current = null
-    setVideoDelayEnabled(true)
-    persistVideoDelay(videoDelayMs, true)
-    setTestClipActive(false)
-    setIsCalibrating(false)
-  }
-  const toggleTestClip = () => {
-    if (testClipActive) {
-      setTestClipActive(false)
-      return
-    }
-    const v = videoRef.current
-    if (v && !isNaN(v.currentTime)) calibReturnRef.current = v.currentTime
-    setTestClipActive(true)
-  }
-  const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
   useDelayCanvas({
     videoRef,
     canvasRef: delayCanvasRef,
@@ -475,43 +418,7 @@ const Tv: React.FC = () => {
   const [completeTitle, setCompleteTitle] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
-  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('playerTheaterMode') === 'true'
-    } catch {
-      return false
-    }
-  })
-  const toggleTheaterMode = useCallback(() => {
-    setIsTheaterMode((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem('playerTheaterMode', next.toString())
-      } catch {
-        // ignore
-      }
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    try {
-      if (isTheaterMode) {
-        document.body.classList.add('theater-mode')
-      } else {
-        document.body.classList.remove('theater-mode')
-      }
-    } catch (e) {
-      console.error(e)
-    }
-    return () => {
-      try {
-        document.body.classList.remove('theater-mode')
-      } catch (e) {
-        console.error(e)
-      }
-    }
-  }, [isTheaterMode])
+  const { isTheaterMode, toggleTheaterMode, handleLayoutClick } = useTheaterMode()
 
   useEffect(() => {
     const handleTheaterKey = (e: KeyboardEvent) => {
@@ -529,17 +436,6 @@ const Tv: React.FC = () => {
       document.removeEventListener('keydown', handleTheaterKey)
     }
   }, [toggleTheaterMode])
-
-  const handleLayoutClick = (e: React.MouseEvent) => {
-    if (isTheaterMode && e.target === e.currentTarget) {
-      setIsTheaterMode(false)
-      try {
-        localStorage.setItem('playerTheaterMode', 'false')
-      } catch {
-        // ignore
-      }
-    }
-  }
   useAutoRotateFullscreen(
     player,
     (streams.length > 0 || iframeUrl !== '') &&
@@ -606,15 +502,14 @@ const Tv: React.FC = () => {
 
   const updateUrlEpisode = useCallback(
     (nextSeason: number, nextEpisode: number) => {
-      setTestClipActive(false)
-      setIsCalibrating(false)
+      stopCalibration()
       const params = new URLSearchParams(searchParams)
       params.set('type', searchParams.get('type') || 'tv')
       params.set('s', String(nextSeason))
       params.set('e', String(nextEpisode))
       navigate(`${window.location.pathname}?${params.toString()}`)
     },
-    [searchParams, navigate]
+    [searchParams, navigate, stopCalibration]
   )
 
   const updateNextEpisodePrompt = useCallback(() => {
@@ -1490,6 +1385,7 @@ const Tv: React.FC = () => {
     referer,
     isEmbedProvider,
     videoRef,
+    calibReturnRef,
     testClipActive,
     mediaId,
     season,
@@ -2175,14 +2071,7 @@ const Tv: React.FC = () => {
                   onMovyServerSelect={handleMovyServerSelect}
                   isMovySource={activeServers.length > 0}
                   videoDelayEnabled={videoDelayEnabled}
-                  onVideoDelayToggle={(v) => {
-                    setVideoDelayEnabled(v)
-                    try {
-                      localStorage.setItem('playerVideoDelayEnabled', String(v))
-                    } catch {
-                      // ignore
-                    }
-                  }}
+                  onVideoDelayToggle={setDelayEnabled}
                   videoDelayMs={videoDelayMs}
                   onVideoDelayChange={handleVideoDelayChange}
                   onCalibrateAvSync={openAvSyncCalibrator}
@@ -2516,26 +2405,19 @@ const Tv: React.FC = () => {
           </Modal>
         )}
 
-        <Modal isOpen={showResumeModal} onClose={handleSkipResume} title="Resume Watching">
-          <div style={{ padding: '1rem', textAlign: 'center' }}>
-            <p>
+        <ResumeModal
+          isOpen={showResumeModal}
+          onClose={handleSkipResume}
+          title="Resume Watching"
+          message={
+            <>
               You were at <strong>{formatTime(resumeTime)}</strong>
-            </p>
-            <div
-              style={{
-                marginTop: '1rem',
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'center',
-              }}
-            >
-              <Button variant="secondary" onClick={handleSkipResume}>
-                Start from Beginning
-              </Button>
-              <Button onClick={handleResume}>Resume</Button>
-            </div>
-          </div>
-        </Modal>
+            </>
+          }
+          restartLabel="Start from Beginning"
+          onResume={handleResume}
+          onRestart={handleSkipResume}
+        />
 
         <Modal
           isOpen={showWatchedModal}

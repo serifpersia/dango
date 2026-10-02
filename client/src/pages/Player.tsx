@@ -23,6 +23,7 @@ import {
 import type Hls from 'hls.js'
 import { Modal } from '../components/common/Modal'
 import { Button } from '../components/common/Button'
+import ResumeModal from '../components/common/ResumeModal'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
@@ -40,6 +41,8 @@ import useVideoPlayer from '../hooks/useVideoPlayer'
 import useAutoRotateFullscreen from '../hooks/useAutoRotateFullscreen'
 import useAnime4K, { type Anime4KProfile } from '../hooks/useAnime4K'
 import useDelayCanvas from '../hooks/useDelayCanvas'
+import { useAvSync } from '../hooks/useAvSync'
+import { useTheaterMode } from '../hooks/useTheaterMode'
 import { useAmbientLight } from '../hooks/useAmbientLight'
 import AmbientLightCanvas from '../components/player/AmbientLightCanvas'
 import AvSyncCalibrator from '../components/player/AvSyncCalibrator'
@@ -152,82 +155,21 @@ const Player: React.FC = () => {
     }
   })
 
-  const [videoDelayMs, setVideoDelayMs] = useState<number>(() => {
-    try {
-      const stored = Number(localStorage.getItem('playerVideoDelayMs'))
-      if (Number.isFinite(stored) && stored >= 0 && stored <= 500) return Math.round(stored)
-    } catch {
-      // ignore
-    }
-    return 180
-  })
-  const [videoDelayEnabled, setVideoDelayEnabled] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('playerVideoDelayEnabled') === 'true'
-    } catch {
-      return false
-    }
-  })
-  const [isCalibrating, setIsCalibrating] = useState(false)
-  const [testClipActive, setTestClipActive] = useState(false)
-  const calibSnapshotRef = useRef<{ enabled: boolean; ms: number } | null>(null)
-  const calibReturnRef = useRef<number | null>(null)
-  const persistVideoDelay = (ms: number, enabled: boolean) => {
-    try {
-      localStorage.setItem('playerVideoDelayMs', String(ms))
-      localStorage.setItem('playerVideoDelayEnabled', String(enabled))
-    } catch {
-      // ignore
-    }
-  }
-  const handleVideoDelayChange = (ms: number) => {
-    const clamped = Math.max(0, Math.min(500, Math.round(ms)))
-    setVideoDelayMs(clamped)
-    try {
-      localStorage.setItem('playerVideoDelayMs', String(clamped))
-    } catch {
-      // ignore
-    }
-  }
-  const openAvSyncCalibrator = () => {
-    calibSnapshotRef.current = { enabled: videoDelayEnabled, ms: videoDelayMs }
-    setVideoDelayEnabled(true)
-    try {
-      localStorage.setItem('playerVideoDelayEnabled', 'true')
-    } catch {
-      // ignore
-    }
-    actions.setShowSettings(false)
-    setIsCalibrating(true)
-  }
-  const cancelAvSyncCalibrator = () => {
-    const snap = calibSnapshotRef.current
-    calibSnapshotRef.current = null
-    if (snap) {
-      setVideoDelayMs(snap.ms)
-      setVideoDelayEnabled(snap.enabled)
-      persistVideoDelay(snap.ms, snap.enabled)
-    }
-    setTestClipActive(false)
-    setIsCalibrating(false)
-  }
-  const applyAvSyncCalibrator = () => {
-    calibSnapshotRef.current = null
-    setVideoDelayEnabled(true)
-    persistVideoDelay(videoDelayMs, true)
-    setTestClipActive(false)
-    setIsCalibrating(false)
-  }
-  const toggleTestClip = () => {
-    if (testClipActive) {
-      setTestClipActive(false)
-      return
-    }
-    const v = refs.videoRef.current
-    if (v && !isNaN(v.currentTime)) calibReturnRef.current = v.currentTime
-    setTestClipActive(true)
-  }
-  const effectiveVideoDelayMs = videoDelayEnabled ? videoDelayMs : 0
+  const {
+    videoDelayMs,
+    videoDelayEnabled,
+    setDelayEnabled,
+    handleVideoDelayChange,
+    isCalibrating,
+    testClipActive,
+    stopCalibration,
+    openAvSyncCalibrator,
+    cancelAvSyncCalibrator,
+    applyAvSyncCalibrator,
+    toggleTestClip,
+    calibReturnRef,
+    effectiveVideoDelayMs,
+  } = useAvSync(refs.videoRef, () => actions.setShowSettings(false))
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const upscaler = useAnime4K({
@@ -347,10 +289,9 @@ const Player: React.FC = () => {
       setPendingQueueTransition(null)
       setQueueCountdown(null)
       hasDismissedShowCompletedRef.current = false
-      setTestClipActive(false)
-      setIsCalibrating(false)
+      stopCalibration()
     }
-  }, [episodeNumber])
+  }, [episodeNumber, stopCalibration])
 
   useEffect(() => {
     hasAutoFallbackRef.current = false
@@ -371,32 +312,7 @@ const Player: React.FC = () => {
   removeQueueRef.current = removeQueue
   const clearQueue = useClearQueue()
   const reorderQueue = useReorderQueue()
-  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('playerTheaterMode') === 'true'
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    try {
-      if (isTheaterMode) {
-        document.body.classList.add('theater-mode')
-      } else {
-        document.body.classList.remove('theater-mode')
-      }
-    } catch (e) {
-      console.error(e)
-    }
-    return () => {
-      try {
-        document.body.classList.remove('theater-mode')
-      } catch (e) {
-        console.error(e)
-      }
-    }
-  }, [isTheaterMode])
+  const { isTheaterMode, toggleTheaterMode, handleLayoutClick } = useTheaterMode()
 
   useLayoutEffect(() => {
     if (player.state.isFullscreen || isTheaterMode) return
@@ -633,6 +549,7 @@ const Player: React.FC = () => {
     state.selectedSource,
     state.selectedLink,
     refs.videoRef,
+    calibReturnRef,
     actions,
     state.loadingVideo,
     testClipActive,
@@ -1028,16 +945,14 @@ const Player: React.FC = () => {
       }
 
       if (e.key.toLowerCase() === 't') {
-        const newMode = !isTheaterMode
-        setIsTheaterMode(newMode)
-        localStorage.setItem('playerTheaterMode', newMode.toString())
+        toggleTheaterMode()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [actions, player.actions.inactivityTimer, handleNShortcut, isTheaterMode])
+  }, [actions, player.actions.inactivityTimer, handleNShortcut, toggleTheaterMode])
 
   const { setAvailableSubtitles, setActiveSubtitleTrack } = actions
 
@@ -1576,13 +1491,6 @@ const Player: React.FC = () => {
 
   const isVideoLoading = state.loadingShowData || state.loadingVideo
 
-  const handleLayoutClick = (e: React.MouseEvent) => {
-    if (isTheaterMode && e.target === e.currentTarget) {
-      setIsTheaterMode(false)
-      localStorage.setItem('playerTheaterMode', 'false')
-    }
-  }
-
   const matureBlocked = state.showMeta?.isAdult === true && !hasMatureConsent
 
   if (matureBlocked) {
@@ -1627,42 +1535,34 @@ const Player: React.FC = () => {
         />
       )}
       <Modal
-        isOpen={shouldShowModal}
+        isOpen={shouldShowModal && isShowCompleted}
         onClose={handleCloseModal}
-        title={isShowCompleted ? 'Show Completed!' : 'Resume Playback?'}
+        title="Show Completed!"
         width="sm"
       >
-        {isShowCompleted ? (
-          <>
-            <Modal.Body>
-              <p>Congratulations! You&apos;ve finished the final episode of this series.</p>
-            </Modal.Body>
-            <Modal.Actions>
-              <Button
-                onClick={handleMoveToCompletedAndNavigate}
-                disabled={isUpdatingWatchlistStatus}
-              >
-                {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
-              </Button>
-            </Modal.Actions>
-          </>
-        ) : (
-          <>
-            <Modal.Body>
-              <p>
-                You were watching at <strong>{player.actions.formatTime(state.resumeTime)}</strong>.
-                Would you like to continue?
-              </p>
-            </Modal.Body>
-            <Modal.Actions>
-              <Button variant="secondary" onClick={handleStartOver}>
-                Start Over
-              </Button>
-              <Button onClick={handleResume}>Resume</Button>
-            </Modal.Actions>
-          </>
-        )}
+        <Modal.Body>
+          <p>Congratulations! You&apos;ve finished the final episode of this series.</p>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button onClick={handleMoveToCompletedAndNavigate} disabled={isUpdatingWatchlistStatus}>
+            {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
+          </Button>
+        </Modal.Actions>
       </Modal>
+
+      <ResumeModal
+        isOpen={shouldShowModal && !isShowCompleted}
+        onClose={handleCloseModal}
+        title="Resume Playback?"
+        message={
+          <>
+            You were watching at <strong>{player.actions.formatTime(state.resumeTime)}</strong>.
+            Would you like to continue?
+          </>
+        }
+        onResume={handleResume}
+        onRestart={handleStartOver}
+      />
 
       <Modal
         isOpen={shouldShowNextEpisodeModal}
@@ -1802,11 +1702,7 @@ const Player: React.FC = () => {
             animeTitle={displayTitle}
             episodeNumber={state.currentEpisode}
             isTheaterMode={isTheaterMode}
-            onTheaterModeToggle={() => {
-              const newMode = !isTheaterMode
-              setIsTheaterMode(newMode)
-              localStorage.setItem('playerTheaterMode', newMode.toString())
-            }}
+            onTheaterModeToggle={toggleTheaterMode}
             anime4kEnabled={upscaler.isEnabled}
             onAnime4kToggle={upscaler.toggle}
             anime4kSupported={upscaler.isWebGPUSupported}
@@ -1815,14 +1711,7 @@ const Player: React.FC = () => {
             anime4kInitializing={upscaler.isInitializing}
             anime4kError={upscaler.error}
             videoDelayEnabled={videoDelayEnabled}
-            onVideoDelayToggle={(v) => {
-              setVideoDelayEnabled(v)
-              try {
-                localStorage.setItem('playerVideoDelayEnabled', String(v))
-              } catch {
-                // ignore
-              }
-            }}
+            onVideoDelayToggle={setDelayEnabled}
             videoDelayMs={videoDelayMs}
             onVideoDelayChange={handleVideoDelayChange}
             onCalibrateAvSync={openAvSyncCalibrator}

@@ -126,7 +126,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     if (!refs.videoRef.current) return
     refs.videoRef.current.volume = newVolume
     refs.videoRef.current.muted = newVolume === 0
-    localStorage.setItem('playerVolume', newVolume.toString())
   }
 
   const handleSeek = (percent: number) => {
