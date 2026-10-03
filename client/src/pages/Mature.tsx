@@ -308,6 +308,8 @@ export default function Mature() {
 
   const results = (response?.data || []).map((s) => ({ ...s, isAdult: true }))
   const hasMore = response?.hasMore ?? false
+  const totalPages =
+    response?.total != null ? Math.max(1, Math.ceil(response.total / limit)) : undefined
 
   const handleSearch = () => {
     hideVirtualKeyboard()
@@ -642,7 +644,7 @@ export default function Mature() {
             <div className={styles.pagination}>
               <Pagination
                 page={page}
-                totalPages={Math.max(1, Math.ceil((response?.total ?? 0) / limit))}
+                totalPages={totalPages}
                 canGoNext={hasMore}
                 onChange={handlePageChange}
                 variant="labeled"
@@ -660,7 +662,7 @@ export default function Mature() {
             <div className={styles.pagination}>
               <Pagination
                 page={page}
-                totalPages={Math.max(1, Math.ceil((response?.total ?? 0) / limit))}
+                totalPages={totalPages}
                 canGoNext={hasMore}
                 onChange={handlePageChange}
                 variant="labeled"
