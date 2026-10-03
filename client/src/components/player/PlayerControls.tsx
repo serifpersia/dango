@@ -1,14 +1,13 @@
 import React, { useEffect, Suspense, lazy } from 'react'
-import styles from './PlayerControls.module.css'
-import Icon from '../common/Icon'
 import CenterControls from './CenterControls'
-import SeekBar from './SeekBar'
+import ControlTopBar from './ControlTopBar'
+import PlayerBottomBar from './PlayerBottomBar'
 import UnifiedVideoShell from './UnifiedVideoShell'
-import UnifiedVolumeControl from './UnifiedVolumeControl'
+import styles from './PlayerControls.module.css'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
-import { pickSubtitleIndex, subtitleKey } from '../../lib/subtitles'
+import { useControlHandlers } from '../../hooks/useControlHandlers'
 import type { FallbackChoice } from '../../lib/fallbackChoice'
 import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 
@@ -91,12 +90,14 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   className,
   hideChrome = false,
 }) => {
-  const { state, refs, actions } = player
+  const { state, actions } = player
   const { showSettings } = state
-  const { setShowSettings, setShowVolumeSlider } = actions
+  const { setShowSettings } = actions
+  const handlers = useControlHandlers(player)
 
   const settingsRef = React.useRef<HTMLDivElement>(null)
   const settingsBtnRef = React.useRef<HTMLButtonElement>(null)
+  const timeDisplayRef = React.useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,119 +121,24 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     }
   }, [showSettings, setShowSettings])
 
-  const timeDisplayRef = React.useRef<HTMLSpanElement>(null)
-
-  const handleVolumeChange = (newVolume: number) => {
-    if (!refs.videoRef.current) return
-    refs.videoRef.current.volume = newVolume
-    refs.videoRef.current.muted = newVolume === 0
-  }
-
-  const handleSeek = (percent: number) => {
-    if (!refs.videoRef.current || isNaN(state.duration) || state.duration === 0) return
-    refs.videoRef.current.currentTime = percent * state.duration
-    actions.sendProgressUpdate(false, true)
-  }
-
-  const handleScrubStart = () => {
-    if (!refs.videoRef.current) return
-    actions.setIsScrubbing(true)
-    actions.wasPlayingBeforeScrub.current = !refs.videoRef.current.paused
-    refs.videoRef.current.pause()
-  }
-
-  const handleScrubMove = (percent: number) => {
-    if (!refs.videoRef.current || !state.duration) return
-    refs.videoRef.current.currentTime = percent * state.duration
-  }
-
-  const handleScrubEnd = () => {
-    actions.setIsScrubbing(false)
-    if (actions.wasPlayingBeforeScrub.current) {
-      refs.videoRef.current?.play()
-    }
-  }
-
-  const handleSubtitleSelection = (trackId: string | null) => {
-    if (!refs.videoRef.current) return
-    actions.setActiveSubtitleTrack(trackId)
-    try {
-      if (trackId === null || trackId === 'off') {
-        localStorage.setItem('playerSubtitlesEnabled', 'false')
-      } else {
-        localStorage.setItem('playerSubtitlesEnabled', 'true')
-        const chosen = state.availableSubtitles.find(
-          (t) => t.label === trackId || t.lang === trackId
-        )
-        if (chosen) localStorage.setItem('playerLastSubtitle', subtitleKey(chosen))
-        else localStorage.setItem('playerLastSubtitle', trackId)
-      }
-    } catch {
-      // ignore
-    }
-    let matched = false
-    Array.from(refs.videoRef.current.textTracks).forEach((track) => {
-      const isMatch =
-        trackId !== null &&
-        trackId !== 'off' &&
-        (track.language === trackId || track.label === trackId)
-      const shouldShow = isMatch && !matched
-      track.mode = shouldShow ? 'showing' : 'hidden'
-      if (shouldShow) matched = true
-    })
-  }
-
-  const isSubtitleActive = state.activeSubtitleTrack !== null && state.activeSubtitleTrack !== 'off'
-
-  const handleCCToggle = () => {
-    if (!refs.videoRef.current) return
-    if (isSubtitleActive) {
-      handleSubtitleSelection('off')
-      return
-    }
-    if (state.availableSubtitles.length === 0) return
-    let lastKey: string | null = null
-    try {
-      lastKey = localStorage.getItem('playerLastSubtitle')
-    } catch {
-      // ignore
-    }
-    const idx = pickSubtitleIndex(state.availableSubtitles, { lastKey, enabled: true })
-    if (idx < 0) return
-    const trackToActivate = state.availableSubtitles[idx]
-    handleSubtitleSelection(trackToActivate.label || trackToActivate.lang)
-  }
-
-  const renderVolumeIcon = () => {
-    if (state.isMuted || state.volume === 0) return <Icon name="volume-mute" />
-    if (state.volume < 0.5) return <Icon name="volume-down" />
-    return <Icon name="volume-up" />
-  }
+  const controlsVisible = state.showControls || showSettings || state.isScrubbing
 
   const topBar = (
-    <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !state.isScrubbing ? styles.hidden : ''} `}
-      data-speed-boost-ignore="true"
-      style={{ pointerEvents: 'none', background: 'none' }}
-    >
-      <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
-        <button
-          className={styles.backBtn}
-          onClick={(e) => {
-            e.stopPropagation()
-            window.history.back()
-          }}
-          title="Back"
-          aria-label="Back"
-        >
-          <Icon name="chevron-left" />
-        </button>
-        <div className={styles.videoTitleInfo}>
-          <span className={styles.animeTitle}>{animeTitle}</span>
-          {episodeNumber && <span className={styles.episodeNumber}>Episode {episodeNumber}</span>}
-        </div>
-      </div>
-    </div>
+    <ControlTopBar
+      visible={controlsVisible}
+      title={animeTitle}
+      episode={episodeNumber ? `Episode ${episodeNumber}` : undefined}
+      onBack={() => window.history.back()}
+      classes={{
+        overlay: styles.controlsOverlay,
+        hidden: styles.hidden,
+        top: styles.topControls,
+        backBtn: styles.backBtn,
+        titleInfo: styles.videoTitleInfo,
+        title: styles.animeTitle,
+        episode: styles.episodeNumber,
+      }}
+    />
   )
 
   const center =
@@ -246,152 +152,18 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     ) : null
 
   const bottomBar = (
-    <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !state.isScrubbing ? styles.hidden : ''} `}
-      data-speed-boost-ignore="true"
-      style={{ pointerEvents: 'none', background: 'none', justifyContent: 'flex-end' }}
-    >
-      <div
-        className={styles.bottomControls}
-        data-speed-boost-ignore="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <SeekBar
-          classes={{
-            container: styles.progressBarContainer,
-            scrubbing: styles.scrubbing,
-            timeBubble: styles.timeBubble,
-            bar: styles.progressBar,
-            buffered: styles.bufferedBar,
-            watched: styles.watchedBar,
-            thumb: styles.thumb,
-          }}
-          videoRef={refs.videoRef}
-          duration={state.duration}
-          formatTime={actions.formatTime}
-          isScrubbing={state.isScrubbing}
-          onSeek={handleSeek}
-          onScrubStart={handleScrubStart}
-          onScrubMove={handleScrubMove}
-          onScrubEnd={handleScrubEnd}
-          timeLabelRef={timeDisplayRef}
-        >
-          {state.duration > 0 && player.state.currentSkipInterval && (
-            <div
-              className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]} `}
-              style={{
-                left: `${(player.state.currentSkipInterval.start_time / state.duration) * 100}% `,
-                width: `${((player.state.currentSkipInterval.end_time - player.state.currentSkipInterval.start_time) / state.duration) * 100}% `,
-              }}
-            ></div>
-          )}
-          {skipIntervals.map((interval) => {
-            const startPercent = (interval.start_time / state.duration) * 100
-            const widthPercent = ((interval.end_time - interval.start_time) / state.duration) * 100
-            return (
-              <div
-                key={interval.skip_id}
-                className={`${styles.skipSegment} ${styles[interval.skip_type]} `}
-                style={{ left: `${startPercent}% `, width: `${widthPercent}% ` }}
-                title={interval.skip_type.toUpperCase()}
-              />
-            )
-          })}
-        </SeekBar>
-
-        <div className={styles.bottomControlsRow}>
-          <div className={styles.leftControls}>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.togglePlay}
-              aria-label={state.isPlaying ? 'Pause' : 'Play'}
-            >
-              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
-            </button>
-
-            <UnifiedVolumeControl
-              muted={state.isMuted}
-              volume={state.volume}
-              volumeIcon={renderVolumeIcon()}
-              buttonClassName={styles.controlBtn}
-              onToggleMute={actions.toggleMute}
-              onVolumeChange={handleVolumeChange}
-              onExpandedChange={(v) => setShowVolumeSlider(v)}
-            />
-
-            <span className={styles.timeDisplay} ref={timeDisplayRef}>
-              {actions.formatTime(0)} / {actions.formatTime(state.duration)}
-            </span>
-
-            {state.currentSkipInterval && !state.isAutoSkipEnabled && (
-              <button
-                className={styles.controlBtn}
-                onClick={() => {
-                  if (refs.videoRef.current && state.currentSkipInterval) {
-                    refs.videoRef.current.currentTime = state.currentSkipInterval.end_time
-                    actions.setCurrentSkipInterval(null)
-                  }
-                }}
-              >
-                Skip {state.currentSkipInterval.skip_type === 'op' ? 'Opening' : 'Ending'}
-              </button>
-            )}
-          </div>
-
-          <div className={styles.rightControls}>
-            <div className={styles.skipControls}>
-              {showNextEpisodeButton && (
-                <button
-                  className={styles.nextEpisodeBtn}
-                  onClick={onNextEpisode}
-                  title="Play next episode"
-                >
-                  Next EP
-                </button>
-              )}
-            </div>
-
-            <button
-              className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
-              onClick={handleCCToggle}
-              title={isSubtitleActive ? 'Disable Subtitles' : 'Enable Subtitles'}
-              aria-label="Toggle Subtitles"
-            >
-              <Icon name="closed-captioning" size={22} />
-            </button>
-
-            <button
-              ref={settingsBtnRef}
-              className={`${styles.controlBtn} ${showSettings ? styles.active : ''} `}
-              onClick={() => setShowSettings(!showSettings)}
-              aria-label="Settings"
-            >
-              <Icon name="cog" />
-            </button>
-
-            <button
-              className={`${styles.controlBtn} ${styles.theaterBtn} ${isTheaterMode ? styles.active : ''} `}
-              onClick={(e) => {
-                e.stopPropagation()
-                onTheaterModeToggle()
-              }}
-              title={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
-              aria-label={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
-            >
-              <Icon name="tv" />
-            </button>
-
-            <button
-              className={styles.controlBtn}
-              onClick={actions.toggleFullscreen}
-              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PlayerBottomBar
+      player={player}
+      handlers={handlers}
+      visible={controlsVisible}
+      skipIntervals={skipIntervals}
+      showNextEpisodeButton={showNextEpisodeButton}
+      onNextEpisode={onNextEpisode}
+      isTheaterMode={isTheaterMode}
+      onTheaterModeToggle={onTheaterModeToggle}
+      settingsBtnRef={settingsBtnRef}
+      timeDisplayRef={timeDisplayRef}
+    />
   )
 
   const settingsNode = (
@@ -406,7 +178,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         onSourceChange={onSourceChange}
         subtitles={state.availableSubtitles}
         activeSubtitleTrack={state.activeSubtitleTrack}
-        onSubtitleChange={handleSubtitleSelection}
+        onSubtitleChange={handlers.handleSubtitleSelection}
         subtitleSettings={{
           fontSize: state.subtitleFontSize,
           position: state.subtitlePosition,

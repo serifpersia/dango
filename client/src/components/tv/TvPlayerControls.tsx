@@ -2,37 +2,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import Icon from '../common/Icon'
 import styles from './TvPlayerControls.module.css'
 import CenterControls from '../player/CenterControls'
+import ControlTopBar from '../player/ControlTopBar'
+import TvBottomBar from './TvBottomBar'
+import TvSettings, { type TvSettingsView } from './TvSettings'
 import UnifiedVideoShell from '../player/UnifiedVideoShell'
-import UnifiedVolumeControl from '../player/UnifiedVolumeControl'
-import { formatTime } from '../../lib/utils'
-import { pickSubtitleIndex } from '../../lib/subtitles'
-import SeekBar from '../player/SeekBar'
-import SettingsShell from '../player/SettingsShell'
-import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
-import SubtitleDelayMenu from '../player/SubtitleDelayMenu'
-import AvSyncMenu from '../player/AvSyncMenu'
-import AmbientLightMenu from '../player/AmbientLightMenu'
+import { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
 import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
-import OptionListMenu from '../player/OptionListMenu'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
-import {
-  buildCueCss,
-  fitSubtitleSize,
-  formatSubtitleDelay,
-  type SubtitleStyleSettings,
-} from '../../lib/subtitleStyle'
-
-type SettingsView =
-  | 'main'
-  | 'quality'
-  | 'subtitles'
-  | 'subtitle-style'
-  | 'subtitle-timing'
-  | 'audio'
-  | 'server'
-  | 'av-sync'
-  | 'ambient'
-  | null
+import { buildCueCss, fitSubtitleSize, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
 
 interface TvPlayerControlsProps {
   player: ReturnType<typeof useVideoPlayer>
@@ -114,7 +91,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     subtitleEdge,
     subtitleBold,
   } = state
-  const [settingsView, setSettingsView] = useState<SettingsView>(null)
+  const [settingsView, setSettingsView] = useState<TvSettingsView>(null)
   const timeLabelRef = useRef<HTMLSpanElement>(null)
   const [videoBoxH, setVideoBoxH] = useState(0)
 
@@ -296,42 +273,6 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     videoBoxH,
   ])
 
-  const handleSeek = (percent: number) => {
-    const video = videoRef.current
-    if (!video || isNaN(state.duration) || state.duration === 0) return
-    video.currentTime = percent * state.duration
-  }
-
-  const handleScrubStart = () => {
-    if (!videoRef.current) return
-    actions.setIsScrubbing(true)
-    actions.wasPlayingBeforeScrub.current = !videoRef.current.paused
-    videoRef.current.pause()
-  }
-
-  const handleScrubMove = (percent: number) => {
-    const video = videoRef.current
-    if (video && state.duration) video.currentTime = percent * state.duration
-  }
-
-  const handleScrubEnd = () => {
-    actions.setIsScrubbing(false)
-    if (actions.wasPlayingBeforeScrub.current) {
-      videoRef.current?.play().catch(() => {})
-    }
-  }
-
-  const handleVolumeChange = (newVolume: number) => {
-    const video = videoRef.current
-    if (!video) return
-    video.volume = newVolume
-    video.muted = newVolume === 0
-  }
-
-  const toggleMute = () => {
-    actions.toggleMute()
-  }
-
   const hasSubtitles = subtitles.length > 0
   const isSubtitleActive = selectedSubtitle >= 0
 
@@ -340,211 +281,28 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     actions.setShowControls(true)
   }
 
-  const toggleSubtitles = () => {
-    if (isSubtitleActive) {
-      onSubtitleChange(-1)
-      return
-    }
-    let lastKey: string | null = null
-    try {
-      lastKey = localStorage.getItem('tvLastSubtitle')
-    } catch {
-      // ignore
-    }
-    onSubtitleChange(pickSubtitleIndex(subtitles, { lastKey, enabled: true }))
-  }
-
   const closeSettings = () => {
     setSettingsView(null)
   }
 
-  const renderMainSettings = () => (
-    <>
-      {streams.length > 1 && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('quality')}>
-          <span>Quality</span>
-          <span className={styles.currentValue}>{streams[qualityIdx]?.quality || 'Auto'}</span>
-        </button>
-      )}
-      {isMovySource && movyServers.length > 0 && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('server')}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon name="server" size={12} /> Movy Server
-          </span>
-          <span className={styles.currentValue} style={{ textTransform: 'capitalize' }}>
-            {selectedMovyServer}
-          </span>
-        </button>
-      )}
-      {hasSubtitles && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('subtitles')}>
-          <span>Subtitles</span>
-          <span className={styles.currentValue}>
-            {isSubtitleActive
-              ? subtitles[selectedSubtitle]?.label || subtitles[selectedSubtitle]?.language
-              : 'Off'}
-          </span>
-        </button>
-      )}
-      {hasSubtitles && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('subtitle-style')}>
-          <span>Subtitle Style</span>
-          <span className={styles.currentValue}>
-            {subtitleFontSize.toFixed(1)}x · {subtitlePosition}
-          </span>
-        </button>
-      )}
-      {hasSubtitles && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('subtitle-timing')}>
-          <span>Subtitle Timing</span>
-          <span className={styles.currentValue}>{formatSubtitleDelay(subtitleDelayMs)}</span>
-        </button>
-      )}
-      {audioTracks.length > 0 && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('audio')}>
-          <span>Audio Track</span>
-          <span className={styles.currentValue}>
-            {audioTracks[selectedAudioTrack]?.label || audioTracks[selectedAudioTrack]?.language}
-          </span>
-        </button>
-      )}
-      <button className={styles.menuItem} onClick={() => setSettingsView('av-sync')}>
-        <span>A/V Sync</span>
-        <span className={styles.currentValue}>
-          {videoDelayEnabled ? `${videoDelayMs}ms` : 'Off'}
-        </span>
-      </button>
-      {ambientSettings && onAmbientChange && (
-        <button className={styles.menuItem} onClick={() => setSettingsView('ambient')}>
-          <span>Ambient Light</span>
-          <span className={styles.currentValue}>{ambientSettings.enabled ? 'On' : 'Off'}</span>
-        </button>
-      )}
-    </>
-  )
-
-  const renderQualitySettings = () => (
-    <OptionListMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      options={streams.map((s, i) => ({
-        key: String(i),
-        label: s.quality,
-        selected: i === qualityIdx,
-      }))}
-      onSelect={(key) => onQualityChange(Number(key))}
-    />
-  )
-
-  const renderSubtitleSettings = () => (
-    <OptionListMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      options={[
-        { key: 'off', label: 'Off', selected: !isSubtitleActive },
-        ...subtitles.map((track, i) => ({
-          key: String(i),
-          label: track.label || track.language,
-          selected: i === selectedSubtitle,
-        })),
-      ]}
-      onSelect={(key) => onSubtitleChange(key === 'off' ? -1 : Number(key))}
-    />
-  )
-
-  const renderSubtitleStyleSettings = () => (
-    <SubtitleStyleMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      values={{
-        fontSize: subtitleFontSize,
-        position: subtitlePosition,
-        bgOpacity: subtitleBgOpacity,
-        bgColor: subtitleBgColor,
-        textColor: subtitleTextColor,
-        edge: subtitleEdge,
-        bold: subtitleBold,
-      }}
-      onChange={handleSubtitleStyleChange}
-    />
-  )
-
-  const renderSubtitleTimingSettings = () => (
-    <SubtitleDelayMenu
-      classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
-      delayMs={subtitleDelayMs}
-      onDelayChange={(ms) => onSubtitleDelayChange?.(ms)}
-    />
-  )
-
-  const renderAudioSettings = () => (
-    <OptionListMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      options={audioTracks.map((track, i) => ({
-        key: String(i),
-        label: track.label || track.language,
-        selected: i === selectedAudioTrack,
-      }))}
-      onSelect={(key) => onAudioTrackChange(Number(key))}
-    />
-  )
-
-  const renderServerSettings = () => (
-    <OptionListMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      options={movyServers.map((city) => ({
-        key: city,
-        label: <span style={{ textTransform: 'capitalize' }}>{city}</span>,
-        selected: selectedMovyServer === city,
-      }))}
-      onSelect={(city) => onMovyServerSelect?.(city)}
-    />
-  )
-
-  const renderAvSyncSettings = () => (
-    <AvSyncMenu
-      classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
-      enabled={videoDelayEnabled}
-      delayMs={videoDelayMs}
-      onToggle={(v) => onVideoDelayToggle?.(v)}
-      onDelayChange={(ms) => onVideoDelayChange?.(ms)}
-      onCalibrate={() => {
-        setSettingsView(null)
-        onCalibrateAvSync?.()
-      }}
-    />
-  )
-
-  const renderAmbientSettings = () =>
-    ambientSettings && onAmbientChange ? (
-      <AmbientLightMenu
-        classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
-        values={ambientSettings}
-        onChange={onAmbientChange}
-      />
-    ) : null
-
-  const volumeIcon = state.isMuted ? (
-    <Icon name="volume-mute" />
-  ) : state.volume < 0.5 ? (
-    <Icon name="volume-down" />
-  ) : (
-    <Icon name="volume-up" />
-  )
+  const controlsVisible = state.showControls || !!settingsView
 
   const topBar = (
-    <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
-      data-speed-boost-ignore="true"
-      style={{ pointerEvents: 'none', background: 'none' }}
-    >
-      <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.backBtn} onClick={onBack} title="Back" aria-label="Back">
-          <Icon name="chevron-left" />
-        </button>
-        <div className={styles.videoTitleInfo}>
-          <span className={styles.animeTitle}>{title}</span>
-          {episodeLabel && <span className={styles.episodeLabel}>{episodeLabel}</span>}
-        </div>
-      </div>
-    </div>
+    <ControlTopBar
+      visible={controlsVisible}
+      title={title}
+      episode={episodeLabel}
+      onBack={onBack}
+      classes={{
+        overlay: styles.controlsOverlay,
+        hidden: styles.hidden,
+        top: styles.topControls,
+        backBtn: styles.backBtn,
+        titleInfo: styles.videoTitleInfo,
+        title: styles.animeTitle,
+        episode: styles.episodeLabel,
+      }}
+    />
   )
 
   const center =
@@ -558,147 +316,59 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     ) : null
 
   const bottomBar = (
-    <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !settingsView ? styles.hidden : ''}`}
-      data-speed-boost-ignore="true"
-      style={{ pointerEvents: 'none', background: 'none', justifyContent: 'flex-end' }}
-    >
-      <div className={styles.bottomControls} onClick={(e) => e.stopPropagation()}>
-        <SeekBar
-          classes={{
-            container: styles.progressBarContainer,
-            scrubbing: styles.scrubbing,
-            timeBubble: styles.timeBubble,
-            bar: styles.progressBar,
-            buffered: styles.bufferedBar,
-            watched: styles.watchedBar,
-            thumb: styles.thumb,
-          }}
-          videoRef={videoRef}
-          duration={state.duration}
-          formatTime={formatTime}
-          isScrubbing={state.isScrubbing}
-          buffered="full"
-          onSeek={handleSeek}
-          onScrubStart={handleScrubStart}
-          onScrubMove={handleScrubMove}
-          onScrubEnd={handleScrubEnd}
-          timeLabelRef={timeLabelRef}
-        />
-
-        <div className={styles.bottomControlsRow}>
-          <div className={styles.leftControls}>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.togglePlay}
-              aria-label={state.isPlaying ? 'Pause' : 'Play'}
-            >
-              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
-            </button>
-            <UnifiedVolumeControl
-              muted={state.isMuted}
-              volume={state.volume}
-              volumeIcon={volumeIcon}
-              buttonClassName={styles.controlBtn}
-              onToggleMute={toggleMute}
-              onVolumeChange={handleVolumeChange}
-              onExpandedChange={(v) => actions.setShowVolumeSlider(v)}
-            />
-            <span className={styles.timeDisplay} ref={timeLabelRef}>
-              {formatTime(0)} / {formatTime(state.duration)}
-            </span>
-          </div>
-
-          <div className={styles.rightControls}>
-            {showNextEpisodeButton && (
-              <button
-                className={styles.nextEpisodeBtn}
-                onClick={onNextEpisode}
-                title="Play next episode"
-              >
-                Next EP
-              </button>
-            )}
-            {hasSubtitles && (
-              <button
-                className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
-                onClick={toggleSubtitles}
-                aria-label={isSubtitleActive ? 'Turn subtitles off' : 'Turn subtitles on'}
-              >
-                <Icon name="closed-captioning" />
-              </button>
-            )}
-            <button
-              className={`${styles.controlBtn} ${settingsView ? styles.active : ''}`}
-              onClick={() => (settingsView ? closeSettings() : openSettings())}
-              aria-label="Settings"
-            >
-              <Icon name="cog" />
-            </button>
-            <button
-              className={`${styles.controlBtn} ${isTheaterMode ? styles.active : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onTheaterModeToggle()
-              }}
-              title={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
-              aria-label={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
-            >
-              <Icon name="tv" />
-            </button>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.toggleFullscreen}
-              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <TvBottomBar
+      player={player}
+      visible={controlsVisible}
+      settingsOpen={!!settingsView}
+      onOpenSettings={openSettings}
+      onCloseSettings={closeSettings}
+      hasSubtitles={hasSubtitles}
+      isSubtitleActive={isSubtitleActive}
+      subtitles={subtitles}
+      onSubtitleChange={onSubtitleChange}
+      showNextEpisodeButton={showNextEpisodeButton}
+      onNextEpisode={onNextEpisode}
+      isTheaterMode={isTheaterMode}
+      onTheaterModeToggle={onTheaterModeToggle}
+      timeLabelRef={timeLabelRef}
+    />
   )
 
   const settingsNode = settingsView ? (
-    <div data-speed-boost-ignore="true" onClick={(e) => e.stopPropagation()}>
-      <SettingsShell
-        classes={{
-          panel: styles.settingsPanel,
-          header: styles.settingsHeader,
-          backBtn: styles.settingsBackBtn,
-          title: styles.settingsTitle,
-          content: styles.settingsContent,
-        }}
-        title={
-          settingsView === 'main'
-            ? 'Settings'
-            : settingsView === 'subtitle-style'
-              ? 'Subtitle Style'
-              : settingsView === 'subtitle-timing'
-                ? 'Subtitle Timing'
-                : settingsView === 'audio'
-                  ? 'Audio Track'
-                  : settingsView === 'server'
-                    ? 'Movy Server'
-                    : settingsView === 'av-sync'
-                      ? 'A/V Sync'
-                      : settingsView === 'ambient'
-                        ? 'Ambient Light'
-                        : settingsView.charAt(0).toUpperCase() + settingsView.slice(1)
-        }
-        onBack={() => (settingsView === 'main' ? closeSettings() : setSettingsView('main'))}
-      >
-        {settingsView === 'main' && renderMainSettings()}
-        {settingsView === 'quality' && renderQualitySettings()}
-        {settingsView === 'subtitles' && renderSubtitleSettings()}
-        {settingsView === 'subtitle-style' && renderSubtitleStyleSettings()}
-        {settingsView === 'subtitle-timing' && renderSubtitleTimingSettings()}
-        {settingsView === 'audio' && renderAudioSettings()}
-        {settingsView === 'server' && renderServerSettings()}
-        {settingsView === 'av-sync' && renderAvSyncSettings()}
-        {settingsView === 'ambient' && renderAmbientSettings()}
-      </SettingsShell>
-    </div>
+    <TvSettings
+      view={settingsView}
+      onSelectView={setSettingsView}
+      onClose={closeSettings}
+      player={player}
+      onSubtitleStyleChange={handleSubtitleStyleChange}
+      streams={streams}
+      qualityIdx={qualityIdx}
+      onQualityChange={onQualityChange}
+      isMovySource={isMovySource}
+      movyServers={movyServers}
+      selectedMovyServer={selectedMovyServer}
+      onMovyServerSelect={onMovyServerSelect}
+      hasSubtitles={hasSubtitles}
+      subtitles={subtitles}
+      selectedSubtitle={selectedSubtitle}
+      isSubtitleActive={isSubtitleActive}
+      onSubtitleChange={onSubtitleChange}
+      audioTracks={audioTracks}
+      selectedAudioTrack={selectedAudioTrack}
+      onAudioTrackChange={onAudioTrackChange}
+      videoDelayEnabled={videoDelayEnabled}
+      onVideoDelayToggle={onVideoDelayToggle}
+      videoDelayMs={videoDelayMs}
+      onVideoDelayChange={onVideoDelayChange}
+      onCalibrate={() => {
+        setSettingsView(null)
+        onCalibrateAvSync?.()
+      }}
+      subtitleDelayMs={subtitleDelayMs}
+      onSubtitleDelayChange={onSubtitleDelayChange}
+      ambientSettings={ambientSettings}
+      onAmbientChange={onAmbientChange}
+    />
   ) : null
 
   const overlays = (
