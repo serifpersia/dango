@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const watchedEpisodes = sqliteTable(
@@ -67,7 +68,7 @@ export const discoveredNotifications = sqliteTable(
   {
     showId: text('showId').notNull(),
     episodeNumber: text('episodeNumber').notNull(),
-    discoveredAt: text('discoveredAt'),
+    discoveredAt: text('discoveredAt').default(sql`CURRENT_TIMESTAMP`),
   },
   (t) => [primaryKey({ columns: [t.showId, t.episodeNumber] })]
 )
@@ -77,7 +78,7 @@ export const dismissedNotifications = sqliteTable(
   {
     showId: text('showId').notNull(),
     episodeNumber: text('episodeNumber').notNull(),
-    dismissedAt: text('dismissedAt'),
+    dismissedAt: text('dismissedAt').default(sql`CURRENT_TIMESTAMP`),
   },
   (t) => [primaryKey({ columns: [t.showId, t.episodeNumber] })]
 )

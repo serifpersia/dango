@@ -823,6 +823,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(
       'DELETE FROM discovered_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = discovered_notifications.showId AND we.episodeNumber = discovered_notifications.episodeNumber)'
     )
+    db.run(
+      `UPDATE discovered_notifications SET discoveredAt = datetime('now') WHERE discoveredAt IS NULL`
+    )
 
     const addCol = (tbl: string, col: string, type: string) => {
       const columns = db.all<{ name: string }>(`PRAGMA table_info(${tbl})`)
