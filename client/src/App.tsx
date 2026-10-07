@@ -57,6 +57,7 @@ function App() {
   const location = useLocation()
   const navigationType = useNavigationType()
   const scrollPositions = useRef(new Map<string, number>())
+  const prevPathname = useRef(location.pathname)
   const virtualKeyboard = useVirtualKeyboard()
   const { showTelemetryModal, setShowTelemetryModal } = useTelemetry()
   useDiscordPageStatus()
@@ -118,13 +119,14 @@ function App() {
     if (navigationType === 'POP') {
       const y = positions.get(key) ?? 0
       window.scrollTo({ top: y, behavior: 'instant' })
-    } else {
+    } else if (location.pathname !== prevPathname.current) {
       window.scrollTo({ top: 0, behavior: 'instant' })
     }
+    prevPathname.current = location.pathname
     return () => {
       positions.set(key, window.scrollY)
     }
-  }, [location.key, navigationType])
+  }, [location.key, location.pathname, navigationType])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

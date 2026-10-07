@@ -169,13 +169,15 @@ const Header: React.FC = () => {
   }
 
   const searchPlaceholder =
-    contentType === 'manga'
-      ? 'Search manga...'
-      : contentType === 'tv'
-        ? 'Search TV & movies...'
-        : contentType === 'asmr'
-          ? 'Search ASMR...'
-          : 'Search anime...'
+    location.pathname === '/music'
+      ? 'Search music...'
+      : contentType === 'manga'
+        ? 'Search manga...'
+        : contentType === 'tv'
+          ? 'Search TV & movies...'
+          : contentType === 'asmr'
+            ? 'Search ASMR...'
+            : 'Search anime...'
 
   const listLink =
     contentType === 'manga'
@@ -191,6 +193,12 @@ const Header: React.FC = () => {
     hideVirtualKeyboard()
     const trimmed = query.trim()
     if (!trimmed) return
+    if (location.pathname === '/music') {
+      const next = new URLSearchParams(location.search)
+      next.set('q', trimmed)
+      navigate(`/music?${next.toString()}`)
+      return
+    }
     if (contentType === 'manga') {
       navigate(`/manga?q=${encodeURIComponent(trimmed)}`)
     } else if (contentType === 'tv') {

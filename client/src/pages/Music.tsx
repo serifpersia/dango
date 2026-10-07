@@ -43,8 +43,11 @@ const Music: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const paramId = extractVideoId(searchParams.get('v') ?? '')
 
-  const [queryInput, setQueryInput] = useState('')
-  const [query, setQuery] = useState('')
+  const [queryInput, setQueryInput] = useState(() => searchParams.get('q') ?? '')
+  const query = searchParams.get('q') ?? ''
+  useEffect(() => {
+    setQueryInput(query)
+  }, [query])
   const [cookieInput, setCookieInput] = useState(() => {
     try {
       return localStorage.getItem('ytmusic_cookie') ?? ''
@@ -203,11 +206,20 @@ const Music: React.FC = () => {
     }
   }, [paramId, selectedId, tracks, openPlaylistTracks, libraryTracks, upnextTracks, trackData])
 
+  const setVideoParam = (id: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (id) next.set('v', id)
+      else next.delete('v')
+      return next
+    })
+  }
+
   const playTrack = (track: MusicTrack, from: MusicTrack[]) => {
     failedRef.current.delete(track.id)
     setSelected(track)
     setQueue(from.length > 0 ? from : [track])
-    setSearchParams({ v: track.id })
+    setVideoParam(track.id)
   }
 
   const handleTrackFailed = (track: MusicTrack) => {
@@ -231,18 +243,18 @@ const Music: React.FC = () => {
         const first = queueRef.current[0]
         if (first) {
           setSelected(first)
-          setSearchParams({ v: first.id })
+          setVideoParam(first.id)
         }
         return
       }
       setQueue([...queueRef.current, ...fresh])
       setSelected(fresh[0])
-      setSearchParams({ v: fresh[0].id })
+      setVideoParam(fresh[0].id)
     } catch {
       const first = queueRef.current[0]
       if (first) {
         setSelected(first)
-        setSearchParams({ v: first.id })
+        setVideoParam(first.id)
       }
     } finally {
       extendingRef.current = false
@@ -277,7 +289,7 @@ const Music: React.FC = () => {
       next = currentQueue[nextIdx]
     }
     setSelected(next)
-    setSearchParams({ v: next.id })
+    setVideoParam(next.id)
   }
 
   const toggleRadio = () => {
@@ -454,10 +466,15 @@ const Music: React.FC = () => {
             e.preventDefault()
             const direct = extractVideoId(queryInput)
             if (direct) {
-              setQuery('')
-              setSearchParams({ v: direct })
+              setVideoParam(direct)
             } else {
-              setQuery(queryInput)
+              const q = queryInput.trim()
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                if (q) next.set('q', q)
+                else next.delete('q')
+                return next
+              })
             }
           }}
         >
@@ -736,7 +753,7 @@ const Music: React.FC = () => {
           onTrackFailed={handleTrackFailed}
           onClose={() => {
             setSelected(null)
-            setSearchParams({})
+            setVideoParam(null)
           }}
           liked={selected ? isLiked(selected) : false}
           likeVisible={auth?.authenticated === true}
