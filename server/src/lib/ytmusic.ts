@@ -144,8 +144,28 @@ export async function refreshAuthedInnertube(): Promise<Innertube | null> {
   }
 }
 
-export function getMusicAuthStatus(): YTMusicAuthStatus {
-  return { authenticated: readCookie() !== null }
+const AUTH_TTL_MS = 5 * 60 * 1000
+let authProbeAt = 0
+let authProbeOk = false
+
+export async function verifyMusicSession(): Promise<boolean> {
+  if (!readCookie()) return false
+  const now = Date.now()
+  if (now - authProbeAt < AUTH_TTL_MS) return authProbeOk
+  authProbeAt = now
+  try {
+    const yt = await getAuthedInnertube()
+    if (!yt) return false
+    await yt.account.getInfo()
+    authProbeOk = true
+  } catch {
+    authProbeOk = false
+  }
+  return authProbeOk
+}
+
+export async function getMusicAuthStatus(): Promise<YTMusicAuthStatus> {
+  return { authenticated: await verifyMusicSession() }
 }
 
 export async function saveMusicCookie(cookie: string): Promise<void> {
@@ -167,6 +187,8 @@ export async function saveMusicCookie(cookie: string): Promise<void> {
   }
   fs.writeFileSync(COOKIE_PATH, clean, 'utf-8')
   authedTube = trial
+  authProbeAt = Date.now()
+  authProbeOk = true
   logger.info('[ytmusic] cookie sign-in validated and saved')
 }
 
@@ -177,4 +199,6 @@ export async function signOutMusic(): Promise<void> {
     // ignore
   }
   authedTube = null
+  authProbeAt = 0
+  authProbeOk = false
 }

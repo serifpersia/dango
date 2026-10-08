@@ -10,6 +10,7 @@ import {
   getMusicAuthStatus,
   signOutMusic,
   isParserVariantError,
+  verifyMusicSession,
   type YtBasicInfo,
   type YtPanel,
   type YtSessionActions,
@@ -174,6 +175,11 @@ function upnextToTrack(node: unknown, trustLike = false): MusicTrack | null {
 
 interface MenuEndpoint {
   call: (actions: unknown) => Promise<unknown>
+  payload?: { signInEndpoint?: unknown }
+}
+
+function isSignInPrompt(endpoint: MenuEndpoint | null): boolean {
+  return !!endpoint?.payload && 'signInEndpoint' in endpoint.payload
 }
 
 function parseUpnext(
@@ -629,6 +635,9 @@ export const musicRouter = router({
     if (!yt) {
       throw unauthorized('MUSIC_AUTH_REQUIRED')
     }
+    if (!(await verifyMusicSession())) {
+      throw unauthorized('MUSIC_AUTH_REQUIRED')
+    }
     const attempt = async (
       session: Awaited<ReturnType<typeof getAuthedInnertube>> & {}
     ): Promise<void> => {
@@ -638,23 +647,39 @@ export const musicRouter = router({
       const panel = await session.music.getUpNext(id)
       const contents = (panel as YtPanel).contents ?? []
       let endpoint: MenuEndpoint | null = null
+      let signedOut = false
       for (const item of contents) {
         const toggle = findLikeToggle(item, id)
-        endpoint = like ? toggle.like : toggle.unlike
-        if (endpoint) break
+        const picked = like ? toggle.like : toggle.unlike
+        if (isSignInPrompt(picked)) {
+          signedOut = true
+          continue
+        }
+        if (picked) {
+          endpoint = picked
+          break
+        }
       }
+      if (signedOut && !endpoint) throw new Error('MUSIC_SESSION_EXPIRED')
       if (!endpoint) throw new Error('Like toggle not found for track')
       await endpoint.call(actions)
     }
     try {
       await attempt(yt)
     } catch (err) {
+      if ((err as Error).message === 'MUSIC_SESSION_EXPIRED') {
+        logger.warn('[music] like rejected, session expired')
+        throw unauthorized('MUSIC_AUTH_REQUIRED')
+      }
       logger.warn({ err }, '[music] rate failed, retrying with a fresh saved-cookie session')
       const fresh = await refreshAuthedInnertube()
       if (!fresh) throw failed('Like action failed')
       try {
         await attempt(fresh)
       } catch (retryErr) {
+        if ((retryErr as Error).message === 'MUSIC_SESSION_EXPIRED') {
+          throw unauthorized('MUSIC_AUTH_REQUIRED')
+        }
         logger.error({ err: retryErr }, '[music] rate retry failed')
         throw failed('Like action failed')
       }
