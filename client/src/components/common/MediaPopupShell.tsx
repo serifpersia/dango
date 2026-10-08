@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { createPortal } from 'preact/compat'
 import { useFloating, flip, shift, autoUpdate } from '@floating-ui/react'
+import useIsMobile from '../../hooks/useIsMobile'
 import styles from './MediaPopup.module.css'
 
 interface MediaPopupShellProps {
@@ -18,7 +19,7 @@ const MediaPopupShell: React.FC<MediaPopupShellProps> = ({
   onRequestClose,
   children,
 }) => {
-  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches)
+  const centered = useIsMobile()
 
   const virtualEl = React.useMemo(
     () => ({
@@ -38,21 +39,21 @@ const MediaPopupShell: React.FC<MediaPopupShellProps> = ({
   }, [refs, virtualEl])
 
   React.useEffect(() => {
-    if (!isTouch) return
+    if (!centered) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [isTouch])
+  }, [centered])
 
   const content = (
     <>
-      {isTouch && <div className={styles.popupBackdrop} onClick={() => onRequestClose?.()} />}
+      {centered && <div className={styles.popupBackdrop} onClick={() => onRequestClose?.()} />}
       <div
-        ref={isTouch ? undefined : refs.setFloating}
-        className={`${styles.popupPortal} ${isTouch ? styles.mobile : ''}`}
-        style={isTouch ? undefined : floatingStyles}
+        ref={centered ? undefined : refs.setFloating}
+        className={`${styles.popupPortal} ${centered ? styles.mobile : ''}`}
+        style={centered ? undefined : floatingStyles}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
