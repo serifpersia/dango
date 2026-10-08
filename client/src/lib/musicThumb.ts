@@ -34,6 +34,16 @@ export function musicThumbCandidates(
   return out
 }
 
+export function musicCoverUrl(
+  id: string | undefined,
+  thumbnails?: { url: string }[]
+): string {
+  const first = thumbnails?.[0]?.url
+  if (first) return upgrade(first)
+  if (id && VIDEO_ID.test(id)) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+  return ''
+}
+
 export function rememberThumb(id: string | undefined, url: string): void {
   if (!id || DEAD.has(url)) return
   WINNER.set(id, url)

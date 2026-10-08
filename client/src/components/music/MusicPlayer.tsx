@@ -5,6 +5,7 @@ import MusicThumb from './MusicThumb'
 import type { MusicTrack } from '../../hooks/useMusic'
 import { trpcClient } from '../../lib/trpc'
 import { clearDiscordPresence } from '../../lib/trpcBeacon'
+import { musicCoverUrl } from '../../lib/musicThumb'
 import styles from '../asmr/Asmr.module.css'
 
 interface MusicPlayerProps {
@@ -153,7 +154,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     return () => document.body.classList.remove('asmr-player-open')
   }, [])
 
-  const cover = track.thumbnails?.[track.thumbnails.length - 1]?.url ?? null
+  const cover = musicCoverUrl(track.id, track.thumbnails)
 
   const sendMusicPresence = React.useCallback(
     (playing: boolean) => {

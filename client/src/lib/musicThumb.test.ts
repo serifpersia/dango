@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { musicThumbCandidates, forgetThumb, rememberThumb } from './musicThumb'
+import {
+  musicThumbCandidates,
+  musicCoverUrl,
+  forgetThumb,
+  rememberThumb,
+} from './musicThumb'
 
 const yt3 = (size: number, token: string) =>
   `https://yt3.googleusercontent.com/${token}=w${size}-h${size}-l90-rj`
@@ -51,5 +56,25 @@ describe('musicThumbCandidates', () => {
       { url: yt3(120, 'TOKENC') },
     ])
     expect(c).toHaveLength(2)
+  })
+})
+
+describe('musicCoverUrl', () => {
+  it('returns a direct https url, never the proxy wrapper', () => {
+    const cover = musicCoverUrl('nFOlaUH5jrE', [{ url: yt3(120, 'TOKENA') }])
+    expect(cover.startsWith('https://')).toBe(true)
+    expect(cover).not.toContain('/api/image-proxy')
+    expect(cover).toContain('w544-h544')
+  })
+
+  it('falls back to the permanent url when there is no thumbnail', () => {
+    expect(musicCoverUrl('nFOlaUH5jrE')).toBe(
+      'https://i.ytimg.com/vi/nFOlaUH5jrE/hqdefault.jpg'
+    )
+  })
+
+  it('returns empty for ids that are neither video ids nor thumbnailed', () => {
+    expect(musicCoverUrl('VLPLxyzPlaylistId')).toBe('')
+    expect(musicCoverUrl(undefined)).toBe('')
   })
 })
