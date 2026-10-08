@@ -23,7 +23,10 @@ import {
   validateLanSession,
   verifyAppPassword,
 } from './app-auth.js'
-import { importMangaFromMalXmlItems, type MalXmlMangaItem } from './lib/tracker/manga-sync.service.js'
+import {
+  importMangaFromMalXmlItems,
+  type MalXmlMangaItem,
+} from './lib/tracker/manga-sync.service.js'
 import type { ProviderCatalogItem } from './providers/remote-types.js'
 import type { DatabaseWrapper } from './db.js'
 import { LibraryRepository } from './repositories/library.repository.js'

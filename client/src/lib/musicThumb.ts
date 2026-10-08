@@ -3,8 +3,7 @@ const WINNER = new Map<string, string>()
 
 // strict=1 so a dead upstream 404s instead of returning the placeholder SVG,
 // which the browser would treat as a successful load and cache.
-const proxy = (url: string) =>
-  `/api/image-proxy?url=${encodeURIComponent(url)}&strict=1`
+const proxy = (url: string) => `/api/image-proxy?url=${encodeURIComponent(url)}&strict=1`
 
 // yt3 tokens expire but the path does not, so any size suffix renders fine.
 const upgrade = (url: string) =>
@@ -37,10 +36,7 @@ export function musicThumbCandidates(
   return out
 }
 
-export function musicCoverUrl(
-  id: string | undefined,
-  thumbnails?: { url: string }[]
-): string {
+export function musicCoverUrl(id: string | undefined, thumbnails?: { url: string }[]): string {
   const first = thumbnails?.[0]?.url
   if (first) return upgrade(first)
   if (id && VIDEO_ID.test(id)) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`

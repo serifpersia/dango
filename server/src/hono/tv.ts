@@ -39,10 +39,7 @@ function isPlaylistBody(body: Buffer): boolean {
   )
 }
 
-export function registerTv(
-  app: Hono,
-  getTvProvider: (name: string) => TvProvider | undefined
-) {
+export function registerTv(app: Hono, getTvProvider: (name: string) => TvProvider | undefined) {
   app.get('/api/tv/embed/:provider/:type/:tmdbId', async (c) => {
     const provider = c.req.param('provider')
     const type = c.req.param('type')

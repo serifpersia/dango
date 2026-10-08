@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  musicThumbCandidates,
-  musicCoverUrl,
-  forgetThumb,
-  rememberThumb,
-} from './musicThumb'
+import { musicThumbCandidates, musicCoverUrl, forgetThumb, rememberThumb } from './musicThumb'
 
 const yt3 = (size: number, token: string) =>
   `https://yt3.googleusercontent.com/${token}=w${size}-h${size}-l90-rj`
@@ -73,9 +68,7 @@ describe('musicCoverUrl', () => {
   })
 
   it('falls back to the permanent url when there is no thumbnail', () => {
-    expect(musicCoverUrl('nFOlaUH5jrE')).toBe(
-      'https://i.ytimg.com/vi/nFOlaUH5jrE/hqdefault.jpg'
-    )
+    expect(musicCoverUrl('nFOlaUH5jrE')).toBe('https://i.ytimg.com/vi/nFOlaUH5jrE/hqdefault.jpg')
   })
 
   it('returns empty for ids that are neither video ids nor thumbnailed', () => {

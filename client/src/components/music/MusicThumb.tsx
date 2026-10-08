@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from '../common/Icon'
 import radioStyles from '../radio/Radio.module.css'
-import {
-  forgetThumb,
-  musicThumbCandidates,
-  rememberThumb,
-} from '../../lib/musicThumb'
+import { forgetThumb, musicThumbCandidates, rememberThumb } from '../../lib/musicThumb'
 
 interface Props {
   id: string
