@@ -844,6 +844,7 @@ export function registerProxy(app: Hono) {
     const targetUrl = url as string
     const cookie = c.req.query('cookie') || ''
     const ua = c.req.query('ua') || ''
+    const strict = c.req.query('strict') === '1'
     const abort = new AbortController()
     linkAbort(c.req.raw.signal, abort)
 
@@ -903,11 +904,15 @@ export function registerProxy(app: Hono) {
         outHeaders.set('Access-Control-Allow-Origin', '*')
         return new Response(body as BodyInit, { headers: outHeaders })
       }
+      // strict=1 callers retry another candidate instead of settling for the
+      // placeholder, which would otherwise read as a successful load.
+      if (strict) return c.text('Not Found', 404)
       const placeholder = placeholderSvg()
       if (placeholder) return placeholder
       return c.text('Not Found', 404)
     } catch {
       if (abort.signal.aborted) return new Response(null, { status: 499 })
+      if (strict) return c.text('Not Found', 502)
       const placeholder = placeholderSvg()
       if (placeholder) return placeholder
       return c.text('Not Found', 404)

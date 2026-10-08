@@ -26,6 +26,11 @@ describe('musicThumbCandidates', () => {
     expect(decoded(c[0])).toContain('i.ytimg.com/vi/nFOlaUH5jrE/hqdefault.jpg')
   })
 
+  it('asks the proxy to fail hard so dead art triggers the next candidate', () => {
+    const c = musicThumbCandidates('nFOlaUH5jrE', [{ url: yt3(120, 'TOKENA') }])
+    expect(c[0]).toContain('strict=1')
+  })
+
   it('omits the ytimg fallback for ids that are not video ids', () => {
     const c = musicThumbCandidates('VLPLxyzPlaylistId', [{ url: yt3(120, 'TOKENB') }])
     expect(c).toHaveLength(1)

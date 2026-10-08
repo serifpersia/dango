@@ -1,7 +1,10 @@
 const DEAD = new Set<string>()
 const WINNER = new Map<string, string>()
 
-const proxy = (url: string) => `/api/image-proxy?url=${encodeURIComponent(url)}`
+// strict=1 so a dead upstream 404s instead of returning the placeholder SVG,
+// which the browser would treat as a successful load and cache.
+const proxy = (url: string) =>
+  `/api/image-proxy?url=${encodeURIComponent(url)}&strict=1`
 
 // yt3 tokens expire but the path does not, so any size suffix renders fine.
 const upgrade = (url: string) =>
