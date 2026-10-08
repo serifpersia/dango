@@ -110,9 +110,6 @@ importers:
       react-router:
         specifier: ^8.3.0
         version: 8.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      react-simple-maps:
-        specifier: ^5.0.3
-        version: 5.0.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@preact/preset-vite':
         specifier: ^2.10.5
@@ -1402,36 +1399,6 @@ packages:
         integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==,
       }
 
-  '@types/d3-color@3.1.3':
-    resolution:
-      {
-        integrity: sha512-iO90scth9WAbmgv7ogoq57O9YpKmFBbmoEoCHDB2xMBY0+/KVrqAaCDyCE16dUspeOvIxFFRI+0sEtqDqy2b4A==,
-      }
-
-  '@types/d3-geo@3.1.1':
-    resolution:
-      {
-        integrity: sha512-65Emv9fQiQQqphLlRkuQ5ypPsOmWPhtBGCMv61JDPEPMvsx+gzhGf74yw1a78xFKPj6zw4AgQICJoQv0vK9M2w==,
-      }
-
-  '@types/d3-interpolate@3.0.4':
-    resolution:
-      {
-        integrity: sha512-mgLPETlrpVV1YRJIglr4Ez47g7Yxjl1lj7YKsiMCb27VJH9W8NVM6Bb9d8kkpG/uAQS5AmbA48q2IAolKKo1MA==,
-      }
-
-  '@types/d3-selection@3.0.11':
-    resolution:
-      {
-        integrity: sha512-bhAXu23DJWsrI45xafYpkQ4NtcKMwWnAC/vKrd2l+nxMFuvOT3XMYTIj2opv8vq8AO5Yh7Qac/nSeP/3zjTK0w==,
-      }
-
-  '@types/d3-zoom@3.0.8':
-    resolution:
-      {
-        integrity: sha512-iqMC4/YlFCSlO8+2Ii1GGGliCAY4XdeG748w5vQUbevlbDu0zSjH/+jojorQVBK/se0j6DUFNPBGSqD3YWYnDw==,
-      }
-
   '@types/deep-eql@4.0.2':
     resolution:
       {
@@ -1448,12 +1415,6 @@ packages:
     resolution:
       {
         integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==,
-      }
-
-  '@types/geojson@7946.0.16':
-    resolution:
-      {
-        integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==,
       }
 
   '@types/jsdom@30.0.0':
@@ -1478,12 +1439,6 @@ packages:
     resolution:
       {
         integrity: sha512-85Y2BjiufFzaMIlvJDvTTB8Fxl2xfLo4HgmHzVBz08w4wDePCTjYw66PdrolO0kzli3yam/YCgRufyo1DdQVTA==,
-      }
-
-  '@types/topojson-specification@1.0.5':
-    resolution:
-      {
-        integrity: sha512-C7KvcQh+C2nr6Y2Ub4YfgvWvWCgP2nOQMtfhlnwsRL4pYmmwzBS7HclGiS87eQfDOU/DLQpX6GEscviaz4yLIQ==,
       }
 
   '@types/tough-cookie@4.0.5':
@@ -1811,12 +1766,6 @@ packages:
         integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==,
       }
 
-  commander@2.20.3:
-    resolution:
-      {
-        integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==,
-      }
-
   content-type@3.0.0:
     resolution:
       {
@@ -1868,85 +1817,6 @@ packages:
       {
         integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==,
       }
-
-  d3-array@3.2.4:
-    resolution:
-      {
-        integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==,
-      }
-    engines: { node: '>=12' }
-
-  d3-color@3.1.0:
-    resolution:
-      {
-        integrity: sha512-zg/chbXyeBtMQ1LbD/WSoW2DpC3I0mpmPdW+ynRTj/x2DAWYrIY7qeZIHidozwV24m4iavr15lNwIwLxRmOxhA==,
-      }
-    engines: { node: '>=12' }
-
-  d3-dispatch@3.0.1:
-    resolution:
-      {
-        integrity: sha512-rzUyPU/S7rwUflMyLc1ETDeBj0NRuHKKAcvukozwhshr6g6c5d8zh4c2gQjY2bZ0dXeGLWc1PF174P2tVvKhfg==,
-      }
-    engines: { node: '>=12' }
-
-  d3-drag@3.0.0:
-    resolution:
-      {
-        integrity: sha512-pWbUJLdETVA8lQNJecMxoXfH6x+mO2UQo8rSmZ+QqxcbyA3hfeprFgIT//HW2nlHChWeIIMwS2Fq+gEARkhTkg==,
-      }
-    engines: { node: '>=12' }
-
-  d3-ease@3.0.1:
-    resolution:
-      {
-        integrity: sha512-wR/XK3D3XcLIZwpbvQwQ5fK+8Ykds1ip7A2Txe0yxncXSdq1L9skcG7blcedkOX+ZcgxGAmLX1FrRGbADwzi0w==,
-      }
-    engines: { node: '>=12' }
-
-  d3-geo@3.1.1:
-    resolution:
-      {
-        integrity: sha512-637ln3gXKXOwhalDzinUgY83KzNWZRKbYubaG+fGVuc/dxO64RRljtCTnf5ecMyE1RIdtqpkVcq0IbtU2S8j2Q==,
-      }
-    engines: { node: '>=12' }
-
-  d3-interpolate@3.0.1:
-    resolution:
-      {
-        integrity: sha512-3bYs1rOD33uo8aqJfKP3JWPAibgw8Zm2+L9vBKEHJ2Rg+viTR7o5Mmv5mZcieN+FRYaAOWX5SJATX6k1PWz72g==,
-      }
-    engines: { node: '>=12' }
-
-  d3-selection@3.0.0:
-    resolution:
-      {
-        integrity: sha512-fmTRWbNMmsmWq6xJV8D19U/gw/bwrHfNXxrIN+HfZgnzqTHp9jOmKMhsTUjXOJnZOdZY9Q28y4yebKzqDKlxlQ==,
-      }
-    engines: { node: '>=12' }
-
-  d3-timer@3.0.1:
-    resolution:
-      {
-        integrity: sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==,
-      }
-    engines: { node: '>=12' }
-
-  d3-transition@3.0.1:
-    resolution:
-      {
-        integrity: sha512-ApKvfjsSR6tg06xrL434C0WydLr7JewBB3V+/39RMHsaXTOG0zmt/OAXeng5M5LBm0ojmxJrpomQVZ1aPvBL4w==,
-      }
-    engines: { node: '>=12' }
-    peerDependencies:
-      d3-selection: 2 - 3
-
-  d3-zoom@3.0.0:
-    resolution:
-      {
-        integrity: sha512-b8AmV3kfQaqWAuacbPuNbL6vahnOJflOhexLzMMNLga62+/nh0JzvJ0aO/5a5MVgUFGS7Hu1P9P03o3fJkDCyw==,
-      }
-    engines: { node: '>=12' }
 
   data-urls@7.0.0:
     resolution:
@@ -2675,13 +2545,6 @@ packages:
       }
     engines: { node: '>=0.8.19' }
 
-  internmap@2.0.3:
-    resolution:
-      {
-        integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==,
-      }
-    engines: { node: '>=12' }
-
   is-extglob@2.1.1:
     resolution:
       {
@@ -3205,15 +3068,6 @@ packages:
       react-dom:
         optional: true
 
-  react-simple-maps@5.0.3:
-    resolution:
-      {
-        integrity: sha512-ww+FmrkINuOJUkwkez8af0q4S68y0JxOqby2fpaFpmK01/bySisv9r8rDa+bzHlB5kKrIggwZqhbGYjsCiIaTA==,
-      }
-    peerDependencies:
-      react: ^16.8.0 || 17.x || 18.x || 19.x
-      react-dom: ^16.8.0 || 17.x || 18.x || 19.x
-
   react@19.3.0:
     resolution:
       {
@@ -3437,13 +3291,6 @@ packages:
     resolution:
       {
         integrity: sha512-iHtaIWWIbMDkCeJdTBzZFGgbluE5J+oHlb2g7+oAz1S1gpuVpabRZdQyd471Vl8UUkcz2vXSL8xZH2kyCe8tfA==,
-      }
-    hasBin: true
-
-  topojson-client@3.1.0:
-    resolution:
-      {
-        integrity: sha512-605uxS6bcYxGXw9qi62XyrV6Q3xwbndjachmNxu8HWTtVPxZfEJN9fd/SZS1Q54Sn2y0TMyMxFj/cJINqGHrKw==,
       }
     hasBin: true
 
@@ -3827,7 +3674,6 @@ snapshots:
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.1)
       '@csstools/css-tokenizer': 4.0.1
       lru-cache: 11.5.3
-    optional: true
 
   '@asamuzakjp/dom-selector@9.2.1':
     dependencies:
@@ -3835,7 +3681,6 @@ snapshots:
       css-tree: 3.2.1
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
-    optional: true
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -3969,7 +3814,6 @@ snapshots:
   '@bramus/specificity@2.4.2':
     dependencies:
       css-tree: 3.2.1
-    optional: true
 
   '@bufbuild/protobuf@2.15.0': {}
 
@@ -3985,14 +3829,12 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
-  '@csstools/color-helpers@6.1.1':
-    optional: true
+  '@csstools/color-helpers@6.1.1': {}
 
   '@csstools/css-calc@3.4.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.1))(@csstools/css-tokenizer@4.0.1)':
     dependencies:
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.1)
       '@csstools/css-tokenizer': 4.0.1
-    optional: true
 
   '@csstools/css-color-parser@4.2.3(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.1))(@csstools/css-tokenizer@4.0.1)':
     dependencies:
@@ -4000,20 +3842,16 @@ snapshots:
       '@csstools/css-calc': 3.4.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.1))(@csstools/css-tokenizer@4.0.1)
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.1)
       '@csstools/css-tokenizer': 4.0.1
-    optional: true
 
   '@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.1)':
     dependencies:
       '@csstools/css-tokenizer': 4.0.1
-    optional: true
 
   '@csstools/css-syntax-patches-for-csstree@1.1.14(css-tree@3.2.1)':
     optionalDependencies:
       css-tree: 3.2.1
-    optional: true
 
-  '@csstools/css-tokenizer@4.0.1':
-    optional: true
+  '@csstools/css-tokenizer@4.0.1': {}
 
   '@discordjs/collection@2.1.1': {}
 
@@ -4145,8 +3983,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exodus/bytes@1.15.1':
-    optional: true
+  '@exodus/bytes@1.15.1': {}
 
   '@floating-ui/core@1.8.0':
     dependencies:
@@ -4478,32 +4315,11 @@ snapshots:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
 
-  '@types/d3-color@3.1.3': {}
-
-  '@types/d3-geo@3.1.1':
-    dependencies:
-      '@types/geojson': 7946.0.16
-
-  '@types/d3-interpolate@3.0.4':
-    dependencies:
-      '@types/d3-color': 3.1.3
-
-  '@types/d3-selection@3.0.11': {}
-
-  '@types/d3-zoom@3.0.8':
-    dependencies:
-      '@types/d3-interpolate': 3.0.4
-      '@types/d3-selection': 3.0.11
-
   '@types/deep-eql@4.0.2': {}
 
   '@types/esrecurse@4.3.1': {}
 
   '@types/estree@1.0.9': {}
-
-  '@types/geojson@7946.0.16': {}
-
-  '@types/json-schema@7.0.15': {}
 
   '@types/jsdom@30.0.0':
     dependencies:
@@ -4512,6 +4328,8 @@ snapshots:
       parse5: 8.0.1
       undici-types: 8.11.2
 
+  '@types/json-schema@7.0.15': {}
+
   '@types/node@22.20.1':
     dependencies:
       undici-types: 6.21.0
@@ -4519,10 +4337,6 @@ snapshots:
   '@types/responselike@1.0.0':
     dependencies:
       '@types/node': 22.20.1
-
-  '@types/topojson-specification@1.0.5':
-    dependencies:
-      '@types/geojson': 7946.0.16
 
   '@types/tough-cookie@4.0.5': {}
 
@@ -4686,7 +4500,6 @@ snapshots:
   bidi-js@1.1.0:
     dependencies:
       require-from-string: 2.0.2
-    optional: true
 
   boolbase@1.0.0: {}
 
@@ -4757,8 +4570,6 @@ snapshots:
 
   colorette@2.0.20: {}
 
-  commander@2.20.3: {}
-
   content-type@3.0.0: {}
 
   convert-source-map@2.0.0: {}
@@ -4783,55 +4594,10 @@ snapshots:
     dependencies:
       mdn-data: 2.27.1
       source-map-js: 1.2.1
-    optional: true
 
   css-what@6.2.2: {}
 
   csstype@3.2.3: {}
-
-  d3-array@3.2.4:
-    dependencies:
-      internmap: 2.0.3
-
-  d3-color@3.1.0: {}
-
-  d3-dispatch@3.0.1: {}
-
-  d3-drag@3.0.0:
-    dependencies:
-      d3-dispatch: 3.0.1
-      d3-selection: 3.0.0
-
-  d3-ease@3.0.1: {}
-
-  d3-geo@3.1.1:
-    dependencies:
-      d3-array: 3.2.4
-
-  d3-interpolate@3.0.1:
-    dependencies:
-      d3-color: 3.1.0
-
-  d3-selection@3.0.0: {}
-
-  d3-timer@3.0.1: {}
-
-  d3-transition@3.0.1(d3-selection@3.0.0):
-    dependencies:
-      d3-color: 3.1.0
-      d3-dispatch: 3.0.1
-      d3-ease: 3.0.1
-      d3-interpolate: 3.0.1
-      d3-selection: 3.0.0
-      d3-timer: 3.0.1
-
-  d3-zoom@3.0.0:
-    dependencies:
-      d3-dispatch: 3.0.1
-      d3-drag: 3.0.0
-      d3-interpolate: 3.0.1
-      d3-selection: 3.0.0
-      d3-transition: 3.0.1(d3-selection@3.0.0)
 
   data-urls@7.0.0:
     dependencies:
@@ -4839,7 +4605,6 @@ snapshots:
       whatwg-url: 16.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   dateformat@4.6.3: {}
 
@@ -4847,8 +4612,7 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
-  decimal.js@10.6.0:
-    optional: true
+  decimal.js@10.6.0: {}
 
   decompress-response@6.0.0:
     dependencies:
@@ -4917,8 +4681,7 @@ snapshots:
 
   entities@7.0.1: {}
 
-  entities@8.1.0:
-    optional: true
+  entities@8.1.0: {}
 
   es-module-lexer@2.3.2: {}
 
@@ -5176,7 +4939,6 @@ snapshots:
       '@exodus/bytes': 1.15.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   htmlparser2@10.1.0:
     dependencies:
@@ -5202,8 +4964,6 @@ snapshots:
 
   imurmurhash@0.1.4: {}
 
-  internmap@2.0.3: {}
-
   is-extglob@2.1.1: {}
 
   is-glob@4.0.3:
@@ -5212,8 +4972,7 @@ snapshots:
 
   is-obj@2.0.0: {}
 
-  is-potential-custom-element-name@1.0.1:
-    optional: true
+  is-potential-custom-element-name@1.0.1: {}
 
   is-unsafe@2.0.2: {}
 
@@ -5247,7 +5006,6 @@ snapshots:
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   jsesc@3.1.0: {}
 
@@ -5286,8 +5044,7 @@ snapshots:
 
   lru-cache@11.5.2: {}
 
-  lru-cache@11.5.3:
-    optional: true
+  lru-cache@11.5.3: {}
 
   lru-cache@5.1.1:
     dependencies:
@@ -5303,8 +5060,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  mdn-data@2.27.1:
-    optional: true
+  mdn-data@2.27.1: {}
 
   meriyah@7.3.3: {}
 
@@ -5388,7 +5144,6 @@ snapshots:
   parse5@8.0.1:
     dependencies:
       entities: 8.1.0
-    optional: true
 
   path-exists@4.0.0: {}
 
@@ -5486,29 +5241,13 @@ snapshots:
     optionalDependencies:
       react-dom: 19.3.0(react@19.3.0)
 
-  react-simple-maps@5.0.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
-    dependencies:
-      '@types/d3-geo': 3.1.1
-      '@types/d3-zoom': 3.0.8
-      '@types/geojson': 7946.0.16
-      '@types/topojson-specification': 1.0.5
-      d3-color: 3.1.0
-      d3-geo: 3.1.1
-      d3-interpolate: 3.0.1
-      d3-selection: 3.0.0
-      d3-zoom: 3.0.0
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-      topojson-client: 3.1.0
-
   react@19.3.0: {}
 
   real-require@0.2.0: {}
 
   real-require@1.0.0: {}
 
-  require-from-string@2.0.2:
-    optional: true
+  require-from-string@2.0.2: {}
 
   resolve-alpn@1.2.1: {}
 
@@ -5555,7 +5294,6 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
-    optional: true
 
   scheduler@0.28.0: {}
 
@@ -5614,27 +5352,19 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  tldts-core@7.4.13:
-    optional: true
+  tldts-core@7.4.13: {}
 
   tldts@7.4.13:
     dependencies:
       tldts-core: 7.4.13
-    optional: true
-
-  topojson-client@3.1.0:
-    dependencies:
-      commander: 2.20.3
 
   tough-cookie@6.0.2:
     dependencies:
       tldts: 7.4.13
-    optional: true
 
   tr46@6.0.0:
     dependencies:
       punycode: 2.3.1
-    optional: true
 
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
@@ -5673,8 +5403,7 @@ snapshots:
 
   undici@7.29.1: {}
 
-  undici@8.10.2:
-    optional: true
+  undici@8.10.2: {}
 
   universal-user-agent@7.0.3: {}
 
@@ -5738,10 +5467,8 @@ snapshots:
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
-    optional: true
 
-  webidl-conversions@8.0.1:
-    optional: true
+  webidl-conversions@8.0.1: {}
 
   whatwg-encoding@3.1.1:
     dependencies:
@@ -5749,8 +5476,7 @@ snapshots:
 
   whatwg-mimetype@4.0.0: {}
 
-  whatwg-mimetype@5.0.0:
-    optional: true
+  whatwg-mimetype@5.0.0: {}
 
   whatwg-url@16.0.1:
     dependencies:
@@ -5759,7 +5485,6 @@ snapshots:
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   whatwg-url@17.1.2:
     dependencies:
@@ -5768,7 +5493,6 @@ snapshots:
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-    optional: true
 
   which@2.0.2:
     dependencies:
@@ -5785,13 +5509,11 @@ snapshots:
 
   ws@8.21.3: {}
 
-  xml-name-validator@5.0.0:
-    optional: true
+  xml-name-validator@5.0.0: {}
 
   xml-naming@0.3.0: {}
 
-  xmlchars@2.2.0:
-    optional: true
+  xmlchars@2.2.0: {}
 
   yallist@3.1.1: {}
 

@@ -8,8 +8,6 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
 [![App version](https://img.shields.io/badge/dango-3.5.0-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
 
-![Users](https://dango-users-badge.ramiserifpersia.workers.dev)
-
 [![Provider Status](https://dango-users-badge.ramiserifpersia.workers.dev/?provider=all)](https://dango-users-badge.ramiserifpersia.workers.dev/?view=status)
 
 ![Animation](docs/showcase.webp)
@@ -234,18 +232,6 @@ Bidirectional sync is fully supported:
 - Go to **Trackers** in the navigation panel.
 - Select **Sync Now**.
 - Local episode progress updates remotely; external catalog updates merge safely into your local database without overwriting uncommitted states.
-
----
-
-## Community
-
-Need help configuring your setup, troubleshooting builds, discussing feature requests or simply just chat about anime?
-
-<div align="left">
-
-[![Join Discord](https://invidget.switchblade.xyz/2FTSPXCsvn)](https://discord.gg/2FTSPXCsvn)
-
-</div>
 
 ---
 

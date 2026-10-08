@@ -10,52 +10,40 @@ function statusMeta(status) {
   return STATUS_META[key] || STATUS_META.UNKNOWN
 }
 
+const REGISTRY_URL =
+  'https://raw.githubusercontent.com/serifpersia/dango-providers/main/registry.json'
+
 export default {
-  async fetch(request, env) {
-    const sheetUrl = env.GOOGLE_SHEETS_URL
+  async fetch(request) {
     const url = new URL(request.url)
     const provider = url.searchParams.get('provider')
     const view = url.searchParams.get('view')
 
-    if (provider) return await handleProviderBadge(provider, sheetUrl)
-    if (view === 'all') return await handleAllBadges(sheetUrl)
-    if (view === 'status') return await handleStatusPage(sheetUrl)
+    if (provider) return await handleProviderBadge(provider)
+    if (view === 'all') return await handleAllBadges()
+    if (view === 'status') return await handleStatusPage()
 
-    return await handleUsersBadge(sheetUrl)
+    return await handleProviderBadge('all')
   },
 }
 
-async function handleUsersBadge(sheetUrl) {
+async function fetchProviders() {
   try {
-    const response = await fetch(sheetUrl)
-    const data = await response.json()
-
-    const active = data.active ?? 0
-    const total = data.total ?? 0
-
-    const label = 'USERS'
-    const message = `ACTIVE:${active} | TOTAL:${total}`
-
-    const svg = createBadge(label, message, '#897cff')
-    return svgResponse(svg)
-  } catch (e) {
-    const svg = createBadge('USERS', 'UNAVAILABLE', '#9f9f9f')
-    return svgResponse(svg)
-  }
-}
-
-async function fetchProviders(sheetUrl) {
-  try {
-    const res = await fetch(sheetUrl + '?type=providers')
+    const res = await fetch(REGISTRY_URL)
     const data = await res.json()
-    return Array.isArray(data.providers) ? data.providers : []
+    const list = Array.isArray(data.providers) ? data.providers : []
+    return list
+      .filter((p) => (!p.kind || p.kind === 'anime') && !p.mature)
+      .map((p) => String(p.id || p.label || ''))
+      .filter(Boolean)
+      .map((id) => ({ provider: id, status: 'OK', note: '' }))
   } catch (e) {
     return []
   }
 }
 
-async function handleProviderBadge(provider, sheetUrl) {
-  const providers = await fetchProviders(sheetUrl)
+async function handleProviderBadge(provider) {
+  const providers = await fetchProviders()
   const needle = String(provider).toLowerCase()
 
   if (needle === 'all') {
@@ -69,8 +57,8 @@ async function handleProviderBadge(provider, sheetUrl) {
   return svgResponse(svg)
 }
 
-async function handleStatusPage(sheetUrl) {
-  const providers = await fetchProviders(sheetUrl)
+async function handleStatusPage() {
+  const providers = await fetchProviders()
   const rows = providers
     .map((p) => {
       const meta = statusMeta(p.status)
@@ -99,8 +87,8 @@ async function handleStatusPage(sheetUrl) {
   })
 }
 
-async function handleAllBadges(sheetUrl) {
-  const providers = await fetchProviders(sheetUrl)
+async function handleAllBadges() {
+  const providers = await fetchProviders()
   const list =
     providers.length > 0 ? providers : [{ provider: 'no data', status: 'UNKNOWN', note: '' }]
 

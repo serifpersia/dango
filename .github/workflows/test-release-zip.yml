@@ -43,7 +43,6 @@ jobs:
           G_CLIENT_ID: ${{ secrets.G_CLIENT_ID }}
           GOOGLE_AUTH_WORKER_URL: ${{ secrets.GOOGLE_AUTH_WORKER_URL }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-          DISCORD_ROLES_WORKER_URL: ${{ secrets.DISCORD_ROLES_WORKER_URL }}
 
       - name: Build Application
         # Direct exec calls: `pnpm run build` triggers pnpm's
@@ -54,7 +53,6 @@ jobs:
           pnpm --filter dango-client exec vite build
           pnpm --filter dango-server exec tsc
         env:
-          VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           VITE_ANILIST_CLIENT_ID: ${{ secrets.ANILIST_CLIENT_ID }}
 
       - name: Verify build artifacts

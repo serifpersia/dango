@@ -37,7 +37,6 @@ import { createHonoApp } from './app-hono.js'
 import { startWatchlistDiscovery, stopWatchlistDiscovery } from './hono/watchlist.js'
 import { checkAnilistStatus } from './lib/anilist.js'
 import { offlineDb } from './lib/offline-db.js'
-import { initDiscordRolesSync } from './lib/discord-roles-sync.service.js'
 
 const app = createHonoApp(
   () => ({ shuttingDown: isShuttingDown, dbReady: !!db }),
@@ -204,7 +203,6 @@ async function main() {
   discordGatewayService.setEnabled(isRpcEnabled)
 
   checkAnilistStatus().catch(() => {})
-  initDiscordRolesSync(db)
 
   if (CONFIG.PROVIDER_REPO_URL.trim()) {
     setInterval(() => {

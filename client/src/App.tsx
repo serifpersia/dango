@@ -4,10 +4,6 @@ import toast from 'react-hot-toast'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
-import { useTelemetry } from './hooks/useTelemetry'
-import TelemetryNoticeModal from './components/modals/TelemetryNoticeModal'
-import DiscordCommunityPromo from './components/modals/DiscordCommunityPromo'
-import { trpcClient } from './lib/trpc'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
@@ -33,7 +29,6 @@ const TvWatchlist = lazy(() => import('./pages/TvWatchlist'))
 const ListeningList = lazy(() => import('./pages/ListeningList'))
 const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
-const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 const PlayerRedirect = lazy(() => import('./pages/PlayerRedirect'))
 const VirtualKeyboard = lazy(() => import('./components/common/VirtualKeyboard'))
@@ -59,18 +54,7 @@ function App() {
   const scrollPositions = useRef(new Map<string, number>())
   const prevPathname = useRef(location.pathname)
   const virtualKeyboard = useVirtualKeyboard()
-  const { showTelemetryModal, setShowTelemetryModal } = useTelemetry()
   useDiscordPageStatus()
-  const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState('')
-
-  useEffect(() => {
-    trpcClient.discord.rolesConfig
-      .query()
-      .then((d) => {
-        if (d.workerUrl) setDiscordRolesWorkerUrl(d.workerUrl)
-      })
-      .catch(() => {})
-  }, [])
 
   const [lanLocked, setLanLocked] = useState(false)
 
@@ -156,10 +140,6 @@ function App() {
         onClose={closeAnimePaheModal}
         onSuccess={onSuccess}
       />
-      <TelemetryNoticeModal
-        isOpen={showTelemetryModal}
-        onClose={() => setShowTelemetryModal(false)}
-      />
       <LanAuthModal
         isOpen={lanAuthOpen}
         onClose={lanLocked ? () => {} : closeLanAuthModal}
@@ -168,7 +148,6 @@ function App() {
           closeLanAuthModal()
         }}
       />
-      {discordRolesWorkerUrl && <DiscordCommunityPromo workerUrl={discordRolesWorkerUrl} />}
       <Toaster
         position="top-center"
         toastOptions={{
@@ -223,7 +202,6 @@ function App() {
               <Route path="/trackers" element={<Trackers />} />
               <Route path="/mal" element={<Navigate to="/trackers" replace />} />
               <Route path="/insights" element={<Insights />} />
-              <Route path="/map" element={<UserMap />} />
               <Route path="/anime/:id" element={<AnimeInfoPage />} />
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />

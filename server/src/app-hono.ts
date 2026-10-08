@@ -24,14 +24,6 @@ import {
   verifyAppPassword,
 } from './app-auth.js'
 import { updateEnvFile } from './utils/env.utils.js'
-import { discordGatewayService } from './discord-gateway.js'
-import {
-  computeDiscordSyncStats,
-  getCachedRecommendations,
-  getLinkedDiscordUser,
-  setLinkedDiscordUser,
-  syncDiscordRoles,
-} from './lib/discord-roles-sync.service.js'
 import { getWatchInsights, getGenreCards } from './lib/insights.js'
 import { translateTexts } from './lib/translate.js'
 import { AniListTracker } from './lib/tracker/anilist-tracker.js'
@@ -48,7 +40,6 @@ import {
   type MalXmlMangaItem,
 } from './lib/tracker/manga-sync.service.js'
 import type { ProviderCatalogItem } from './providers/remote-types.js'
-import { getMachineId } from './utils/machine-id.js'
 import type { DatabaseWrapper } from './db.js'
 import { SettingsRepository } from './repositories/settings.repository.js'
 import { LibraryRepository } from './repositories/library.repository.js'
@@ -72,7 +63,6 @@ import {
   readPayloadVersion,
   type SyncPayload,
 } from './sync-payload.js'
-import { discordRPCService } from './discord-rpc.js'
 import { offlineDb } from './lib/offline-db.js'
 import {
   getMalImportStatus,
@@ -157,15 +147,8 @@ function mapMalMangaXmlStatus(status: string): string {
   }
 }
 
-const gatewayLog = logger.child({ module: 'DiscordGatewayRoutes' })
-
 const TRACKER_TOKEN_KEY = 'tracker_anilist_token'
 const TRACKER_USER_KEY = 'tracker_anilist_user'
-
-function maskToken(t: string | undefined | null): string {
-  if (!t) return 'none'
-  return t.slice(0, 8) + '...' + t.slice(-4)
-}
 
 export function getHonoClientIp(c: Context): string | undefined {
   try {

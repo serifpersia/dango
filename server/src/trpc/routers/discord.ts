@@ -4,7 +4,6 @@ import { discordRPCService } from '../../discord-rpc.js'
 import { discordGatewayService } from '../../discord-gateway.js'
 import { getDlsitePoster, getMangadexCover } from '../../hono/watchlist.js'
 import { updateEnvFile } from '../../utils/env.utils.js'
-import { CONFIG } from '../../config.js'
 import logger from '../../logger.js'
 
 function maskToken(t: string | undefined | null): string {
@@ -272,9 +271,5 @@ export const discordRouter = router({
       gatewayLog.error({ err: e }, 'Failed to remove Discord Gateway token')
       throw failed('Failed to remove token')
     }
-  }),
-
-  rolesConfig: protectedProcedure.query(() => {
-    return { workerUrl: CONFIG.DISCORD_ROLES_WORKER_URL || null }
   }),
 })

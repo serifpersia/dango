@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { useSearchParams, useNavigate } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'
@@ -13,17 +13,10 @@ import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
-import DiscordRolesSettings from '../components/settings/DiscordRolesSettings'
 import Icon from '../components/common/Icon'
 import { trpcClient } from '../lib/trpc'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
-import packageJson from '../../../package.json'
-import {
-  deleteTelemetryData,
-  getPrivacyFriendlyUserAgent,
-  sendTelemetryPing,
-} from '../hooks/useTelemetry'
 import {
   getVirtualKeyboardEnabled,
   VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT,
@@ -41,15 +34,14 @@ const LIST_TAB_LABELS = {
   asmr: 'Listening List',
 } as const
 
-type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database' | 'community'
+type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
 const Settings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
   const { contentType } = useContentType()
   const initialTab = searchParams.get('tab') as SettingsTab | null
   const [activeTab, setActiveTab] = useState<SettingsTab>(
-    initialTab && ['general', 'sync', 'watchlist', 'database', 'community'].includes(initialTab)
+    initialTab && ['general', 'sync', 'watchlist', 'database'].includes(initialTab)
       ? initialTab
       : 'general'
   )
@@ -60,34 +52,6 @@ const Settings: React.FC = () => {
   const [sidebarIndicator, setSidebarIndicator] = useState({ top: 0, height: 0, left: 0, width: 0 })
   const { lowEndMode, setLowEndMode } = useLowEndMode()
   const { hasConsent: hasMatureConsent, revoke: revokeMatureConsent } = useMatureConsent()
-  const [discordRolesWorkerUrl, setDiscordRolesWorkerUrl] = useState<string>('')
-  const [telemetryEnabled, setTelemetryEnabled] = useState(
-    localStorage.getItem('telemetry_enabled') !== 'false'
-  )
-  const [installationId, setInstallationId] = useState<string>(
-    localStorage.getItem('installation_id') || ''
-  )
-
-  useEffect(() => {
-    trpcClient.settings.installationId
-      .query()
-      .then((data) => {
-        if (data.id) {
-          setInstallationId(data.id)
-          localStorage.setItem('installation_id', data.id)
-        }
-      })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    trpcClient.discord.rolesConfig
-      .query()
-      .then((d) => {
-        if (d.workerUrl) setDiscordRolesWorkerUrl(d.workerUrl)
-      })
-      .catch(() => {})
-  }, [])
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
 
   const [discordEnabled, setDiscordEnabled] = useState(true)
@@ -144,16 +108,6 @@ const Settings: React.FC = () => {
     updateSetting.mutate({ key: 'discordRPCHideMature', value: String(enabled) })
   }
 
-  const toggleTelemetry = (enabled: boolean) => {
-    setTelemetryEnabled(enabled)
-    localStorage.setItem('telemetry_enabled', String(enabled))
-    if (enabled) {
-      sendTelemetryPing()
-    } else {
-      deleteTelemetryData()
-    }
-  }
-
   const toggleVirtualKeyboard = (enabled: boolean) => {
     setVirtualKeyboardEnabled(enabled)
     localStorage.setItem(VIRTUAL_KEYBOARD_ENABLED_KEY, String(enabled))
@@ -166,7 +120,7 @@ const Settings: React.FC = () => {
 
   React.useEffect(() => {
     const tab = searchParams.get('tab') as SettingsTab | null
-    if (tab && ['general', 'sync', 'watchlist', 'database', 'community'].includes(tab)) {
+    if (tab && ['general', 'sync', 'watchlist', 'database'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -505,72 +459,6 @@ const Settings: React.FC = () => {
                 <DiscordTokenBookmarklet />
               </div>
 
-              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div className={styles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Telemetry Tracking</h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Share anonymous installation data to help track active users. Collected:
-                      Browser type and OS (e.g. 'Chrome on Windows'), App Version, First Seen/Last
-                      Seen timestamps, and timezone (e.g. 'Europe/Berlin'). No other personal
-                      information or usage habits are collected.
-                    </p>
-                  </div>
-                  <ToggleSwitch
-                    isChecked={telemetryEnabled}
-                    onChange={(e) => toggleTelemetry(e.target.checked)}
-                    id="telemetry-enabled"
-                  />
-                </div>
-                {telemetryEnabled && (
-                  <div
-                    style={{
-                      marginTop: '0.75rem',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>
-                      Data currently being shared:
-                    </p>
-                    <div
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        padding: '0.5rem',
-                        borderRadius: '4px',
-                        wordBreak: 'break-all',
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      <p style={{ margin: '0' }}>
-                        <strong>ID:</strong> {installationId || 'Loading...'}
-                      </p>
-                      <p style={{ margin: '0' }}>
-                        <strong>Version:</strong> {packageJson.version}
-                      </p>
-                      <p style={{ margin: '0' }}>
-                        <strong>Browser:</strong> {getPrivacyFriendlyUserAgent()}
-                      </p>
-                      <p style={{ margin: '0' }}>
-                        <strong>Timezone:</strong>{' '}
-                        {Intl.DateTimeFormat().resolvedOptions().timeZone}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div style={{ marginTop: '1rem' }}>
-                  <Button variant="secondary" size="sm" onClick={() => navigate('/map')}>
-                    View User Map
-                  </Button>
-                </div>
-              </div>
-
               {hasMatureConsent && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                   <div className={styles.settingRow}>
@@ -652,19 +540,6 @@ const Settings: React.FC = () => {
             <ClearDatabaseSettings />
           </div>
         )
-      case 'community':
-        return (
-          <div className={styles.tabContent}>
-            {discordRolesWorkerUrl ? (
-              <DiscordRolesSettings workerUrl={discordRolesWorkerUrl} />
-            ) : (
-              <div className={styles.sectionCard}>
-                <h3>Discord Community Roles</h3>
-                <p>Discord Roles integration is not configured on this instance.</p>
-              </div>
-            )}
-          </div>
-        )
       default:
         return null
     }
@@ -724,17 +599,6 @@ const Settings: React.FC = () => {
           >
             <Icon name="database" /> <span>Database</span>
           </button>
-          {discordRolesWorkerUrl && (
-            <button
-              ref={(el) => {
-                if (el) tabBtnRefs.current.set('community', el)
-              }}
-              className={`${styles.sidebarItem} ${activeTab === 'community' ? styles.active : ''}`}
-              onClick={() => selectTab('community')}
-            >
-              <Icon name="discord" /> <span>Community</span>
-            </button>
-          )}
         </aside>
 
         <main className={styles.mainContent}>

@@ -49,7 +49,6 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/anime/')) page = 'anime'
     else if (path.startsWith('/insights')) page = 'insights'
     else if (path.startsWith('/settings')) page = 'settings'
-    else if (path.startsWith('/map')) page = 'map'
     else if (path.startsWith('/trackers')) page = 'trackers'
     else if (path.startsWith('/asmr')) page = 'asmr'
     else if (path.startsWith('/manga')) page = 'manga'
