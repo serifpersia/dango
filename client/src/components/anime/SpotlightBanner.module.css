@@ -99,7 +99,7 @@
   }
 }
 
-/* Simple centered dot navigation */
+/* Sliding pill navigation */
 .dots {
   position: absolute;
   left: 50%;
@@ -113,16 +113,14 @@
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: none;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.3);
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    transform 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dot:hover {
@@ -130,8 +128,9 @@
 }
 
 .dotActive {
-  background: var(--accent-light);
-  transform: scale(1.25);
+  width: 32px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
 /* Direction-aware slide track */
