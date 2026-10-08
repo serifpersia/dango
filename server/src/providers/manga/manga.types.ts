@@ -48,14 +48,6 @@ export interface MangaSearchOptions {
   ratings?: MangaContentRating[]
 }
 
-export const SAFE_RATINGS: MangaContentRating[] = ['safe']
-export const MATURE_RATINGS: MangaContentRating[] = [
-  'safe',
-  'suggestive',
-  'erotica',
-  'pornographic',
-]
-
 export interface MangaProvider {
   name: MangaProviderName
   search(

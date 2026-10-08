@@ -1,5 +1,3 @@
-export type ProviderId = string
-
 export interface ProviderOption {
   value: string
   label: string

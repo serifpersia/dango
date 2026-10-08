@@ -25,7 +25,6 @@ import {
 } from './sync-state.js'
 
 const TOKEN_KEY = 'tracker_anilist_token'
-const USER_KEY = 'tracker_anilist_user'
 const SYNC_STATE_KEY = 'tracker_anilist_sync_state'
 
 export interface SyncSummary {

@@ -271,7 +271,7 @@ export const watchlistRouter = router({
 
     const [watchedEpisodes, episodes] = await Promise.all([
       WatchedEpisodesRepository.getByShow(db, showId),
-      resolveAvailableEpisodes(db, showId),
+      resolveAvailableEpisodes(showId),
     ])
 
     const watchedSet = new Set(watchedEpisodes.map((ep) => ep.episodeNumber.toString()))
@@ -303,7 +303,7 @@ export const watchlistRouter = router({
     const [watchedEpisodes, queuedEpisodes, episodes] = await Promise.all([
       WatchedEpisodesRepository.getByShow(db, showId),
       QueueRepository.getByShow(db, showId),
-      resolveAvailableEpisodes(db, showId),
+      resolveAvailableEpisodes(showId),
     ])
 
     const watchedSet = new Set(watchedEpisodes.map((ep) => ep.episodeNumber.toString()))
@@ -732,7 +732,7 @@ async function getContinueWatchingData(
   return enrichedRows
 }
 
-async function resolveAvailableEpisodes(db: DatabaseWrapper, showId: string): Promise<string[]> {
+async function resolveAvailableEpisodes(showId: string): Promise<string[]> {
   const episodeData = await getAnilistEpisodes(showId)
   const episodes =
     Array.isArray(episodeData) && episodeData.length

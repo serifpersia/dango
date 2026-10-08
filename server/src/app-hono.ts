@@ -23,25 +23,9 @@ import {
   validateLanSession,
   verifyAppPassword,
 } from './app-auth.js'
-import { updateEnvFile } from './utils/env.utils.js'
-import { getWatchInsights, getGenreCards } from './lib/insights.js'
-import { translateTexts } from './lib/translate.js'
-import { AniListTracker } from './lib/tracker/anilist-tracker.js'
-import {
-  syncAniList,
-  importFromMalUsername,
-  importFromUsername,
-} from './lib/tracker/sync.service.js'
-import {
-  syncAniListManga,
-  importFromUsernameManga,
-  importMangaFromMalUsername,
-  importMangaFromMalXmlItems,
-  type MalXmlMangaItem,
-} from './lib/tracker/manga-sync.service.js'
+import { importMangaFromMalXmlItems, type MalXmlMangaItem } from './lib/tracker/manga-sync.service.js'
 import type { ProviderCatalogItem } from './providers/remote-types.js'
 import type { DatabaseWrapper } from './db.js'
-import { SettingsRepository } from './repositories/settings.repository.js'
 import { LibraryRepository } from './repositories/library.repository.js'
 import {
   performAsmrWriteTransactionAsync,
@@ -63,13 +47,7 @@ import {
   readPayloadVersion,
   type SyncPayload,
 } from './sync-payload.js'
-import { offlineDb } from './lib/offline-db.js'
-import {
-  getMalImportStatus,
-  requestMalImportCancel,
-  prepareMalImport,
-  executeMalImport,
-} from './lib/mal-import.js'
+import { getMalImportStatus, prepareMalImport, executeMalImport } from './lib/mal-import.js'
 import { registerMusic } from './hono/music.js'
 import { registerAuth, type RunSyncSequence } from './hono/auth.js'
 import { type JasmrApi } from './hono/asmr.js'
@@ -146,9 +124,6 @@ function mapMalMangaXmlStatus(status: string): string {
       return 'Planned'
   }
 }
-
-const TRACKER_TOKEN_KEY = 'tracker_anilist_token'
-const TRACKER_USER_KEY = 'tracker_anilist_user'
 
 export function getHonoClientIp(c: Context): string | undefined {
   try {
@@ -756,7 +731,7 @@ export function createHonoApp(
 
   registerMusic(app)
   registerAuth(app, getDbs, runSync)
-  registerTv(app, media.getApiCache, media.getTvProvider)
+  registerTv(app, media.getTvProvider)
   registerProxy(app)
 
   app.onError((err: Error & { status?: number }, c) => {

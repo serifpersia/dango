@@ -876,7 +876,6 @@ export function registerProxy(app: Hono) {
 
       headers['Referer'] = refererValue
 
-      let lastStatus = 0
       let body: Buffer | null = null
       let contentType = 'image/webp'
       for (let attempt = 0; attempt < 3 && !body; attempt++) {
@@ -889,7 +888,6 @@ export function registerProxy(app: Hono) {
           throwHttpErrors: false,
           timeout: { request: 30000 },
         })
-        lastStatus = resp.statusCode
         if (resp.statusCode === 200 && resp.rawBody?.length) {
           body = Buffer.from(resp.rawBody)
           contentType = String(resp.headers['content-type'] || 'image/webp')

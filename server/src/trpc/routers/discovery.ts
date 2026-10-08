@@ -5,12 +5,8 @@ export const discoveryRouter = router({
   status: protectedProcedure.query(() => {
     return getWatchlistDiscoveryStatus()
   }),
-  nudge: protectedProcedure.mutation(() => {
-    const started = triggerWatchlistDiscovery(false)
-    return { success: true, started, ...getWatchlistDiscoveryStatus() }
-  }),
   refresh: protectedProcedure.mutation(() => {
-    const started = triggerWatchlistDiscovery(true)
+    const started = triggerWatchlistDiscovery()
     return { success: true, started, ...getWatchlistDiscoveryStatus() }
   }),
 })

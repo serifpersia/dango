@@ -6,8 +6,6 @@ import { makeLibraryRepo } from './library.repository.js'
 
 export const TV_STATUSES: string[] = ['Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export type TvStatus = (typeof TV_STATUSES)[number]
-
 export interface TvLibraryRow {
   id: string
   tmdbId: number

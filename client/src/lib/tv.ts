@@ -6,15 +6,6 @@ export const normalizeTvMediaType = (raw: unknown): TvMediaType =>
 export const buildTvId = (mediaType: string, tmdbId: number | string): string =>
   `${normalizeTvMediaType(mediaType)}:${tmdbId}`
 
-export const parseTvId = (id: string): { mediaType: TvMediaType; tmdbId: number } | null => {
-  const sep = id.indexOf(':')
-  if (sep < 0) return null
-  const mediaType = normalizeTvMediaType(id.slice(0, sep))
-  const tmdbId = Number(id.slice(sep + 1))
-  if (!tmdbId) return null
-  return { mediaType, tmdbId }
-}
-
 export const tvDetailPath = (mediaType: string, tmdbId: number | string): string => {
   const t = normalizeTvMediaType(mediaType)
   return `/tv/${tmdbId}?type=${t}`

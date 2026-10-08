@@ -321,15 +321,6 @@ const MAL_STATUS_IDS: Record<string, string | undefined> = {
   not_yet_released: '3',
 }
 
-const MAL_RATING_IDS: Record<string, string> = {
-  g: '1',
-  pg: '2',
-  pg13: '3',
-  r17: '4',
-  r: '5',
-  rx: '6',
-}
-
 const MAL_ORDER_IDS: Record<string, string> = {
   start_date: '2',
   score: '3',
@@ -706,8 +697,6 @@ export async function malSearchMedia(
 
   const url = `https://myanimelist.net/anime.php?${params.toString()}`
   const key = `mal:search:${params.toString()}:page:${page}`
-  const parseHtml = (html: string): AnilistMedia[] =>
-    parseSearchResults(html).map(toAnilistSearchMedia)
   const finish = (list: AnilistMedia[]): Promise<AnilistMedia[]> =>
     enrichTitles ? enrichCardTitles(store, list) : Promise.resolve(list)
   let serverSorted = false

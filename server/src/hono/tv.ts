@@ -1,5 +1,4 @@
 import type { Hono } from 'hono'
-import type { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
 import { linkAbort, setProxyHeaders } from '../utils/http.utils.js'
 import { URL } from 'url'
@@ -42,7 +41,6 @@ function isPlaylistBody(body: Buffer): boolean {
 
 export function registerTv(
   app: Hono,
-  getApiCache: () => AppCache,
   getTvProvider: (name: string) => TvProvider | undefined
 ) {
   app.get('/api/tv/embed/:provider/:type/:tmdbId', async (c) => {

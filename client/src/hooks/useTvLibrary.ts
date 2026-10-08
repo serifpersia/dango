@@ -30,16 +30,6 @@ export interface TvLibraryItem {
   updatedAt?: number | null
 }
 
-export interface TvProgressItem {
-  mediaId: string
-  season: number
-  episode: number
-  currentTime: number
-  duration: number
-  completed?: number | boolean
-  updatedAt: number
-}
-
 export interface ContinueWatchingTvItem extends TvLibraryItem {
   season?: number | null
   episode?: number | null

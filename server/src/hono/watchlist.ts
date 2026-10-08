@@ -8,7 +8,6 @@ import { dbAll } from '../utils/db-utils.js'
 import { AppCache } from '../utils/cache.utils.js'
 import {
   getAiredEpisodesForShows,
-  getAnilistEpisodes,
   isAnilistRateLimited,
   batchGetShowStatuses,
 } from '../lib/anilist.js'
@@ -27,10 +26,10 @@ let discoveryState: 'idle' | 'running' | 'complete' | 'empty' | 'error' = 'idle'
 let discoveryTotal = 0
 let discoveryDone = 0
 let discoveryStopped = false
-let triggerImpl: ((force?: boolean) => boolean) | null = null
+let triggerImpl: (() => boolean) | null = null
 
-export function triggerWatchlistDiscovery(force = false): boolean {
-  return triggerImpl?.(force) ?? false
+export function triggerWatchlistDiscovery(): boolean {
+  return triggerImpl?.() ?? false
 }
 
 export function stopWatchlistDiscovery(): void {
@@ -60,7 +59,7 @@ export function getWatchlistDiscoveryStatus(): {
 export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
   const anilistIdCache = new Map<string, number | null>()
 
-  const getAnilistId = async (showId: string, showName: string): Promise<number | null> => {
+  const getAnilistId = async (showId: string): Promise<number | null> => {
     if (anilistIdCache.has(showId)) {
       return anilistIdCache.get(showId) || null
     }
@@ -115,7 +114,7 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
           if (Date.now() - startedAt > MAX_RUN_MS) return
           const show = watchingShows[nextIndex]
           nextIndex += 1
-          const id = await getAnilistId(show.id, show.name)
+          const id = await getAnilistId(show.id)
           discoveryDone += 1
           anilistResults.push({ show, id })
         }
@@ -219,12 +218,10 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
           const watchedSet = new Set(watchedEps.map((e) => e.toString()))
           const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
 
-          let inserted = false
           for (const { episodeKey, airingAt } of episodes) {
             if (nowUnix - airingAt > 30 * 24 * 60 * 60) continue
             if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
               await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
-              inserted = true
             }
           }
         }
@@ -256,11 +253,9 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
         const watchedSet = new Set(watchedEps.map((e) => e.toString()))
         const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
 
-        let inserted = false
         for (const { episodeKey } of episodes) {
           if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
             await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
-            inserted = true
           }
         }
       }
@@ -282,12 +277,11 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
     }
   }
 
-  triggerImpl = (force = false) => {
+  triggerImpl = () => {
     if (discoveryStopped || discoveryBusy) return false
-    const now = Date.now()
-    if (!force && now - lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
-    lastExternalDiscoveryAt = now
-    runDiscovery(force)
+    if (Date.now() - lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
+    lastExternalDiscoveryAt = Date.now()
+    runDiscovery(true)
     return true
   }
 

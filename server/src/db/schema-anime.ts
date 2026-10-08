@@ -95,12 +95,3 @@ export const tempShowIds = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.id] })]
 )
-
-export const legacyIdMapping = sqliteTable(
-  'legacy_id_mapping',
-  {
-    legacyId: text('legacyId').notNull(),
-    numericId: text('numericId'),
-  },
-  (t) => [primaryKey({ columns: [t.legacyId] })]
-)

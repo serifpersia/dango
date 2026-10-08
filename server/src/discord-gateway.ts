@@ -1,6 +1,4 @@
 import WebSocket from 'ws'
-import fs from 'fs'
-import path from 'path'
 import logger from './logger.js'
 import { CONFIG } from './config.js'
 import dotenv from 'dotenv'
@@ -26,7 +24,6 @@ class DiscordGatewayService {
   private gateway: WebSocket | null = null
   private heartbeat: NodeJS.Timeout | null = null
   private token: string | null = null
-  private isConnected = false
   private reconnectTimeout: NodeJS.Timeout | null = null
   private lastActivity: PresenceData | null = null
   private isEnabled = false
@@ -332,7 +329,6 @@ class DiscordGatewayService {
       clearInterval(this.heartbeat)
       this.heartbeat = null
     }
-    this.isConnected = false
   }
 
   private connect() {
@@ -343,7 +339,6 @@ class DiscordGatewayService {
 
     this.gateway = new WebSocket(wsUrl)
     let heartbeatInterval = 41250
-    let responded = false
 
     this.gateway.on('message', (data) => {
       try {
@@ -401,8 +396,6 @@ class DiscordGatewayService {
           // ignore
         } else if (msg.op === 0) {
           if (msg.t === 'READY') {
-            responded = true
-            this.isConnected = true
             log.info(`Gateway READY as ${msg.d.user?.username || 'unknown'}`)
             if (this.lastActivity) {
               void this.updatePresence(this.lastActivity).catch((err) =>
@@ -434,7 +427,6 @@ class DiscordGatewayService {
   }
 
   private handleDisconnect() {
-    this.isConnected = false
     if (this.heartbeat) {
       clearInterval(this.heartbeat)
       this.heartbeat = null

@@ -187,7 +187,6 @@ function normalizePayload(input: unknown): SyncPayload {
 
 class GitHubSyncService {
   private deviceState: DeviceFlowState = { status: 'idle' }
-  private devicePromise: Promise<void> | null = null
 
   isAuthenticated() {
     return !!process.env.GITHUB_TOKEN
@@ -290,7 +289,7 @@ class GitHubSyncService {
       resolveVerification = resolve
     })
 
-    this.devicePromise = this.runDeviceAuth(db, runSyncSequence, resolveVerification!)
+    void this.runDeviceAuth(db, runSyncSequence, resolveVerification!)
     await verificationReady
 
     return this.deviceState
@@ -516,8 +515,6 @@ class GitHubSyncService {
       }
       resolveVerification()
       log.error({ err }, 'GitHub device authentication failed')
-    } finally {
-      this.devicePromise = null
     }
   }
 

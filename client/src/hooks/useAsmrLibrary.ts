@@ -27,15 +27,6 @@ export interface AsmrLibraryItem {
   updatedAt?: number | null
 }
 
-export interface AsmrProgressItem {
-  workId: string
-  trackIndex: number
-  trackLabel: string
-  currentTime: number
-  duration: number
-  updatedAt: number
-}
-
 export interface ContinueListeningItem extends AsmrLibraryItem {
   trackIndex?: number | null
   trackLabel?: string | null
@@ -79,15 +70,6 @@ export const useAsmrProgress = (workId?: string) => {
     ...trpc.asmrProgress.getByWork.queryOptions({ workId: workId || '' }),
     enabled: !!workId,
   })
-}
-
-export const useAsmrTrackProgress = (workId?: string, trackIndex?: number) => {
-  const query = useAsmrProgress(workId)
-  const row =
-    trackIndex !== undefined
-      ? (query.data?.progress ?? []).find((p) => p.trackIndex === trackIndex)
-      : undefined
-  return { ...query, row }
 }
 
 export const useAddAsmrBookmark = () => {

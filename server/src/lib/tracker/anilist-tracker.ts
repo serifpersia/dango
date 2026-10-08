@@ -70,12 +70,6 @@ interface RequestOptions {
   retries?: number
 }
 
-export async function exchangeAuthorizationCode(): Promise<{ access_token: string }> {
-  throw new Error(
-    'Authorization Code flow removed — use Implicit Grant (response_type=token) instead.'
-  )
-}
-
 export class AniListTracker {
   constructor(private token?: string) {}
 

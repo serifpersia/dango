@@ -15,12 +15,6 @@ export interface QueueRow {
   type?: string
 }
 
-export interface SuggestedEpisode {
-  showId: string
-  episodeNumber: string
-  resumeTime: number
-}
-
 export const QueueRepository = {
   getAll: (db: DatabaseWrapper) =>
     getDrizzle(db).all<QueueRow>(sql`

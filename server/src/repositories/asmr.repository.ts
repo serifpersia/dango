@@ -6,8 +6,6 @@ import { makeLibraryRepo } from './library.repository.js'
 
 export const ASMR_STATUSES: string[] = ['Listening', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export type AsmrStatus = (typeof ASMR_STATUSES)[number]
-
 export interface AsmrLibraryRow {
   id: string
   rjCode: string

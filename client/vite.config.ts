@@ -10,8 +10,6 @@ export default defineConfig({
   resolve: {
     // `react` resolves to a local compat layer (preact/compat + React 19
     // `use`/`useOptimistic` polyfills required by react-router v8).
-    // `prop-types` resolves to a no-op stub: react-simple-maps imports it
-    // for legacy runtime checks, but this strict-TS project does not use it.
     alias: [
       {
         find: /^react$/,
@@ -21,10 +19,6 @@ export default defineConfig({
       { find: /^react-dom$/, replacement: 'preact/compat' },
       { find: /^react-dom\/client$/, replacement: 'preact/compat/client' },
       { find: /^react-dom\/test-utils$/, replacement: 'preact/test-utils' },
-      {
-        find: /^prop-types$/,
-        replacement: fileURLToPath(new URL('./src/lib/prop-types-stub.ts', import.meta.url)),
-      },
     ],
   },
   server: {

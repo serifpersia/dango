@@ -74,10 +74,6 @@ export function malCachePruneExpired(): number {
   return row?.rows ?? 0
 }
 
-export function malCacheDelete(key: string): void {
-  dbRun(db(), 'DELETE FROM mal_cache WHERE key = ?', [key])
-}
-
 export function malCacheStore(): MalCacheStore {
   return {
     get: (key) => malCacheGet(key),

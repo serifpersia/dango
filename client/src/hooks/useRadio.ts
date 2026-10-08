@@ -56,14 +56,6 @@ export function songArtist(song: ListenMoeSong | null): string {
   return song.artists.map((a) => a.nameRomaji || a.name).join(', ')
 }
 
-export function songAnime(song: ListenMoeSong | null): string {
-  if (!song) return ''
-  return song.sources
-    .map((s) => s.nameRomaji || s.name)
-    .filter(Boolean)
-    .join(', ')
-}
-
 export const useRadioStations = () => {
   const trpc = useTRPC()
   return useQuery({

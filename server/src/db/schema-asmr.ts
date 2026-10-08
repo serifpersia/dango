@@ -1,22 +1,5 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-export const asmrLibrary = sqliteTable(
-  'asmr_library',
-  {
-    id: text('id').notNull(),
-    rjCode: text('rjCode').notNull(),
-    title: text('title'),
-    thumbnail: text('thumbnail'),
-    status: text('status'),
-    isAdult: integer('isAdult'),
-    lastTrackIndex: integer('lastTrackIndex'),
-    lastTrackLabel: text('lastTrackLabel'),
-    lastPosition: real('lastPosition'),
-    updatedAt: integer('updatedAt'),
-  },
-  (t) => [primaryKey({ columns: [t.id] })]
-)
-
 export const asmrProgress = sqliteTable(
   'asmr_progress',
   {

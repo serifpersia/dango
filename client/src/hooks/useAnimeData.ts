@@ -47,34 +47,12 @@ export interface QueueItem {
   type?: string
 }
 
-export const useTrendingAnime = () => {
-  const trpc = useTRPC()
-  return useQuery({
-    ...trpc.data.trending.queryOptions(),
-    staleTime: 1000 * 60 * 5,
-  })
-}
-
 export const useSpotlightBanners = () => {
   const trpc = useTRPC()
   return useQuery({
     ...trpc.data.spotlight.queryOptions(),
     staleTime: 1000 * 60 * 5,
     retry: 1,
-  })
-}
-
-export interface BatchedHomeData {
-  trending: Anime[]
-  seasonal: Anime[]
-  spotlight: Anime[]
-}
-
-export const useBatchedHome = (format: string = 'TV') => {
-  const trpc = useTRPC()
-  return useQuery({
-    ...trpc.data.home.queryOptions({ format }),
-    staleTime: 1000 * 60 * 5,
   })
 }
 
@@ -94,13 +72,6 @@ export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: nu
   })
 }
 
-export const useLatestReleases = (format: string = 'TV') => {
-  const trpc = useTRPC()
-  return useQuery({
-    ...trpc.data.latestReleases.queryOptions({ format }),
-  })
-}
-
 export const useInfiniteLatestReleases = (format: string = 'TV', size: number = 12) => {
   return useInfiniteQuery<Anime[]>({
     queryKey: ['latestReleases', format, size],
@@ -113,18 +84,6 @@ export const useInfiniteLatestReleases = (format: string = 'TV', size: number = 
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length >= size ? allPages.length + 1 : undefined
-    },
-  })
-}
-
-export const useCurrentSeason = (format: string = 'ALL') => {
-  return useInfiniteQuery({
-    queryKey: ['currentSeason', format],
-    queryFn: ({ pageParam = 1 }) =>
-      trpcClient.data.seasonal.query({ format, page: pageParam as number }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage: Anime[], allPages) => {
-      return lastPage.length > 0 ? allPages.length + 1 : undefined
     },
   })
 }
@@ -375,33 +334,6 @@ function parseListFilters(filters: string, page: number, limit: number): ListFil
   return input
 }
 
-export const useInfiniteWatchlist = (status: string, filters: string = '') => {
-  return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: unknown[] }>(
-    {
-      queryKey: ['watchlist', status, filters],
-      queryFn: async ({ pageParam = 1 }) => {
-        const params = new URLSearchParams(filters)
-        params.set('status', status)
-        const response = await trpcClient.watchlist.list.query(
-          parseListFilters(params.toString(), pageParam as number, 14)
-        )
-        return response as unknown as PaginatedAnimeResponse
-      },
-      initialPageParam: 1,
-      getNextPageParam: (lastPage) => {
-        if (lastPage.data.length === 0 || lastPage.page * lastPage.limit >= lastPage.total) {
-          return undefined
-        }
-        return lastPage.page + 1
-      },
-      select: (data) => ({
-        ...data,
-        pages: data.pages.flatMap((page) => page.data),
-      }),
-    }
-  )
-}
-
 export const usePaginatedWatchlist = (
   status: string,
   filters: string = '',
@@ -544,15 +476,6 @@ export interface Notification {
   id: string
 }
 
-export interface SystemNotification {
-  id: string
-  type: 'system'
-  title: string
-  message: string
-  icon: 'warning' | 'error' | 'info'
-  createdAt: number
-}
-
 export const useNotifications = (enabled: boolean = true) => {
   const trpc = useTRPC()
   return useQuery({
@@ -597,30 +520,6 @@ export const useTriggerDiscovery = () => {
   const statusKey = trpc.discovery.status.queryOptions().queryKey
   return useMutation(
     trpc.discovery.refresh.mutationOptions({
-      onSuccess: (data) => {
-        queryClient.setQueryData<DiscoveryStatus>(statusKey, {
-          running: data.running,
-          state: data.state,
-          total: data.total,
-          done: data.done,
-          lastRunAt: data.lastRunAt,
-        })
-        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
-        queryClient.invalidateQueries({ queryKey: ['notifications'] })
-      },
-      onError: () => {
-        queryClient.invalidateQueries({ queryKey: statusKey })
-      },
-    })
-  )
-}
-
-export const useNudgeDiscovery = () => {
-  const trpc = useTRPC()
-  const queryClient = useQueryClient()
-  const statusKey = trpc.discovery.status.queryOptions().queryKey
-  return useMutation(
-    trpc.discovery.nudge.mutationOptions({
       onSuccess: (data) => {
         queryClient.setQueryData<DiscoveryStatus>(statusKey, {
           running: data.running,

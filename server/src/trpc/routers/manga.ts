@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
 import { parseJsonBody } from '../../utils/http.utils.js'
-import { defineSchema, optStr, reqObj, reqStr } from '../validation.js'
+import { defineSchema, optStr, reqObj } from '../validation.js'
 import type {
   MangaContentRating,
   MangaProviderName,

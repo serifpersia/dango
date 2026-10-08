@@ -257,20 +257,6 @@ class DiscordRPCService {
     discordGatewayService.disconnect()
   }
 
-  private formatTime(seconds: number): string {
-    if (isNaN(seconds) || seconds <= 0) return '00:00'
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = Math.floor(seconds % 60)
-    const mm = String(m).padStart(2, '0')
-    const ss = String(s).padStart(2, '0')
-    if (h > 0) {
-      const hh = String(h).padStart(2, '0')
-      return `${hh}:${mm}:${ss}`
-    }
-    return `${mm}:${ss}`
-  }
-
   public async updatePresence(data: DiscordActivityData) {
     this.lastActivity = data
     if (data.sessionId) {

@@ -6,8 +6,6 @@ import { makeLibraryRepo } from './library.repository.js'
 
 export const MANGA_STATUSES: string[] = ['Reading', 'Completed', 'On-Hold', 'Dropped', 'Planned']
 
-export type MangaStatus = (typeof MANGA_STATUSES)[number]
-
 export interface MangaLibraryRow {
   id: string
   provider: string

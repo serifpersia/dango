@@ -1,5 +1,4 @@
 import { Show } from '../providers/provider.interface.js'
-import logger from '../logger.js'
 import { parseJsonBody } from '../utils/http.utils.js'
 
 const SUB_SCHEDULE_URL =
@@ -268,8 +267,4 @@ export async function getAiredEpisodesFromAniScheduleFeed(
     }
   }
   return results
-}
-
-export function isAniScheduleAvailable(): boolean {
-  return !!scheduleCache.data || !!subFeedCache.data
 }

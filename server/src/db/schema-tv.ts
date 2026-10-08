@@ -1,25 +1,5 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-export const tvLibrary = sqliteTable(
-  'tv_library',
-  {
-    id: text('id').notNull(),
-    tmdbId: integer('tmdbId').notNull(),
-    mediaType: text('mediaType').notNull(),
-    title: text('title'),
-    poster: text('poster'),
-    backdrop: text('backdrop'),
-    year: text('year'),
-    overview: text('overview'),
-    status: text('status'),
-    adult: integer('adult'),
-    lastSeason: integer('lastSeason'),
-    lastEpisode: integer('lastEpisode'),
-    updatedAt: integer('updatedAt'),
-  },
-  (t) => [primaryKey({ columns: [t.id] })]
-)
-
 export const tvProgress = sqliteTable(
   'tv_progress',
   {

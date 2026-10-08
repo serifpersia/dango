@@ -53,10 +53,6 @@ export function isAnilistRateLimited(): boolean {
   return anilistRateLimited && anilistCooldownUntil > Date.now()
 }
 
-export function markAnilistDownAtBoot(): void {
-  anilistWasDownAtBoot = anilistUnavailable()
-}
-
 export async function checkAnilistStatus(): Promise<boolean> {
   const available = await performAnilistStatusCheck()
   if (!available) {
@@ -1258,7 +1254,7 @@ export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, s
     for (let i = 0; i < ids.length; i += BATCH) {
       const batch = ids.slice(i, i + BATCH)
       const aliases = batch
-        .map((id, idx) => `a${idx}: Media(id: $id${idx}, type: ANIME) { id status }`)
+        .map((_id, idx) => `a${idx}: Media(id: $id${idx}, type: ANIME) { id status }`)
         .join('\n')
       const variables: Record<string, unknown> = {}
       batch.forEach((id, idx) => {
@@ -1596,7 +1592,7 @@ export async function getAiredEpisodesForShows(
     const batch = ids.slice(i, i + BATCH)
     const aliases = batch
       .map(
-        (id, idx) =>
+        (_id, idx) =>
           `a${idx}: Media(id: $id${idx}, type: ANIME) { id airingSchedule(perPage: 100) { nodes { episode airingAt } } }`
       )
       .join('\n')
@@ -1631,37 +1627,6 @@ export async function getAiredEpisodesForShows(
 
   setCachedAiredEpisodes(cacheKey, results)
   return results
-}
-
-export async function getAiredEpisodesForShow(
-  id: number,
-  startDate: Date,
-  endDate: Date
-): Promise<number[]> {
-  const dayStart = Math.floor(startDate.getTime() / 1000)
-  const dayEnd = Math.floor(endDate.getTime() / 1000)
-
-  const query = `
-    query ($id: Int, $dayStart: Int, $dayEnd: Int) {
-      Media(id: $id, type: ANIME) {
-        id
-        airingSchedule(airingAt_greater: $dayStart, airingAt_lesser: $dayEnd) {
-          episode
-          airingAt
-        }
-      }
-    }
-  `
-
-  const result = await anilistRequest<{
-    Media: { airingSchedule?: { episode: number; airingAt: number }[] }
-  }>(query, { id, dayStart, dayEnd })
-
-  const schedules = result?.data?.Media?.airingSchedule
-  if (!schedules || schedules.length === 0) return []
-
-  const now = Math.floor(Date.now() / 1000)
-  return schedules.filter((s) => s.airingAt <= now).map((s) => s.episode)
 }
 
 export async function getSchedule(date: Date, format?: string, adult = false): Promise<Show[]> {

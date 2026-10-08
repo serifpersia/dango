@@ -1,12 +1,9 @@
 import type { Hono } from 'hono'
 import logger from '../logger.js'
 import { googleDriveService } from '../google.js'
-import { githubSyncService } from '../github-sync.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
-import { initSyncProvider, getActiveProvider } from '../sync.js'
 import { CONFIG } from '../config.js'
-import { rcloneService } from '../rclone.js'
 import { updateEnvFile } from '../utils/env.utils.js'
 
 export type RunSyncSequence = (

@@ -30,17 +30,9 @@ export const SYNC_TABLES = ANIME_SYNC_TABLES
 export { MANGA_SYNC_TABLES, TV_SYNC_TABLES, ASMR_SYNC_TABLES }
 
 export type SyncTable = (typeof SYNC_TABLES)[number]
-export type MangaSyncTable = (typeof MANGA_SYNC_TABLES)[number]
-export type TvSyncTable = (typeof TV_SYNC_TABLES)[number]
-export type AsmrSyncTable = (typeof ASMR_SYNC_TABLES)[number]
 export type AnimeSyncPayload = SyncPayload<SyncTable>
-export type MangaSyncPayload = SyncPayload<MangaSyncTable>
-export type TvSyncPayload = SyncPayload<TvSyncTable>
-export type AsmrSyncPayload = SyncPayload<AsmrSyncTable>
 
 export type MediaKind = 'anime' | 'manga' | 'tv' | 'asmr'
-
-export const MEDIA_KINDS: MediaKind[] = ['anime', 'manga', 'tv', 'asmr']
 
 export interface KindSyncDef {
   mid: '' | 'manga ' | 'TV ' | 'ASMR '
