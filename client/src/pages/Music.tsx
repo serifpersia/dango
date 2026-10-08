@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import MusicPlayer from '../components/music/MusicPlayer'
+import MusicThumb from '../components/music/MusicThumb'
 import MusicCookieHelp from '../components/music/MusicCookieHelp'
 import {
   useMusicAuthStatus,
@@ -353,19 +354,7 @@ const Music: React.FC = () => {
       onClick={() => setOpenPlaylist(p)}
       aria-label={`Open ${p.title}`}
     >
-      {p.thumbnails?.[0]?.url ? (
-        <img
-          src={p.thumbnails[0].url}
-          alt=""
-          className={radioStyles.stationThumb}
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <span className={radioStyles.stationThumbPlaceholder}>
-          <Icon name="headphones" />
-        </span>
-      )}
+      <MusicThumb id={p.id} thumbnails={p.thumbnails} />
       <span className={radioStyles.stationMeta}>
         <span className={radioStyles.stationName}>{p.title}</span>
         {p.subtitle && <span className={radioStyles.stationSub}>{p.subtitle}</span>}
@@ -389,19 +378,7 @@ const Music: React.FC = () => {
           style={{ flex: 1, minWidth: 0, background: 'transparent', border: 0, padding: 0 }}
           aria-label={`Play ${t.title}`}
         >
-          {t.thumbnails?.[0]?.url ? (
-            <img
-              src={t.thumbnails[0].url}
-              alt=""
-              className={radioStyles.stationThumb}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <span className={radioStyles.stationThumbPlaceholder}>
-              <Icon name="headphones" />
-            </span>
-          )}
+          <MusicThumb id={t.id} thumbnails={t.thumbnails} />
           <span className={radioStyles.stationMeta}>
             <span className={radioStyles.stationName}>{t.title}</span>
             <span className={radioStyles.stationSub}>

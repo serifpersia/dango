@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
+import MusicThumb from './MusicThumb'
 import type { MusicTrack } from '../../hooks/useMusic'
 import { trpcClient } from '../../lib/trpc'
 import { clearDiscordPresence } from '../../lib/trpcBeacon'
 import styles from '../asmr/Asmr.module.css'
-import radioStyles from '../radio/Radio.module.css'
 
 interface MusicPlayerProps {
   track: MusicTrack
@@ -211,10 +211,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     else audio.pause()
   }
 
-  const [artFailed, setArtFailed] = useState(false)
-  useEffect(() => {
-    setArtFailed(false)
-  }, [cover])
   const headline = `${track.title} — ${track.artists}`
 
   const transportRow = (
@@ -285,16 +281,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const barContent = (
     <>
-      {track.thumbnails?.[0]?.url && !artFailed && (
-        <img
-          src={track.thumbnails[0].url}
-          alt=""
-          className={radioStyles.stationThumb}
-          loading="lazy"
-          decoding="async"
-          onError={() => setArtFailed(true)}
-        />
-      )}
+      <MusicThumb id={track.id} thumbnails={track.thumbnails} />
 
       <div className={styles.playerInfo}>
         <p className={styles.playerTitle} title={headline}>
