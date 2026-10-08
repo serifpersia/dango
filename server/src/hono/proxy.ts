@@ -15,6 +15,7 @@ import {
 } from '../utils/megaplay.utils.js'
 
 const proxyCache = new AppCache({ ttlSeconds: 30, maxKeys: 500 })
+const imageCache = new AppCache({ ttlSeconds: 86400, maxKeys: 3000 })
 
 function assTimeToVtt(value: string): string | null {
   const m = value.trim().match(/^(-?\d+):(\d{2}):(\d{2})[.:](\d{2,3})$/)
@@ -855,6 +856,17 @@ export function registerProxy(app: Hono) {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
 
+    const cacheKey = `${targetUrl}|${cookie}|${ua}`
+    const cached = imageCache.get<{ body: Buffer; contentType: string }>(cacheKey)
+    if (cached) {
+      const hit = new Headers()
+      hit.set('Cache-Control', 'public, max-age=604800, immutable')
+      hit.set('Content-Type', cached.contentType)
+      hit.set('Access-Control-Allow-Origin', '*')
+      hit.set('X-Dango-Cache', 'hit')
+      return new Response(cached.body as BodyInit, { headers: hit })
+    }
+
     try {
       if (targetUrl.includes('animepahe')) {
         refererValue = 'https://animepahe.pw/'
@@ -898,6 +910,7 @@ export function registerProxy(app: Hono) {
       }
 
       if (body) {
+        imageCache.set(cacheKey, { body, contentType })
         const outHeaders = new Headers()
         outHeaders.set('Cache-Control', 'public, max-age=604800, immutable')
         outHeaders.set('Content-Type', contentType)
