@@ -375,7 +375,11 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
         const HlsClass = await loadHls()
         if (!current()) return
         if (HlsClass?.isSupported()) {
-          instance = new HlsClass({ enableWorker: true, ...options.hlsConfig })
+          instance = new HlsClass({
+            enableWorker: true,
+            startPosition: options.initialTime ?? -1,
+            ...options.hlsConfig,
+          })
           hls = instance
           const player = instance
           const refreshTracks = () => {

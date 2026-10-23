@@ -34,7 +34,7 @@ export function useMediaSource({
   setActiveSubtitleTrack,
   onFatalError,
 }: UseMediaSourceOptions) {
-  const seekToTimeRef = useRef<number>(0)
+  const seekToTimeRef = useRef<number | null>(null)
   const resumeTimeRef = useRef(resumeTime)
   const showResumeModalRef = useRef(showResumeModal)
   const onFatalErrorRef = useRef(onFatalError)
@@ -61,9 +61,13 @@ export function useMediaSource({
     if (calibReturnRef.current != null) {
       seekToTimeRef.current = calibReturnRef.current
       calibReturnRef.current = null
-    } else if (resumeTimeRef.current > 5 && !showResumeModalRef.current) {
+    } else if (
+      seekToTimeRef.current === null &&
+      resumeTimeRef.current > 5 &&
+      !showResumeModalRef.current
+    ) {
       seekToTimeRef.current = resumeTimeRef.current
-    } else if (showResumeModalRef.current) {
+    } else if (seekToTimeRef.current === null && showResumeModalRef.current) {
       seekToTimeRef.current = 0
     }
 
@@ -115,8 +119,8 @@ export function useMediaSource({
       setAvailableSubtitles(selectedSource.subtitles)
     }
 
-    const targetTime = seekToTimeRef.current
-    seekToTimeRef.current = 0
+    const targetTime = seekToTimeRef.current ?? 0
+    seekToTimeRef.current = null
 
     const isLowEnd = document.body.classList.contains('low-end')
     return engine.loadSource(
