@@ -61,14 +61,22 @@ function App() {
   const [lanLocked, setLanLocked] = useState(false)
 
   useEffect(() => {
-    fetchApi('/api/auth/app-status')
-      .then((data) => {
+    const controller = new AbortController()
+    fetchApi('/api/auth/app-status', { signal: controller.signal })
+      .then((data: { hasPassword: boolean; isAuthenticated: boolean }) => {
         if (data.hasPassword && !data.isAuthenticated) {
           setLanLocked(true)
           openLanAuthModal()
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          toast.error(
+            'Could not check server access. The server may still be starting; reload to retry.'
+          )
+        }
+      })
+    return () => controller.abort()
   }, [openLanAuthModal])
 
   const [lanNoticeShown, setLanNoticeShown] = useLocalStorage<string>(

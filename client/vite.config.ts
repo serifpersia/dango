@@ -38,7 +38,10 @@ export default defineConfig({
               if (err?.code === 'ECONNREFUSED') {
                 const r = res as import('http').ServerResponse | undefined
                 if (r && typeof r.writeHead === 'function' && !r.headersSent) {
-                  r.writeHead(503, { 'Content-Type': 'application/json' })
+                  r.writeHead(503, {
+                    'Content-Type': 'application/json',
+                    'x-dango-not-ready': '1',
+                  })
                   r.end(JSON.stringify({ error: 'Backend is starting up' }))
                 }
                 return false
