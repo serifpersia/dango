@@ -1,3 +1,4 @@
+import { closeTrackerActivityStreams } from './hono/tracker-activity.js'
 process.setMaxListeners(100)
 import { EventEmitter } from 'events'
 EventEmitter.defaultMaxListeners = 100
@@ -291,6 +292,7 @@ async function main() {
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
+    closeTrackerActivityStreams(db)
     stopWatchlistDiscovery()
     clearInterval(syncInterval)
     clearInterval(offlineDbInterval)

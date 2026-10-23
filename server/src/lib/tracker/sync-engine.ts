@@ -1,3 +1,6 @@
+import type { DatabaseWrapper } from '../../db.js'
+import { withTrackerWrite } from './tracker-activity.js'
+
 export type RemotePushUpdate = {
   mediaId: number
   status: string | undefined
@@ -40,18 +43,21 @@ export function assertDeleteCap(opts: {
 }
 
 export async function pushRemoteChanges(
+  db: DatabaseWrapper,
   tracker: RemoteSyncClient,
   pushUpdates: RemotePushUpdate[],
   remoteDeleteEntryIds: RemoteDeleteEntry[]
 ): Promise<void> {
   const batchSize = 10
 
-  for (let i = 0; i < pushUpdates.length; i += batchSize) {
-    await tracker.batchUpdateMediaEntries(pushUpdates.slice(i, i + batchSize))
-  }
+  await withTrackerWrite(db, 'anilist', async () => {
+    for (let i = 0; i < pushUpdates.length; i += batchSize) {
+      await tracker.batchUpdateMediaEntries(pushUpdates.slice(i, i + batchSize))
+    }
 
-  const deleteBatch = remoteDeleteEntryIds.map((r) => r.entryId)
-  for (let i = 0; i < deleteBatch.length; i += batchSize) {
-    await tracker.batchDeleteMediaEntries(deleteBatch.slice(i, i + batchSize))
-  }
+    const deleteBatch = remoteDeleteEntryIds.map((r) => r.entryId)
+    for (let i = 0; i < deleteBatch.length; i += batchSize) {
+      await tracker.batchDeleteMediaEntries(deleteBatch.slice(i, i + batchSize))
+    }
+  })
 }

@@ -47,6 +47,7 @@ import {
   type SyncPayload,
 } from './sync-payload.js'
 import { getMalImportStatus, prepareMalImport, executeMalImport } from './lib/mal-import.js'
+import { finishMalLogin } from './lib/tracker/mal-tracker.js'
 import { registerAuth, type RunSyncSequence } from './hono/auth.js'
 import { type JasmrApi } from './providers/asmr/asmr.types.js'
 import { registerTv } from './hono/tv.js'
@@ -61,6 +62,7 @@ import type { TvProvider } from './providers/tv.types.js'
 import { discordRPCService } from './discord-rpc.js'
 import { offlineDb } from './lib/offline-db/index.js'
 import { malCacheStore } from './repositories/mal-cache.repository.js'
+import { registerTrackerActivity } from './hono/tracker-activity.js'
 
 export type HonoHealthState = {
   shuttingDown: boolean
@@ -479,6 +481,8 @@ export function createHonoApp(
     return c.json({ error: 'LAN_AUTH_REQUIRED' }, 401)
   })
 
+  registerTrackerActivity(app, () => getDbs().db)
+
   app.all('/api/trpc/*', (c) =>
     fetchRequestHandler({
       endpoint: '/api/trpc',
@@ -557,6 +561,22 @@ export function createHonoApp(
       return c.json(await providerApi.refresh())
     } catch (err) {
       return c.json({ error: (err as Error).message || 'refresh failed' }, 500)
+    }
+  })
+
+  app.get('/api/tracker/mal/callback', async (c) => {
+    const fail = (reason: string) =>
+      c.redirect(`/trackers?mal=error&reason=${encodeURIComponent(reason)}`)
+    const error = c.req.query('error')
+    if (error) return fail(error)
+    const code = c.req.query('code')
+    const state = c.req.query('state')
+    if (!code || !state) return fail('missing_code')
+    try {
+      const user = await finishMalLogin(getDbs().db, code, state)
+      return c.redirect(`/trackers?mal=success&user=${encodeURIComponent(user.name)}`)
+    } catch (err) {
+      return fail(err instanceof Error ? err.message : 'MyAnimeList authentication failed')
     }
   })
 

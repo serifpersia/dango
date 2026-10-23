@@ -49,6 +49,7 @@ export type MangaSyncDirection = 'two-way' | 'pull-only'
 
 export interface MangaSyncOptions {
   direction?: MangaSyncDirection
+  deletions?: boolean
 }
 
 export function parseChapterProgress(value: unknown): number {

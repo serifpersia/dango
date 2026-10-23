@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useSidebar } from '../contexts/SidebarContext'
 import { useContentType } from '../contexts/ContentTypeContext'
-import { useAnilistAuthCallback } from '../hooks/useAnilistAuthCallback'
+import { useMalAuthCallback } from '../hooks/useMalAuthCallback'
+import AniListConnection from '../components/settings/AniListConnection'
 import { trpcClient } from '../lib/trpc'
 import { fetchWithLocalHeaders } from '../lib/fetchApi'
 import { Button } from '../components/common/Button'
 import Icon from '../components/common/Icon'
+import MalConnection from '../components/settings/MalConnection'
 
 import styles from './Trackers.module.css'
 import { qk } from '../lib/queryKeys'
@@ -32,6 +34,10 @@ interface TrackerStatus {
     connected: boolean
     user: { id: number; name: string; avatar?: string } | null
   }
+  mal: {
+    connected: boolean
+    user: { id: number; name: string; avatar?: string } | null
+  }
 }
 
 interface SyncSummary {
@@ -43,9 +49,6 @@ interface SyncSummary {
   errors: string[]
   warnings?: string[]
 }
-
-const CLIENT_ID_SETTING = 'tracker_anilist_client_id'
-const SHIPPED_ANILIST_CLIENT_ID = (import.meta.env.VITE_ANILIST_CLIENT_ID || '').trim()
 
 const Trackers: React.FC = () => {
   const { setIsOpen: _setIsOpen } = useSidebar()
@@ -60,9 +63,8 @@ const Trackers: React.FC = () => {
   const [publicUsername, setPublicUsername] = useState<string>('')
   const [anilistImportMode, setAnilistImportMode] = useState<'username' | 'sync'>('username')
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null)
-  const [clientIdInput, setClientIdInput] = useState<string>('')
   const [eraseManga, setEraseManga] = useState<boolean>(false)
-  const isExchangingToken = useAnilistAuthCallback()
+  useMalAuthCallback()
 
   const { data: trackerStatus, isLoading: statusLoading } = useQuery({
     queryKey: [qk.trackerStatus],
@@ -72,68 +74,46 @@ const Trackers: React.FC = () => {
     },
   })
 
-  const { data: savedClientId } = useQuery({
-    queryKey: [qk.anilistClientId],
-    queryFn: async (): Promise<string> => {
-      const data = await trpcClient.settings.getByKey.query({ key: CLIENT_ID_SETTING })
-      return data.value || ''
+  const anilistConnected = trackerStatus?.anilist?.connected ?? false
+  const malConnected = trackerStatus?.mal?.connected ?? false
+
+  const { data: activeTrackerData } = useQuery({
+    queryKey: ['activeTrackerProvider'],
+    queryFn: async () => {
+      const res = await trpcClient.settings.getByKey.query({ key: 'active_tracker_provider' })
+      return (res?.value as string) || ''
     },
   })
 
-  const initializedRef = useRef(false)
-  React.useEffect(() => {
-    if (initializedRef.current) return
-    if (savedClientId === undefined) return
-    if (savedClientId) setClientIdInput(savedClientId)
-    initializedRef.current = true
-  }, [savedClientId])
+  const activeTrackerMutation = useMutation({
+    mutationFn: async (provider: string) => {
+      await trpcClient.settings.set.mutate({ key: 'active_tracker_provider', value: provider })
+      return provider
+    },
+    onSuccess: (provider) => {
+      queryClient.invalidateQueries({ queryKey: ['activeTrackerProvider'] })
+      toast.success(`Active tracker set to ${provider === 'mal' ? 'MyAnimeList' : 'AniList'}`)
+    },
+    onError: () => toast.error('Failed to update active tracker'),
+  })
 
-  const anilistConnected = trackerStatus?.anilist?.connected ?? false
+  const activeTracker =
+    activeTrackerData &&
+    ((activeTrackerData === 'anilist' && anilistConnected) ||
+      (activeTrackerData === 'mal' && malConnected))
+      ? activeTrackerData
+      : anilistConnected && !malConnected
+        ? 'anilist'
+        : malConnected && !anilistConnected
+          ? 'mal'
+          : anilistConnected
+            ? 'anilist'
+            : ''
+  const showTrackerSelector = anilistConnected || malConnected
 
   useEffect(() => {
     if (anilistConnected) setAnilistImportMode('sync')
   }, [anilistConnected])
-  const anilistUser = trackerStatus?.anilist?.user ?? null
-
-  const hasShipped = !!SHIPPED_ANILIST_CLIENT_ID
-  const savedTrim = (savedClientId || '').trim()
-
-  const handleAniListLogin = async () => {
-    const inputTrim = clientIdInput.trim()
-    const clientId = inputTrim || SHIPPED_ANILIST_CLIENT_ID
-    if (!clientId) {
-      toast.error('Enter your AniList client ID first')
-      return
-    }
-    const saveSetting = async (key: string, value: string) => {
-      await trpcClient.settings.set.mutate({ key, value })
-    }
-    try {
-      if (inputTrim) {
-        if (inputTrim !== savedClientId) await saveSetting(CLIENT_ID_SETTING, inputTrim)
-      } else if (hasShipped && savedTrim) {
-        await saveSetting(CLIENT_ID_SETTING, '')
-      }
-      queryClient.invalidateQueries({ queryKey: [qk.anilistClientId] })
-    } catch (err) {
-      toast.error((err as Error).message)
-      return
-    }
-    const frontendBase = window.location.origin + window.location.pathname
-    const state = encodeURIComponent(frontendBase)
-    window.location.href = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&state=${state}`
-  }
-
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      return trpcClient.tracker.anilistDisconnect.mutate()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [qk.trackerStatus] })
-      toast.success('Disconnected from AniList')
-    },
-    onError: (err: Error) => toast.error(err.message),
-  })
 
   const syncMutation = useMutation({
     mutationFn: async (): Promise<SyncSummary> => {
@@ -432,9 +412,46 @@ const Trackers: React.FC = () => {
           color: 'var(--text-secondary)',
         }}
       >
-        ⚠ Syncing writes directly to your AniList entries, and dango may not always handle
-        anime/manga lists correctly - always keep a backup of your lists before syncing.
+        ⚠ Syncing writes directly to your AniList and MyAnimeList entries, and dango may not always
+        handle anime/manga lists correctly - always keep a backup of your lists before syncing.
       </div>
+
+      {showTrackerSelector && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid var(--glass-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '0.85rem',
+          }}
+        >
+          <label htmlFor="active-tracker-select" style={{ fontWeight: 600 }}>
+            Active tracker:
+          </label>
+          <select
+            id="active-tracker-select"
+            value={activeTracker}
+            onChange={(e) => activeTrackerMutation.mutate(e.currentTarget.value)}
+            style={{
+              padding: '0.4rem 0.6rem',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--glass-border)',
+              fontSize: 'var(--font-size-sm)',
+              cursor: 'pointer',
+            }}
+          >
+            {anilistConnected && <option value="anilist">AniList</option>}
+            {malConnected && <option value="mal">MyAnimeList</option>}
+          </select>
+        </div>
+      )}
 
       {!showMangaTrackers && (
         <>
@@ -451,98 +468,14 @@ const Trackers: React.FC = () => {
               </div>
             </div>
 
-            {anilistConnected && anilistUser ? (
-              <div className={styles.connectedProfile}>
-                {anilistUser.avatar && (
-                  <img
-                    src={anilistUser.avatar}
-                    alt="Avatar"
-                    className={styles.avatar}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                )}
-                <div className={styles.connectedInfo}>
-                  <span className={styles.connectedName}>{anilistUser.name}</span>
-                  <span className={styles.connectedHint}>2-way sync is ready</span>
-                </div>
-                <button
-                  className={styles.secondaryBtn}
-                  onClick={() => disconnectMutation.mutate()}
-                  disabled={disconnectMutation.isPending}
-                >
-                  <Icon name="sign-out-alt" /> Disconnect
-                </button>
-              </div>
-            ) : (
-              <div className={styles.loginSection}>
-                <p className={styles.loginText}>
-                  Log in with AniList to enable bidirectional progress &amp; status synchronization.
-                  {isExchangingToken && (
-                    <span style={{ marginLeft: 8, color: 'var(--accent)' }}>Finishing login…</span>
-                  )}
-                </p>
-                <div className={styles.fieldLabel}>
-                  AniList client ID - defaults to Dango's app{' '}
-                  <a
-                    href="https://anilist.co/settings/developer"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    create your own app <Icon name="external-link-alt" size={9} />
-                  </a>
-                </div>
-                <div className={styles.inputGroup}>
-                  <input
-                    type="text"
-                    placeholder="Client ID"
-                    value={clientIdInput}
-                    onChange={(e) => setClientIdInput(e.currentTarget.value)}
-                    className={styles.input}
-                  />
-                  <button
-                    className={styles.primaryBtn}
-                    onClick={handleAniListLogin}
-                    disabled={!(clientIdInput.trim() || hasShipped)}
-                  >
-                    <Icon name="external-link-alt" /> Connect
-                  </button>
-                </div>
-                <p className={styles.helpText}>
-                  {hasShipped ? (
-                    <>
-                      By default uses Dango's client. To use your own AniList app: create it at{' '}
-                      <a
-                        href="https://anilist.co/settings/developer"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        anilist.co/settings/developer
-                      </a>
-                      , set its <strong>Redirect URL</strong> to{' '}
-                      <code>{`${window.location.origin}/api/tracker/anilist/callback`}</code>, then
-                      paste only the <strong>Client ID</strong> above (leave empty to use Dango's).
-                    </>
-                  ) : (
-                    <>
-                      No shipped client in this build - create your own app at{' '}
-                      <a
-                        href="https://anilist.co/settings/developer"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        anilist.co/settings/developer
-                      </a>
-                      , set <strong>Redirect URL</strong> to{' '}
-                      <code>{`${window.location.origin}/api/tracker/anilist/callback`}</code>, then
-                      paste the <strong>Client ID</strong> above.
-                    </>
-                  )}
-                </p>
-              </div>
+            <AniListConnection />
+            {anilistConnected && activeTracker !== 'anilist' && (
+              <p style={{ color: 'var(--color-warning)', marginTop: '8px', fontSize: '0.85rem' }}>
+                Not the active tracker - sync disabled.
+              </p>
             )}
 
-            {anilistConnected && (
+            {anilistConnected && activeTracker === 'anilist' && (
               <>
                 <hr className={styles.divider} />
 
@@ -645,17 +578,6 @@ const Trackers: React.FC = () => {
                     )}
                   </>
                 )}
-
-                <p
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-tertiary)',
-                    marginTop: '8px',
-                  }}
-                >
-                  AniList <code>Rewatching (REPEATING)</code> is not tracked - entries with this
-                  status are ignored.
-                </p>
               </>
             )}
           </div>
@@ -676,12 +598,16 @@ const Trackers: React.FC = () => {
               </div>
             </div>
 
-            {!anilistConnected ? (
-              <p className={styles.loginText}>
-                Connect your AniList account above to sync your manga reading list.
+            <AniListConnection />
+            {anilistConnected && activeTracker !== 'anilist' && (
+              <p style={{ color: 'var(--color-warning)', marginTop: '8px', fontSize: '0.85rem' }}>
+                Not the active tracker - sync disabled.
               </p>
-            ) : (
+            )}
+
+            {anilistConnected && activeTracker === 'anilist' && (
               <>
+                <hr className={styles.divider} />
                 <div className={styles.radioGroup}>
                   <label className={styles.radioLabel}>
                     <input
@@ -829,17 +755,6 @@ const Trackers: React.FC = () => {
                     )}
                   </>
                 )}
-
-                <p
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-tertiary)',
-                    marginTop: '8px',
-                  }}
-                >
-                  AniList <code>Rereading (REPEATING)</code> is not tracked - entries with this
-                  status are ignored.
-                </p>
               </>
             )}
           </div>
@@ -852,8 +767,15 @@ const Trackers: React.FC = () => {
               <div className={styles.cardTitleRow}>
                 <Icon name="myanimelist" className={styles.malIcon} />
                 <h3>MyAnimeList</h3>
+                {statusLoading ? null : malConnected ? (
+                  <span className={styles.badgeOnline}>Connected</span>
+                ) : (
+                  <span className={styles.badgeOffline}>Not connected</span>
+                )}
               </div>
             </div>
+
+            <MalConnection active={activeTracker === 'mal'} />
 
             <div className={styles.radioGroup}>
               <label className={styles.radioLabel}>
@@ -1062,8 +984,15 @@ const Trackers: React.FC = () => {
             <div className={styles.cardTitleRow}>
               <Icon name="myanimelist" className={styles.malIcon} />
               <h3>MyAnimeList Manga</h3>
+              {statusLoading ? null : malConnected ? (
+                <span className={styles.badgeOnline}>Connected</span>
+              ) : (
+                <span className={styles.badgeOffline}>Not connected</span>
+              )}
             </div>
           </div>
+
+          <MalConnection kind="manga" active={activeTracker === 'mal'} />
 
           <div className={styles.radioGroup}>
             <label className={styles.radioLabel}>

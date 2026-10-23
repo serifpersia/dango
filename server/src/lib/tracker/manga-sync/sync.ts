@@ -21,6 +21,7 @@ import { searchAnilistMangaByTitle } from '../../anilist/index.js'
 import { readTrackerSyncState, resolveStatus } from '../sync-state.js'
 import type { TrackerSyncState, TrackerSyncStateEntry } from '../sync-state.js'
 import { assertDeleteCap, collectMediaIds, pushRemoteChanges } from '../sync-engine.js'
+import { clearRewatchForShow, isRewatching, readRewatchMarkers, setRewatching } from '../rewatch.js'
 import {
   buildAnilistMangaId,
   buildSyntheticChapterId,
@@ -45,6 +46,7 @@ export async function syncAniListManga(
 ): Promise<MangaSyncResult> {
   const direction: MangaSyncDirection = opts.direction === 'pull-only' ? 'pull-only' : 'two-way'
   const pullOnly = direction === 'pull-only'
+  const includeDeletions = opts.deletions === true && !pullOnly
   const tokenRow = await SettingsRepository.getByKey(db, TOKEN_KEY)
   const token = tokenRow?.value
   if (!token) throw new Error('AniList is not connected. Please log in first.')
@@ -54,7 +56,9 @@ export async function syncAniListManga(
   const remoteEntries = await tracker.fetchUserMangaList(viewer.id)
 
   const localItems = await MangaLibraryRepository.getAll(mangaDb)
-  const syncState = await readTrackerSyncState(db, MANGA_SYNC_STATE_KEY)
+  const rawSyncState = await readTrackerSyncState(db, MANGA_SYNC_STATE_KEY)
+  const syncState = localItems.length === 0 ? {} : rawSyncState
+  const rewatchMarkers = await readRewatchMarkers(db)
 
   const remoteByMediaId = new Map<number, RemoteMangaEntry>()
   for (const entry of remoteEntries) remoteByMediaId.set(entry.mediaId, entry)
@@ -228,6 +232,18 @@ export async function syncAniListManga(
             })
             continue
           }
+          if (!includeDeletions || isRewatching(rewatchMarkers, 'anilist', local.id)) {
+            summary.skipped++
+            record({
+              mediaId,
+              title: local.title,
+              action: 'skipped',
+              localStatus: local.status,
+              note: 'Deletions only run from the manual sync.',
+            })
+            continue
+          }
+          await clearRewatchForShow(db, local.id)
           libraryDeletes.push(local.id)
           stateUpdates[stateKey] = undefined
           summary.pulled++
@@ -279,6 +295,22 @@ export async function syncAniListManga(
 
       if (!local && remote) {
         if (syncState[stateKey] && !pullOnly) {
+          if (
+            !includeDeletions ||
+            remote.rewatching ||
+            isRewatching(rewatchMarkers, 'anilist', localId)
+          ) {
+            summary.skipped++
+            record({
+              mediaId,
+              title: remote.title.english || remote.title.romaji || `Manga #${mediaId}`,
+              action: 'skipped',
+              remoteStatus: remote.status,
+              note: 'Deletions only run from the manual sync.',
+            })
+            continue
+          }
+          await clearRewatchForShow(db, localId)
           if (remote.entryId) {
             remoteDeleteEntryIds.push({ showId: stateKey, entryId: remote.entryId })
             stateUpdates[stateKey] = undefined
@@ -298,6 +330,7 @@ export async function syncAniListManga(
           record({ mediaId, title: `Manga #${mediaId}`, action: 'delete-remote' })
           continue
         }
+        if (remote.rewatching) await setRewatching(db, 'anilist', localId)
         logger.debug(
           { mediaId, remoteStatus: remote.status },
           '[AniList Manga Sync] Remote only -> pulling to local'
@@ -341,10 +374,25 @@ export async function syncAniListManga(
 
       if (!local && !remote && syncState[stateKey]) {
         stateUpdates[stateKey] = undefined
+        await clearRewatchForShow(db, localId)
         continue
       }
 
       if (local && remote) {
+        if (remote.rewatching || isRewatching(rewatchMarkers, 'anilist', local.id)) {
+          if (remote.rewatching) await setRewatching(db, 'anilist', local.id)
+          stateUpdates[stateKey] = { lastSyncedAt: now, remoteUpdatedAt: remote.updatedAt }
+          summary.skipped++
+          record({
+            mediaId,
+            title: local.title,
+            action: 'skipped',
+            localStatus: local.status,
+            remoteStatus: remote.status,
+            note: 'Rewatching on AniList - left untouched.',
+          })
+          continue
+        }
         const localChapters = await getLocalChapterProgress(
           mangaDb,
           local.id,
@@ -503,7 +551,7 @@ export async function syncAniListManga(
     })
   }
 
-  await pushRemoteChanges(tracker, pushUpdates, remoteDeleteEntryIds)
+  await pushRemoteChanges(db, tracker, pushUpdates, remoteDeleteEntryIds)
 
   if (
     libraryUpserts.length > 0 ||

@@ -161,9 +161,14 @@ export const MangaProgressRepository = {
     getDrizzle(db).run(sql`
       DELETE FROM manga_progress WHERE mangaId = ${mangaId} AND chapterId = ${chapterId}`),
 
-  deleteSyntheticChapters: (db: DatabaseWrapper, mangaId: string, keepChapterId: string) =>
+  deleteSyntheticChapters: (
+    db: DatabaseWrapper,
+    mangaId: string,
+    keepChapterId: string,
+    prefix = 'anilist:ch'
+  ) =>
     getDrizzle(db).run(sql`
-      DELETE FROM manga_progress WHERE mangaId = ${mangaId} AND chapterId LIKE 'anilist:ch:%' AND chapterId != ${keepChapterId}`),
+      DELETE FROM manga_progress WHERE mangaId = ${mangaId} AND chapterId LIKE ${prefix + ':%'} AND chapterId != ${keepChapterId}`),
 
   moveSyntheticChapters: (db: DatabaseWrapper, fromMangaId: string, toMangaId: string) =>
     getDrizzle(db).run(sql`

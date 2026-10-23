@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import { performWriteTransactionAsync } from '../../db/transaction.js'
@@ -7,6 +8,7 @@ import { requestMalImportCancel } from '../../lib/mal-import.js'
 import { defineSchema, reqObj } from '../validation.js'
 import { badRequest, conflict } from '../errors.js'
 import { keyInput, setSettingInput } from '../validation.js'
+import { isPrivateTrackerSetting } from '../../lib/tracker/local-settings.js'
 
 export const SETTING_DEFAULTS: Record<string, string> = {
   discordRPCEnabled: 'true',
@@ -36,6 +38,8 @@ const translateInput = () =>
 
 export const settingsRouter = router({
   getByKey: protectedProcedure.input(keyInput()).query(async ({ ctx, input }) => {
+    if (isPrivateTrackerSetting(input.key))
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Tracker credentials are private.' })
     const row = await SettingsRepository.getByKey(ctx.db, input.key)
     const value = row ? row.value : (SETTING_DEFAULTS[input.key] ?? null)
     return { value }
@@ -43,6 +47,11 @@ export const settingsRouter = router({
 
   set: protectedProcedure.input(setSettingInput()).mutation(async ({ ctx, input }) => {
     const key = input.key
+    if (isPrivateTrackerSetting(key))
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Use the tracker account settings to manage credentials.',
+      })
     const value = String(input.value ?? '')
     const shouldDelete = value === '' && key === 'tracker_anilist_client_id'
     await performWriteTransactionAsync(ctx.db, async (tx) => {

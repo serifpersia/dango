@@ -32,6 +32,7 @@ export const qk = {
   asmrWork: 'asmrWork',
   trackerStatus: 'trackerStatus',
   anilistClientId: 'anilistClientId',
+  malClientConfig: 'malClientConfig',
   notifications: 'notifications',
   settings: 'settings',
   insights: 'insights',

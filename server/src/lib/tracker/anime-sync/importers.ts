@@ -65,7 +65,7 @@ export async function importFromUsername(
 
       if (remote.progress > 0) {
         for (let ep = 1; ep <= remote.progress; ep++) {
-          await WatchedEpisodesRepository.insertIfMissing(tx, {
+          await WatchedEpisodesRepository.markCompleted(tx, {
             showId,
             episodeNumber: String(ep),
             watchedAt: toSqliteDatetime(remote.updatedAt),
@@ -242,7 +242,7 @@ export async function importFromMalUsername(
       }
       for (const w of watched) {
         for (let ep = 1; ep <= w.progress; ep++) {
-          await WatchedEpisodesRepository.insertIfMissing(tx, {
+          await WatchedEpisodesRepository.markCompleted(tx, {
             showId: w.showId,
             episodeNumber: String(ep),
           })

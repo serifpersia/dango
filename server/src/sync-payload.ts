@@ -4,6 +4,7 @@ import { CONFIG } from './config.js'
 import type { DatabaseWrapper } from './db.js'
 import { dbAll, dbGet } from './utils/db-utils.js'
 import { isTempSyncRow } from './lib/temp-ids.js'
+import { isLocalTrackerSetting } from './lib/tracker/local-settings.js'
 
 const log = logger.child({ module: 'SyncPayload' })
 
@@ -62,7 +63,10 @@ export function exportTables<TTable extends string>(
   const out = {} as Record<TTable, SyncRow[]>
   for (const table of tables) {
     const rows = dbAll<SyncRow>(db, `SELECT * FROM "${String(table).replace(/"/g, '""')}"`)
-    out[table] = rows.filter((row) => !isTempSyncRow(row))
+    out[table] = rows.filter(
+      (row) =>
+        !isTempSyncRow(row) && !(String(table) === 'settings' && isLocalTrackerSetting(row.key))
+    )
   }
   return {
     version: readPayloadVersion({ version: 0, exportedAt: '', tables: out }),
@@ -105,6 +109,9 @@ export function importTables<TTable extends string>(
     localColumns.set(String(table), new Set(cols.map((c) => c.name)))
   }
   db.serialize(() => {
+    const localTrackerSettings = tables.some((t) => String(t) === 'settings')
+      ? dbAll<SyncRow>(db, 'SELECT * FROM settings').filter((row) => isLocalTrackerSetting(row.key))
+      : []
     for (const table of tables) {
       db.run(`DELETE FROM "${String(table).replace(/"/g, '""')}"`)
     }
@@ -112,6 +119,7 @@ export function importTables<TTable extends string>(
       const known = localColumns.get(String(table))
       for (const row of asRec[String(table)] || []) {
         if (isTempSyncRow(row)) continue
+        if (String(table) === 'settings' && isLocalTrackerSetting(row.key)) continue
         const columns = Object.keys(row).filter((c) => known?.has(c))
         if (columns.length === 0) continue
         const columnSql = columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')
@@ -122,6 +130,9 @@ export function importTables<TTable extends string>(
           values
         )
       }
+    }
+    for (const row of localTrackerSettings) {
+      db.run('INSERT INTO settings (key, value) VALUES (?, ?)', [row.key, row.value])
     }
   })
 }

@@ -104,6 +104,18 @@ export const WatchedEpisodesRepository = {
       })
       .onConflictDoNothing(),
 
+  markCompleted: async (
+    db: DatabaseWrapper,
+    data: { showId: string; episodeNumber: string; watchedAt?: string }
+  ) => {
+    await WatchedEpisodesRepository.insertIfMissing(db, data)
+    // Remote completion also finishes an existing partial local playback record.
+    db.run(
+      'UPDATE watched_episodes SET currentTime = MAX(currentTime, duration) WHERE showId = ? AND episodeNumber = ? AND duration > 0',
+      [data.showId, data.episodeNumber]
+    )
+  },
+
   deleteByShow: (db: DatabaseWrapper, showId: string) =>
     getDrizzle(db).delete(watchedEpisodes).where(eq(watchedEpisodes.showId, showId)),
 

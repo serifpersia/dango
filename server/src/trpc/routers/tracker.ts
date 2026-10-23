@@ -1,3 +1,7 @@
+import { MAL_KEYS, beginMalLogin, credentialSettings } from '../../lib/tracker/mal-tracker.js'
+import { syncMyAnimeList } from '../../lib/tracker/mal-sync.service.js'
+import { syncMyAnimeListManga } from '../../lib/tracker/mal-manga-sync.service.js'
+import { withTrackerLock } from '../../lib/tracker/sync-lock.js'
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
@@ -104,7 +108,20 @@ export const trackerRouter = router({
           user = null
         }
       }
-      return { anilist: { connected: !!tokenRow?.value, user } }
+      const malTokens = await SettingsRepository.getByKey(ctx.db, MAL_KEYS.tokens)
+      const malUser = await SettingsRepository.getByKey(ctx.db, MAL_KEYS.user)
+      return {
+        anilist: {
+          connected: !!tokenRow?.value,
+          user,
+        },
+        mal: {
+          connected: !!malTokens?.value,
+          user: malUser?.value
+            ? (JSON.parse(malUser.value) as { id: number; name: string; avatar?: string })
+            : null,
+        },
+      }
     } catch {
       throw failed('Failed to read tracker status')
     }
@@ -142,15 +159,114 @@ export const trackerRouter = router({
 
   sync: protectedProcedure.input(trackerSyncInput()).mutation(async ({ ctx, input }) => {
     const { provider = 'anilist' } = input
-    if (provider !== 'anilist') {
+    if (provider !== 'anilist' && provider !== 'mal') {
       throw badRequest(`Provider "${provider}" is not supported yet`)
     }
     try {
-      const summary = await syncAniList(ctx.db)
+      const summary =
+        provider === 'mal'
+          ? await syncMyAnimeList(ctx.db, { deletions: true })
+          : await syncAniList(ctx.db, { deletions: true })
       return { success: true, summary }
     } catch (err) {
       throw failed(err instanceof Error ? err.message : 'Sync failed')
     }
+  }),
+
+  malConfig: protectedProcedure.query(async ({ ctx }) => {
+    const { mode, clientId, hasSecret, hasCustomId, hasWorker } = await credentialSettings(ctx.db)
+    return { mode, clientId, hasSecret, hasCustomId, hasWorker }
+  }),
+
+  malSaveConfig: protectedProcedure
+    .input(
+      defineSchema<
+        { clientId: string; clientSecret?: string },
+        { clientId: string; clientSecret?: string }
+      >((value) => {
+        const obj = reqObj(value)
+        if (typeof obj.clientId !== 'string') throw badRequest('Invalid MAL client ID')
+        if (obj.clientSecret !== undefined && typeof obj.clientSecret !== 'string')
+          throw badRequest('Invalid client secret')
+        return {
+          clientId: obj.clientId.trim(),
+          clientSecret: obj.clientSecret as string | undefined,
+        }
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!input.clientId) {
+        if ((await credentialSettings(ctx.db)).mode !== 'worker')
+          throw badRequest('MAL client ID and secret are required')
+        return { success: true }
+      }
+      if (!input.clientSecret?.trim()) throw badRequest('MAL client secret is required')
+      const clientSecret = input.clientSecret.trim()
+      await withTrackerLock(ctx.db, 'mal', () =>
+        ctx.db.transact(async (tx) => {
+          const old = (await SettingsRepository.getByKey(tx, MAL_KEYS.clientId))?.value || ''
+          if (old && old !== input.clientId) {
+            for (const key of [
+              MAL_KEYS.tokens,
+              MAL_KEYS.user,
+              MAL_KEYS.pending,
+              MAL_KEYS.clientSecret,
+            ])
+              await SettingsRepository.deleteByKey(tx, key)
+          }
+          await SettingsRepository.upsert(tx, MAL_KEYS.clientId, input.clientId)
+          await SettingsRepository.upsert(tx, MAL_KEYS.clientSecret, clientSecret)
+        })
+      )
+      return { success: true }
+    }),
+
+  malClearConfig: protectedProcedure.mutation(async ({ ctx }) => {
+    await withTrackerLock(ctx.db, 'mal', () =>
+      ctx.db.transact(async (tx) => {
+        for (const key of [
+          MAL_KEYS.clientId,
+          MAL_KEYS.clientSecret,
+          MAL_KEYS.tokens,
+          MAL_KEYS.user,
+          MAL_KEYS.pending,
+          'tracker_mal_sync_state',
+        ])
+          await SettingsRepository.deleteByKey(tx, key)
+      })
+    )
+    return { success: true }
+  }),
+
+  malLogin: protectedProcedure
+    .input(
+      defineSchema<{ redirectUri: string }, { redirectUri: string }>((value) => {
+        const obj = reqObj(value)
+        if (typeof obj.redirectUri !== 'string') throw badRequest('Redirect URI is required')
+        return { redirectUri: obj.redirectUri }
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await beginMalLogin(ctx.db, input.redirectUri)
+      } catch (err) {
+        throw badRequest(err instanceof Error ? err.message : 'Could not start MAL login')
+      }
+    }),
+
+  malDisconnect: protectedProcedure.mutation(async ({ ctx }) => {
+    await withTrackerLock(ctx.db, 'mal', () =>
+      ctx.db.transact(async (tx) => {
+        for (const key of [
+          MAL_KEYS.tokens,
+          MAL_KEYS.user,
+          MAL_KEYS.pending,
+          'tracker_mal_sync_state',
+        ])
+          await SettingsRepository.deleteByKey(tx, key)
+      })
+    )
+    return { success: true }
   }),
 
   anilistImport: protectedProcedure
@@ -195,6 +311,7 @@ export const trackerRouter = router({
       const syncDirection = direction === 'pull-only' ? 'pull-only' : 'two-way'
       const result = await syncAniListManga(ctx.db, mangaDb, {
         direction: syncDirection,
+        deletions: true,
       })
       return {
         success: true,
@@ -202,6 +319,20 @@ export const trackerRouter = router({
         details: result.details,
         direction: syncDirection,
       }
+    } catch (err) {
+      if (err instanceof TRPCError) throw err
+      throw failed(err instanceof Error ? err.message : 'Manga sync failed')
+    }
+  }),
+
+  mangaMalSync: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const mangaDb = ctx.mangaDb
+      if (!mangaDb || mangaDb.isClosedCheck()) {
+        throw unavailable('Manga database is not ready')
+      }
+      const summary = await syncMyAnimeListManga(ctx.db, mangaDb, { deletions: true })
+      return { success: true, summary }
     } catch (err) {
       if (err instanceof TRPCError) throw err
       throw failed(err instanceof Error ? err.message : 'Manga sync failed')

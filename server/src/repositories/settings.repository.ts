@@ -20,6 +20,13 @@ export const SettingsRepository = {
   deleteByKey: (db: DatabaseWrapper, key: string) =>
     getDrizzle(db).delete(settings).where(eq(settings.key, key)),
 
+  getByPrefix: async (db: DatabaseWrapper, prefix: string) => {
+    const rows = await getDrizzle(db).all<{ key: string; value: string }>(
+      sql`SELECT key, value FROM settings WHERE key LIKE ${`${prefix}%`}`
+    )
+    return rows.filter((row) => row.key.startsWith(prefix))
+  },
+
   readContinueFlags: async (
     db: DatabaseWrapper,
     ignoreKey: string,

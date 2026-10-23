@@ -416,6 +416,10 @@
   gap: var(--space-3);
 }
 
+.loginSection > .primaryBtn {
+  align-self: flex-start;
+}
+
 .fieldLabel {
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -440,6 +444,26 @@
   font-size: 0.8rem;
   color: var(--text-tertiary);
   line-height: 1.6;
+}
+
+.resetBtn {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.resetBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.resetBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .helpText code {
@@ -538,6 +562,26 @@
 .inputGroup {
   display: flex;
   gap: var(--space-2);
+}
+
+.credentialFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.credentialField {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.credentialField .input {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .input {
@@ -656,6 +700,10 @@
 }
 
 @media (max-width: 600px) {
+  .credentialFields {
+    grid-template-columns: 1fr;
+  }
+
   .importCard {
     padding: var(--space-6);
   }

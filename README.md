@@ -25,7 +25,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 - **Multi-Provider Playback:** Switch seamlessly between multiple third-party streaming providers directly within the player interface.
 - **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
 - **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
-- **Trackers & Sync:** Bi-directional AniList sync and one-way MyAnimeList list imports.
+- **Trackers & Sync:** Bi-directional AniList and MyAnimeList sync for anime and manga, plus username and XML list imports.
 - **Expanded Media Hub:** Dedicated interfaces for Manga, ASMR, and TV/Movies.
 - **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
 
@@ -267,11 +267,15 @@ Used as a manual fallback for services like Mega, Dropbox, or custom WebDAV:
 
 ### AniList
 
-Bidirectional sync is fully supported:
+Bidirectional sync for anime and manga. Go to **Trackers**, connect, then **Sync Now** (anime) / **Start Sync** (manga). Progress and statuses merge both ways; remote-only entries import, local-only entries push. AniList requires no setup.
 
-- Go to **Trackers** in the navigation panel.
-- Select **Sync Now**.
-- Local episode progress updates remotely; external catalog updates merge safely into your local database without overwriting uncommitted states.
+### MyAnimeList
+
+Release builds use Dango's auth worker (no setup). For your own app, create one at [MAL API settings](https://myanimelist.net/apiconfig), register `your-origin/api/tracker/mal/callback`, and paste client ID/secret in **Trackers** (or set `MAL_CLIENT_ID`/`MAL_CLIENT_SECRET`). MAL needs the secret even with PKCE. `MAL_AUTH_WORKER_URL` points self-built releases at a worker.
+
+**Sync Now** merges your authenticated list both ways. Remote-only entries import, local-only push, missing entries are never deleted. Unmatched titles are reported, not guessed. Username and XML imports work without login. Manga sync links by exact title first, then searches up to 25 unlinked titles per sync.
+
+Progress is pushed on **Sync Now** (and on playback once an episode reaches 80% for the active tracker). MAL tokens refresh automatically; credentials stay on this server and are excluded from library exports. Disconnect removes local tokens. Server needs HTTPS access to `myanimelist.net`, `api.myanimelist.net`, and `graphql.anilist.co`.
 
 ---
 

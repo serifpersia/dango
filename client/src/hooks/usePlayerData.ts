@@ -131,8 +131,9 @@ async function fetchVideoSources(
           )[0]
         : null
 
-    const resumeTime = progress?.currentTime || 0
+    const savedResumeTime = progress?.currentTime || 0
     const resumeDuration = progress?.duration || 0
+    const resumeTime = savedResumeTime
     const rawSkips = Array.isArray(skipTimesData)
       ? skipTimesData
       : (skipTimesData as { results?: RawSkipInterval[] } | undefined)?.results || []
