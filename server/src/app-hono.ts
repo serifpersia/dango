@@ -334,6 +334,15 @@ export function createHonoApp(
     return c.json({ status: 'ok', ready: true })
   })
 
+  app.post('/api/internal/client-error', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+    logger.warn(
+      { clientError: body, url: c.req.path, method: c.req.method },
+      'Client error reported'
+    )
+    return c.json({ ok: true })
+  })
+
   app.use(async (c: Context, next: () => Promise<void>) => {
     const guard = getGuardState()
     if (guard.shuttingDown) {

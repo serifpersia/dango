@@ -10,6 +10,34 @@ interface State {
   hasError: boolean
 }
 
+async function reportClientError(error: Error, info: ErrorInfo): Promise<void> {
+  const payload = {
+    message: error.message,
+    stack: error.stack,
+    componentStack: info.componentStack,
+    url: typeof window !== 'undefined' ? window.location.href : '',
+    timestamp: new Date().toISOString(),
+  }
+  const body = JSON.stringify(payload)
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(
+        '/api/internal/client-error',
+        new Blob([body], { type: 'application/json' })
+      )
+      return
+    }
+  } catch {
+    // ignore
+  }
+  fetch('/api/internal/client-error', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+  }).catch(() => {})
+}
+
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -21,6 +49,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo)
+    void reportClientError(error, errorInfo)
   }
 
   public render() {
