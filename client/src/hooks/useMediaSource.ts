@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { loadHls } from '../lib/hls'
 import { pickSubtitleIndex } from '../lib/subtitles'
-import type Hls from 'hls.js'
+import type { PlayerEngine } from '../lib/player/engine'
 import type { SubtitleTrack, VideoLink, VideoSource } from '../types/player'
 
 interface UseMediaSourceOptions {
+  engine: PlayerEngine
   videoRef: { current: HTMLVideoElement | null }
   selectedSource: VideoSource | null
   selectedLink: VideoLink | null
@@ -15,13 +15,13 @@ interface UseMediaSourceOptions {
   calibReturnRef: { current: number | null }
   setAvailableSubtitles: (tracks: SubtitleTrack[]) => void
   setActiveSubtitleTrack: (track: string) => void
-  showControls: (visible: boolean) => void
   onFatalError: () => void
 }
 
 // attaches the stream to the video element: the hls config, the subtitle
 // tracks, the resume seek and the saved volume
 export function useMediaSource({
+  engine,
   videoRef,
   selectedSource,
   selectedLink,
@@ -32,10 +32,8 @@ export function useMediaSource({
   calibReturnRef,
   setAvailableSubtitles,
   setActiveSubtitleTrack,
-  showControls,
   onFatalError,
 }: UseMediaSourceOptions) {
-  const hlsInstance = useRef<Hls | null>(null)
   const seekToTimeRef = useRef<number>(0)
   const resumeTimeRef = useRef(resumeTime)
   const showResumeModalRef = useRef(showResumeModal)
@@ -51,36 +49,12 @@ export function useMediaSource({
     const videoElement = videoRef.current
     if (!videoElement) return
 
-    let cancelled = false
-    if (hlsInstance.current) {
-      hlsInstance.current.destroy()
-      hlsInstance.current = null
-    }
-
-    if (loadingVideo || selectedSource) {
-      videoElement.pause()
-      videoElement.removeAttribute('src')
-      videoElement.load()
-    }
-
-    while (videoElement.firstChild) {
-      videoElement.removeChild(videoElement.firstChild)
-    }
-
+    while (videoElement.firstChild) videoElement.removeChild(videoElement.firstChild)
     if (testClipActive) {
-      videoElement.src = '/av-sync-test.mp4'
-      videoElement.play().catch(() => {
-        showControls(true)
-      })
-      return () => {
-        cancelled = true
-      }
+      return engine.loadSource({ url: '/av-sync-test.mp4' }, { autoPlay: true })
     }
-
-    if (!selectedSource || !selectedLink) return
-
-    if (selectedSource.type === 'iframe') {
-      seekToTimeRef.current = 0
+    if (loadingVideo || !selectedSource || !selectedLink || selectedSource.type === 'iframe') {
+      engine.unload()
       return
     }
 
@@ -144,91 +118,31 @@ export function useMediaSource({
     const targetTime = seekToTimeRef.current
     seekToTimeRef.current = 0
 
-    const handleLoaded = () => {
-      if (targetTime > 0) {
-        videoElement.currentTime = targetTime
-      }
-    }
-    videoElement.addEventListener('loadedmetadata', handleLoaded, { once: true })
-
-    const shouldAutoPlay = !(showResumeModalRef.current && resumeTimeRef.current > 5)
-    const playWhenReady = () => {
-      if (shouldAutoPlay) {
-        videoElement.play().catch(() => {
-          showControls(true)
-        })
-      }
-    }
-
-    if (selectedLink.hls) {
-      void (async () => {
-        const HlsClass = await loadHls()
-        if (cancelled) return
-        if (!HlsClass || !HlsClass.isSupported()) {
-          videoElement.src = proxiedUrl
-          playWhenReady()
-          return
-        }
-        const isLowEnd = document.body.classList.contains('low-end')
-        const hls = new HlsClass({
+    const isLowEnd = document.body.classList.contains('low-end')
+    return engine.loadSource(
+      { url: proxiedUrl, hls: selectedLink.hls },
+      {
+        initialTime: targetTime,
+        autoPlay: !(showResumeModalRef.current && resumeTimeRef.current > 5),
+        hlsConfig: {
           maxBufferLength: isLowEnd ? 15 : 30,
           maxMaxBufferLength: isLowEnd ? 30 : 60,
-          maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
+          maxBufferSize: (isLowEnd ? 25 : 60) * 1000 * 1000,
           startLevel: -1,
-          enableWorker: true,
-        })
-        hlsInstance.current = hls
-        hls.on(HlsClass.Events.ERROR, (_event, data) => {
-          if (data.fatal) onFatalErrorRef.current()
-        })
-        const hasManualSubs = (selectedSource.subtitles?.length ?? 0) > 0
-        const disableEmbeddedSubs = () => {
-          try {
-            if (
-              hasManualSubs &&
-              typeof hls.subtitleTrack === 'number' &&
-              hls.subtitleTrack !== -1
-            ) {
-              hls.subtitleTrack = -1
-            }
-          } catch {
-            // ignore
+        },
+        onHls: (hls, HlsClass) => {
+          if (!selectedSource.subtitles?.length) return
+          const disableEmbeddedSubs = () => {
+            if (hls.subtitleTrack !== -1) hls.subtitleTrack = -1
           }
-        }
-        hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => {
-          if (data?.id !== -1) disableEmbeddedSubs()
-        })
-        disableEmbeddedSubs()
-        hls.loadSource(proxiedUrl)
-        hls.attachMedia(videoElement)
-        hls.once(HlsClass.Events.MANIFEST_PARSED, () => {
-          if (!cancelled) playWhenReady()
-        })
-      })()
-    } else {
-      videoElement.src = proxiedUrl
-      playWhenReady()
-    }
-
-    const savedVolume = localStorage.getItem('playerVolume')
-    const savedMuted = localStorage.getItem('playerMuted')
-
-    if (savedVolume !== null) {
-      videoElement.volume = parseFloat(savedVolume)
-    }
-    if (savedMuted !== null) {
-      videoElement.muted = savedMuted === 'true'
-    }
-
-    return () => {
-      cancelled = true
-      videoElement.removeEventListener('loadedmetadata', handleLoaded)
-      if (hlsInstance.current) {
-        hlsInstance.current.destroy()
-        hlsInstance.current = null
+          hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, disableEmbeddedSubs)
+          disableEmbeddedSubs()
+        },
+        onError: () => onFatalErrorRef.current(),
       }
-    }
+    )
   }, [
+    engine,
     selectedSource,
     selectedLink,
     videoRef,
@@ -237,7 +151,6 @@ export function useMediaSource({
     testClipActive,
     setActiveSubtitleTrack,
     setAvailableSubtitles,
-    showControls,
   ])
 
   // the page keeps the position when the user picks another source

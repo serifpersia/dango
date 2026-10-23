@@ -1,8 +1,12 @@
 import React from 'react'
 import Icon from '../common/Icon'
 import styles from './TvPlayerControls.module.css'
-import SeekBar from '../player/SeekBar'
-import UnifiedVolumeControl from '../player/UnifiedVolumeControl'
+import {
+  PlayerTimeline,
+  PlayPauseButton,
+  PlayerVolume,
+  FullscreenButton,
+} from '../player/PlaybackControls'
 import { formatTime } from '../../lib/utils'
 import { pickSubtitleIndex } from '../../lib/subtitles'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
@@ -40,41 +44,7 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
   onTheaterModeToggle,
   timeLabelRef,
 }) => {
-  const { state, refs, actions } = player
-  const videoRef = refs.videoRef
-
-  const handleSeek = (percent: number) => {
-    const video = videoRef.current
-    if (!video || isNaN(state.duration) || state.duration === 0) return
-    video.currentTime = percent * state.duration
-  }
-
-  const handleScrubStart = () => {
-    if (!videoRef.current) return
-    actions.setIsScrubbing(true)
-    actions.wasPlayingBeforeScrub.current = !videoRef.current.paused
-    videoRef.current.pause()
-  }
-
-  const handleScrubMove = (percent: number) => {
-    const video = videoRef.current
-    if (video && state.duration) video.currentTime = percent * state.duration
-  }
-
-  const handleScrubEnd = () => {
-    actions.setIsScrubbing(false)
-    if (actions.wasPlayingBeforeScrub.current) {
-      videoRef.current?.play().catch(() => {})
-    }
-  }
-
-  const handleVolumeChange = (newVolume: number) => {
-    const video = videoRef.current
-    if (!video) return
-    video.volume = newVolume
-    video.muted = newVolume === 0
-  }
-
+  const { state, actions } = player
   const toggleSubtitles = () => {
     if (isSubtitleActive) {
       onSubtitleChange(-1)
@@ -89,14 +59,6 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
     onSubtitleChange(pickSubtitleIndex(subtitles, { lastKey, enabled: true }))
   }
 
-  const volumeIcon = state.isMuted ? (
-    <Icon name="volume-mute" />
-  ) : state.volume < 0.5 ? (
-    <Icon name="volume-down" />
-  ) : (
-    <Icon name="volume-up" />
-  )
-
   return (
     <div
       className={`${styles.controlsOverlay} ${!visible ? styles.hidden : ''}`}
@@ -104,7 +66,7 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
       style={{ pointerEvents: 'none', background: 'none', justifyContent: 'flex-end' }}
     >
       <div className={styles.bottomControls} onClick={(e) => e.stopPropagation()}>
-        <SeekBar
+        <PlayerTimeline
           classes={{
             container: styles.progressBarContainer,
             scrubbing: styles.scrubbing,
@@ -114,35 +76,15 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
             watched: styles.watchedBar,
             thumb: styles.thumb,
           }}
-          videoRef={videoRef}
-          duration={state.duration}
-          formatTime={formatTime}
-          isScrubbing={state.isScrubbing}
-          buffered="full"
-          onSeek={handleSeek}
-          onScrubStart={handleScrubStart}
-          onScrubMove={handleScrubMove}
-          onScrubEnd={handleScrubEnd}
           timeLabelRef={timeLabelRef}
         />
 
         <div className={styles.bottomControlsRow}>
           <div className={styles.leftControls}>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.togglePlay}
-              aria-label={state.isPlaying ? 'Pause' : 'Play'}
-            >
-              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
-            </button>
-            <UnifiedVolumeControl
-              muted={state.isMuted}
-              volume={state.volume}
-              volumeIcon={volumeIcon}
+            <PlayPauseButton className={styles.controlBtn} />
+            <PlayerVolume
               buttonClassName={styles.controlBtn}
-              onToggleMute={actions.toggleMute}
-              onVolumeChange={handleVolumeChange}
-              onExpandedChange={(v) => actions.setShowVolumeSlider(v)}
+              onExpandedChange={actions.setShowVolumeSlider}
             />
             <span className={styles.timeDisplay} ref={timeLabelRef}>
               {formatTime(0)} / {formatTime(state.duration)}
@@ -186,13 +128,7 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
             >
               <Icon name="tv" />
             </button>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.toggleFullscreen}
-              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
-            </button>
+            <FullscreenButton className={styles.controlBtn} />
           </div>
         </div>
       </div>

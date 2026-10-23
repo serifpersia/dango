@@ -1,8 +1,7 @@
 import React from 'react'
 import styles from './PlayerControls.module.css'
 import Icon from '../common/Icon'
-import SeekBar from './SeekBar'
-import UnifiedVolumeControl from './UnifiedVolumeControl'
+import { PlayerTimeline, PlayPauseButton, PlayerVolume, FullscreenButton } from './PlaybackControls'
 import type { SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import type { useControlHandlers } from '../../hooks/useControlHandlers'
@@ -35,12 +34,6 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
   const { state, refs, actions } = player
   const { showSettings } = state
 
-  const renderVolumeIcon = () => {
-    if (state.isMuted || state.volume === 0) return <Icon name="volume-mute" />
-    if (state.volume < 0.5) return <Icon name="volume-down" />
-    return <Icon name="volume-up" />
-  }
-
   return (
     <div
       className={`${styles.controlsOverlay} ${!visible ? styles.hidden : ''} `}
@@ -52,7 +45,7 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
         data-speed-boost-ignore="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <SeekBar
+        <PlayerTimeline
           classes={{
             container: styles.progressBarContainer,
             scrubbing: styles.scrubbing,
@@ -62,14 +55,6 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
             watched: styles.watchedBar,
             thumb: styles.thumb,
           }}
-          videoRef={refs.videoRef}
-          duration={state.duration}
-          formatTime={actions.formatTime}
-          isScrubbing={state.isScrubbing}
-          onSeek={handlers.handleSeek}
-          onScrubStart={handlers.handleScrubStart}
-          onScrubMove={handlers.handleScrubMove}
-          onScrubEnd={handlers.handleScrubEnd}
           timeLabelRef={timeDisplayRef}
         >
           {state.duration > 0 && player.state.currentSkipInterval && (
@@ -93,26 +78,15 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
               />
             )
           })}
-        </SeekBar>
+        </PlayerTimeline>
 
         <div className={styles.bottomControlsRow}>
           <div className={styles.leftControls}>
-            <button
-              className={styles.controlBtn}
-              onClick={actions.togglePlay}
-              aria-label={state.isPlaying ? 'Pause' : 'Play'}
-            >
-              {state.isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
-            </button>
+            <PlayPauseButton className={styles.controlBtn} />
 
-            <UnifiedVolumeControl
-              muted={state.isMuted}
-              volume={state.volume}
-              volumeIcon={renderVolumeIcon()}
+            <PlayerVolume
               buttonClassName={styles.controlBtn}
-              onToggleMute={actions.toggleMute}
-              onVolumeChange={handlers.handleVolumeChange}
-              onExpandedChange={(v) => actions.setShowVolumeSlider(v)}
+              onExpandedChange={actions.setShowVolumeSlider}
             />
 
             <span className={styles.timeDisplay} ref={timeDisplayRef}>
@@ -177,13 +151,7 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
               <Icon name="tv" />
             </button>
 
-            <button
-              className={styles.controlBtn}
-              onClick={actions.toggleFullscreen}
-              aria-label={state.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              {state.isFullscreen ? <Icon name="compress" /> : <Icon name="expand" />}
-            </button>
+            <FullscreenButton className={styles.controlBtn} />
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ export interface SeekBarClasses {
 
 interface SeekBarProps {
   classes: SeekBarClasses
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  videoRef: React.RefObject<HTMLMediaElement | null>
   duration: number
   formatTime: (time: number) => string
   isScrubbing: boolean
@@ -59,6 +59,11 @@ const SeekBar: React.FC<SeekBarProps> = ({
     if (!video) return
     const paint = (time: number) => {
       const percent = (time / duration) * 100 || 0
+      containerRef.current?.setAttribute('aria-valuenow', String(Math.round(time)))
+      containerRef.current?.setAttribute(
+        'aria-valuetext',
+        `${formatTime(time)} of ${formatTime(duration)}`
+      )
       if (watchedRef.current) watchedRef.current.style.width = `${percent}%`
       if (thumbRef.current) thumbRef.current.style.left = `${percent}%`
       if (timeLabelRef?.current) {
@@ -90,11 +95,17 @@ const SeekBar: React.FC<SeekBarProps> = ({
   const percentAt = (clientX: number) => {
     if (!containerRef.current) return 0
     const rect = containerRef.current.getBoundingClientRect()
+    if (rect.width <= 0) return 0
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
   }
 
   const paintPreview = (percent: number) => {
     const time = percent * duration
+    containerRef.current?.setAttribute('aria-valuenow', String(Math.round(time)))
+    containerRef.current?.setAttribute(
+      'aria-valuetext',
+      `${formatTime(time)} of ${formatTime(duration)}`
+    )
     const pct100 = (time / duration) * 100 || 0
     if (watchedRef.current) watchedRef.current.style.width = `${pct100}%`
     if (thumbRef.current) thumbRef.current.style.left = `${pct100}%`
@@ -116,6 +127,11 @@ const SeekBar: React.FC<SeekBarProps> = ({
       const percent = percentAt(e.clientX)
       callbacksRef.current.onScrubMove(percent)
       const time = percent * duration
+      containerRef.current?.setAttribute('aria-valuenow', String(Math.round(time)))
+      containerRef.current?.setAttribute(
+        'aria-valuetext',
+        `${formatTime(time)} of ${formatTime(duration)}`
+      )
       const pct100 = (time / duration) * 100 || 0
       if (watchedRef.current) watchedRef.current.style.width = `${pct100}%`
       if (thumbRef.current) thumbRef.current.style.left = `${pct100}%`
@@ -152,7 +168,10 @@ const SeekBar: React.FC<SeekBarProps> = ({
     } catch {
       // ignore
     }
-    if (!isScrubbingRef.current) onScrubStart()
+    if (!isScrubbingRef.current) {
+      isScrubbingRef.current = true
+      onScrubStart()
+    }
     const percent = percentAt(e.clientX)
     onScrubMove(percent)
     paintPreview(percent)
@@ -193,9 +212,8 @@ const SeekBar: React.FC<SeekBarProps> = ({
       aria-label="Seek"
       aria-valuemin={0}
       aria-valuemax={Math.round(duration || 0)}
-      aria-valuenow={Math.round(
-        ((Number(watchedRef.current?.style.width?.replace('%', '')) || 0) * (duration || 0)) / 100
-      )}
+      aria-valuenow={Math.round(videoRef.current?.currentTime || 0)}
+      aria-disabled={!duration}
       tabIndex={0}
       onClick={(e) => {
         if (justScrubbedRef.current) {
@@ -222,6 +240,10 @@ const SeekBar: React.FC<SeekBarProps> = ({
       }}
       onKeyDown={(e) => {
         if (!videoRef.current || !duration) return
+        if (e.key === 'Home' || e.key === 'End') {
+          e.preventDefault()
+          onSeek(e.key === 'Home' ? 0 : 1)
+        }
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
           e.preventDefault()
           const delta = (e.key === 'ArrowRight' ? 5 : -5) / duration

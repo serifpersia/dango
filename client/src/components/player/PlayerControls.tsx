@@ -2,7 +2,7 @@ import React, { useEffect, Suspense, lazy } from 'react'
 import CenterControls from './CenterControls'
 import ControlTopBar from './ControlTopBar'
 import PlayerBottomBar from './PlayerBottomBar'
-import UnifiedVideoShell from './UnifiedVideoShell'
+import PlayerSurface from './PlayerSurface'
 import styles from './PlayerControls.module.css'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
@@ -142,14 +142,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   )
 
   const center =
-    !loadingVideo && !state.isBuffering && state.duration > 0 ? (
-      <CenterControls
-        isPlaying={state.isPlaying}
-        onTogglePlay={actions.togglePlay}
-        onSkipBack={() => actions.seek(-10)}
-        onSkipForward={() => actions.seek(10)}
-      />
-    ) : null
+    !loadingVideo && !state.isBuffering && state.duration > 0 ? <CenterControls /> : null
 
   const bottomBar = (
     <PlayerBottomBar
@@ -230,19 +223,20 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   ) : null
 
   return (
-    <UnifiedVideoShell
-      player={player}
+    <PlayerSurface
+      engine={player.engine}
       topBar={topBar}
       centerControls={center}
       bottomBar={!loadingVideo && state.duration > 0 ? bottomBar : null}
       settingsPanel={settingsNodeWithGuard}
       overlays={overlays}
-      isInteracting={isInteractingExtra}
+      isInteracting={isInteractingExtra || state.showSettings || state.showVolumeSlider}
+      nativeControls={state.useNativeControls}
       className={className}
       chromeDisabled={hideChrome}
     >
       {children}
-    </UnifiedVideoShell>
+    </PlayerSurface>
   )
 }
 

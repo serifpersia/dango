@@ -8,7 +8,7 @@ interface AnimeMetaDetailsProps {
 }
 
 export default function AnimeMetaDetails({ showMeta, styles }: AnimeMetaDetailsProps) {
-  const resolved = styles ?? ownStyles
+  const resolved = { ...ownStyles, ...styles }
   const metaDetails = getAnimeMetaDetails(showMeta)
 
   return (

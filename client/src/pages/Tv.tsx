@@ -1,3 +1,4 @@
+import { PlayerVideo } from '../components/player/PlayerMedia'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -30,7 +31,6 @@ import {
   loadAutoplayEnabled,
   storeAutoplayEnabled,
 } from '../lib/playbackCompletion'
-import { loadHls, canPlayHlsNatively } from '../lib/hls'
 import { formatTime } from '../lib/utils'
 import { bindHlsAudioTracks, type HlsAudioHost } from '../components/tv/hlsAudio'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
@@ -412,6 +412,7 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     const handleTheaterKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
       const target = e.target as HTMLElement
       if (
         target.closest(
@@ -632,7 +633,6 @@ const Tv: React.FC = () => {
   }, [player.actions, saveVideoProgress, videoRef])
 
   const handleVideoLoadedMetadata = useCallback(() => {
-    player.actions.onLoadedMetadata()
     const video = videoRef.current
     if (!video) return
     try {
@@ -651,7 +651,7 @@ const Tv: React.FC = () => {
       pendingSeekRef.current = null
     }
     updateNextEpisodePrompt()
-  }, [player.actions, videoRef, updateNextEpisodePrompt])
+  }, [videoRef, updateNextEpisodePrompt])
 
   const applyPendingSeek = useCallback(() => {
     const video = videoRef.current
@@ -778,11 +778,14 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     return () => {
       if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
-      if (video && !video.ended) {
-        saveVideoProgress(video.currentTime, video.duration || 0)
+      if (!video?.ended && player.engine.getState().duration > 0) {
+        saveVideoProgress(
+          player.engine.getTimeline().currentTime,
+          player.engine.getState().duration
+        )
       }
     }
-  }, [saveVideoProgress, videoRef])
+  }, [player.engine, saveVideoProgress, videoRef])
 
   const pickDefaultSubtitle = useCallback((subs: SubtitleTrack[]): number => {
     let lastKey: string | null = null
@@ -1133,36 +1136,17 @@ const Tv: React.FC = () => {
 
   useEffect(() => {
     if (!videoRef.current) return
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
+    hlsRef.current = null
     if (isEmbedProvider || selectedIsIframe) {
-      const v = videoRef.current
-      if (v) {
-        v.pause()
-        v.removeAttribute('src')
-        v.load()
-      }
+      player.engine.unload()
       return
     }
-
-    let cancelled = false
-
     if (testClipActive) {
-      const clipVideo = videoRef.current
-      if (clipVideo) {
-        clipVideo.pause()
-        clipVideo.removeAttribute('src')
-        clipVideo.load()
-        clipVideo.src = '/av-sync-test.mp4'
-        if (!playbackPromptBlockedRef.current) clipVideo.play().catch(() => {})
-      }
-      return () => {
-        cancelled = true
-      }
+      return player.engine.loadSource(
+        { url: '/av-sync-test.mp4' },
+        { autoPlay: !playbackPromptBlockedRef.current }
+      )
     }
-
     if (calibReturnRef.current != null) {
       pendingSeekRef.current = calibReturnRef.current
       calibReturnRef.current = null
@@ -1206,49 +1190,38 @@ const Tv: React.FC = () => {
 
     const proxiedUrl = `/api/tv/stream-proxy?url=${encodeURIComponent(currentUrl)}&referer=${encodeURIComponent(referer)}&provider=${encodeURIComponent(source)}`
 
-    if (streams[qualityIdx]?.type === 'hls') {
-      void (async () => {
-        const HlsClass = await loadHls()
-        if (cancelled) return
-        if (HlsClass && HlsClass.isSupported()) {
-          const lowMemory = isConstrainedDevice() || document.body.classList.contains('low-end')
-          const bufTarget = lowMemory ? 60 : 180
-          const hls = new HlsClass({
-            enableWorker: true,
-            lowLatencyMode: false,
-            startPosition: resumePosition > 0 ? resumePosition : -1,
-            maxBufferLength: bufTarget,
-            maxMaxBufferLength: bufTarget + (lowMemory ? 30 : 60),
-            backBufferLength: lowMemory ? 30 : 60,
-            maxBufferSize: (lowMemory ? 120 : 360) * 1000 * 1000,
-            fragLoadPolicy: {
-              default: {
-                maxTimeToFirstByteMs: 15000,
-                maxLoadTimeMs: 45000,
-                timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
-                errorRetry: { maxNumRetry: 3, retryDelayMs: 800, maxRetryDelayMs: 6000 },
-              },
+    const lowMemory = isConstrainedDevice() || document.body.classList.contains('low-end')
+    const bufTarget = lowMemory ? 60 : 180
+    const disposeSource = player.engine.loadSource(
+      { url: proxiedUrl, hls: streams[qualityIdx]?.type === 'hls' },
+      {
+        hlsConfig: {
+          enableWorker: true,
+          lowLatencyMode: false,
+          startPosition: resumePosition > 0 ? resumePosition : -1,
+          maxBufferLength: bufTarget,
+          maxMaxBufferLength: bufTarget + (lowMemory ? 30 : 60),
+          backBufferLength: lowMemory ? 30 : 60,
+          maxBufferSize: (lowMemory ? 120 : 360) * 1000 * 1000,
+          fragLoadPolicy: {
+            default: {
+              maxTimeToFirstByteMs: 15000,
+              maxLoadTimeMs: 45000,
+              timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+              errorRetry: { maxNumRetry: 3, retryDelayMs: 800, maxRetryDelayMs: 6000 },
             },
-            manifestLoadPolicy: {
-              default: {
-                maxTimeToFirstByteMs: 10000,
-                maxLoadTimeMs: 25000,
-                timeoutRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 2000 },
-                errorRetry: { maxNumRetry: 2, retryDelayMs: 800, maxRetryDelayMs: 4000 },
-              },
+          },
+          manifestLoadPolicy: {
+            default: {
+              maxTimeToFirstByteMs: 10000,
+              maxLoadTimeMs: 25000,
+              timeoutRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 2000 },
+              errorRetry: { maxNumRetry: 2, retryDelayMs: 800, maxRetryDelayMs: 4000 },
             },
-          })
+          },
+        },
+        onHls: (hls, HlsClass) => {
           hlsRef.current = hls
-          hls.on(HlsClass.Events.ERROR, (_event, data) => {
-            if (data.fatal) {
-              setStreamError(`Stream failed (${data.details}). Try another source or reload.`)
-              setStreamLoading(false)
-              hls.destroy()
-              hlsRef.current = null
-            }
-          })
-          hls.loadSource(proxiedUrl)
-          hls.attachMedia(video)
           const readSubtitlePreference = (): { enabled: boolean; index: number } => {
             let enabled = false
             let index = 0
@@ -1286,15 +1259,7 @@ const Tv: React.FC = () => {
             getWant: () => selectedAudioTrackRef.current,
             onResolve: (id) => setSelectedAudioTrack(id),
           })
-          hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-            applySubtitlePreference()
-            if (
-              resumePosition > 0 ||
-              (!playbackPromptBlockedRef.current && resumeCheckedRef.current)
-            ) {
-              video.play().catch(() => player.actions.setShowControls(true))
-            }
-          })
+          hls.on(HlsClass.Events.MANIFEST_PARSED, applySubtitlePreference)
           hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => {
             applySubtitlePreference()
           })
@@ -1322,27 +1287,18 @@ const Tv: React.FC = () => {
             setSelectedSubtitle(data.id)
             suppressNativeSubtitles()
           })
-        } else if (canPlayHlsNatively(video)) {
-          video.src = proxiedUrl
-          if (
-            resumePosition > 0 ||
-            (!playbackPromptBlockedRef.current && resumeCheckedRef.current)
-          ) {
-            video.play().catch(() => {
-              setStreamError('Failed to play stream. Try another source.')
-            })
-          }
-        }
-      })()
-    } else {
-      video.src = proxiedUrl
-      if (resumePosition > 0 || (!playbackPromptBlockedRef.current && resumeCheckedRef.current)) {
-        video.play().catch(() => {
-          setStreamError('Failed to play stream. Try another source.')
-        })
+        },
+        onReady: () => {
+          if (resumePosition > 0 || (!playbackPromptBlockedRef.current && resumeCheckedRef.current))
+            void player.engine.play()
+        },
+        onError: (error) => {
+          setStreamError(error.message)
+          setStreamLoading(false)
+          hlsRef.current = null
+        },
       }
-    }
-
+    )
     const handleVideoError = () => {
       const err = video.error
       const code = err?.code
@@ -1355,7 +1311,8 @@ const Tv: React.FC = () => {
     }
     video.addEventListener('error', handleVideoError)
     return () => {
-      cancelled = true
+      disposeSource()
+      hlsRef.current = null
       video.removeEventListener('error', handleVideoError)
     }
   }, [
@@ -1376,6 +1333,7 @@ const Tv: React.FC = () => {
     applyPendingSeek,
     suppressNativeSubtitles,
     player.actions,
+    player.engine,
   ])
 
   useEffect(() => {
@@ -1986,8 +1944,7 @@ const Tv: React.FC = () => {
                   ambientSettings={ambientSettings}
                   onAmbientChange={updateAmbient}
                 >
-                  <video
-                    ref={videoRef}
+                  <PlayerVideo
                     autoPlay={resumeChecked && !playbackPromptBlocked}
                     playsInline
                     disablePictureInPicture
@@ -2013,13 +1970,8 @@ const Tv: React.FC = () => {
                       checkEnd()
                     }}
                     onDurationChange={() => {
-                      player.actions.onDurationChange()
                       logDuration()
                     }}
-                    onVolumeChange={player.actions.onVolumeChange}
-                    onWaiting={player.actions.onWaiting}
-                    onPlaying={player.actions.onPlaying}
-                    onCanPlay={player.actions.onCanPlay}
                     onContextMenu={(e) => e.preventDefault()}
                     onError={() => {
                       setStreamError('Video failed to load. Try another server or reload.')

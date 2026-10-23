@@ -4,37 +4,6 @@ import type useVideoPlayer from './useVideoPlayer'
 export function useControlHandlers(player: ReturnType<typeof useVideoPlayer>) {
   const { state, refs, actions } = player
 
-  const handleVolumeChange = (newVolume: number) => {
-    if (!refs.videoRef.current) return
-    refs.videoRef.current.volume = newVolume
-    refs.videoRef.current.muted = newVolume === 0
-  }
-
-  const handleSeek = (percent: number) => {
-    if (!refs.videoRef.current || isNaN(state.duration) || state.duration === 0) return
-    refs.videoRef.current.currentTime = percent * state.duration
-    actions.sendProgressUpdate(false, true)
-  }
-
-  const handleScrubStart = () => {
-    if (!refs.videoRef.current) return
-    actions.setIsScrubbing(true)
-    actions.wasPlayingBeforeScrub.current = !refs.videoRef.current.paused
-    refs.videoRef.current.pause()
-  }
-
-  const handleScrubMove = (percent: number) => {
-    if (!refs.videoRef.current || !state.duration) return
-    refs.videoRef.current.currentTime = percent * state.duration
-  }
-
-  const handleScrubEnd = () => {
-    actions.setIsScrubbing(false)
-    if (actions.wasPlayingBeforeScrub.current) {
-      refs.videoRef.current?.play()
-    }
-  }
-
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!refs.videoRef.current) return
     actions.setActiveSubtitleTrack(trackId)
@@ -86,11 +55,6 @@ export function useControlHandlers(player: ReturnType<typeof useVideoPlayer>) {
   }
 
   return {
-    handleVolumeChange,
-    handleSeek,
-    handleScrubStart,
-    handleScrubMove,
-    handleScrubEnd,
     handleSubtitleSelection,
     isSubtitleActive,
     handleCCToggle,

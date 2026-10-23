@@ -5,7 +5,7 @@ import CenterControls from '../player/CenterControls'
 import ControlTopBar from '../player/ControlTopBar'
 import TvBottomBar from './TvBottomBar'
 import TvSettings, { type TvSettingsView } from './TvSettings'
-import UnifiedVideoShell from '../player/UnifiedVideoShell'
+import PlayerSurface from '../player/PlayerSurface'
 import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 import { buildCueCss, fitSubtitleSize, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
@@ -244,15 +244,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     />
   )
 
-  const center =
-    !isLoading && !state.isBuffering && state.duration > 0 ? (
-      <CenterControls
-        isPlaying={state.isPlaying}
-        onTogglePlay={actions.togglePlay}
-        onSkipBack={() => actions.seek(-10)}
-        onSkipForward={() => actions.seek(10)}
-      />
-    ) : null
+  const center = !isLoading && !state.isBuffering && state.duration > 0 ? <CenterControls /> : null
 
   const bottomBar = (
     <TvBottomBar
@@ -332,19 +324,20 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   )
 
   return (
-    <UnifiedVideoShell
-      player={player}
+    <PlayerSurface
+      engine={player.engine}
       topBar={topBar}
       centerControls={center}
       bottomBar={!isLoading && state.duration > 0 ? bottomBar : null}
       settingsPanel={settingsNode}
       overlays={overlays}
-      isInteracting={!!settingsView}
+      isInteracting={!!settingsView || state.showVolumeSlider}
+      nativeControls={state.useNativeControls}
       onStageClick={closeSettings}
       className={state.isFullscreen ? styles.fullscreenFlat : ''}
     >
       {children}
-    </UnifiedVideoShell>
+    </PlayerSurface>
   )
 }
 

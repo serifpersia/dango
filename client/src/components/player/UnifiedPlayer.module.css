@@ -29,6 +29,7 @@
 .shell:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   aspect-ratio: auto;
   border-radius: 0;
 }
@@ -50,6 +51,7 @@
   .shell {
     aspect-ratio: auto;
     height: 100vh;
+    height: 100dvh;
     border-radius: 0;
   }
 }
@@ -101,6 +103,7 @@
 .shellFullscreen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   aspect-ratio: auto;
 }
 
@@ -113,6 +116,19 @@
 
 .uiLayer > * {
   pointer-events: auto;
+}
+
+.engineStatus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  max-width: 90%;
+  padding: var(--space-3);
+  background: var(--bg-scrim-strong);
+  color: var(--text-primary);
+  text-align: center;
 }
 
 .volumeWrap {

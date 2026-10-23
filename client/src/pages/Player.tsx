@@ -1,3 +1,4 @@
+import { PlayerVideo } from '../components/player/PlayerMedia'
 import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -316,11 +317,12 @@ const Player: React.FC = () => {
     providerOrder: DIRECT_PROVIDER_ORDER,
     matureProviders: MATURE_PROVIDERS,
     setPreferredSource,
-    dispatch,
     showControls: actions.setShowControls,
+    dispatch,
   })
 
   const { seekToTimeRef } = useMediaSource({
+    engine: player.engine,
     videoRef: refs.videoRef,
     selectedSource: state.selectedSource,
     selectedLink: state.selectedLink,
@@ -331,7 +333,6 @@ const Player: React.FC = () => {
     calibReturnRef,
     setAvailableSubtitles: actions.setAvailableSubtitles,
     setActiveSubtitleTrack: actions.setActiveSubtitleTrack,
-    showControls: actions.setShowControls,
     onFatalError: handleVideoSourceError,
   })
 
@@ -820,8 +821,7 @@ const Player: React.FC = () => {
                   </div>
                 )}
                 {!isVideoLoading && state.videoSources.length > 0 && (
-                  <video
-                    ref={refs.videoRef}
+                  <PlayerVideo
                     controls={player.state.useNativeControls}
                     playsInline
                     webkit-playsinline="true"
@@ -833,7 +833,6 @@ const Player: React.FC = () => {
                       if (!testClipActive) checkEnd(true)
                     }}
                     onDurationChange={() => {
-                      actions.onDurationChange()
                       logDuration()
                     }}
                     onSeeked={() => {
@@ -842,7 +841,6 @@ const Player: React.FC = () => {
                       checkEnd()
                     }}
                     onLoadedMetadata={() => {
-                      actions.onLoadedMetadata()
                       handleThresholds()
                       logDuration()
                       if (!testClipActive) checkEnd()
@@ -860,10 +858,6 @@ const Player: React.FC = () => {
                         cancelQueueTransition()
                       }
                     }}
-                    onVolumeChange={actions.onVolumeChange}
-                    onWaiting={actions.onWaiting}
-                    onPlaying={actions.onPlaying}
-                    onCanPlay={actions.onCanPlay}
                     onError={handleVideoSourceError}
                     onContextMenu={(e) => e.preventDefault()}
                     className={canvasPresentationActive ? styles.videoElementHidden : ''}

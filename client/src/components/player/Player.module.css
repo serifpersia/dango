@@ -591,7 +591,6 @@
 }
 
 .videoContainer.fullscreenActive {
-  cursor: none;
   border-radius: 0;
 }
 

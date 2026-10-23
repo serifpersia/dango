@@ -13,10 +13,11 @@ export function usePlayerShortcuts({
 }: UsePlayerShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
       const target = e.target as HTMLElement
       if (
         target.closest(
-          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
+          'input, textarea, button, select, a, [role="button"], [role="slider"], [contenteditable="true"]'
         )
       )
         return

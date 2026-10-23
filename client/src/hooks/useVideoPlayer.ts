@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { usePlayerCore, usePlayerState } from '../lib/player/usePlayerCore'
 import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 import { formatTime } from '../lib/utils'
@@ -10,11 +11,6 @@ import {
   type SubtitleEdge,
   type SubtitleStyleKey,
 } from '../lib/subtitleStyle'
-import {
-  toggleFullscreen as toggleFullscreenCrossBrowser,
-  isFullscreenActive,
-  subscribeFullscreen,
-} from '../lib/fullscreen'
 import { qk } from '../lib/queryKeys'
 
 interface VideoPlayerProps {
@@ -44,42 +40,28 @@ const useVideoPlayer = ({
 }: VideoPlayerProps) => {
   const queryClient = useQueryClient()
   const trpc = useTRPC()
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const playerContainerRef = useRef<HTMLDivElement>(null)
-  const inactivityTimer = useRef<number | null>(null)
-  const wasPlayingBeforeScrub = useRef(false)
+  const { engine, mediaRef: videoRef } = usePlayerCore({
+    volumeKey: 'playerVolume',
+    mutedKey: 'playerMuted',
+  })
+  const {
+    isPlaying,
+    isMuted,
+    volume,
+    duration,
+    isScrubbing,
+    isBuffering,
+    isFullscreen,
+    isSpeedBoostActive,
+    showControls,
+  } = usePlayerState(engine)
+  const playerContainerRef = engine.containerRef
   const debouncedUpdateTimer = useRef<NodeJS.Timeout | null>(null)
   const lastThrottledUpdateTime = useRef(0)
-  const speedBoostRef = useRef({
-    mouse: false,
-    keyboard: false,
-  })
-  const mouseHoldTimerRef = useRef<number | null>(null)
-  const spaceHoldTimerRef = useRef<number | null>(null)
-  const spaceKeyHeldRef = useRef(false)
 
   const sessionIdRef = useRef(Math.random().toString(36).substring(2))
 
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(() => {
-    try {
-      return localStorage.getItem('playerMuted') === 'true'
-    } catch {
-      return false
-    }
-  })
-  const [volume, setVolume] = useState(() => {
-    try {
-      const savedVolume = parseFloat(localStorage.getItem('playerVolume') || '')
-      return isNaN(savedVolume) ? 1 : Math.max(0, Math.min(1, savedVolume))
-    } catch {
-      return 1
-    }
-  })
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [duration, setDuration] = useState(0)
-  const [showControls, setShowControls] = useState(true)
-  const [isScrubbing, setIsScrubbing] = useState(false)
+  const setShowControls = engine.setShowControls
   const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(
     localStorage.getItem('autoSkipEnabled') === 'true'
   )
@@ -145,8 +127,6 @@ const useVideoPlayer = ({
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
-  const [isBuffering, setIsBuffering] = useState(false)
-  const [isSpeedBoostActive, setIsSpeedBoostActive] = useState(false)
   const [useNativeControls, setUseNativeControls] = useState(() => {
     try {
       return localStorage.getItem('playerUseNativeControls') === 'true'
@@ -165,8 +145,8 @@ const useVideoPlayer = ({
       showId,
       episodeNumber,
       episodeCount,
-      currentTime: video ? video.currentTime : 0,
-      duration: video ? video.duration : 0,
+      currentTime: engine.getTimeline().currentTime,
+      duration: engine.getState().duration,
       showName: showMeta.name,
       showThumbnail: showMeta.thumbnail,
       nativeName: showMeta.names?.native,
@@ -176,11 +156,11 @@ const useVideoPlayer = ({
         : undefined,
       popularityScore: showMeta.score,
       type: showMeta.type,
-      isPlaying: video ? !video.paused : true,
+      isPlaying: video ? !video.paused : sourceType === 'iframe',
       sessionId: sessionIdRef.current,
       isAdult: showMeta.isAdult,
     }
-  }, [showId, episodeNumber, episodeCount, showMeta])
+  }, [engine, videoRef, showId, episodeNumber, episodeCount, showMeta, sourceType])
 
   const sendProgressUpdate = useCallback(
     (isFinalUpdate = false, force = false) => {
@@ -190,9 +170,10 @@ const useVideoPlayer = ({
       if (!payload) return false
 
       const video = videoRef.current
-      if (!video && sourceType !== 'iframe') return false
+      if (!video && !isFinalUpdate && sourceType !== 'iframe') return false
+      if (sourceType !== 'iframe' && payload.duration <= 0) return false
 
-      const timeToReport = video ? video.currentTime : 0
+      const timeToReport = engine.getTimeline().currentTime
 
       if (!force) {
         if (timeToReport === 0) return false
@@ -208,7 +189,7 @@ const useVideoPlayer = ({
 
       const saveProgress = async () => {
         try {
-          await trpcClient.progress.updateProgress.mutate(payload)
+          await trpcKeepalive('progress.updateProgress', payload)
           queryClient.invalidateQueries({ queryKey: [qk.videoSources, showId, episodeNumber] })
           queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
           queryClient.invalidateQueries({ queryKey: [qk.thisWeekSchedule] })
@@ -228,16 +209,17 @@ const useVideoPlayer = ({
 
       return true
     },
-    [buildProgressPayload, sourceType, queryClient, showId, episodeNumber, trpc.continueWatching]
+    [
+      engine,
+      buildProgressPayload,
+      sourceType,
+      queryClient,
+      showId,
+      episodeNumber,
+      trpc.continueWatching,
+      videoRef,
+    ]
   )
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (video) {
-      video.volume = volume
-      video.muted = isMuted
-    }
-  }, [videoRef, volume, isMuted])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -246,375 +228,68 @@ const useVideoPlayer = ({
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('pagehide', handleBeforeUnload)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') handleBeforeUnload()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     const debounceTimer = debouncedUpdateTimer
-    const activityTimer = inactivityTimer
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('pagehide', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (!hasEnded.current) {
         sendProgressUpdate(true)
       }
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
-      if (activityTimer.current) clearTimeout(activityTimer.current)
     }
   }, [sendProgressUpdate])
 
-  // show the controls again and hide them again after a moment, the page
-  // used to poke the timer ref directly
-  const flashControls = useCallback(() => {
-    setShowControls(true)
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    inactivityTimer.current = window.setTimeout(() => {
-      setShowControls(false)
-    }, 1000)
-  }, [setShowControls])
+  const flashControls = useCallback(() => engine.setShowControls(true), [engine])
 
-  const toggleFullscreen = useCallback(() => {
-    const container = playerContainerRef.current
-    if (!container) return
-    void toggleFullscreenCrossBrowser(container, videoRef.current).catch((err) => {
-      console.error(
-        `Error attempting to toggle full-screen mode: ${(err as Error)?.message} (${(err as Error)?.name})`
-      )
-    })
-  }, [])
-
+  const toggleFullscreen = engine.toggleFullscreen
   const togglePlay = useCallback(() => {
-    if (!videoRef.current) return
-    if (videoRef.current.paused) {
-      videoRef.current.play().catch(() => console.warn('Autoplay was prevented.'))
-    } else {
-      videoRef.current.pause()
-      setShowControls(true)
-    }
-  }, [setShowControls])
-
-  const syncPlaybackRate = useCallback(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    const shouldBoost = speedBoostRef.current.mouse || speedBoostRef.current.keyboard
-    video.playbackRate = shouldBoost ? 2 : 1
-  }, [])
-
-  const setMouseSpeedBoost = useCallback(
-    (enabled: boolean) => {
-      if (speedBoostRef.current.mouse === enabled) return
-      speedBoostRef.current.mouse = enabled
-      setIsSpeedBoostActive(enabled || speedBoostRef.current.keyboard)
-      syncPlaybackRate()
-    },
-    [syncPlaybackRate]
-  )
-
-  const setKeyboardSpeedBoost = useCallback(
-    (enabled: boolean) => {
-      if (speedBoostRef.current.keyboard === enabled) return
-      speedBoostRef.current.keyboard = enabled
-      setIsSpeedBoostActive(speedBoostRef.current.mouse || enabled)
-      syncPlaybackRate()
-    },
-    [syncPlaybackRate]
-  )
-
+    engine.togglePlay()
+    setShowControls(true)
+  }, [engine, setShowControls])
+  const toggleMute = useCallback(() => {
+    engine.toggleMute()
+    setShowControls(true)
+  }, [engine, setShowControls])
   const seek = useCallback(
     (seconds: number) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime += seconds
-        if (debouncedUpdateTimer.current) clearTimeout(debouncedUpdateTimer.current)
-        debouncedUpdateTimer.current = setTimeout(() => {
-          sendProgressUpdate(false, true)
-        }, 1500)
-        setShowControls(true)
-      }
+      engine.seekRelative(seconds)
+      if (debouncedUpdateTimer.current) clearTimeout(debouncedUpdateTimer.current)
+      debouncedUpdateTimer.current = setTimeout(() => sendProgressUpdate(false, true), 1500)
+      setShowControls(true)
     },
-    [sendProgressUpdate, setShowControls]
+    [engine, sendProgressUpdate, setShowControls]
   )
-
-  const toggleMute = useCallback(() => {
-    if (!videoRef.current) return
-    const newMuted = !videoRef.current.muted
-    videoRef.current.muted = newMuted
-    setIsMuted(newMuted)
-    localStorage.setItem('playerMuted', String(newMuted))
-    if (!newMuted && videoRef.current.volume === 0) {
-      const newVolume = 0.5
-      videoRef.current.volume = newVolume
-      setVolume(newVolume)
-      localStorage.setItem('playerVolume', String(newVolume))
-    }
-    setShowControls(true)
-  }, [setShowControls])
-
-  useEffect(() => {
-    const getVideo = () => videoRef.current
-    const cleanup = subscribeFullscreen(getVideo, (active) => {
-      setIsFullscreen(active)
-      if (active) setShowControls(true)
-    })
-    setIsFullscreen(isFullscreenActive(getVideo()))
-    return cleanup
-  }, [setShowControls])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (
-        target.closest(
-          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
-        )
-      )
-        return
-
-      if (e.code === 'Space') {
-        e.preventDefault()
-
-        if (spaceKeyHeldRef.current) return
-
-        spaceKeyHeldRef.current = true
-
-        if (spaceHoldTimerRef.current) {
-          clearTimeout(spaceHoldTimerRef.current)
-        }
-
-        spaceHoldTimerRef.current = window.setTimeout(() => {
-          spaceHoldTimerRef.current = null
-          if (!spaceKeyHeldRef.current) return
-          setKeyboardSpeedBoost(true)
-        }, 180)
-        return
-      }
-
-      switch (e.key.toLowerCase()) {
-        case 'f':
-          toggleFullscreen()
-          break
-        case 'm':
-          toggleMute()
-          break
-        case 'arrowright':
-          seek(10)
-          break
-        case 'arrowleft':
-          seek(-10)
-          break
-        case 'arrowup':
-          e.preventDefault()
-          if (videoRef.current) {
-            const newVolume = Math.min(1, videoRef.current.volume + 0.1)
-            videoRef.current.volume = newVolume
-            setVolume(newVolume)
-          }
-          break
-        case 'arrowdown':
-          e.preventDefault()
-          if (videoRef.current) {
-            const newVolume = Math.max(0, videoRef.current.volume - 0.1)
-            videoRef.current.volume = newVolume
-            setVolume(newVolume)
-          }
-          break
-      }
-    }
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return
-
-      e.preventDefault()
-      spaceKeyHeldRef.current = false
-
-      if (speedBoostRef.current.keyboard) {
-        setKeyboardSpeedBoost(false)
-        return
-      }
-
-      if (spaceHoldTimerRef.current) {
-        clearTimeout(spaceHoldTimerRef.current)
-        spaceHoldTimerRef.current = null
-        togglePlay()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('keyup', handleKeyUp)
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('keyup', handleKeyUp)
-      if (spaceHoldTimerRef.current) {
-        clearTimeout(spaceHoldTimerRef.current)
-        spaceHoldTimerRef.current = null
-      }
-      spaceKeyHeldRef.current = false
-      setKeyboardSpeedBoost(false)
-      setIsSpeedBoostActive(false)
-    }
-  }, [setKeyboardSpeedBoost, togglePlay, toggleFullscreen, toggleMute, seek])
-
-  useEffect(() => {
-    const isBoostIgnoredTarget = (target: HTMLElement | null): boolean => {
-      if (!target) return true
-      return !!target.closest(
-        '[data-speed-boost-ignore="true"], [data-player-ui="true"], button, input, select, textarea, a, [role="button"], [role="slider"], [contenteditable="true"]'
-      )
-    }
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return
-
-      const target = e.target as HTMLElement | null
-      if (!target) return
-
-      if (isBoostIgnoredTarget(target)) return
-
-      const container = playerContainerRef.current
-      if (!container || !container.contains(target)) return
-
-      if (mouseHoldTimerRef.current) {
-        clearTimeout(mouseHoldTimerRef.current)
-      }
-
-      mouseHoldTimerRef.current = window.setTimeout(() => {
-        mouseHoldTimerRef.current = null
-        setMouseSpeedBoost(true)
-      }, 180)
-    }
-
-    const handleTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null
-      if (!target) return
-
-      if (isBoostIgnoredTarget(target)) return
-
-      const container = playerContainerRef.current
-      if (!container || !container.contains(target)) return
-
-      if (mouseHoldTimerRef.current) {
-        clearTimeout(mouseHoldTimerRef.current)
-      }
-
-      mouseHoldTimerRef.current = window.setTimeout(() => {
-        mouseHoldTimerRef.current = null
-        setMouseSpeedBoost(true)
-      }, 180)
-    }
-
-    const handleMouseUp = () => {
-      if (mouseHoldTimerRef.current) {
-        clearTimeout(mouseHoldTimerRef.current)
-        mouseHoldTimerRef.current = null
-      }
-      setMouseSpeedBoost(false)
-    }
-
-    const handleWindowBlur = () => {
-      if (mouseHoldTimerRef.current) {
-        clearTimeout(mouseHoldTimerRef.current)
-        mouseHoldTimerRef.current = null
-      }
-      spaceKeyHeldRef.current = false
-      if (spaceHoldTimerRef.current) {
-        clearTimeout(spaceHoldTimerRef.current)
-        spaceHoldTimerRef.current = null
-      }
-      setKeyboardSpeedBoost(false)
-      setMouseSpeedBoost(false)
-      setIsSpeedBoostActive(false)
-    }
-
-    document.addEventListener('mousedown', handleMouseDown)
-    document.addEventListener('mouseup', handleMouseUp)
-    document.addEventListener('touchstart', handleTouchStart, { passive: true })
-    document.addEventListener('touchend', handleMouseUp)
-    document.addEventListener('touchcancel', handleMouseUp)
-    document.addEventListener('pointerup', handleMouseUp)
-    document.addEventListener('pointercancel', handleMouseUp)
-    window.addEventListener('blur', handleWindowBlur)
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown)
-      document.removeEventListener('mouseup', handleMouseUp)
-      document.removeEventListener('touchstart', handleTouchStart)
-      document.removeEventListener('touchend', handleMouseUp)
-      document.removeEventListener('touchcancel', handleMouseUp)
-      document.removeEventListener('pointerup', handleMouseUp)
-      document.removeEventListener('pointercancel', handleMouseUp)
-      window.removeEventListener('blur', handleWindowBlur)
-      if (mouseHoldTimerRef.current) {
-        clearTimeout(mouseHoldTimerRef.current)
-        mouseHoldTimerRef.current = null
-      }
-    }
-  }, [setKeyboardSpeedBoost, setMouseSpeedBoost])
-
   const onPlay = useCallback(() => {
     hasEnded.current = false
-    setIsPlaying(true)
-    setIsBuffering(false)
-    setTimeout(() => sendProgressUpdate(false, true), 50)
+    sendProgressUpdate(false, true)
   }, [sendProgressUpdate])
-  const onPlaying = useCallback(() => {
-    setIsPlaying(true)
-    setIsBuffering(false)
-  }, [])
-  const onWaiting = useCallback(() => {
-    const video = videoRef.current
-    if (video && !video.paused && video.readyState >= 3 && !video.seeking) return
-    setIsBuffering(true)
-  }, [])
-  const onCanPlay = useCallback(() => {
-    setIsBuffering(false)
-  }, [])
   const onPause = useCallback(() => {
-    setIsPlaying(false)
-    setIsBuffering(false)
     setShowControls(true)
-    setTimeout(() => sendProgressUpdate(false, true), 50)
-  }, [sendProgressUpdate])
-
-  const isBufferingRef = useRef(false)
-  isBufferingRef.current = isBuffering
-
-  useEffect(() => {
-    if (!isBuffering) return
-    let lastTime = videoRef.current?.currentTime ?? 0
-    let checks = 0
-    const timer = window.setInterval(() => {
-      const video = videoRef.current
-      if (!video) return
-      checks += 1
-      const current = video.currentTime
-      const advanced = current !== lastTime
-      lastTime = current
-      if (video.paused || video.seeking) return
-      if (advanced || video.readyState >= 3) {
-        setIsBuffering(false)
-        return
-      }
-      if (checks >= 24 && video.readyState >= 2 && !video.ended) {
-        setIsBuffering(false)
-      }
-    }, 500)
-    return () => window.clearInterval(timer)
-  }, [isBuffering])
+    sendProgressUpdate(false, true)
+  }, [sendProgressUpdate, setShowControls])
 
   useEffect(() => {
     hasEnded.current = false
     lastReportedTime.current = -1
     lastThrottledUpdateTime.current = 0
     sessionIdRef.current = Math.random().toString(36).substring(2)
-    setDuration(0)
-    setIsBuffering(false)
-  }, [showId, episodeNumber])
+    engine.reset()
+  }, [engine, showId, episodeNumber])
 
-  const resetMediaState = useCallback(() => {
-    setDuration(0)
-    setIsBuffering(false)
-  }, [])
+  const resetMediaState = engine.reset
 
   useEffect(() => {
     const sessionId = sessionIdRef.current
     return () => {
       clearDiscordPresence(sessionId)
     }
-  }, [showId, episodeNumber])
+  }, [engine, showId, episodeNumber])
 
   useEffect(() => {
     if (sourceType !== 'iframe') return
@@ -628,40 +303,14 @@ const useVideoPlayer = ({
     return () => clearInterval(heartbeatInterval)
   }, [sourceType, sendProgressUpdate])
 
-  const onLoadedMetadata = useCallback(() => {
-    setDuration(videoRef.current?.duration || 0)
-    syncPlaybackRate()
-  }, [syncPlaybackRate])
-  const onDurationChange = useCallback(() => {
-    const duration = videoRef.current?.duration
-    if (duration && Number.isFinite(duration)) setDuration(duration)
-  }, [])
-  const onVolumeChange = useCallback(() => {
-    if (videoRef.current) {
-      const newMuted = videoRef.current.muted
-      const newVolume = videoRef.current.volume
-
-      setIsMuted(newMuted)
-      setVolume(newVolume)
-
-      localStorage.setItem('playerMuted', String(newMuted))
-      localStorage.setItem('playerVolume', String(newVolume))
-    }
-  }, [])
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current
     if (!video) return
-    if (isBufferingRef.current && !video.paused && !video.seeking) {
-      setIsBuffering(false)
-    }
     const time = video.currentTime || 0
     const now = Date.now()
-    if (now - lastThrottledUpdateTime.current > 60000) {
-      if (sendProgressUpdate()) {
-        lastThrottledUpdateTime.current = now
-      }
+    if (now - lastThrottledUpdateTime.current > 60000 && sendProgressUpdate()) {
+      lastThrottledUpdateTime.current = now
     }
-
     const activeSkip =
       skipIntervals.find((interval) => time >= interval.start_time && time < interval.end_time) ||
       null
@@ -674,7 +323,7 @@ const useVideoPlayer = ({
       video.currentTime = activeSkip.end_time
       setCurrentSkipInterval(null)
     }
-  }, [skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
+  }, [videoRef, skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
 
   const reportFinalProgress = useCallback(() => {
     const payload = buildProgressPayload()
@@ -696,32 +345,6 @@ const useVideoPlayer = ({
     reportFinalProgress()
   }, [reportFinalProgress])
 
-  useEffect(() => {
-    const handleScrubEnd = () => {
-      if (isScrubbing) {
-        setIsScrubbing(false)
-        if (wasPlayingBeforeScrub.current) {
-          videoRef.current?.play()
-        }
-        sendProgressUpdate(false, true)
-      }
-    }
-    if (isScrubbing) {
-      document.addEventListener('mouseup', handleScrubEnd)
-      document.addEventListener('pointerup', handleScrubEnd)
-      document.addEventListener('touchend', handleScrubEnd)
-      document.addEventListener('pointercancel', handleScrubEnd)
-      document.addEventListener('touchcancel', handleScrubEnd)
-    }
-    return () => {
-      document.removeEventListener('mouseup', handleScrubEnd)
-      document.removeEventListener('pointerup', handleScrubEnd)
-      document.removeEventListener('touchend', handleScrubEnd)
-      document.removeEventListener('pointercancel', handleScrubEnd)
-      document.removeEventListener('touchcancel', handleScrubEnd)
-    }
-  }, [isScrubbing, sendProgressUpdate])
-
   const actions = useMemo(
     () => ({
       togglePlay,
@@ -730,14 +353,10 @@ const useVideoPlayer = ({
       toggleFullscreen,
       onPlay,
       onPause,
-      onLoadedMetadata,
-      onDurationChange,
       formatTime,
-      onVolumeChange,
       onTimeUpdate,
       onEnded,
       setShowControls,
-      setIsScrubbing,
       setIsAutoSkipEnabled,
       setCurrentSkipInterval,
       setSubtitleFontSize,
@@ -752,13 +371,7 @@ const useVideoPlayer = ({
       setActiveSubtitleTrack,
       setShowSettings,
       setShowVolumeSlider,
-      wasPlayingBeforeScrub,
-      inactivityTimer,
       flashControls,
-      setIsFullscreen,
-      onWaiting,
-      onPlaying,
-      onCanPlay,
       sendProgressUpdate,
       setUseNativeControls,
       resetMediaState,
@@ -770,24 +383,19 @@ const useVideoPlayer = ({
       toggleFullscreen,
       onPlay,
       onPause,
-      onLoadedMetadata,
-      onDurationChange,
-      onVolumeChange,
       onTimeUpdate,
       onEnded,
-      setIsFullscreen,
-      onWaiting,
-      onPlaying,
-      onCanPlay,
       sendProgressUpdate,
       setUseNativeControls,
       resetMediaState,
       flashControls,
       setSubtitleStyle,
+      setShowControls,
     ]
   )
 
   return {
+    engine,
     refs: { videoRef, playerContainerRef },
     state: {
       isPlaying,

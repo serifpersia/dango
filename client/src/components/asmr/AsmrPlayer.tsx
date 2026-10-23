@@ -1,3 +1,4 @@
+import { PlayerAudio } from '../player/PlayerMedia'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
 import { useNavigate } from 'react-router'
@@ -14,8 +15,18 @@ import { buildAsmrId } from '../../lib/asmr'
 import { trpcClient } from '../../lib/trpc'
 import { clearDiscordPresence } from '../../lib/trpcBeacon'
 import { formatTime } from '../../lib/utils'
-import { loadHls } from '../../lib/hls'
-import type Hls from 'hls.js'
+import { usePlayerCore, usePlayerState, usePlayerTimeline } from '../../lib/player/usePlayerCore'
+import { usePlayerInput } from '../../lib/player/usePlayerInput'
+import { usePlayer } from '../player/PlayerContext'
+import { PlayerProvider } from '../player/PlayerProvider'
+import {
+  PlayPauseButton,
+  SeekButton,
+  SeekSlider,
+  VolumeSlider,
+  PlayerTime,
+  PlayerStatus,
+} from '../player/PlaybackControls'
 import styles from './Asmr.module.css'
 
 interface AsmrPlayerProps {
@@ -33,7 +44,19 @@ interface AsmrPlayerProps {
   onClose: () => void
 }
 
-const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
+const AsmrPlayer: React.FC<AsmrPlayerProps> = (props) => {
+  const { engine } = usePlayerCore<HTMLAudioElement>({
+    volumeKey: 'asmrVolume',
+    mutedKey: 'asmrMuted',
+  })
+  return (
+    <PlayerProvider engine={engine}>
+      <AsmrPlayerContent {...props} />
+    </PlayerProvider>
+  )
+}
+
+const AsmrPlayerContent: React.FC<AsmrPlayerProps> = ({
   title,
   images,
   chapters,
@@ -47,12 +70,10 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   onExpandedChange,
   onClose,
 }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const hlsRef = useRef<Hls | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-  const [bufferedEnd, setBufferedEnd] = useState(0)
+  const engine = usePlayer()
+  const audioRef = engine.mediaRef as { current: HTMLAudioElement | null }
+  const { duration, volume, isPlaying } = usePlayerState(engine)
+  const { currentTime } = usePlayerTimeline(engine)
   const [showArt, setShowArt] = useState(true)
   const [imageIndex, setImageIndex] = useState(0)
   const [loadedImages, setLoadedImages] = useState<ReadonlySet<string>>(new Set())
@@ -65,15 +86,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         ? crypto.randomUUID()
         : `asmr-${Date.now()}-${Math.random().toString(36).slice(2)}`
   }
-  const [volume, setVolume] = useState(() => {
-    const saved = parseFloat(localStorage.getItem('asmrVolume') || '')
-    return Number.isFinite(saved) ? saved : 1
-  })
-  const volumeRef = useRef(volume)
-  useEffect(() => {
-    volumeRef.current = volume
-  }, [volume])
-
   const navigate = useNavigate()
   const workId = React.useMemo(() => (rjCode ? buildAsmrId(rjCode) : ''), [rjCode])
   const saveProgress = useSaveAsmrProgress()
@@ -147,13 +159,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   const saveTrackRef = useRef(saveTrack)
   saveTrackRef.current = saveTrack
 
-  const destroyHls = useCallback(() => {
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
-  }, [])
-
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !trackLink) return
@@ -168,64 +173,32 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         clearTimeout(progressSaveTimerRef.current)
         progressSaveTimerRef.current = null
       }
-      saveTrackRef.current(metaAtLoad, timeRef.current, durationRef.current, true)
+      saveTrackRef.current(
+        metaAtLoad,
+        engine.getTimeline().currentTime,
+        engine.getState().duration || durationRef.current,
+        true
+      )
     }
 
-    setCurrentTime(0)
-    setDuration(0)
-    setBufferedEnd(0)
-    setIsPlaying(false)
     timeRef.current = 0
     durationRef.current = 0
     lastSavedTimeRef.current = 0
-    destroyHls()
 
     const knownRow = progressDataRef.current?.progress?.find((r) => r.trackIndex === trackIndex)
     const knownCt = knownRow?.currentTime || 0
     const knownDur = knownRow?.duration || 0
     const holdForResume = knownCt >= 10 && knownDur - knownCt >= 15
 
-    if (trackIsHls) {
-      let cancelled = false
-      void (async () => {
-        const HlsClass = await loadHls()
-        if (cancelled) return
-        if (HlsClass && HlsClass.isSupported()) {
-          const hls = new HlsClass({ enableWorker: true })
-          hlsRef.current = hls
-          hls.loadSource(trackLink)
-          hls.attachMedia(audio)
-          if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
-        } else {
-          audio.src = trackLink
-          audio.load()
-          audio.volume = volumeRef.current
-          if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
-        }
-      })()
-      return () => {
-        cancelled = true
-        destroyHls()
-        audio.removeAttribute('src')
-        saveAtUnload()
-      }
-    } else {
-      audio.src = trackLink
-    }
-
-    audio.load()
-    audio.volume = volumeRef.current
-    if (!holdForResume) audio.play().catch(() => setIsPlaying(false))
-
+    const disposeSource = engine.loadSource(
+      { url: trackLink, hls: trackIsHls },
+      { autoPlay: !holdForResume }
+    )
     return () => {
-      destroyHls()
-      audio.removeAttribute('src')
       saveAtUnload()
+      disposeSource()
     }
-  }, [trackLink, trackIsHls, destroyHls, workId, trackIndex, trackLabel])
-
-  useEffect(() => () => destroyHls(), [destroyHls])
-
+  }, [engine, trackLink, trackIsHls, workId, trackIndex, trackLabel, audioRef])
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') flushSaveRef.current()
@@ -248,16 +221,10 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     if (!(ct >= 10 && dur - ct >= 15 && timeRef.current < ct)) return
     const audio = audioRef.current
     if (!audio) return
-    audio.currentTime = ct
+    engine.seek(ct)
     timeRef.current = ct
-    setCurrentTime(ct)
-    audio.play().catch(() => {})
-  }, [savedRow, duration, trackKey])
-
-  useEffect(() => {
-    const audio = audioRef.current
-    if (audio) audio.volume = volume
-  }, [volume])
+    void engine.play()
+  }, [engine, audioRef, savedRow, duration, trackKey])
 
   useEffect(() => {
     if (!expanded) return
@@ -303,7 +270,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         .catch(() => {})
       trpcClient.discord.heartbeat.mutate({ sessionId: sessionIdRef.current }).catch(() => {})
     },
-    [title, tracks, trackIndex, images, isAdult, rjCode]
+    [audioRef, title, tracks, trackIndex, images, isAdult, rjCode]
   )
 
   useEffect(() => {
@@ -355,6 +322,17 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   useEffect(() => {
     if (!expanded) return
     const onKey = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        (e.target instanceof Element &&
+          e.target.closest(
+            'input, textarea, select, button, [role="slider"], [contenteditable="true"]'
+          ))
+      )
+        return
       if (e.key === 'Escape') {
         if (showChapterPanel) setShowChapterPanel(false)
         else onExpandedChange(false)
@@ -368,24 +346,6 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     return () => window.removeEventListener('keydown', onKey)
   }, [expanded, showArt, images.length, showChapterPanel, onExpandedChange])
 
-  const togglePlay = () => {
-    const audio = audioRef.current
-    if (!audio) return
-    if (audio.paused) {
-      audio.play().catch(() => {})
-    } else {
-      audio.pause()
-    }
-  }
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = audioRef.current
-    if (!audio || !duration) return
-    const time = parseFloat(e.currentTarget.value)
-    audio.currentTime = time
-    setCurrentTime(time)
-  }
-
   const handleEnded = () => {
     flushSave(true)
     if (trackIndex < tracks.length - 1) {
@@ -398,20 +358,17 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   const handleTimeUpdate = (e: React.TargetedEvent<HTMLAudioElement>) => {
     const t = e.currentTarget.currentTime
     timeRef.current = t
-    setCurrentTime(t)
     if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
     progressSaveTimerRef.current = setTimeout(() => flushSaveRef.current(), 5000)
   }
 
   const handlePause = () => {
-    setIsPlaying(false)
     flushSaveRef.current()
   }
 
   const handleLoadedMetadata = (e: React.TargetedEvent<HTMLAudioElement>) => {
     const d = e.currentTarget.duration
     durationRef.current = Number.isFinite(d) ? d : 0
-    setDuration(e.currentTarget.duration)
   }
 
   const handleCompleteAndHome = useCallback(() => {
@@ -432,28 +389,8 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
 
   const activeChapter = chapters.reduce((acc, c, i) => (currentTime >= c.time ? i : acc), -1)
 
-  const seekTo = (time: number) => {
-    const audio = audioRef.current
-    if (!audio) return
-    audio.currentTime = time
-    setCurrentTime(time)
-  }
-
-  const seekBy = (delta: number) => {
-    const audio = audioRef.current
-    if (!audio) return
-    const base = Number.isFinite(audio.currentTime) ? audio.currentTime : currentTime
-    const target = Math.max(0, Math.min(duration || Infinity, base + delta))
-    audio.currentTime = target
-    setCurrentTime(target)
-    setShowControls(true)
-  }
-
-  const playedPct = duration ? Math.min(100, (currentTime / duration) * 100) : 0
-  const bufferedPct = duration
-    ? Math.min(100, Math.max(playedPct, (bufferedEnd / duration) * 100))
-    : 0
-
+  const seekTo = (time: number) => engine.seek(time)
+  usePlayerInput(engine, () => setShowControls(true), !expanded || (!showArt && !showChapterPanel))
   const transportRow = (
     <>
       <div className={styles.playerButtons}>
@@ -465,31 +402,9 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         >
           <Icon name="step-backward" />
         </button>
-        <button
-          className={`${styles.playerBtn} ${styles.seekBtn}`}
-          onClick={() => seekBy(-10)}
-          aria-label="Seek back 10 seconds"
-          title="Back 10s"
-        >
-          <Icon name="undo" />
-          <span className={styles.seekBtnLabel}>10</span>
-        </button>
-        <button
-          className={`${styles.playerBtn} ${styles.playBtn}`}
-          onClick={togglePlay}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-        >
-          {isPlaying ? <Icon name="pause" /> : <Icon name="play" />}
-        </button>
-        <button
-          className={`${styles.playerBtn} ${styles.seekBtn}`}
-          onClick={() => seekBy(10)}
-          aria-label="Seek forward 10 seconds"
-          title="Forward 10s"
-        >
-          <Icon name="redo" />
-          <span className={styles.seekBtnLabel}>10</span>
-        </button>
+        <SeekButton seconds={-10} className={`${styles.playerBtn} ${styles.seekBtn}`} />
+        <PlayPauseButton className={`${styles.playerBtn} ${styles.playBtn}`} />
+        <SeekButton seconds={10} className={`${styles.playerBtn} ${styles.seekBtn}`} />
         <button
           className={styles.playerBtn}
           onClick={() => onTrackChange(Math.min(tracks.length - 1, trackIndex + 1))}
@@ -501,24 +416,9 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       </div>
 
       <div className={styles.seekRow}>
-        <span className={styles.timeLabel}>{formatTime(currentTime)}</span>
-        <input
-          className={styles.seekBar}
-          type="range"
-          min={0}
-          max={duration || 0}
-          step={0.1}
-          value={Math.min(currentTime, duration || 0)}
-          onChange={handleSeek}
-          style={
-            {
-              '--played-percent': `${playedPct}%`,
-              '--buffered-percent': `${bufferedPct}%`,
-            } as React.CSSProperties
-          }
-          aria-label="Seek"
-        />
-        <span className={styles.timeLabel}>{formatTime(duration)}</span>
+        <PlayerTime className={styles.timeLabel} />
+        <SeekSlider className={styles.seekBar} />
+        <PlayerTime className={styles.timeLabel} durationOnly />
       </div>
     </>
   )
@@ -535,6 +435,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
       </button>
 
       <div className={styles.playerInfo}>
+        <PlayerStatus />
         <p className={styles.playerTitle} title={title}>
           {t ? t(title) : title}
         </p>
@@ -554,21 +455,7 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
         ) : (
           <Icon name="volume-up" className={styles.volumeIcon} />
         )}
-        <input
-          className={styles.volumeBar}
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={volume}
-          onChange={(e) => {
-            const v = parseFloat(e.currentTarget.value)
-            setVolume(v)
-            localStorage.setItem('asmrVolume', String(v))
-          }}
-          style={{ '--volume-percent': `${volume * 100}%` } as React.CSSProperties}
-          aria-label="Volume"
-        />
+        <VolumeSlider className={styles.volumeBar} />
       </div>
 
       <div className={styles.playerActions}>
@@ -602,17 +489,11 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
   )
 
   const audioEl = (
-    <audio
-      ref={audioRef}
+    <PlayerAudio
       preload="metadata"
-      onPlay={() => setIsPlaying(true)}
       onPause={handlePause}
       onTimeUpdate={handleTimeUpdate}
       onLoadedMetadata={handleLoadedMetadata}
-      onProgress={(e) => {
-        const a = e.currentTarget
-        if (a.buffered.length > 0) setBufferedEnd(a.buffered.end(a.buffered.length - 1))
-      }}
       onEnded={handleEnded}
     />
   )
@@ -648,7 +529,9 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     return createPortal(
       <>
         {audioEl}
-        <div className={styles.playerBar}>{barContent}</div>
+        <div ref={engine.containerRef} data-player-root="true" className={styles.playerBar}>
+          {barContent}
+        </div>
         {completeModal}
       </>,
       document.body
@@ -663,7 +546,11 @@ const AsmrPlayer: React.FC<AsmrPlayerProps> = ({
     <>
       {audioEl}
       {completeModal}
-      <div className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}>
+      <div
+        ref={engine.containerRef}
+        data-player-root="true"
+        className={`${styles.npOverlay} ${!showControls ? styles.npOverlayControlsHidden : ''}`}
+      >
         <div
           className={`${styles.npStage} ${!showArt || !hasImages ? styles.npStageBlank : ''}`}
           onClick={() => setShowControls((v) => !v)}

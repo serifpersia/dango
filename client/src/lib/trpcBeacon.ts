@@ -26,12 +26,13 @@ export function trpcBeacon(path: string, input: unknown): void {
 }
 
 export async function trpcKeepalive(path: string, input: unknown): Promise<void> {
-  await fetch(batchUrl(path), {
+  const response = await fetch(batchUrl(path), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: batchBody(input),
     keepalive: true,
   })
+  if (!response.ok) throw new Error(`tRPC request failed (HTTP ${response.status})`)
 }
 
 export function clearDiscordPresence(sessionId: string | undefined): void {
