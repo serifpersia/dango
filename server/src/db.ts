@@ -123,9 +123,13 @@ export class DatabaseWrapper {
       return
     }
     try {
-      this.isClosed = true
-      this.statementCache.clear()
-      this.db.close()
+      try {
+        this.checkpoint()
+      } finally {
+        this.db.close()
+        this.isClosed = true
+        this.statementCache.clear()
+      }
       if (cb) cb(null)
     } catch (e) {
       logger.error({ err: e }, 'Error during database close')
