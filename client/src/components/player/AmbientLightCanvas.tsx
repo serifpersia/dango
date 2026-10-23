@@ -71,8 +71,10 @@ const AmbientLightCanvas: React.FC<AmbientLightCanvasProps> = ({
       last = 0
       raf = requestAnimationFrame(tick)
     }
+    const stop = () => cancelAnimationFrame(raf)
 
     video.addEventListener('play', start)
+    video.addEventListener('pause', stop)
     video.addEventListener('seeked', paint)
     video.addEventListener('loadeddata', paint)
     raf = requestAnimationFrame(tick)
@@ -80,6 +82,7 @@ const AmbientLightCanvas: React.FC<AmbientLightCanvasProps> = ({
       stopped = true
       cancelAnimationFrame(raf)
       video.removeEventListener('play', start)
+      video.removeEventListener('pause', stop)
       video.removeEventListener('seeked', paint)
       video.removeEventListener('loadeddata', paint)
     }

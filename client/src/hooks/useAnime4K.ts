@@ -205,14 +205,22 @@ export default function useAnime4K({
         const { ModeA, ModeB, ModeC, ModeAA } = await import(
           /* @vitePreload: false */ 'anime4k-webgpu-async'
         )
+        if (cancelled || generationRef.current !== generation) return
         if (!navigator.gpu) throw new Error('WebGPU not available')
         const adapter = await navigator.gpu.requestAdapter()
+        if (cancelled || generationRef.current !== generation) return
         if (!adapter) throw new Error('No GPU adapter found')
         const device = await adapter.requestDevice()
         if (!device) throw new Error('Failed to get GPU device')
+        if (cancelled || generationRef.current !== generation) {
+          device.destroy()
+          return
+        }
+        deviceRef.current = device
 
         const context = canvas.getContext('webgpu')
         if (!context) throw new Error('Failed to get WebGPU context')
+        contextRef.current = context
 
         const format = navigator.gpu.getPreferredCanvasFormat()
         context.configure({
@@ -356,14 +364,6 @@ export default function useAnime4K({
           blitRef.current = null
         }
 
-        if (generationRef.current !== generation) {
-          inputTexture.destroy()
-          device.destroy()
-          return
-        }
-
-        deviceRef.current = device
-        contextRef.current = context
         pipelineRef.current = pipeline
         inputTextureRef.current = inputTexture
         outputTextureRef.current = outputTexture
@@ -604,6 +604,10 @@ export default function useAnime4K({
         schedule()
       } catch (err) {
         if (!cancelled && generationRef.current === generation) {
+          contextRef.current?.unconfigure()
+          deviceRef.current?.destroy()
+          deviceRef.current = null
+          contextRef.current = null
           setError(err instanceof Error ? err.message : 'Failed to initialize upscaler')
           setIsInitializing(false)
           setIsEnabled(false)
@@ -618,6 +622,7 @@ export default function useAnime4K({
       generationRef.current += 1
       cancelScheduled()
       flushDelayQueue()
+      contextRef.current?.unconfigure()
       if (inputTextureRef.current) {
         inputTextureRef.current.destroy()
         inputTextureRef.current = null
