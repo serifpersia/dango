@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { mangaCoverSrc } from '../hooks/useManga'
 import {
   isMangaAdult,
   resolveMangaTitle,
@@ -6,6 +7,26 @@ import {
   parseSyntheticChapterId,
   findChapterByNumber,
 } from './manga'
+
+describe('mangaCoverSrc', () => {
+  it.each([
+    ['mangadex', 'https://uploads.mangadex.org/covers/id/cover.jpg', 'https://mangadex.org/'],
+    ['mangapill', 'https://cdn.example.com/cover.jpg', 'https://www.mangapill.com/'],
+  ])('proxies %s covers with their provider Referer', (provider, cover, referer) => {
+    const result = new URL(mangaCoverSrc(provider, cover), 'http://192.168.1.20:3000')
+    expect(result.origin).toBe('http://192.168.1.20:3000')
+    expect(result.pathname).toBe('/api/proxy')
+    expect(result.searchParams.get('url')).toBe(cover)
+    expect(result.searchParams.get('referer')).toBe(referer)
+  })
+
+  it('leaves empty and unrelated provider covers unchanged', () => {
+    expect(mangaCoverSrc('mangadex', '')).toBe('')
+    expect(mangaCoverSrc('other', 'https://example.com/cover.jpg')).toBe(
+      'https://example.com/cover.jpg'
+    )
+  })
+})
 
 describe('isMangaAdult', () => {
   it('flags erotica and pornographic ratings', () => {

@@ -58,7 +58,7 @@ export const mangaPageSrc = (provider: MangaProviderName, url: string) =>
 
 export const mangaCoverSrc = (provider: MangaProviderName, url: string) => {
   if (!url) return url
-  if (provider === 'mangapill') return mangaPageSrc(provider, url)
+  if (provider === 'mangapill' || provider === 'mangadex') return mangaPageSrc(provider, url)
   return url
 }
 

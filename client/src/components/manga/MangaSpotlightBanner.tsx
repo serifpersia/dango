@@ -15,7 +15,6 @@ const MangaSpotlightBanner: React.FC<MangaSpotlightBannerProps> = ({ mangaList }
     () =>
       mangaList.slice(0, 6).map((manga) => {
         const link = `/manga/${manga.provider || 'mangadex'}/${manga.id}`
-        // mangapill covers are hotlink protected - go through the proxy
         const cover = mangaCoverSrc(manga.provider || 'mangadex', manga.cover || '')
         return {
           key: `${manga.provider}-${manga.id}`,
