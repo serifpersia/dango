@@ -25,6 +25,9 @@
   --color-info-text: #ffffff;
   --badge-info-bg: var(--accent);
   --badge-info-text: var(--accent-text);
+  --palette-gold: #d8b56b;
+  --palette-silver: #c3c9d1;
+  --palette-bronze: #c08d5f;
 
   /* ===== COLOR: BLUE ===== */
   --secondary-h: 180;

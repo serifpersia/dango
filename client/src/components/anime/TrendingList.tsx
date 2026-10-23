@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import Icon from '../common/Icon'
+import SectionSelect from '../common/SectionSelect'
 import ErrorMessage from '../common/ErrorMessage'
 import AnimeCard from './AnimeCard'
 import { useInfiniteTrendingList } from '../../hooks/useAnimeData'
@@ -76,17 +77,13 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
         </div>
 
         <div className={styles['header-actions']}>
-          <select
-            className={styles.timeSelect}
+          <SectionSelect
+            ariaLabel="Trending sort"
+            width={120}
             value={sort}
-            onChange={(e) => setSort(e.currentTarget.value)}
-          >
-            {sortOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={sortOptions}
+            onChange={setSort}
+          />
         </div>
       </div>
 

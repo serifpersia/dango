@@ -76,37 +76,6 @@
   }
 }
 
-/* ===== TIMEFRAME SELECT ===== */
-.timeSelect {
-  width: 120px;
-  height: 34px;
-  padding: 0 var(--space-3);
-  padding-right: 2rem;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  transition: all var(--transition-base);
-}
-
-.timeSelect:hover {
-  border-color: var(--border-secondary);
-  background-color: var(--bg-elevated);
-}
-
-.timeSelect:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 /* ===== CAROUSEL ===== */
 .carouselContainer {
   position: relative;
@@ -177,15 +146,15 @@
 }
 
 .rankPill.rankGold {
-  color: #d8b56b;
+  color: var(--palette-gold);
 }
 
 .rankPill.rankSilver {
-  color: #c3c9d1;
+  color: var(--palette-silver);
 }
 
 .rankPill.rankBronze {
-  color: #c08d5f;
+  color: var(--palette-bronze);
 }
 
 @media (max-width: 768px) {

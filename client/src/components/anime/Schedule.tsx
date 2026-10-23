@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Icon from '../common/Icon'
+import SectionSelect from '../common/SectionSelect'
 import { useQuery } from '@tanstack/react-query'
 import { trpcClient } from '../../lib/trpc'
 import AnimeCard from './AnimeCard'
@@ -138,17 +139,13 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
         </div>
 
         <div className={styles.headerActions}>
-          <select
-            className={styles.timeSelect}
+          <SectionSelect
+            ariaLabel="Schedule format"
+            width={120}
             value={format}
-            onChange={(e) => setFormat(e.currentTarget.value)}
-          >
-            {formatOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={formatOptions}
+            onChange={setFormat}
+          />
         </div>
       </div>
 
@@ -160,6 +157,7 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
                 key={dayButton.dateString}
                 type="button"
                 data-date={dayButton.dateString}
+                aria-pressed={selectedDate === dayButton.dateString}
                 className={`${styles.dayBtn} ${
                   selectedDate === dayButton.dateString ? styles.active : ''
                 }`}

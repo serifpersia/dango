@@ -1,4 +1,5 @@
 import React from 'react'
+import Icon from './Icon'
 import styles from './SectionSelect.module.css'
 
 interface SectionSelectOption {
@@ -22,19 +23,22 @@ const SectionSelect: React.FC<SectionSelectProps> = ({
   width,
 }) => {
   return (
-    <select
-      className={styles.select}
-      style={width !== undefined ? { width } : undefined}
-      value={value}
-      aria-label={ariaLabel}
-      onChange={(e) => onChange(e.currentTarget.value)}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <span className={styles.wrapper}>
+      <select
+        className={styles.select}
+        style={width !== undefined ? { width } : undefined}
+        value={value}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.currentTarget.value)}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <Icon name="chevron-down" size={12} className={styles.arrow} />
+    </span>
   )
 }
 
