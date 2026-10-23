@@ -1,4 +1,5 @@
 import { emitAuthRequired } from './auth-bus'
+import toast from 'react-hot-toast'
 
 const sleep = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {
@@ -30,8 +31,16 @@ export const fetchWithLocalHeaders = async (
       new URL(target, window.location.origin).origin === window.location.origin)
 
   if (isLocalEndpoint) {
-    const animepaheUa = localStorage.getItem('animepahe_ua')
-    const animepaheCookie = localStorage.getItem('animepahe_cookie')
+    let animepaheUa = localStorage.getItem('animepahe_ua')
+    let animepaheCookie = localStorage.getItem('animepahe_cookie')
+    if (animepaheCookie && animepaheUa && animepaheUa !== navigator.userAgent) {
+      localStorage.removeItem('animepahe_cookie')
+      localStorage.removeItem('animepahe_ua')
+      animepaheCookie = null
+      animepaheUa = null
+      toast.error('Your browser changed. Verify AnimePahe again to refresh its cookie.')
+      emitAuthRequired('animepahe')
+    }
     const jasmrUa = localStorage.getItem('jasmr_ua')
     const jasmrCookie = localStorage.getItem('jasmr_cookie')
 

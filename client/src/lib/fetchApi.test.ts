@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchWithLocalHeaders } from './fetchApi'
+import { subscribeAuthRequired } from './auth-bus'
+import toast from 'react-hot-toast'
+
+vi.mock('react-hot-toast', () => ({ default: { error: vi.fn() } }))
 
 const notReady = () =>
   new Response('Database initializing...', {
@@ -74,7 +78,9 @@ describe('fetchWithLocalHeaders', () => {
 
   it('preserves Headers overrides and does not send local credentials to another origin', async () => {
     vi.stubGlobal('window', { location: { origin: 'https://dango.example' } })
-    vi.stubGlobal('localStorage', { getItem: () => 'secret' })
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (key === 'animepahe_ua' ? navigator.userAgent : 'secret'),
+    })
     const fetch = vi.fn().mockImplementation(async () => new Response('ok'))
     vi.stubGlobal('fetch', fetch)
     await fetchWithLocalHeaders('/api/health', {
@@ -85,5 +91,32 @@ describe('fetchWithLocalHeaders', () => {
     expect(fetch.mock.calls[1][1].headers.has('x-animepahe-cookie')).toBe(false)
     await fetchWithLocalHeaders('//external.example/api/health')
     expect(fetch.mock.calls[2][1].headers.has('x-animepahe-cookie')).toBe(false)
+  })
+
+  it('invalidates stale browser credentials once and requests verification', async () => {
+    const values = new Map([
+      ['animepahe_ua', 'old-browser'],
+      ['animepahe_cookie', 'old-cookie'],
+    ])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+    })
+    const fetch = vi.fn().mockImplementation(async () => new Response('ok'))
+    vi.stubGlobal('fetch', fetch)
+    const onAuth = vi.fn()
+    const unsubscribe = subscribeAuthRequired('animepahe', onAuth)
+    vi.mocked(toast.error).mockClear()
+    try {
+      await fetchWithLocalHeaders('/api/providers')
+      await fetchWithLocalHeaders('/api/providers')
+      expect(values.size).toBe(0)
+      expect(onAuth).toHaveBeenCalledOnce()
+      expect(toast.error).toHaveBeenCalledOnce()
+      expect(fetch.mock.calls[0][1].headers.has('x-animepahe-cookie')).toBe(false)
+      expect(fetch.mock.calls[0][1].headers.has('x-animepahe-ua')).toBe(false)
+    } finally {
+      unsubscribe()
+    }
   })
 })

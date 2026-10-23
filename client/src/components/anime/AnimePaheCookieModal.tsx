@@ -65,7 +65,6 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
   }, [])
 
   const handleStartVerification = () => {
-    localStorage.setItem('animepahe_ua', userAgent)
     window.open('https://animepahe.pw', '_blank', 'noopener,noreferrer')
     setStep(2)
   }
@@ -116,6 +115,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
     }
 
     try {
+      localStorage.setItem('animepahe_ua', userAgent)
       localStorage.setItem('animepahe_cookie', trimmed)
       toast.success('Cookie updated successfully! Reloading…')
       onSuccess?.()
