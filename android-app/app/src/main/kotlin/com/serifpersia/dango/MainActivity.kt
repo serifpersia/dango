@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.io.File
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -240,7 +241,7 @@ class MainActivity : AppCompatActivity() {
                 if (result.resultCode != RESULT_OK || result.data?.data == null || downloadUrl == null) {
                     return@registerForActivityResult
                 }
-                saveDownloadToUri(downloadUrl, result.data!!.data!!)
+                saveDownloadToUri(downloadUrl, result.data!!.data!!, pendingDownloadFileName)
             }
 
         swipeRefreshLayout.setColorSchemeColors(0xFF8B5CF6.toInt())
@@ -566,7 +567,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveDownloadToUri(downloadUrl: String, destinationUri: Uri) {
+    private fun saveDownloadToUri(downloadUrl: String, destinationUri: Uri, fileName: String) {
         val userAgent = try {
             webView.settings.userAgentString
         } catch (_: Exception) {
@@ -575,6 +576,7 @@ class MainActivity : AppCompatActivity() {
         scope.launch {
             val saved = withContext(Dispatchers.IO) {
                 var conn: HttpURLConnection? = null
+                var tempFile: File? = null
                 try {
                     conn = URL(downloadUrl).openConnection() as HttpURLConnection
                     conn.connectTimeout = 15000
@@ -598,9 +600,26 @@ class MainActivity : AppCompatActivity() {
                         Log.w(TAG, "Download failed: HTTP ${conn.responseCode} for $downloadUrl")
                         return@withContext false
                     }
-                    conn.inputStream.use { input ->
-                        contentResolver.openOutputStream(destinationUri)?.use { output ->
-                            input.copyTo(output)
+                    val download = File.createTempFile("dango-export-", ".tmp", cacheDir)
+                    tempFile = download
+                    val downloadedBytes = conn.inputStream.use { input ->
+                        download.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    check(downloadedBytes > 0) { "Empty export" }
+                    val expectedBytes = conn.contentLengthLong
+                    check(expectedBytes < 0 || downloadedBytes == expectedBytes) { "Incomplete export" }
+                    if (fileName.endsWith(".db", ignoreCase = true)) {
+                        val header = ByteArray(16)
+                        download.inputStream().use { input ->
+                            check(input.read(header) == header.size &&
+                                header.contentEquals("SQLite format 3\u0000".toByteArray(Charsets.US_ASCII))) {
+                                "Invalid SQLite export"
+                            }
+                        }
+                    }
+                    download.inputStream().use { input ->
+                        contentResolver.openOutputStream(destinationUri, "wt")?.use { output ->
+                            check(input.copyTo(output) == downloadedBytes) { "Incomplete export copy" }
                             true
                         } ?: false
                     }
@@ -608,6 +627,7 @@ class MainActivity : AppCompatActivity() {
                     Log.w(TAG, "Download failed for $downloadUrl: ${e.message}")
                     false
                 } finally {
+                    tempFile?.delete()
                     try {
                         conn?.disconnect()
                     } catch (_: Exception) {
