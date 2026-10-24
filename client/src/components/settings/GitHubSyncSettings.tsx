@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { profileQuery } from '../../hooks/useProfile'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
@@ -30,6 +32,7 @@ interface GitHubStatus {
 }
 
 const GitHubSyncSettings: React.FC = () => {
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
@@ -76,6 +79,7 @@ const GitHubSyncSettings: React.FC = () => {
 
       if (nextDevice.status === 'success') {
         stopPolling()
+        await queryClient.invalidateQueries({ queryKey: profileQuery.queryKey })
         await fetchStatus()
         setStatusModal({
           show: true,
@@ -140,6 +144,7 @@ const GitHubSyncSettings: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await trpcClient.auth.githubLogout.mutate()
+      await queryClient.invalidateQueries({ queryKey: profileQuery.queryKey })
       setAuthenticated(false)
       setUser(null)
       setDevice({ status: 'idle' })

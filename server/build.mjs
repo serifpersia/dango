@@ -21,7 +21,11 @@ await build({
 })
 
 await build({
-  entryPoints: [join(root, 'src', 'shipped-defaults.ts'), join(root, 'src', 'config.ts')],
+  entryPoints: [
+    join(root, 'src', 'shipped-defaults.ts'),
+    join(root, 'src', 'config.ts'),
+    join(root, 'src', 'profile-scope.ts'),
+  ],
   outdir: join(root, 'dist'),
   outbase: join(root, 'src'),
   platform: 'node',

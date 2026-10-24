@@ -1,9 +1,8 @@
 import fs from 'fs'
-import { CONFIG } from '../config.js'
+import { CONFIG, INSTALL_CONFIG } from '../config.js'
+import { profileScope } from '../profile-scope.js'
 
-const lockPath = `${CONFIG.ENV_PATH}.lock`
-
-async function acquireLock(): Promise<fs.promises.FileHandle> {
+async function acquireLock(lockPath: string): Promise<fs.promises.FileHandle> {
   let handle: fs.promises.FileHandle | undefined
   let attempts = 0
   while (!handle) {
@@ -20,16 +19,21 @@ async function acquireLock(): Promise<fs.promises.FileHandle> {
   return handle
 }
 
-function releaseLock(handle: fs.promises.FileHandle) {
+function releaseLock(handle: fs.promises.FileHandle, lockPath: string) {
   handle.close().catch(() => {})
   fs.promises.unlink(lockPath).catch(() => {})
 }
 
 export async function updateEnvFile(updates: Record<string, string>) {
-  const lockHandle = await acquireLock()
+  if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
+  const installation = Object.keys(updates).some((key) =>
+    ['PORT', 'APP_PASSWORD_HASH', 'DISCORD_GATEWAY_TOKEN'].includes(key)
+  )
+  const envPath = installation ? INSTALL_CONFIG.ENV_PATH : CONFIG.ENV_PATH
+  const lockPath = `${envPath}.lock`
+  const lockHandle = await acquireLock(lockPath)
   try {
-    const envPath = CONFIG.ENV_PATH
-
+    if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
     let envContent = ''
     if (fs.existsSync(envPath)) {
       envContent = fs.readFileSync(envPath, 'utf8')
@@ -72,6 +76,11 @@ export async function updateEnvFile(updates: Record<string, string>) {
     fs.writeFileSync(envPath, finalContent)
 
     Object.entries(updates).forEach(([key, value]) => {
+      const scope = profileScope.getStore()
+      if (scope && !installation) {
+        scope.env[key] = value || undefined
+        return
+      }
       if (value === '') {
         delete process.env[key]
       } else {
@@ -79,6 +88,6 @@ export async function updateEnvFile(updates: Record<string, string>) {
       }
     })
   } finally {
-    releaseLock(lockHandle)
+    releaseLock(lockHandle, lockPath)
   }
 }

@@ -1,10 +1,11 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useCallback, useEffect, useState } from 'react'
 
 const MATURE_CONSENT_KEY = 'agreedToViewMature'
 
 function readConsent(): boolean {
   try {
-    return localStorage.getItem(MATURE_CONSENT_KEY) === 'true'
+    return profileStorage.getItem(MATURE_CONSENT_KEY) === 'true'
   } catch {
     return false
   }
@@ -23,8 +24,8 @@ function sync() {
 
 function write(consented: boolean) {
   try {
-    if (consented) localStorage.setItem(MATURE_CONSENT_KEY, 'true')
-    else localStorage.removeItem(MATURE_CONSENT_KEY)
+    if (consented) profileStorage.setItem(MATURE_CONSENT_KEY, 'true')
+    else profileStorage.removeItem(MATURE_CONSENT_KEY)
   } catch {
     // ignore
   }

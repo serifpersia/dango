@@ -1,9 +1,10 @@
+import { profileStorage } from '../lib/profileStorage'
 import React, { useCallback, useEffect, useState } from 'react'
 
 export function useTheaterMode() {
   const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('playerTheaterMode') === 'true'
+      return profileStorage.getItem('playerTheaterMode') === 'true'
     } catch {
       return false
     }
@@ -32,7 +33,7 @@ export function useTheaterMode() {
     setIsTheaterMode((prev) => {
       const next = !prev
       try {
-        localStorage.setItem('playerTheaterMode', next.toString())
+        profileStorage.setItem('playerTheaterMode', next.toString())
       } catch {
         // ignore
       }
@@ -45,7 +46,7 @@ export function useTheaterMode() {
       if (isTheaterMode && e.target === e.currentTarget) {
         setIsTheaterMode(false)
         try {
-          localStorage.setItem('playerTheaterMode', 'false')
+          profileStorage.setItem('playerTheaterMode', 'false')
         } catch {
           // ignore
         }

@@ -1,3 +1,7 @@
+import ProfileSettings from '../components/settings/ProfileSettings'
+import { profileQuery } from '../hooks/useProfile'
+import { useQuery } from '@tanstack/react-query'
+import { profileStorage } from '../lib/profileStorage'
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router'
 import { Button } from '../components/common/Button'
@@ -40,6 +44,7 @@ const LIST_TAB_LABELS = {
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
 const Settings: React.FC = () => {
+  const { data: profile } = useQuery(profileQuery)
   const [searchParams, setSearchParams] = useSearchParams()
   const { contentType } = useContentType()
   const initialTab = searchParams.get('tab') as SettingsTab | null
@@ -75,6 +80,7 @@ const Settings: React.FC = () => {
   } | null>(null)
 
   useEffect(() => {
+    if (!profile?.owner) return
     trpcClient.discord.gatewayStatus
       .query()
       .then((data) => {
@@ -84,7 +90,7 @@ const Settings: React.FC = () => {
         }
       })
       .catch(() => {})
-  }, [])
+  }, [profile?.owner])
 
   useEffect(() => {
     if (discordSetting !== undefined) {
@@ -127,7 +133,7 @@ const Settings: React.FC = () => {
 
   const toggleVirtualKeyboard = (enabled: boolean) => {
     setVirtualKeyboardEnabled(enabled)
-    localStorage.setItem(VIRTUAL_KEYBOARD_ENABLED_KEY, String(enabled))
+    profileStorage.setItem(VIRTUAL_KEYBOARD_ENABLED_KEY, String(enabled))
     window.dispatchEvent(new CustomEvent(VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT))
   }
 
@@ -257,6 +263,7 @@ const Settings: React.FC = () => {
       case 'general':
         return (
           <div className={styles.tabContent}>
+            <ProfileSettings />
             <div className={sharedStyles.sectionCard}>
               <h3>Appearance & Preferences</h3>
               <p>Configure how titles are displayed and other general preferences.</p>
@@ -334,37 +341,35 @@ const Settings: React.FC = () => {
                 </div>
               </div>
 
-              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div className={sharedStyles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Discord Rich Presence</h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Show your current anime and watch progress on your Discord profile status.
-                    </p>
+              {profile?.owner && (
+                <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                  <div className={sharedStyles.settingRow}>
+                    <div style={{ minWidth: 0 }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Discord Rich Presence</h4>
+                      <p
+                        style={{
+                          margin: '0.25rem 0 0',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        Show your current anime and watch progress on your Discord profile status.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      isChecked={discordEnabled}
+                      onChange={(e) => toggleDiscord(e.currentTarget.checked)}
+                      id="discord-rpc-enabled"
+                    />
                   </div>
-                  <ToggleSwitch
-                    isChecked={discordEnabled}
-                    onChange={(e) => toggleDiscord(e.currentTarget.checked)}
-                    id="discord-rpc-enabled"
-                  />
                 </div>
-              </div>
+              )}
 
-              <div style={{ marginTop: '2rem' }}>
-                <LanAuthSettings />
-              </div>
+              <div style={{ marginTop: '2rem' }}>{profile?.owner && <LanAuthSettings />}</div>
 
-              <div style={{ marginTop: '2rem' }}>
-                <ServerPortSettings />
-              </div>
+              <div style={{ marginTop: '2rem' }}>{profile?.owner && <ServerPortSettings />}</div>
 
-              {discordEnabled && (
+              {profile?.owner && discordEnabled && (
                 <div className={styles.settingItem} style={{ marginTop: '1rem' }}>
                   <div className={sharedStyles.settingRow}>
                     <div style={{ minWidth: 0 }}>
@@ -388,120 +393,122 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              <div
-                className={styles.settingItem}
-                style={{
-                  marginTop: '1.5rem',
-                  background: 'var(--bg-tertiary)',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                }}
-              >
-                <div className={sharedStyles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>
-                      Discord Mobile Presence (Gateway)
-                    </h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0.75rem',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Paste your Discord authentication token to enable presence on mobile devices.
-                      If no token is saved, the default desktop Rich Presence is used. The token is
-                      stored locally in your configuration and never shared.
-                    </p>
-                  </div>
-                </div>
-
-                <Alert variant="warning" style={{ marginTop: '1.25rem', paddingTop: '1.25rem' }}>
-                  <strong>Use at your own risk.</strong> This feature uses the Discord Gateway API
-                  with your user token, which violates Discord's Terms of Service. Discord may
-                  detect this usage and take action against your account, including phone number
-                  locks, temporary suspensions, or permanent bans. While the risk is generally low,
-                  it is not zero. Only use this if you understand and accept the risks.
-                </Alert>
-
+              {profile?.owner && (
                 <div
+                  className={styles.settingItem}
                   style={{
-                    marginTop: '0.75rem',
-                    display: 'flex',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
+                    marginTop: '1.5rem',
+                    background: 'var(--bg-tertiary)',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
                   }}
                 >
-                  <input
-                    type="password"
-                    value={discordGatewayToken}
-                    onChange={(e) => setDiscordGatewayToken(e.currentTarget.value)}
-                    placeholder="Paste Discord token here..."
+                  <div className={sharedStyles.settingRow}>
+                    <div style={{ minWidth: 0 }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>
+                        Discord Mobile Presence (Gateway)
+                      </h4>
+                      <p
+                        style={{
+                          margin: '0.25rem 0 0.75rem',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        Paste your Discord authentication token to enable presence on mobile
+                        devices. If no token is saved, the default desktop Rich Presence is used.
+                        The token is stored locally in your configuration and never shared.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert variant="warning" style={{ marginTop: '1.25rem', paddingTop: '1.25rem' }}>
+                    <strong>Use at your own risk.</strong> This feature uses the Discord Gateway API
+                    with your user token, which violates Discord's Terms of Service. Discord may
+                    detect this usage and take action against your account, including phone number
+                    locks, temporary suspensions, or permanent bans. While the risk is generally
+                    low, it is not zero. Only use this if you understand and accept the risks.
+                  </Alert>
+
+                  <div
                     style={{
-                      flex: '1 1 200px',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                      fontFamily: 'monospace',
-                      minWidth: 0,
-                    }}
-                  />
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const data = await trpcClient.discord.gatewaySave.mutate({
-                          token: discordGatewayToken,
-                        })
-                        setDiscordGatewayStatus({
-                          hasToken: true,
-                          masked: data.masked,
-                          enabled: true,
-                        })
-                        setDiscordGatewayToken(data.masked)
-                      } catch (e) {
-                        alert(e instanceof Error ? e.message : 'Failed to save token')
-                      }
+                      marginTop: '0.75rem',
+                      display: 'flex',
+                      gap: '0.5rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
                     }}
                   >
-                    Save
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={async () => {
-                      await trpcClient.discord.gatewayRemove.mutate().catch(() => {})
-                      setDiscordGatewayToken('')
-                      setDiscordGatewayStatus({ hasToken: false, masked: null, enabled: false })
-                    }}
-                  >
-                    Remove
-                  </Button>
+                    <input
+                      type="password"
+                      value={discordGatewayToken}
+                      onChange={(e) => setDiscordGatewayToken(e.currentTarget.value)}
+                      placeholder="Paste Discord token here..."
+                      style={{
+                        flex: '1 1 200px',
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'monospace',
+                        minWidth: 0,
+                      }}
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const data = await trpcClient.discord.gatewaySave.mutate({
+                            token: discordGatewayToken,
+                          })
+                          setDiscordGatewayStatus({
+                            hasToken: true,
+                            masked: data.masked,
+                            enabled: true,
+                          })
+                          setDiscordGatewayToken(data.masked)
+                        } catch (e) {
+                          alert(e instanceof Error ? e.message : 'Failed to save token')
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        await trpcClient.discord.gatewayRemove.mutate().catch(() => {})
+                        setDiscordGatewayToken('')
+                        setDiscordGatewayStatus({ hasToken: false, masked: null, enabled: false })
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+
+                  {discordGatewayStatus && (
+                    <p
+                      style={{
+                        marginTop: '0.5rem',
+                        fontSize: '0.8rem',
+                        color: discordGatewayStatus.hasToken ? 'green' : 'var(--text-secondary)',
+                      }}
+                    >
+                      Status:{' '}
+                      {discordGatewayStatus.hasToken
+                        ? `Token saved (${discordGatewayStatus.masked})`
+                        : 'No token saved'}
+                      {discordGatewayStatus.enabled ? ' - Gateway active' : ''}
+                    </p>
+                  )}
+
+                  {profile?.owner && <DiscordTokenBookmarklet />}
                 </div>
-
-                {discordGatewayStatus && (
-                  <p
-                    style={{
-                      marginTop: '0.5rem',
-                      fontSize: '0.8rem',
-                      color: discordGatewayStatus.hasToken ? 'green' : 'var(--text-secondary)',
-                    }}
-                  >
-                    Status:{' '}
-                    {discordGatewayStatus.hasToken
-                      ? `Token saved (${discordGatewayStatus.masked})`
-                      : 'No token saved'}
-                    {discordGatewayStatus.enabled ? ' - Gateway active' : ''}
-                  </p>
-                )}
-
-                <DiscordTokenBookmarklet />
-              </div>
+              )}
 
               {hasMatureConsent && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
@@ -541,7 +548,7 @@ const Settings: React.FC = () => {
             <SyncProviderSelector />
             <GitHubSyncSettings />
             <GoogleAuthSettings />
-            <RcloneSettings />
+            {profile?.owner && <RcloneSettings />}
           </div>
         )
       case 'watchlist':
@@ -580,7 +587,7 @@ const Settings: React.FC = () => {
               />
               {statusMessage && <p className={styles.status}>{statusMessage}</p>}
             </div>
-            <OfflineDbSettings />
+            {profile?.owner && <OfflineDbSettings />}
             <ClearDatabaseSettings />
           </div>
         )

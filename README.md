@@ -28,6 +28,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 - **Trackers & Sync:** Bi-directional AniList and MyAnimeList sync for anime and manga, plus username and XML list imports.
 - **Expanded Media Hub:** Dedicated interfaces for Manga, ASMR, and TV/Movies.
 - **LAN Security:** Optional LAN authentication with password enforcement for multi-device local network deployments.
+- **[Profiles](docs/profiles.md):** Separate libraries, tracker/cloud connections and preferences, with optional profile passwords and custom images.
 
 ---
 

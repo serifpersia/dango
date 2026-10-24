@@ -8,7 +8,7 @@ import { LegacyIdMappingRepository } from '../repositories/legacy-id-mapping.rep
 import { rewriteShowId } from '../repositories/show-id.repository.js'
 import logger from '../logger.js'
 
-const inFlightMigrations = new Map<string, Promise<string>>()
+const migrationsByDb = new WeakMap<DatabaseWrapper, Map<string, Promise<string>>>()
 
 async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): Promise<string> {
   const anilistId = await ShowsMetaRepository.getAnilistId(db, numericId)
@@ -164,6 +164,11 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
 }
 
 export function getMigratedId(db: DatabaseWrapper, legacyId: string): Promise<string> {
+  let inFlightMigrations = migrationsByDb.get(db)
+  if (!inFlightMigrations) {
+    inFlightMigrations = new Map()
+    migrationsByDb.set(db, inFlightMigrations)
+  }
   if (isTempShowId(legacyId)) return Promise.resolve(legacyId)
 
   if (/^(mal-\d+|-\d+)$/i.test(legacyId)) {

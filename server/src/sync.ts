@@ -1,10 +1,11 @@
+import { profileService, profileEnv, profileScope } from './profile-scope.js'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import logger from './logger.js'
-import { googleDriveService } from './google.js'
-import { rcloneService } from './rclone.js'
-import { githubSyncService } from './github-sync.js'
+import { getGoogleDriveService } from './google.js'
+import { getRcloneService } from './rclone.js'
+import { getGitHubSyncService } from './github-sync.js'
 import { CONFIG } from './config.js'
 import { DatabaseWrapper } from './db.js'
 import { getLocalManifestVersion, setLocalManifestVersion } from './db/transaction.js'
@@ -32,22 +33,30 @@ export interface KindSyncDef {
 export const KIND_SYNC: Record<MediaKind, KindSyncDef> = {
   anime: {
     rcloneLabel: 'rclone',
-    manifestPath: CONFIG.LOCAL_MANIFEST_PATH,
+    get manifestPath() {
+      return CONFIG.LOCAL_MANIFEST_PATH
+    },
     rcloneFile: CONFIG.RCLONE_SYNC_FILENAME,
   },
   manga: {
     rcloneLabel: 'rclone manga',
-    manifestPath: CONFIG.MANGA_LOCAL_MANIFEST_PATH,
+    get manifestPath() {
+      return CONFIG.MANGA_LOCAL_MANIFEST_PATH
+    },
     rcloneFile: CONFIG.MANGA_RCLONE_SYNC_FILENAME,
   },
   tv: {
     rcloneLabel: 'rclone tv',
-    manifestPath: CONFIG.TV_LOCAL_MANIFEST_PATH,
+    get manifestPath() {
+      return CONFIG.TV_LOCAL_MANIFEST_PATH
+    },
     rcloneFile: CONFIG.TV_RCLONE_SYNC_FILENAME,
   },
   asmr: {
     rcloneLabel: 'rclone asmr',
-    manifestPath: CONFIG.ASMR_LOCAL_MANIFEST_PATH,
+    get manifestPath() {
+      return CONFIG.ASMR_LOCAL_MANIFEST_PATH
+    },
     rcloneFile: CONFIG.ASMR_RCLONE_SYNC_FILENAME,
   },
 }
@@ -60,11 +69,11 @@ async function getRcloneRemotePayloadVersion(
   remoteFolder: string,
   fileName: string
 ): Promise<number> {
-  const exists = await rcloneService.fileExists(remoteFolder, fileName)
+  const exists = await getRcloneService().fileExists(remoteFolder, fileName)
   if (!exists) return 0
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_sync.json`)
   try {
-    await rcloneService.downloadFile(remoteFolder, fileName, tempPath)
+    await getRcloneService().downloadFile(remoteFolder, fileName, tempPath)
     const content = await fs.readFile(tempPath, 'utf-8')
     const payload = JSON.parse(content) as SyncPayload<string>
     return readPayloadVersion(payload)
@@ -84,7 +93,7 @@ async function rcloneSyncUp(
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_${kind}_up.json`)
   try {
     await fs.writeFile(tempPath, JSON.stringify(payload, null, 2))
-    await rcloneService.uploadFile(tempPath, remoteFolder, KIND_SYNC[kind].rcloneFile)
+    await getRcloneService().uploadFile(tempPath, remoteFolder, KIND_SYNC[kind].rcloneFile)
   } finally {
     if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {})
   }
@@ -98,7 +107,7 @@ async function rcloneSyncDown(
   const config = SYNC_KINDS[kind]
   const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_rclone_${kind}_down.json`)
   try {
-    await rcloneService.downloadFile(remoteFolder, KIND_SYNC[kind].rcloneFile, tempPath)
+    await getRcloneService().downloadFile(remoteFolder, KIND_SYNC[kind].rcloneFile, tempPath)
     const content = await fs.readFile(tempPath, 'utf-8')
     const payload = normalizePayload(
       JSON.parse(content),
@@ -118,7 +127,7 @@ async function rcloneSyncDown(
 const rcloneBackend: SyncBackend = {
   name: 'rclone',
   label: 'Rclone',
-  isAuthenticated: () => rcloneService.isActive(),
+  isAuthenticated: () => getRcloneService().isActive(),
   version: (kind, { remoteFolder }) =>
     getRcloneRemotePayloadVersion(remoteFolder, KIND_SYNC[kind].rcloneFile),
   up: (kind, db, { remoteFolder }) => rcloneSyncUp(db, kind, remoteFolder),
@@ -147,25 +156,25 @@ class Mutex {
   }
 }
 
-const syncMutexes = {} as Record<MediaKind, Mutex>
-const isSyncingMap = {} as Record<MediaKind, boolean>
-for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
-  syncMutexes[kind] = new Mutex()
-  isSyncingMap[kind] = false
-}
-
-let activeProvider: 'github' | 'google' | 'rclone' | 'none' = 'none'
+const syncState = profileService(() => ({
+  syncMutexes: Object.fromEntries(
+    Object.keys(KIND_SYNC).map((kind) => [kind, new Mutex()])
+  ) as Record<MediaKind, Mutex>,
+  isSyncingMap: {} as Record<MediaKind, boolean>,
+  activeProvider: 'none' as 'github' | 'google' | 'rclone' | 'none',
+}))
 
 function activeBackend(): SyncBackend | null {
-  if (activeProvider === 'github') return githubSyncService
-  if (activeProvider === 'google') return googleDriveService
-  if (activeProvider === 'rclone') return rcloneBackend
+  if (profileScope.getStore()?.deleted) return null
+  if (syncState().activeProvider === 'github') return getGitHubSyncService()
+  if (syncState().activeProvider === 'google') return getGoogleDriveService()
+  if (syncState().activeProvider === 'rclone') return rcloneBackend
   return null
 }
 
 export async function waitForSync(): Promise<void> {
   await Promise.all(
-    (Object.values(syncMutexes) as Mutex[]).map(async (m) => {
+    (Object.values(syncState().syncMutexes) as Mutex[]).map(async (m) => {
       await m.lock()
       m.unlock()
     })
@@ -173,62 +182,83 @@ export async function waitForSync(): Promise<void> {
 }
 
 export function getActiveProvider() {
-  return activeProvider
+  return syncState().activeProvider
+}
+
+async function selectProvider(provider: 'github' | 'google' | 'rclone' | 'none') {
+  syncState().activeProvider = 'none'
+  if (provider === 'github' || provider === 'google') {
+    const account =
+      provider === 'github'
+        ? (await getGitHubSyncService().getUserProfile())?.login
+        : (await getGoogleDriveService().getUserProfile())?.id
+    if (!account) throw new Error('Could not verify cloud account. Reconnect and try again.')
+    try {
+      profileScope.getStore()?.claimCloud?.(provider, account)
+    } catch (error) {
+      if (provider === 'github') await getGitHubSyncService().logout()
+      else await getGoogleDriveService().logout()
+      throw error
+    }
+  }
+  syncState().activeProvider = provider
 }
 
 export async function initSyncProvider(
   preferred?: 'github' | 'google' | 'rclone' | 'none'
 ): Promise<void> {
+  if (profileScope.getStore()?.deleted) return
   const provider =
-    preferred || (process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined)
+    preferred ||
+    (profileEnv('SYNC_PROVIDER') as 'github' | 'google' | 'rclone' | 'none' | undefined)
 
-  if (provider === 'github' && githubSyncService.isAuthenticated()) {
-    activeProvider = 'github'
+  if (provider === 'github' && getGitHubSyncService().isAuthenticated()) {
+    await selectProvider('github')
     log.info('Sync Provider: GitHub (Selected)')
     return
   }
 
-  if (provider === 'google' && googleDriveService.isAuthenticated()) {
-    activeProvider = 'google'
+  if (provider === 'google' && getGoogleDriveService().isAuthenticated()) {
+    await selectProvider('google')
     log.info('Sync Provider: Google Drive API (Selected)')
     return
   }
 
   if (provider === 'rclone') {
-    const rcloneAvailable = await rcloneService.init()
+    const rcloneAvailable = await getRcloneService().init()
     if (rcloneAvailable) {
-      activeProvider = 'rclone'
-      log.info(`Sync Provider: Rclone (${rcloneService.getRemoteName()}) (Selected)`)
+      await selectProvider('rclone')
+      log.info(`Sync Provider: Rclone (${getRcloneService().getRemoteName()}) (Selected)`)
       return
     }
   }
 
   if (provider === 'none') {
-    activeProvider = 'none'
+    await selectProvider('none')
     log.info('Sync Provider: None (Forced)')
     return
   }
 
-  if (githubSyncService.isAuthenticated()) {
-    activeProvider = 'github'
+  if (getGitHubSyncService().isAuthenticated()) {
+    await selectProvider('github')
     log.info('Sync Provider: GitHub (Fallback)')
     return
   }
 
-  if (googleDriveService.isAuthenticated()) {
-    activeProvider = 'google'
+  if (getGoogleDriveService().isAuthenticated()) {
+    await selectProvider('google')
     log.info('Sync Provider: Google Drive API (Fallback)')
     return
   }
 
-  const rcloneAvailable = await rcloneService.init()
+  const rcloneAvailable = await getRcloneService().init()
   if (rcloneAvailable) {
-    activeProvider = 'rclone'
-    log.info(`Sync Provider: Rclone (${rcloneService.getRemoteName()}) (Fallback)`)
+    await selectProvider('rclone')
+    log.info(`Sync Provider: Rclone (${getRcloneService().getRemoteName()}) (Fallback)`)
     return
   }
 
-  activeProvider = 'none'
+  await selectProvider('none')
   log.info('No sync provider available.')
 }
 
@@ -277,16 +307,16 @@ export async function syncDownOnBoot(
   const backend = activeBackend()
   if (!backend) return -1
 
-  const mutex = syncMutexes[kind]
+  const mutex = syncState().syncMutexes[kind]
   await mutex.lock()
-  if (isSyncingMap[kind]) {
+  if (profileScope.getStore()?.deleted || syncState().isSyncingMap[kind]) {
     mutex.unlock()
     return -1
   }
-  isSyncingMap[kind] = true
+  syncState().isSyncingMap[kind] = true
 
   try {
-    notifySyncStart(`Initial ${withLabel(label, 'sync check')} (${activeProvider})`)
+    notifySyncStart(`Initial ${withLabel(label, 'sync check')} (${syncState().activeProvider})`)
     const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName, kind)
     notifySyncEnd()
 
@@ -298,6 +328,7 @@ export async function syncDownOnBoot(
       notifySyncStart(
         `Importing ${backend.label} ${withLabel(label, 'sync data')} (Remote v${remoteVersion})`
       )
+      if (profileScope.getStore()?.deleted) return -1
       const importedVersion = await backend.down(kind, db, { remoteFolder: remoteFolderName })
       await setKindManifestVersion(kind, importedVersion || remoteVersion)
       notifySyncEnd()
@@ -312,7 +343,7 @@ export async function syncDownOnBoot(
     log.error({ err }, `${cap(withLabel(label, 'sync'))} boot error.`)
     return -1
   } finally {
-    isSyncingMap[kind] = false
+    syncState().isSyncingMap[kind] = false
     mutex.unlock()
   }
 }
@@ -327,13 +358,13 @@ export async function syncUp(
   const backend = activeBackend()
   if (!backend) return
 
-  const mutex = syncMutexes[kind]
+  const mutex = syncState().syncMutexes[kind]
   await mutex.lock()
-  if (isSyncingMap[kind]) {
+  if (profileScope.getStore()?.deleted || syncState().isSyncingMap[kind]) {
     mutex.unlock()
     return
   }
-  isSyncingMap[kind] = true
+  syncState().isSyncingMap[kind] = true
 
   try {
     const localVersion = await getKindManifestVersion(kind)
@@ -345,6 +376,7 @@ export async function syncUp(
     if (localVersion > remoteVersion) {
       if (!backend.isAuthenticated()) return
       notifySyncStart(`Syncing ${withLabel(label, 'up')} (Local v${localVersion})`)
+      if (profileScope.getStore()?.deleted) return
       await backend.up(kind, db, { remoteFolder: remoteFolderName })
 
       notifySyncEnd()
@@ -356,7 +388,7 @@ export async function syncUp(
     notifySyncEnd()
     log.error({ err }, `${cap(withLabel(label, 'sync up failed.'))}`)
   } finally {
-    isSyncingMap[kind] = false
+    syncState().isSyncingMap[kind] = false
     mutex.unlock()
   }
 }
@@ -375,9 +407,9 @@ export async function runFullSyncSequence(
 ): Promise<void> {
   await initSyncProvider(opts.preferredProvider)
 
-  if (getActiveProvider() === 'github' && githubSyncService.isAuthenticated()) {
+  if (getActiveProvider() === 'github' && getGitHubSyncService().isAuthenticated()) {
     try {
-      await githubSyncService.migrateFromAniWebSync()
+      await getGitHubSyncService().migrateFromAniWebSync()
     } catch (err) {
       logger.error({ err }, 'GitHub sync migration from ani-web failed')
     }

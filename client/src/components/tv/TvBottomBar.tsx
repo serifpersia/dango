@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React from 'react'
 import Icon from '../common/Icon'
 import styles from './TvPlayerControls.module.css'
@@ -52,7 +53,7 @@ const TvBottomBar: React.FC<TvBottomBarProps> = ({
     }
     let lastKey: string | null = null
     try {
-      lastKey = localStorage.getItem('tvLastSubtitle')
+      lastKey = profileStorage.getItem('tvLastSubtitle')
     } catch {
       // ignore
     }

@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { PlayerVideo } from '../components/player/PlayerMedia'
 import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router'
@@ -139,7 +140,7 @@ const Player: React.FC = () => {
 
   const [anime4kProfile, setAnime4kProfile] = useState<Anime4KProfile>(() => {
     try {
-      const stored = localStorage.getItem('anime4kProfile')
+      const stored = profileStorage.getItem('anime4kProfile')
       return (['low', 'balanced', 'high', 'denoise'] as const).includes(stored as Anime4KProfile)
         ? (stored as Anime4KProfile)
         : 'balanced'
@@ -442,7 +443,7 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('anime4kProfile', anime4kProfile)
+      profileStorage.setItem('anime4kProfile', anime4kProfile)
     } catch {
       // ignore
     }
@@ -1066,7 +1067,7 @@ const Player: React.FC = () => {
                         const mode = state.currentMode === 'dub' ? 'sub' : 'dub'
                         resetFallback()
                         dispatch({ type: 'SET_MODE', payload: mode })
-                        localStorage.setItem('preferredMode', mode)
+                        profileStorage.setItem('preferredMode', mode)
                       }}
                       type="button"
                       aria-pressed={state.currentMode === 'dub'}
@@ -1079,7 +1080,7 @@ const Player: React.FC = () => {
                         onClick={() => {
                           const newValue = !player.state.useNativeControls
                           player.actions.setUseNativeControls(newValue)
-                          localStorage.setItem('playerUseNativeControls', newValue.toString())
+                          profileStorage.setItem('playerUseNativeControls', newValue.toString())
                         }}
                         type="button"
                       >

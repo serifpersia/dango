@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect } from 'react'
 import {
   buildOverlayCss,
@@ -33,7 +34,7 @@ export function useSubtitleOverlay({
     const overlay = overlayRef.current
     if (!video || !overlay) return
 
-    const subtitlesEnabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+    const subtitlesEnabled = profileStorage.getItem('playerSubtitlesEnabled') !== 'false'
 
     const renderCues = () => {
       overlay.innerHTML = ''

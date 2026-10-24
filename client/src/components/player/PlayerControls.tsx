@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useEffect, Suspense, lazy } from 'react'
 import CenterControls from './CenterControls'
 import ControlTopBar from './ControlTopBar'
@@ -200,7 +201,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         onAutoSkipChange={(value) => {
           actions.setIsAutoSkipEnabled(value)
           try {
-            localStorage.setItem('autoSkipEnabled', value.toString())
+            profileStorage.setItem('autoSkipEnabled', value.toString())
           } catch {
             // ignore
           }

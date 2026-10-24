@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 process.env.XDG_DATA_HOME = mkdtempSync(path.join(tmpdir(), 'dango-mal-manga-test-'))
+process.env.APPDATA = process.env.XDG_DATA_HOME
 const { initializeDatabase, initializeMangaDatabase } = await import('../../db/ddl.js')
 const { SettingsRepository: settings } = await import('../../repositories/settings.repository.js')
 const { MangaLibraryRepository } = await import('../../repositories/manga.repository.js')

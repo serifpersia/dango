@@ -14,7 +14,7 @@ import logger from './logger.js'
 import { notifyServerExit } from './lib/ipc.js'
 
 import { CONFIG } from './config.js'
-import { runFullSyncSequence, syncUp, waitForSync, KIND_SYNC, type MediaKind } from './sync.js'
+import { runFullSyncSequence, syncUp, waitForSync, type MediaKind } from './sync.js'
 import {
   initializeDatabase,
   initializeMangaDatabase,
@@ -34,6 +34,9 @@ import { createHonoApp } from './app-hono.js'
 import { startWatchlistDiscovery, stopWatchlistDiscovery } from './lib/watchlist-discovery.js'
 import { checkAnilistStatus } from './lib/anilist/index.js'
 import { offlineDb } from './lib/offline-db/index.js'
+import { requestMalImportCancel } from './lib/mal-import.js'
+import { ProfileStore } from './profiles.js'
+import { profileScope, profileService } from './profile-scope.js'
 
 const app = createHonoApp(
   () => ({ shuttingDown: isShuttingDown, dbReady: !!db }),
@@ -46,7 +49,9 @@ const app = createHonoApp(
   {
     initializeDatabase,
     setDb: (newDb) => {
-      db = newDb
+      const scoped = profileScope.getStore()?.dbs
+      if (scoped) scoped.db = newDb
+      if (!scoped || profileScope.getStore()?.id === 'default') db = newDb
     },
   },
   {
@@ -55,13 +60,14 @@ const app = createHonoApp(
   },
   runSyncSequence,
   {
-    getApiCache: () => apiCache,
+    getApiCache: profileService(() => new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })),
     getProviders: () => providers,
     getMangaProvider: (name) => mangaProviders[name],
     getTvProvider: (name) => tvProviders[name],
     getProxyRules: () => proxyRules,
     getJasmr: () => asmrProviders['jasmr'],
-  }
+  },
+  () => profiles
 )
 
 const apiCache = new AppCache({ ttlSeconds: 3600, maxKeys: 5000 })
@@ -136,6 +142,7 @@ let tvDb: DatabaseWrapper
 let asmrDb: DatabaseWrapper
 let isShuttingDown = false
 let bootSyncing = true
+let profiles: ProfileStore | undefined
 
 async function runSyncSequence(
   database: DatabaseWrapper,
@@ -145,12 +152,15 @@ async function runSyncSequence(
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
   await runFullSyncSequence(
-    { db: database, mangaDb: mangaDatabase, tvDb, asmrDb },
+    {
+      db: database,
+      mangaDb: mangaDatabase,
+      tvDb: profileScope.getStore()?.dbs?.tvDb ?? tvDb,
+      asmrDb: profileScope.getStore()?.dbs?.asmrDb ?? asmrDb,
+    },
     { remoteFolder, preferredProvider }
   )
 }
-
-startWatchlistDiscovery(() => db)
 
 if (!CONFIG.IS_DEV) {
   const frontendPath = path.join(CONFIG.PACKAGE_ROOT, 'client', 'dist')
@@ -192,6 +202,21 @@ async function main() {
   asmrDb = await initializeAsmrDatabase(asmrDbPath)
   logger.info(`ASMR database initialized at ${asmrDbPath}`)
 
+  profiles = new ProfileStore()
+  profiles.attachDefault({ db, mangaDb, tvDb, asmrDb })
+  profiles.onOpen = async (dbs) => {
+    await runFullSyncSequence(dbs, { remoteFolder }).catch((err) =>
+      logger.error({ err }, 'Profile boot sync failed')
+    )
+    if (!profileScope.getStore()?.deleted) startWatchlistDiscovery(() => dbs.db)
+  }
+  profiles.onDelete = (dbs) => {
+    stopWatchlistDiscovery()
+    requestMalImportCancel()
+    closeTrackerActivityStreams(dbs.db)
+  }
+  profileScope.run(profiles.scope('default'), () => startWatchlistDiscovery(() => db))
+
   await offlineDb.init(db)
   if (await offlineDb.checkWeeklyUpdateDue(db)) {
     logger.info('Weekly offline database update is due on startup, starting background update...')
@@ -215,38 +240,14 @@ async function main() {
     }, CONFIG.PROVIDER_REPO_REFRESH_MS).unref()
   }
 
-  const kindDbs = (): Record<MediaKind, DatabaseWrapper> => ({
-    anime: db,
-    manga: mangaDb,
-    tv: tvDb,
-    asmr: asmrDb,
-  })
-
-  for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
-    if (!fs.existsSync(KIND_SYNC[kind].manifestPath)) {
-      fs.writeFileSync(KIND_SYNC[kind].manifestPath, JSON.stringify({ version: 0 }))
-    }
-  }
-
-  const unsynced: Record<MediaKind, boolean> = {
-    anime: false,
-    manga: false,
-    tv: false,
-    asmr: false,
-  }
-  const watchers = (Object.keys(KIND_SYNC) as MediaKind[]).map((kind) =>
-    fs.watch(KIND_SYNC[kind].manifestPath, (eventType) => {
-      if (eventType === 'change' || eventType === 'rename') {
-        unsynced[kind] = true
-      }
-    })
-  )
-
   const server = serve({ fetch: app.fetch, port: CONFIG.PORT }, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
   })
 
-  runSyncSequence(db, mangaDb)
+  profiles
+    .each(async (dbs, profile) => {
+      if (profile.id === 'default') await runFullSyncSequence(dbs, { remoteFolder })
+    })
     .catch((err) => logger.error({ err }, 'background boot sync failed'))
     .finally(() => {
       bootSyncing = false
@@ -255,24 +256,20 @@ async function main() {
     logger.error({ err }, 'background providers refresh failed')
   )
 
-  const kindDbLabel: Record<MediaKind, string> = {
-    anime: 'database',
-    manga: 'manga database',
-    tv: 'TV database',
-    asmr: 'ASMR database',
-  }
-
+  let syncing = false
   const syncInterval = setInterval(async () => {
-    for (const kind of Object.keys(KIND_SYNC) as MediaKind[]) {
-      if (!unsynced[kind]) continue
-      logger.info(`Uploading accumulated ${kindDbLabel[kind]} changes...`)
-      unsynced[kind] = false
-      try {
-        await syncUp(kindDbs()[kind], kind, remoteFolder)
-      } catch (err) {
-        logger.error({ err }, `Failed to upload ${kindDbLabel[kind]} changes`)
-        unsynced[kind] = true
-      }
+    if (syncing || isShuttingDown) return
+    syncing = true
+    try {
+      await profiles!.each(async (dbs) => {
+        const kinds = { anime: dbs.db, manga: dbs.mangaDb, tv: dbs.tvDb, asmr: dbs.asmrDb }
+        for (const kind of Object.keys(kinds) as MediaKind[])
+          await syncUp(kinds[kind], kind, remoteFolder)
+      })
+    } catch (err) {
+      logger.error({ err }, 'Profile sync failed')
+    } finally {
+      syncing = false
     }
   }, 300000)
 
@@ -292,54 +289,31 @@ async function main() {
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
-    closeTrackerActivityStreams(db)
-    stopWatchlistDiscovery()
+    await profiles!.each(async (dbs) => {
+      closeTrackerActivityStreams(dbs.db)
+      stopWatchlistDiscovery()
+    })
     clearInterval(syncInterval)
     clearInterval(offlineDbInterval)
     discordRPCService.disconnect()
     discordGatewayService.shutdown()
-    for (const watcher of watchers) {
-      await watcher.close()
-    }
 
     if (server) {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
 
-    const kindFinalError: Record<MediaKind, string> = {
-      anime: 'Final sync on shutdown failed',
-      manga: 'Final manga sync on shutdown failed',
-      tv: 'Final TV sync on shutdown failed',
-      asmr: 'Final ASMR sync on shutdown failed',
-    }
-
-    await Promise.allSettled(
-      (Object.keys(KIND_SYNC) as MediaKind[]).map(async (kind) => {
-        if (!unsynced[kind]) return
-        unsynced[kind] = false
-        logger.info(`Sync on shutdown: uploading final ${kindDbLabel[kind]} changes...`)
-        try {
-          await syncUp(kindDbs()[kind], kind, remoteFolder)
-        } catch (e) {
-          logger.error({ err: e }, kindFinalError[kind])
-          unsynced[kind] = true
-        }
-      })
-    )
-
-    await waitForSync()
-
-    asmrDb.close(() => {})
-    tvDb.close(() => {})
-    mangaDb.close(() => {})
-    db.close(() => {
-      notifyServerExit()
-      if (signal === 'SIGUSR2') {
-        process.kill(process.pid, 'SIGUSR2')
-      } else {
-        setTimeout(() => process.exit(0), 100).unref()
-      }
+    await profiles!.each(async (dbs) => {
+      await waitForSync()
+      const kinds = { anime: dbs.db, manga: dbs.mangaDb, tv: dbs.tvDb, asmr: dbs.asmrDb }
+      await Promise.allSettled(
+        (Object.keys(kinds) as MediaKind[]).map((kind) => syncUp(kinds[kind], kind, remoteFolder))
+      )
+      await waitForSync()
     })
+    await profiles!.close()
+    notifyServerExit()
+    if (signal === 'SIGUSR2') process.kill(process.pid, 'SIGUSR2')
+    else setTimeout(() => process.exit(0), 100).unref()
   }
 
   process.on('SIGINT', () => shutdown('SIGINT'))

@@ -63,6 +63,9 @@ import { discordRPCService } from './discord-rpc.js'
 import { offlineDb } from './lib/offline-db/index.js'
 import { malCacheStore } from './repositories/mal-cache.repository.js'
 import { registerTrackerActivity } from './hono/tracker-activity.js'
+import { registerProfiles, profileToken } from './hono/profiles.js'
+import type { ProfileStore } from './profiles.js'
+import { profileScope } from './profile-scope.js'
 
 export type HonoHealthState = {
   shuttingDown: boolean
@@ -312,13 +315,15 @@ function restoreLegacyDatabase(
 export function createHonoApp(
   getState: () => HonoHealthState,
   getGuardState: () => HonoGuardState,
-  getDbs: () => HonoDbs,
+  getDefaultDbs: () => HonoDbs,
   dbAdmin: HonoDbAdmin,
   providerApi: HonoProviderApi,
   runSync: RunSyncSequence,
-  media: HonoMediaDeps
+  media: HonoMediaDeps,
+  getProfiles?: () => ProfileStore | undefined
 ): Hono {
   const app = new Hono()
+  const getDbs = () => profileScope.getStore()?.dbs ?? getDefaultDbs()
 
   app.use(honoRequestLogger)
   app.use(honoRequestContextMiddleware)
@@ -374,7 +379,7 @@ export function createHonoApp(
   app.use(async (c, next) => {
     const origin = c.req.header('origin')
     if (c.req.method === 'OPTIONS') {
-      if (!origin || !isAllowedOrigin(origin)) {
+      if (!origin || !isAllowedOrigin(origin, c.req.url)) {
         await next()
         return
       }
@@ -390,7 +395,7 @@ export function createHonoApp(
         },
       })
     }
-    if (!origin || isAllowedOrigin(origin)) {
+    if (!origin || isAllowedOrigin(origin, c.req.url)) {
       if (origin) c.header('Access-Control-Allow-Origin', origin)
       c.header('Access-Control-Allow-Credentials', 'true')
       c.header('Vary', 'Origin')
@@ -407,12 +412,12 @@ export function createHonoApp(
     const secFetchSite = c.req.header('sec-fetch-site')
     if (secFetchSite === 'cross-site') {
       const origin = c.req.header('origin')
-      if (!isAllowedOrigin(origin)) {
+      if (!origin || !isAllowedOrigin(origin, c.req.url)) {
         return c.json({ error: 'Forbidden: cross-site request rejected' }, 403)
       }
     }
     const origin = c.req.header('origin')
-    if (origin && !isAllowedOrigin(origin)) {
+    if (origin && !isAllowedOrigin(origin, c.req.url)) {
       return c.json({ error: 'Forbidden: cross-origin request rejected' }, 403)
     }
     await next()
@@ -449,6 +454,8 @@ export function createHonoApp(
   })
 
   app.post('/api/auth/app-setup', async (c) => {
+    if (getProfiles && !getProfiles()?.resolve(profileToken(c))?.owner)
+      return c.json({ error: 'Owner access required' }, 403)
     if (!isLoopbackIp(c.req.header('x-dango-client-ip'))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
@@ -489,6 +496,8 @@ export function createHonoApp(
     }
     return c.json({ error: 'LAN_AUTH_REQUIRED' }, 401)
   })
+
+  if (getProfiles) registerProfiles(app, getProfiles)
 
   registerTrackerActivity(app, () => getDbs().db)
 
@@ -566,6 +575,8 @@ export function createHonoApp(
   })
 
   app.post('/api/providers/refresh', async (c) => {
+    if (profileScope.getStore()?.owner === false)
+      return c.json({ error: 'Owner access required' }, 403)
     try {
       return c.json(await providerApi.refresh())
     } catch (err) {

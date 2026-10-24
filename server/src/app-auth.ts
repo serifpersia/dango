@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { CONFIG } from './config.js'
+import { INSTALL_CONFIG as CONFIG } from './config.js'
 
 export const LAN_AUTH_COOKIE = 'dango_lan_auth'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -54,7 +54,10 @@ export function hashAppPassword(password: string): string {
 }
 
 export function verifyAppPassword(password: string): boolean {
-  const stored = getAppPasswordHash()
+  return verifyPasswordHash(password, getAppPasswordHash())
+}
+
+export function verifyPasswordHash(password: string, stored: string): boolean {
   if (!stored) return false
   const parts = stored.split(':')
   if (parts.length !== 3 || parts[0] !== 'scrypt') return false

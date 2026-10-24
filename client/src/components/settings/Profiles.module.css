@@ -1,0 +1,82 @@
+.gate {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  padding: var(--space-5);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.panel {
+  width: min(100%, 440px);
+  padding: var(--space-5);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tertiary);
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.form h3,
+.form p {
+  flex-basis: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.field input,
+.field select {
+  padding: var(--space-3);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.avatarRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.avatarRow > :first-child {
+  width: 72px;
+  height: 72px;
+}
+
+.profileList {
+  list-style: none;
+  padding: 0;
+}
+
+.profileList li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.smallAvatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.profileName {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

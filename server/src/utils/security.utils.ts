@@ -74,19 +74,21 @@ export function isSafeExternalUrl(rawUrl: unknown): { safe: boolean; url?: URL; 
   return { safe: true, url: parsed }
 }
 
-export function isAllowedOrigin(origin: string | undefined): boolean {
+export function isAllowedOrigin(origin: string | undefined, requestUrl?: string): boolean {
   if (!origin) return true // Non-browser clients, same-origin, or mobile webview
 
   try {
     const parsed = new URL(origin)
-    const host = parsed.hostname.toLowerCase()
-    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1'
-
-    if (CONFIG.HOST === '0.0.0.0') {
-      return true
-    }
-
-    return isLocal
+    if (!requestUrl) return false
+    const request = new URL(requestUrl)
+    if (parsed.origin === request.origin) return true
+    const loopback = (host: string) => ['localhost', '127.0.0.1', '[::1]'].includes(host)
+    return (
+      CONFIG.IS_DEV &&
+      loopback(parsed.hostname) &&
+      loopback(request.hostname) &&
+      parsed.port === String(CONFIG.DEV_PORT)
+    )
   } catch {
     return false
   }

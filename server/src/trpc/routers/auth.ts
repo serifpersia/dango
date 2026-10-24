@@ -1,14 +1,16 @@
+import { profileEnv, profileScope } from '../../profile-scope.js'
 import logger from '../../logger.js'
-import { googleDriveService } from '../../google.js'
-import { githubSyncService } from '../../github-sync.js'
+import { getGoogleDriveService } from '../../google.js'
+import { getGitHubSyncService } from '../../github-sync.js'
 import type { DatabaseWrapper } from '../../db.js'
 import { initSyncProvider, getActiveProvider, runFullSyncSequence } from '../../sync.js'
 import { CONFIG } from '../../config.js'
-import { rcloneService } from '../../rclone.js'
+import { getRcloneService } from '../../rclone.js'
 import { updateEnvFile } from '../../utils/env.utils.js'
-import { protectedProcedure, router } from '../index.js'
+import { protectedProcedure, ownerProcedure, router } from '../index.js'
 import { defineSchema, reqObj } from '../validation.js'
 import { badRequest } from '../errors.js'
+import { isSafeExternalUrl } from '../../utils/security.utils.js'
 import type { TrpcContext } from '../context.js'
 
 type SyncProvider = 'github' | 'google' | 'rclone' | 'none'
@@ -60,21 +62,23 @@ const serverPortInput = () =>
 export const authRouter = router({
   configStatus: protectedProcedure.query(async () => {
     const useWorker = !!CONFIG.GOOGLE_AUTH_WORKER_URL
-    const hasLegacyConfig = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
+    const hasLegacyConfig = !!profileEnv('GOOGLE_CLIENT_ID') && !!profileEnv('GOOGLE_CLIENT_SECRET')
     return { hasConfig: useWorker || hasLegacyConfig, useWorker }
   }),
 
   googleAuth: protectedProcedure.query(async () => {
     return {
       useWorker: !!CONFIG.GOOGLE_AUTH_WORKER_URL,
-      hasCustomWorkerUrl: !!process.env.GOOGLE_AUTH_WORKER_URL,
-      hasCustomClientId: !!process.env.GOOGLE_CLIENT_ID,
-      hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      hasCustomWorkerUrl: !!profileEnv('GOOGLE_AUTH_WORKER_URL'),
+      hasCustomClientId: !!profileEnv('GOOGLE_CLIENT_ID'),
+      hasClientSecret: !!profileEnv('GOOGLE_CLIENT_SECRET'),
     }
   }),
 
   saveGoogleAuth: protectedProcedure.input(googleAuthSaveInput()).mutation(async ({ input }) => {
     const { clientId, clientSecret, workerUrl } = input
+    if (workerUrl && profileScope.getStore()?.owner === false && !isSafeExternalUrl(workerUrl).safe)
+      throw badRequest('Use a public HTTP or HTTPS authentication worker URL')
 
     const updates: Record<string, string> = {}
 
@@ -110,75 +114,77 @@ export const authRouter = router({
     return { success: true }
   }),
 
-  rcloneSettings: protectedProcedure.query(async () => {
-    const remotes = await rcloneService.listRemotes()
+  rcloneSettings: ownerProcedure.query(async () => {
+    const remotes = await getRcloneService().listRemotes()
     return {
       remote: CONFIG.RCLONE_REMOTE || '',
       availableRemotes: remotes,
-      activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
+      activeRemote: getRcloneService().isActive() ? getRcloneService().getRemoteName() : null,
     }
   }),
 
   syncSettings: protectedProcedure.query(async () => {
     return {
-      activeProvider: process.env.SYNC_PROVIDER || 'default',
+      activeProvider: profileEnv('SYNC_PROVIDER') || 'default',
       actualActiveProvider: getActiveProvider(),
       authenticatedProviders: {
-        github: githubSyncService.isAuthenticated(),
-        google: googleDriveService.isAuthenticated(),
-        rclone: rcloneService.isActive(),
+        github: getGitHubSyncService().isAuthenticated(),
+        google: getGoogleDriveService().isAuthenticated(),
+        rclone: getRcloneService().isActive(),
       },
     }
   }),
 
   saveSyncProvider: protectedProcedure.input(syncProviderInput()).mutation(async ({ input }) => {
     const { provider } = input
+    if (!['default', 'none', 'github', 'google', 'rclone'].includes(String(provider)))
+      throw badRequest('Invalid sync provider')
 
     const value = provider === 'default' ? '' : (provider as string)
     await updateEnvFile({ SYNC_PROVIDER: value })
     await initSyncProvider()
-    return { success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' }
+    return { success: true, activeProvider: profileEnv('SYNC_PROVIDER') || 'default' }
   }),
 
   githubStatus: protectedProcedure.query(async () => {
     try {
-      const user = await githubSyncService.getUserProfile()
+      const user = await getGitHubSyncService().getUserProfile()
       return {
         authenticated: !!user,
         user,
-        device: githubSyncService.getDeviceState(),
-        hasCustomClientId: !!process.env.GITHUB_CLIENT_ID,
+        device: getGitHubSyncService().getDeviceState(),
+        hasCustomClientId: !!profileEnv('GITHUB_CLIENT_ID'),
       }
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch GitHub auth status')
       return {
         authenticated: false,
         user: null,
-        device: githubSyncService.getDeviceState(),
-        hasCustomClientId: !!process.env.GITHUB_CLIENT_ID,
+        device: getGitHubSyncService().getDeviceState(),
+        hasCustomClientId: !!profileEnv('GITHUB_CLIENT_ID'),
       }
     }
   }),
 
   githubStart: protectedProcedure.mutation(async ({ ctx }) => {
-    const state = await githubSyncService.startDeviceAuth(ctx.db, (db, provider) =>
+    const state = await getGitHubSyncService().startDeviceAuth(ctx.db, (db, provider) =>
       runSyncFromCtx(ctx, db, provider)
     )
     return state
   }),
 
   githubPoll: protectedProcedure.query(async () => {
-    return githubSyncService.getDeviceState()
+    return getGitHubSyncService().getDeviceState()
   }),
 
   githubLogout: protectedProcedure.mutation(async () => {
-    await githubSyncService.logout()
+    await getGitHubSyncService().logout()
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     return { success: true }
   }),
 
-  saveRclone: protectedProcedure.input(rcloneSaveInput()).mutation(async ({ ctx, input }) => {
+  saveRclone: ownerProcedure.input(rcloneSaveInput()).mutation(async ({ ctx, input }) => {
     const { remote } = input
 
     await updateEnvFile({
@@ -189,7 +195,7 @@ export const authRouter = router({
     return { success: true }
   }),
 
-  setServerPort: protectedProcedure.input(serverPortInput()).mutation(async ({ input }) => {
+  setServerPort: ownerProcedure.input(serverPortInput()).mutation(async ({ input }) => {
     const port = Number(input.port)
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw badRequest('Port must be an integer between 1 and 65535')
@@ -200,28 +206,30 @@ export const authRouter = router({
   }),
 
   googleLogin: protectedProcedure.mutation(async ({ ctx }) => {
-    if (googleDriveService.isAuthenticated()) {
-      const user = await googleDriveService.getUserProfile()
+    if (getGoogleDriveService().isAuthenticated()) {
+      const user = await getGoogleDriveService().getUserProfile()
       if (user) {
         await updateEnvFile({ SYNC_PROVIDER: 'google' })
         await runSyncFromCtx(ctx, ctx.db, 'google')
         return { url: null, authenticated: true }
       } else {
         logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
-        await googleDriveService.logout()
+        await getGoogleDriveService().logout()
       }
     }
-    const url = await googleDriveService.getAuthUrl()
-    return { url, authenticated: false }
+    const url = new URL(await getGoogleDriveService().getAuthUrl())
+    const state = profileScope.getStore()?.beginOAuth?.()
+    if (state) url.searchParams.set('state', state)
+    return { url: url.toString(), authenticated: false }
   }),
 
   user: protectedProcedure.query(async () => {
-    const user = await googleDriveService.getUserProfile()
+    const user = await getGoogleDriveService().getUserProfile()
     return user
   }),
 
   logout: protectedProcedure.mutation(async () => {
-    await googleDriveService.logout()
+    await getGoogleDriveService().logout()
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     return { success: true }

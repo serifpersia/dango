@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import Pagination from '../components/common/Pagination'
@@ -55,10 +56,10 @@ const Home: React.FC = () => {
   const trpc = useTRPC()
   const [page, setPage] = React.useState(1)
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    return (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
+    return (profileStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
   })
   const [seasonFormat, setSeasonFormat] = useState(() => {
-    return localStorage.getItem('season_format') || 'TV'
+    return profileStorage.getItem('season_format') || 'TV'
   })
   const seasonalRef = useRef<HTMLDivElement>(null)
 
@@ -85,11 +86,11 @@ const Home: React.FC = () => {
   const { data: thisWeekList, isLoading: loadingThisWeek } = useThisWeekSchedule()
 
   useEffect(() => {
-    localStorage.setItem('home_activeTab', activeTab)
+    profileStorage.setItem('home_activeTab', activeTab)
   }, [activeTab])
 
   useEffect(() => {
-    localStorage.setItem('season_format', seasonFormat)
+    profileStorage.setItem('season_format', seasonFormat)
     setPage(1)
   }, [seasonFormat])
 

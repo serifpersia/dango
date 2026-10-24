@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useMemo, useState } from 'react'
 import Icon from '../common/Icon'
 import styles from './PlayerSettings.module.css'
@@ -137,7 +138,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
           onClick={() => {
             const newValue = !useNativeControls
             onNativeControlsToggle(newValue)
-            localStorage.setItem('playerUseNativeControls', newValue.toString())
+            profileStorage.setItem('playerUseNativeControls', newValue.toString())
           }}
         >
           <span>Native Controls</span>

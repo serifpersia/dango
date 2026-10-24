@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useCallback, useState } from 'react'
 
 export interface AmbientLightSettings {
@@ -18,7 +19,7 @@ export const AMBIENT_DEFAULTS: AmbientLightSettings = {
 
 function readStored(): AmbientLightSettings {
   try {
-    const raw = localStorage.getItem('playerAmbientLight')
+    const raw = profileStorage.getItem('playerAmbientLight')
     if (!raw) return AMBIENT_DEFAULTS
     const parsed = JSON.parse(raw) as Partial<AmbientLightSettings>
     const num = (v: unknown, fallback: number, min: number, max: number) => {
@@ -45,7 +46,7 @@ export function useAmbientLight() {
     setSettings((prev) => {
       const next = { ...prev, ...patch }
       try {
-        localStorage.setItem('playerAmbientLight', JSON.stringify(next))
+        profileStorage.setItem('playerAmbientLight', JSON.stringify(next))
       } catch {
         // ignore
       }

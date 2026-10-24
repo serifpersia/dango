@@ -1,3 +1,4 @@
+import { profileService, profileEnv, profileScope } from './profile-scope.js'
 import logger from './logger.js'
 import { DatabaseWrapper } from './db.js'
 import { updateEnvFile } from './utils/env.utils.js'
@@ -100,7 +101,7 @@ type OctokitInstance = {
 }
 
 function getGitHubClientId() {
-  const id = process.env.GITHUB_CLIENT_ID || SHIPPED_DEFAULTS.GITHUB_CLIENT_ID || ''
+  const id = profileEnv('GITHUB_CLIENT_ID') || SHIPPED_DEFAULTS.GITHUB_CLIENT_ID || ''
   if (!id) {
     throw new Error('GITHUB_CLIENT_ID is not configured')
   }
@@ -135,7 +136,7 @@ class GitHubSyncService implements SyncBackend {
   private deviceState: DeviceFlowState = { status: 'idle' }
 
   isAuthenticated() {
-    return !!process.env.GITHUB_TOKEN
+    return !!profileEnv('GITHUB_TOKEN')
   }
 
   async migrateFromAniWebSync(): Promise<void> {
@@ -242,13 +243,14 @@ class GitHubSyncService implements SyncBackend {
   }
 
   async getUserProfile() {
-    if (!process.env.GITHUB_TOKEN) return null
+    if (!profileEnv('GITHUB_TOKEN')) return null
 
     try {
-      const octokit = await loadOctokit(process.env.GITHUB_TOKEN)
+      const octokit = await loadOctokit(profileEnv('GITHUB_TOKEN')!)
       const { data } = await octokit.rest.users.getAuthenticated({
         headers: GITHUB_API_HEADERS,
       })
+      profileScope.getStore()?.setCloudAvatar?.(data.avatar_url ?? null)
       return {
         login: data.login,
         name: data.name,
@@ -264,8 +266,9 @@ class GitHubSyncService implements SyncBackend {
   }
 
   async logout() {
+    profileScope.getStore()?.setCloudAvatar?.(null)
+    profileScope.getStore()?.claimCloud?.('github', null)
     await updateEnvFile({ GITHUB_TOKEN: '' })
-    delete process.env.GITHUB_TOKEN
     this.deviceState = { status: 'idle' }
   }
 
@@ -339,19 +342,10 @@ class GitHubSyncService implements SyncBackend {
 
       const authentication = await auth({ type: 'oauth' })
       await updateEnvFile({ GITHUB_TOKEN: authentication.token, SYNC_PROVIDER: 'github' })
-      process.env.GITHUB_TOKEN = authentication.token
 
       const user = await this.getUserProfile()
-      this.deviceState = {
-        status: 'success',
-        user: user || undefined,
-      }
-
-      try {
-        await runSyncSequence(db, 'github')
-      } catch (err) {
-        log.error({ err }, 'Post-GitHub-login sync failed')
-      }
+      await runSyncSequence(db, 'github')
+      this.deviceState = { status: 'success', user: user || undefined }
     } catch (err) {
       this.deviceState = {
         status: 'error',
@@ -363,11 +357,11 @@ class GitHubSyncService implements SyncBackend {
   }
 
   private async getOctokit(): Promise<OctokitInstance> {
-    if (!process.env.GITHUB_TOKEN) {
+    if (!profileEnv('GITHUB_TOKEN')) {
       throw new Error('GitHub token is not configured.')
     }
 
-    return loadOctokit(process.env.GITHUB_TOKEN)
+    return loadOctokit(profileEnv('GITHUB_TOKEN')!)
   }
 
   private async ensureRepo(octokit: OctokitInstance): Promise<string> {
@@ -445,4 +439,4 @@ class GitHubSyncService implements SyncBackend {
   }
 }
 
-export const githubSyncService = new GitHubSyncService()
+export const getGitHubSyncService = profileService(() => new GitHubSyncService())

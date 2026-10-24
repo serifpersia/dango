@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { pickSubtitleIndex, subtitleKey } from '../lib/subtitles'
 import type useVideoPlayer from './useVideoPlayer'
 
@@ -9,14 +10,14 @@ export function useControlHandlers(player: ReturnType<typeof useVideoPlayer>) {
     actions.setActiveSubtitleTrack(trackId)
     try {
       if (trackId === null || trackId === 'off') {
-        localStorage.setItem('playerSubtitlesEnabled', 'false')
+        profileStorage.setItem('playerSubtitlesEnabled', 'false')
       } else {
-        localStorage.setItem('playerSubtitlesEnabled', 'true')
+        profileStorage.setItem('playerSubtitlesEnabled', 'true')
         const chosen = state.availableSubtitles.find(
           (t) => t.label === trackId || t.lang === trackId
         )
-        if (chosen) localStorage.setItem('playerLastSubtitle', subtitleKey(chosen))
-        else localStorage.setItem('playerLastSubtitle', trackId)
+        if (chosen) profileStorage.setItem('playerLastSubtitle', subtitleKey(chosen))
+        else profileStorage.setItem('playerLastSubtitle', trackId)
       }
     } catch {
       // ignore
@@ -44,7 +45,7 @@ export function useControlHandlers(player: ReturnType<typeof useVideoPlayer>) {
     if (state.availableSubtitles.length === 0) return
     let lastKey: string | null = null
     try {
-      lastKey = localStorage.getItem('playerLastSubtitle')
+      lastKey = profileStorage.getItem('playerLastSubtitle')
     } catch {
       // ignore
     }

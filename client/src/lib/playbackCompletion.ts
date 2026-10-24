@@ -1,3 +1,4 @@
+import { profileStorage } from './profileStorage'
 export const COMPLETION_THRESHOLD = 0.8
 
 export const RESUME_MIN_TIME = 5
@@ -16,7 +17,7 @@ export const hasResumableProgress = (currentTime: number): boolean => currentTim
 
 export const loadAutoplayEnabled = (): boolean => {
   try {
-    return localStorage.getItem(AUTOPLAY_KEY) === 'true'
+    return profileStorage.getItem(AUTOPLAY_KEY) === 'true'
   } catch {
     return false
   }
@@ -24,7 +25,7 @@ export const loadAutoplayEnabled = (): boolean => {
 
 export const storeAutoplayEnabled = (value: boolean): void => {
   try {
-    localStorage.setItem(AUTOPLAY_KEY, String(value))
+    profileStorage.setItem(AUTOPLAY_KEY, String(value))
   } catch {
     // ignore
   }

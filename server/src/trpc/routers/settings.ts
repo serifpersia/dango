@@ -1,5 +1,6 @@
+import { profileScope } from '../../profile-scope.js'
 import { TRPCError } from '@trpc/server'
-import { protectedProcedure, router } from '../index.js'
+import { protectedProcedure, ownerProcedure, router } from '../index.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import { performWriteTransactionAsync } from '../../db/transaction.js'
 import logger from '../../logger.js'
@@ -47,6 +48,8 @@ export const settingsRouter = router({
 
   set: protectedProcedure.input(setSettingInput()).mutation(async ({ ctx, input }) => {
     const key = input.key
+    if (key.startsWith('discord') && profileScope.getStore()?.owner === false)
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Owner access required' })
     if (isPrivateTrackerSetting(key))
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -71,14 +74,14 @@ export const settingsRouter = router({
     return await ctx.offlineDb.getOfflineDbInfo(ctx.db)
   }),
 
-  setOfflineDbAutoUpdate: protectedProcedure
+  setOfflineDbAutoUpdate: ownerProcedure
     .input(autoUpdateInput())
     .mutation(async ({ ctx, input }) => {
       await SettingsRepository.upsert(ctx.db, 'offlineDbAutoUpdateEnabled', String(input.enabled))
       return { success: true, enabled: input.enabled }
     }),
 
-  triggerOfflineDbUpdate: protectedProcedure.mutation(async ({ ctx }) => {
+  triggerOfflineDbUpdate: ownerProcedure.mutation(async ({ ctx }) => {
     const info = await ctx.offlineDb.getOfflineDbInfo(ctx.db)
     if (info.isRefreshing) {
       throw conflict('Offline database refresh already in progress')

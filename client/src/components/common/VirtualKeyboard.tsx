@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'preact/compat'
 import styles from './VirtualKeyboard.module.css'
@@ -35,7 +36,7 @@ const getInitialState = (): { position: Position; size: KeyboardSize } => {
   }
 
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = profileStorage.getItem(STORAGE_KEY)
     if (!saved) return fallback
 
     const parsed = JSON.parse(saved) as { position?: Position; size?: KeyboardSize }
@@ -72,7 +73,7 @@ export default function VirtualKeyboard({
   const dragOffsetRef = useRef<Position | null>(null)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ position, size }))
+    profileStorage.setItem(STORAGE_KEY, JSON.stringify({ position, size }))
   }, [position, size])
 
   useEffect(() => {

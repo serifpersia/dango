@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { DatabaseWrapper } from './db.js'
+import { INSTALL_CONFIG } from './config.js'
 import {
   initializeAsmrDatabase,
   initializeDatabase,
@@ -15,6 +16,17 @@ process.env.DANGO_MAL_CACHE_PATH ??= path.join(
   fs.mkdtempSync(path.join(os.tmpdir(), 'dango-mal-cache-')),
   'mal-cache.db'
 )
+
+const manifestRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dango-test-manifests-'))
+for (const key of [
+  'LOCAL_MANIFEST_PATH',
+  'MANGA_LOCAL_MANIFEST_PATH',
+  'TV_LOCAL_MANIFEST_PATH',
+  'ASMR_LOCAL_MANIFEST_PATH',
+] as const) {
+  INSTALL_CONFIG[key] = path.join(manifestRoot, path.basename(INSTALL_CONFIG[key]))
+}
+process.once('exit', () => fs.rmSync(manifestRoot, { recursive: true, force: true }))
 
 export interface TestDb {
   db: DatabaseWrapper

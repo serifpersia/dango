@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { PlayerVideo } from '../components/player/PlayerMedia'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
@@ -171,7 +172,7 @@ const Tv: React.FC = () => {
   const [episode, setEpisode] = useState(() => parseInt(searchParams.get('e') || '1', 10) || 1)
   const [source, setSource] = useState(() => {
     try {
-      return localStorage.getItem('tvProvider') || ''
+      return profileStorage.getItem('tvProvider') || ''
     } catch {
       return ''
     }
@@ -210,7 +211,7 @@ const Tv: React.FC = () => {
   const [iframeUrl, setIframeUrl] = useState('')
   const [selectedServer, setSelectedServer] = useState<string>(() => {
     try {
-      return localStorage.getItem('tvServer') || ''
+      return profileStorage.getItem('tvServer') || ''
     } catch {
       return ''
     }
@@ -288,7 +289,7 @@ const Tv: React.FC = () => {
   } = useAvSync(videoRef)
   const [subtitleDelayMs, setSubtitleDelayMs] = useState<number>(() => {
     try {
-      const stored = Number(localStorage.getItem('tvSubtitleDelayMs'))
+      const stored = Number(profileStorage.getItem('tvSubtitleDelayMs'))
       if (Number.isFinite(stored) && stored >= -60000 && stored <= 60000) return Math.round(stored)
     } catch {
       // ignore
@@ -303,7 +304,7 @@ const Tv: React.FC = () => {
     subtitleDelayMsRef.current = clamped
     setSubtitleDelayMs(clamped)
     try {
-      localStorage.setItem('tvSubtitleDelayMs', String(clamped))
+      profileStorage.setItem('tvSubtitleDelayMs', String(clamped))
     } catch {
       // ignore
     }
@@ -638,9 +639,9 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     if (!video) return
     try {
-      const storedVolume = parseFloat(localStorage.getItem('playerVolume') || '')
+      const storedVolume = parseFloat(profileStorage.getItem('playerVolume') || '')
       if (!isNaN(storedVolume)) video.volume = Math.max(0, Math.min(1, storedVolume))
-      video.muted = localStorage.getItem('playerMuted') === 'true'
+      video.muted = profileStorage.getItem('playerMuted') === 'true'
     } catch {
       // ignore
     }
@@ -798,8 +799,8 @@ const Tv: React.FC = () => {
     let lastKey: string | null = null
     let enabled = true
     try {
-      lastKey = localStorage.getItem('tvLastSubtitle')
-      enabled = localStorage.getItem('tvSubtitlesEnabled') !== 'false'
+      lastKey = profileStorage.getItem('tvLastSubtitle')
+      enabled = profileStorage.getItem('tvSubtitlesEnabled') !== 'false'
     } catch {
       // ignore
     }
@@ -809,8 +810,8 @@ const Tv: React.FC = () => {
   const persistSubtitlePick = useCallback((pick: number) => {
     if (pick < 0) return
     try {
-      localStorage.setItem('tvSubtitlesEnabled', 'true')
-      localStorage.setItem('tvSelectedSubtitle', String(pick))
+      profileStorage.setItem('tvSubtitlesEnabled', 'true')
+      profileStorage.setItem('tvSelectedSubtitle', String(pick))
     } catch {
       // ignore
     }
@@ -820,7 +821,7 @@ const Tv: React.FC = () => {
     if (tracks.length === 0) return 0
     let lastKey: string | null = null
     try {
-      lastKey = localStorage.getItem('tvLastAudio')
+      lastKey = profileStorage.getItem('tvLastAudio')
     } catch {
       // ignore
     }
@@ -882,7 +883,7 @@ const Tv: React.FC = () => {
       const next = tvProviders.find((p) => p.tier === 'direct')?.id ?? tvProviders[0].id
       setSource(next)
       try {
-        localStorage.setItem('tvProvider', next)
+        profileStorage.setItem('tvProvider', next)
       } catch {
         // ignore
       }
@@ -901,7 +902,7 @@ const Tv: React.FC = () => {
     if (!activeServers.includes(selectedServer)) {
       setSelectedServer(activeServers[0])
       try {
-        localStorage.setItem('tvServer', activeServers[0])
+        profileStorage.setItem('tvServer', activeServers[0])
       } catch {
         // ignore
       }
@@ -1115,7 +1116,7 @@ const Tv: React.FC = () => {
       setEmbedSelected(false)
       setSelectedServer(server)
       try {
-        localStorage.setItem('tvServer', server)
+        profileStorage.setItem('tvServer', server)
       } catch {
         // ignore
       }
@@ -1127,7 +1128,7 @@ const Tv: React.FC = () => {
   const handleSourceSelect = useCallback((newSource: string) => {
     setSource(newSource)
     try {
-      localStorage.setItem('tvProvider', newSource)
+      profileStorage.setItem('tvProvider', newSource)
     } catch {
       // ignore
     }
@@ -1231,8 +1232,8 @@ const Tv: React.FC = () => {
             let enabled = false
             let index = 0
             try {
-              enabled = localStorage.getItem('tvSubtitlesEnabled') === 'true'
-              const stored = parseInt(localStorage.getItem('tvSelectedSubtitle') || '0', 10)
+              enabled = profileStorage.getItem('tvSubtitlesEnabled') === 'true'
+              const stored = parseInt(profileStorage.getItem('tvSelectedSubtitle') || '0', 10)
               if (!isNaN(stored) && stored >= 0) index = stored
             } catch {
               // ignore
@@ -1778,7 +1779,7 @@ const Tv: React.FC = () => {
     setSelectedAudioTrack(index)
     try {
       const chosen = audioTracks[index]
-      if (chosen) localStorage.setItem('tvLastAudio', subtitleKey(chosen))
+      if (chosen) profileStorage.setItem('tvLastAudio', subtitleKey(chosen))
     } catch {
       // ignore
     }
@@ -1792,12 +1793,12 @@ const Tv: React.FC = () => {
     setSelectedSubtitle(index)
     try {
       if (index === -1) {
-        localStorage.setItem('tvSubtitlesEnabled', 'false')
+        profileStorage.setItem('tvSubtitlesEnabled', 'false')
       } else {
-        localStorage.setItem('tvSubtitlesEnabled', 'true')
-        localStorage.setItem('tvSelectedSubtitle', String(index))
+        profileStorage.setItem('tvSubtitlesEnabled', 'true')
+        profileStorage.setItem('tvSelectedSubtitle', String(index))
         const chosen = subtitles[index]
-        if (chosen) localStorage.setItem('tvLastSubtitle', subtitleKey(chosen))
+        if (chosen) profileStorage.setItem('tvLastSubtitle', subtitleKey(chosen))
       }
     } catch {
       // ignore

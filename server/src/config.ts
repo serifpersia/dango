@@ -3,6 +3,7 @@ import os from 'os'
 import path from 'path'
 import dotenv from 'dotenv'
 import { SHIPPED_DEFAULTS } from './shipped-defaults.js'
+import { profileScope } from './profile-scope.js'
 
 export const SERVER_ROOT = path.resolve(import.meta.dirname, '..')
 const PACKAGE_ROOT = path.resolve(SERVER_ROOT, '..')
@@ -144,7 +145,7 @@ const GOOGLE_REDIRECT_URI = IS_DEV
   ? `http://localhost:${DEV_PORT}/api/auth/google/callback`
   : `http://localhost:${PORT}/api/auth/google/callback`
 
-export const CONFIG = {
+export const INSTALL_CONFIG = {
   ROOT: DATA_ROOT,
   SERVER_ROOT,
   PACKAGE_ROOT,
@@ -192,6 +193,7 @@ export const CONFIG = {
   ASMR_RCLONE_SYNC_FILENAME: IS_DEV ? 'asmr.sync.dev.json' : 'asmr.sync.json',
   IS_DEV,
   PORT,
+  DEV_PORT,
   HOST,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
@@ -207,3 +209,46 @@ export const CONFIG = {
   PROVIDER_ENABLED: process.env.PROVIDER_ENABLED || '',
   PROVIDER_REPO_REFRESH_MS: parseInt(process.env.PROVIDER_REPO_REFRESH_MS || '', 10) || 21600000,
 }
+
+const profilePaths = new Set([
+  'ENV_PATH',
+  'TOKEN_PATH',
+  'LOCAL_MANIFEST_PATH',
+  'MANGA_LOCAL_MANIFEST_PATH',
+  'TV_LOCAL_MANIFEST_PATH',
+  'ASMR_LOCAL_MANIFEST_PATH',
+])
+const profileOptions = new Set([
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_AUTH_WORKER_URL',
+  'RCLONE_REMOTE',
+  'SYNC_PROVIDER',
+])
+
+// Async context keeps existing transaction and sync callers on the requesting profile.
+export const CONFIG = new Proxy(INSTALL_CONFIG, {
+  get(target, key: keyof typeof INSTALL_CONFIG) {
+    const scope = profileScope.getStore()
+    if (!scope) return target[key]
+    if (key === 'ROOT') return scope.root
+    if (profilePaths.has(key)) return path.join(scope.root, path.basename(String(target[key])))
+    if (profileOptions.has(key)) {
+      return (
+        scope.env[key] ||
+        (key === 'GOOGLE_AUTH_WORKER_URL'
+          ? target.GOOGLE_AUTH_WORKER_URL
+          : key.startsWith('GOOGLE_')
+            ? target[key]
+            : undefined)
+      )
+    }
+    return target[key]
+  },
+  set(target, key: keyof typeof INSTALL_CONFIG, value) {
+    const scope = profileScope.getStore()
+    if (scope && profileOptions.has(key)) scope.env[key] = value
+    else Reflect.set(target, key, value)
+    return true
+  },
+})

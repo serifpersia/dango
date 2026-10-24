@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../common/Icon'
 import { useQueryClient } from '@tanstack/react-query'
@@ -26,7 +27,7 @@ const FIT_KEY = 'mangaFitMode'
 
 function loadMode(): ReadMode {
   try {
-    return localStorage.getItem(MODE_KEY) === 'page' ? 'page' : 'strip'
+    return profileStorage.getItem(MODE_KEY) === 'page' ? 'page' : 'strip'
   } catch {
     return 'strip'
   }
@@ -34,7 +35,7 @@ function loadMode(): ReadMode {
 
 function loadFit(): FitMode {
   try {
-    return localStorage.getItem(FIT_KEY) === 'height' ? 'height' : 'width'
+    return profileStorage.getItem(FIT_KEY) === 'height' ? 'height' : 'width'
   } catch {
     return 'width'
   }
@@ -150,14 +151,14 @@ const MangaReader: React.FC<MangaReaderProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(MODE_KEY, mode)
+      profileStorage.setItem(MODE_KEY, mode)
     } catch {
       // ignore
     }
   }, [mode])
   useEffect(() => {
     try {
-      localStorage.setItem(FIT_KEY, fit)
+      profileStorage.setItem(FIT_KEY, fit)
     } catch {
       // ignore
     }

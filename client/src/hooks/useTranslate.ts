@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect, useState, useRef } from 'react'
 import { trpcClient } from '../lib/trpc'
 
@@ -8,7 +9,7 @@ type CacheEntry = { t: string; ts: number }
 
 function loadCache(): Map<string, CacheEntry> {
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
+    const raw = profileStorage.getItem(CACHE_KEY)
     if (!raw) return new Map()
     const obj = JSON.parse(raw) as Record<string, CacheEntry>
     return new Map(Object.entries(obj))
@@ -21,7 +22,7 @@ function saveCache(map: Map<string, CacheEntry>) {
   try {
     const obj: Record<string, CacheEntry> = {}
     for (const [k, v] of map) obj[k] = v
-    localStorage.setItem(CACHE_KEY, JSON.stringify(obj))
+    profileStorage.setItem(CACHE_KEY, JSON.stringify(obj))
   } catch {
     // ignore
   }

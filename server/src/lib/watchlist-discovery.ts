@@ -1,3 +1,4 @@
+import { profileService } from '../profile-scope.js'
 import logger from '../logger.js'
 import type { DatabaseWrapper } from '../db.js'
 import { WatchlistRepository } from '../repositories/watchlist.repository.js'
@@ -58,25 +59,27 @@ async function addDiscoveredNotifications(
   }
 }
 
-let discoveryIntervalId: ReturnType<typeof setInterval> | null = null
-let lastExternalDiscoveryAt = 0
-let discoveryBusy = false
-let lastDiscoveryRunAt = 0
-let discoveryState: 'idle' | 'running' | 'complete' | 'empty' | 'error' = 'idle'
-let discoveryTotal = 0
-let discoveryDone = 0
-let discoveryStopped = false
-let triggerImpl: (() => boolean) | null = null
+const state = profileService(() => ({
+  discoveryIntervalId: null as ReturnType<typeof setInterval> | null,
+  lastExternalDiscoveryAt: 0,
+  discoveryBusy: false,
+  lastDiscoveryRunAt: 0,
+  discoveryState: 'idle' as 'idle' | 'running' | 'complete' | 'empty' | 'error',
+  discoveryTotal: 0,
+  discoveryDone: 0,
+  discoveryStopped: false,
+  triggerImpl: null as (() => boolean) | null,
+}))
 
 export function triggerWatchlistDiscovery(): boolean {
-  return triggerImpl?.() ?? false
+  return state().triggerImpl?.() ?? false
 }
 
 export function stopWatchlistDiscovery(): void {
-  discoveryStopped = true
-  if (discoveryIntervalId !== null) {
-    clearInterval(discoveryIntervalId)
-    discoveryIntervalId = null
+  state().discoveryStopped = true
+  if (state().discoveryIntervalId !== null) {
+    clearInterval(state().discoveryIntervalId!)
+    state().discoveryIntervalId = null
   }
 }
 
@@ -88,11 +91,11 @@ export function getWatchlistDiscoveryStatus(): {
   lastRunAt: number
 } {
   return {
-    running: discoveryBusy,
-    state: discoveryState,
-    total: discoveryTotal,
-    done: Math.min(discoveryDone, discoveryTotal),
-    lastRunAt: lastDiscoveryRunAt,
+    running: state().discoveryBusy,
+    state: state().discoveryState,
+    total: state().discoveryTotal,
+    done: Math.min(state().discoveryDone, state().discoveryTotal),
+    lastRunAt: state().lastDiscoveryRunAt,
   }
 }
 
@@ -122,15 +125,15 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
   }
 
   const runDiscovery = async (fast = false): Promise<void> => {
-    if (discoveryBusy || discoveryStopped) return
-    discoveryBusy = true
-    discoveryState = 'running'
-    discoveryTotal = 0
-    discoveryDone = 0
+    if (state().discoveryBusy || state().discoveryStopped) return
+    state().discoveryBusy = true
+    state().discoveryState = 'running'
+    state().discoveryTotal = 0
+    state().discoveryDone = 0
 
     const db = getDb()
     if (!db || db.isClosedCheck()) {
-      discoveryBusy = false
+      state().discoveryBusy = false
       return
     }
 
@@ -139,9 +142,9 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
 
     try {
       const watchingShows = await WatchlistRepository.getWatchingShows(db)
-      discoveryTotal = watchingShows.length
+      state().discoveryTotal = watchingShows.length
       if (watchingShows.length === 0) {
-        discoveryBusy = false
+        state().discoveryBusy = false
         return
       }
 
@@ -155,7 +158,7 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
           const show = watchingShows[nextIndex]
           nextIndex += 1
           const id = await getAnilistId(show.id)
-          discoveryDone += 1
+          state().discoveryDone += 1
           anilistResults.push({ show, id })
         }
       }
@@ -169,7 +172,7 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
       }
 
       if (Date.now() - startedAt > MAX_RUN_MS || showIdMap.size === 0) {
-        discoveryBusy = false
+        state().discoveryBusy = false
         return
       }
 
@@ -247,31 +250,31 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
 
       await NotificationsRepository.cleanupWatchedNotifications(db)
     } catch (e) {
-      discoveryState = 'error'
+      state().discoveryState = 'error'
       if ((e as Error)?.message === 'Database is closed') {
         logger.info('Notification discovery stopped: database is closed')
       } else {
         logger.error({ err: e }, 'AniList notification discovery failed')
       }
     } finally {
-      discoveryBusy = false
-      lastDiscoveryRunAt = Date.now()
-      if (discoveryState === 'running') {
-        discoveryState = discoveryTotal === 0 ? 'empty' : 'complete'
+      state().discoveryBusy = false
+      state().lastDiscoveryRunAt = Date.now()
+      if (state().discoveryState === 'running') {
+        state().discoveryState = state().discoveryTotal === 0 ? 'empty' : 'complete'
       }
     }
   }
 
-  triggerImpl = () => {
-    if (discoveryStopped || discoveryBusy) return false
-    if (Date.now() - lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
-    lastExternalDiscoveryAt = Date.now()
+  state().triggerImpl = () => {
+    if (state().discoveryStopped || state().discoveryBusy) return false
+    if (Date.now() - state().lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
+    state().lastExternalDiscoveryAt = Date.now()
     runDiscovery(true)
     return true
   }
 
-  discoveryIntervalId = setInterval(() => {
-    if (!discoveryStopped) runDiscovery(false)
+  state().discoveryIntervalId = setInterval(() => {
+    if (!state().discoveryStopped) runDiscovery(false)
   }, BACKGROUND_DISCOVERY_INTERVAL_MS)
-  discoveryIntervalId.unref()
+  state().discoveryIntervalId!.unref()
 }

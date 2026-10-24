@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect, useRef, useState } from 'react'
 
 export const VIRTUAL_KEYBOARD_HIDE_EVENT = 'virtual-keyboard:hide'
@@ -6,7 +7,7 @@ export const VIRTUAL_KEYBOARD_ENABLED_KEY = 'virtual_keyboard_enabled'
 export const VIRTUAL_KEYBOARD_DEFAULT_ENABLED = false
 
 export function getVirtualKeyboardEnabled() {
-  const saved = localStorage.getItem(VIRTUAL_KEYBOARD_ENABLED_KEY)
+  const saved = profileStorage.getItem(VIRTUAL_KEYBOARD_ENABLED_KEY)
   return saved === null ? VIRTUAL_KEYBOARD_DEFAULT_ENABLED : saved === 'true'
 }
 

@@ -269,20 +269,28 @@ export async function computeRecCandidates(taste: TasteProfile): Promise<RecCand
   })
 }
 
-let recCache: { hash: string; candidates: RecCandidate[] } | null = null
+const recommendationsByDb = new WeakMap<
+  DatabaseWrapper,
+  { hash: string; candidates: RecCandidate[] }
+>()
 
 function tasteHashOf(taste: TasteProfile): string {
   return JSON.stringify([taste.genreComp, taste.genreDrop, taste.knownIds.length])
 }
 
 async function refreshCandidatesIfNeeded(
+  db: DatabaseWrapper,
   taste: TasteProfile,
   hash: string
 ): Promise<RecCandidate[]> {
+  let recCache = recommendationsByDb.get(db)
   if (!recCache || recCache.hash !== hash) {
     try {
       const fresh = await computeRecCandidates(taste)
-      if (fresh.length > 0) recCache = { hash, candidates: fresh }
+      if (fresh.length > 0) {
+        recCache = { hash, candidates: fresh }
+        recommendationsByDb.set(db, recCache)
+      }
     } catch (err) {
       logger.warn(
         { err: (err as Error)?.message },
@@ -295,5 +303,5 @@ async function refreshCandidatesIfNeeded(
 
 export async function getCachedRecommendations(db: DatabaseWrapper): Promise<RecCandidate[]> {
   const taste = await computeTasteProfile(db)
-  return refreshCandidatesIfNeeded(taste, tasteHashOf(taste))
+  return refreshCandidatesIfNeeded(db, taste, tasteHashOf(taste))
 }

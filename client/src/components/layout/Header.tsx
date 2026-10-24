@@ -7,59 +7,9 @@ import Logo from '../common/Logo'
 import { useSidebar } from '../../contexts/SidebarContext'
 import { useContentType } from '../../contexts/ContentTypeContext'
 import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
-import { trpcClient } from '../../lib/trpc'
+import { profileQuery } from '../../hooks/useProfile'
+import ProfileAvatar from '../common/ProfileAvatar'
 import styles from './Header.module.css'
-import { qk } from '../../lib/queryKeys'
-
-interface UserProfile {
-  name: string
-  picture?: string
-  email?: string
-  provider: 'github' | 'google' | 'none'
-}
-
-const fetchSyncProfile = async (): Promise<UserProfile | null> => {
-  let settings: { actualActiveProvider?: string }
-  try {
-    settings = await trpcClient.auth.syncSettings.query()
-  } catch {
-    return null
-  }
-  const activeProvider = settings.actualActiveProvider as 'github' | 'google' | 'rclone' | 'none'
-
-  if (activeProvider === 'github') {
-    try {
-      const github = await trpcClient.auth.githubStatus.query()
-      if (github.authenticated && github.user) {
-        return {
-          name: github.user.name || github.user.login,
-          picture: github.user.avatarUrl ?? undefined,
-          provider: 'github',
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  if (activeProvider === 'google') {
-    try {
-      const google = await trpcClient.auth.user.query()
-      if (google) {
-        return {
-          name: (google as { name: string }).name,
-          picture: (google as { picture?: string }).picture,
-          email: (google as { email?: string }).email,
-          provider: 'google',
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return null
-}
 
 const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar()
@@ -79,11 +29,7 @@ const Header: React.FC = () => {
   const headerRef = useRef<HTMLElement>(null)
   const overHeader = useRef(false)
 
-  const { data: user } = useQuery<UserProfile | null>({
-    queryKey: [qk.syncProfile],
-    queryFn: fetchSyncProfile,
-    staleTime: 30000,
-  })
+  const { data: user } = useQuery(profileQuery)
 
   useEffect(() => {
     const vv = window.visualViewport
@@ -295,20 +241,16 @@ const Header: React.FC = () => {
 
             <NotificationBell />
 
-            <Link to="/settings?tab=sync" className={styles.profileBtn} aria-label="Sync settings">
-              {user?.picture ? (
-                <img
-                  src={user.picture}
-                  alt={user.name}
-                  className={styles.profileImg}
-                  referrerPolicy="no-referrer"
-                  decoding="async"
-                />
-              ) : user?.provider === 'github' ? (
-                <Icon name="github" />
-              ) : (
-                <Icon name="cloud" />
-              )}
+            <Link
+              to="/settings"
+              className={styles.profileBtn}
+              aria-label={`${user?.name ?? 'Profile'} — profile settings`}
+              title={`${user?.name ?? 'Profile'}${user?.owner ? ' (owner)' : ''} — profile settings`}
+            >
+              <span className={styles.profileAvatar} aria-hidden="true">
+                <ProfileAvatar image={user?.image} name={user?.name ?? 'Profile'} />
+              </span>
+              <span className={styles.profileName}>{user?.name ?? 'Profile'}</span>
             </Link>
           </div>
         </div>

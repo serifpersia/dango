@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { profileQuery } from '../../hooks/useProfile'
 import React, { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { trpcClient } from '../../lib/trpc'
@@ -14,6 +16,7 @@ interface SyncSettings {
 }
 
 const SyncProviderSelector: React.FC = () => {
+  const queryClient = useQueryClient()
   const [settings, setSettings] = useState<SyncSettings | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -45,6 +48,7 @@ const SyncProviderSelector: React.FC = () => {
           : null
       )
       await fetchSettings()
+      await queryClient.invalidateQueries({ queryKey: profileQuery.queryKey })
       toast.success(
         `Sync provider updated to ${newProvider === 'default' ? 'Default Order' : newProvider}`
       )

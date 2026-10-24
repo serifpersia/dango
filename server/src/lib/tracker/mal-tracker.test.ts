@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 process.env.XDG_DATA_HOME = mkdtempSync(path.join(tmpdir(), 'dango-tracker-test-'))
+process.env.APPDATA = process.env.XDG_DATA_HOME
 const { initializeDatabase } = await import('../../db/ddl.js')
 const { SettingsRepository: settings } = await import('../../repositories/settings.repository.js')
 const { WatchedEpisodesRepository: watched } =

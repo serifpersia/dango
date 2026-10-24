@@ -1,9 +1,10 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useCallback, useRef, useState, type RefObject } from 'react'
 
 const persistDelay = (ms: number, enabled: boolean) => {
   try {
-    localStorage.setItem('playerVideoDelayMs', String(ms))
-    localStorage.setItem('playerVideoDelayEnabled', String(enabled))
+    profileStorage.setItem('playerVideoDelayMs', String(ms))
+    profileStorage.setItem('playerVideoDelayEnabled', String(enabled))
   } catch {
     // ignore
   }
@@ -11,7 +12,7 @@ const persistDelay = (ms: number, enabled: boolean) => {
 
 const persistDelayEnabled = (enabled: boolean) => {
   try {
-    localStorage.setItem('playerVideoDelayEnabled', String(enabled))
+    profileStorage.setItem('playerVideoDelayEnabled', String(enabled))
   } catch {
     // ignore
   }
@@ -23,7 +24,7 @@ export function useAvSync(
 ) {
   const [videoDelayMs, setVideoDelayMs] = useState<number>(() => {
     try {
-      const stored = Number(localStorage.getItem('playerVideoDelayMs'))
+      const stored = Number(profileStorage.getItem('playerVideoDelayMs'))
       if (Number.isFinite(stored) && stored >= 0 && stored <= 500) return Math.round(stored)
     } catch {
       // ignore
@@ -32,7 +33,7 @@ export function useAvSync(
   })
   const [videoDelayEnabled, setVideoDelayEnabled] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('playerVideoDelayEnabled') === 'true'
+      return profileStorage.getItem('playerVideoDelayEnabled') === 'true'
     } catch {
       return false
     }
@@ -46,7 +47,7 @@ export function useAvSync(
     const clamped = Math.max(0, Math.min(500, Math.round(ms)))
     setVideoDelayMs(clamped)
     try {
-      localStorage.setItem('playerVideoDelayMs', String(clamped))
+      profileStorage.setItem('playerVideoDelayMs', String(clamped))
     } catch {
       // ignore
     }

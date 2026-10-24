@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect, useRef } from 'react'
 import { pickSubtitleIndex } from '../lib/subtitles'
 import { isProgressCompleted } from '../lib/playbackCompletion'
@@ -86,10 +87,10 @@ export function useMediaSource({
     }
 
     if (selectedSource.subtitles) {
-      const subtitlesEnabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+      const subtitlesEnabled = profileStorage.getItem('playerSubtitlesEnabled') !== 'false'
       let lastKey: string | null = null
       try {
-        lastKey = localStorage.getItem('playerLastSubtitle')
+        lastKey = profileStorage.getItem('playerLastSubtitle')
       } catch {
         // ignore
       }

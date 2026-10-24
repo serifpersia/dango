@@ -10,6 +10,7 @@ import { ThemeProvider } from './contexts/ThemeProvider'
 import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TRPCProvider, trpcClient } from './lib/trpc'
+import ProfileGate from './components/ProfileGate'
 
 try {
   window.history.scrollRestoration = 'manual'
@@ -32,25 +33,27 @@ const queryClient = new QueryClient({
 const root = document.getElementById('root')
 if (root) {
   render(
-    <BrowserRouter>
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <AnimePaheCookieProvider>
-            <SidebarProvider>
-              <ContentTypeProvider>
-                <TitlePreferenceProvider>
-                  <LowEndModeProvider>
-                    <ThemeProvider>
-                      <App />
-                    </ThemeProvider>
-                  </LowEndModeProvider>
-                </TitlePreferenceProvider>
-              </ContentTypeProvider>
-            </SidebarProvider>
-          </AnimePaheCookieProvider>
-        </QueryClientProvider>
-      </TRPCProvider>
-    </BrowserRouter>,
+    <ProfileGate>
+      <BrowserRouter>
+        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <AnimePaheCookieProvider>
+              <SidebarProvider>
+                <ContentTypeProvider>
+                  <TitlePreferenceProvider>
+                    <LowEndModeProvider>
+                      <ThemeProvider>
+                        <App />
+                      </ThemeProvider>
+                    </LowEndModeProvider>
+                  </TitlePreferenceProvider>
+                </ContentTypeProvider>
+              </SidebarProvider>
+            </AnimePaheCookieProvider>
+          </QueryClientProvider>
+        </TRPCProvider>
+      </BrowserRouter>
+    </ProfileGate>,
     root
   )
 }

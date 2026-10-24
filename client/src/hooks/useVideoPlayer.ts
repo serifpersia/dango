@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { usePlayerCore, usePlayerState } from '../lib/player/usePlayerCore'
 import { useQueryClient } from '@tanstack/react-query'
@@ -64,7 +65,7 @@ const useVideoPlayer = ({
 
   const setShowControls = engine.setShowControls
   const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(
-    localStorage.getItem('autoSkipEnabled') === 'true'
+    profileStorage.getItem('autoSkipEnabled') === 'true'
   )
   const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null)
   const [initialSubtitleStyle] = useState(loadSubtitleStyle)
@@ -117,7 +118,7 @@ const useVideoPlayer = ({
       }
       if (!setters[key](value)) return
       try {
-        localStorage.setItem(SUBTITLE_STYLE_STORAGE_KEYS[key], String(value))
+        profileStorage.setItem(SUBTITLE_STYLE_STORAGE_KEYS[key], String(value))
       } catch {
         // ignore
       }
@@ -130,7 +131,7 @@ const useVideoPlayer = ({
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [useNativeControls, setUseNativeControls] = useState(() => {
     try {
-      return localStorage.getItem('playerUseNativeControls') === 'true'
+      return profileStorage.getItem('playerUseNativeControls') === 'true'
     } catch {
       return false
     }

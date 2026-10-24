@@ -1,3 +1,4 @@
+import { profileService, profileScope } from './profile-scope.js'
 import fs from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
@@ -72,6 +73,7 @@ export class GoogleDriveService implements SyncBackend {
   }
 
   private saveTokens(tokens: GoogleTokenSet) {
+    if (profileScope.getStore()?.deleted) return
     const merged = { ...this.tokens, ...tokens }
     if (merged.expires_in && !merged.expiry_date) {
       merged.expiry_date = Date.now() + merged.expires_in * 1000
@@ -93,6 +95,7 @@ export class GoogleDriveService implements SyncBackend {
   }
 
   private async postJson<T>(url: string, payload: unknown): Promise<T> {
+    if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
     const response = await fetchWithRetry(
       url,
       {
@@ -107,6 +110,7 @@ export class GoogleDriveService implements SyncBackend {
   }
 
   private async postForm<T>(url: string, params: URLSearchParams): Promise<T> {
+    if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
     const response = await fetchWithRetry(
       url,
       {
@@ -201,6 +205,7 @@ export class GoogleDriveService implements SyncBackend {
   }
 
   private async googleRequest<T>(config: GoogleRequestConfig): Promise<GoogleRequestResult<T>> {
+    if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
     await this.ensureAccessToken()
 
     try {
@@ -322,10 +327,16 @@ export class GoogleDriveService implements SyncBackend {
     if (!this.isAuthenticated()) return null
 
     try {
-      const res = await this.googleRequest({
+      const res = await this.googleRequest<{
+        id: string
+        name: string
+        email?: string
+        picture?: string
+      }>({
         method: 'GET',
         url: 'https://www.googleapis.com/oauth2/v2/userinfo',
       })
+      profileScope.getStore()?.setCloudAvatar?.(res.data.picture ?? null)
       return res.data
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch user profile')
@@ -338,6 +349,8 @@ export class GoogleDriveService implements SyncBackend {
   }
 
   public async logout() {
+    profileScope.getStore()?.setCloudAvatar?.(null)
+    profileScope.getStore()?.claimCloud?.('google', null)
     if (fs.existsSync(CONFIG.TOKEN_PATH)) {
       fs.unlinkSync(CONFIG.TOKEN_PATH)
     }
@@ -645,4 +658,4 @@ export class GoogleDriveService implements SyncBackend {
   }
 }
 
-export const googleDriveService = new GoogleDriveService()
+export const getGoogleDriveService = profileService(() => new GoogleDriveService())

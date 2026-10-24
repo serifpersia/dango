@@ -3,7 +3,7 @@ function batchBody(input: unknown): string {
 }
 
 function batchUrl(path: string): string {
-  return `/api/trpc/${path}?batch=1`
+  return `/api/trpc/${path}?batch=1&_profile=${encodeURIComponent(getActiveProfileId())}`
 }
 
 export function trpcBeacon(path: string, input: unknown): void {
@@ -40,3 +40,4 @@ export function clearDiscordPresence(sessionId: string | undefined): void {
   trpcBeacon('discord.clear', { sessionId })
   trpcBeacon('discord.heartbeat', { sessionId, bye: true })
 }
+import { getActiveProfileId } from './profileStorage'

@@ -1,5 +1,7 @@
+import { profileStorage } from './profileStorage'
 import { emitAuthRequired } from './auth-bus'
 import toast from 'react-hot-toast'
+import { getActiveProfileId } from './profileStorage'
 
 const sleep = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {
@@ -31,18 +33,24 @@ export const fetchWithLocalHeaders = async (
       new URL(target, window.location.origin).origin === window.location.origin)
 
   if (isLocalEndpoint) {
-    let animepaheUa = localStorage.getItem('animepahe_ua')
-    let animepaheCookie = localStorage.getItem('animepahe_cookie')
+    if (
+      !target.includes('/api/profiles/status') &&
+      !target.includes('/api/profiles/login') &&
+      !target.includes('/api/auth/app-')
+    )
+      headers.set('x-dango-profile-id', getActiveProfileId())
+    let animepaheUa = profileStorage.getItem('animepahe_ua')
+    let animepaheCookie = profileStorage.getItem('animepahe_cookie')
     if (animepaheCookie && animepaheUa && animepaheUa !== navigator.userAgent) {
-      localStorage.removeItem('animepahe_cookie')
-      localStorage.removeItem('animepahe_ua')
+      profileStorage.removeItem('animepahe_cookie')
+      profileStorage.removeItem('animepahe_ua')
       animepaheCookie = null
       animepaheUa = null
       toast.error('Your browser changed. Verify AnimePahe again to refresh its cookie.')
       emitAuthRequired('animepahe')
     }
-    const jasmrUa = localStorage.getItem('jasmr_ua')
-    const jasmrCookie = localStorage.getItem('jasmr_cookie')
+    const jasmrUa = profileStorage.getItem('jasmr_ua')
+    const jasmrCookie = profileStorage.getItem('jasmr_cookie')
 
     if (animepaheUa) headers.set('x-animepahe-ua', animepaheUa)
     if (animepaheCookie) headers.set('x-animepahe-cookie', animepaheCookie)
@@ -56,6 +64,21 @@ export const fetchWithLocalHeaders = async (
   const canRetry = isLocalEndpoint && (method === 'GET' || method === 'HEAD')
 
   let response = await fetch(url, options)
+  if (isLocalEndpoint && response.status === 409) {
+    const body = await response
+      .clone()
+      .json()
+      .catch(() => null)
+    if (body?.error === 'PROFILE_CHANGED') window.location.reload()
+  }
+  if (isLocalEndpoint && response.status === 401 && !target.includes('/api/profiles/')) {
+    const body = await response
+      .clone()
+      .json()
+      .catch(() => null)
+    if (body?.error === 'PROFILE_AUTH_REQUIRED')
+      window.dispatchEvent(new Event('dango:profile-auth-required'))
+  }
 
   for (
     let attempt = 0;

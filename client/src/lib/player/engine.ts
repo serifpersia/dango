@@ -1,3 +1,4 @@
+import { profileStorage } from '../profileStorage'
 import { canPlayHlsNatively, loadHls } from '../hls'
 import type Hls from 'hls.js'
 import type {
@@ -13,7 +14,7 @@ let activeMedia: HTMLMediaElement | null = null
 
 function stored(key: string | undefined): string | null {
   try {
-    return key ? localStorage.getItem(key) : null
+    return key ? profileStorage.getItem(key) : null
   } catch {
     return null
   }
@@ -21,7 +22,7 @@ function stored(key: string | undefined): string | null {
 
 function persist(key: string | undefined, value: number | boolean) {
   try {
-    if (key) localStorage.setItem(key, String(value))
+    if (key) profileStorage.setItem(key, String(value))
   } catch {
     // ignore
   }

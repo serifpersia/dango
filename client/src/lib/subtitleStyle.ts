@@ -1,3 +1,4 @@
+import { profileStorage } from './profileStorage'
 export type SubtitleEdge = 'shadow' | 'outline' | 'none'
 
 export interface SubtitleStyleSettings {
@@ -38,7 +39,7 @@ const isHexColor = (v: unknown): v is string => typeof v === 'string' && /^#[0-9
 
 const readNumber = (key: string, fallback: number, min: number, max: number): number => {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = profileStorage.getItem(key)
     if (raw === null) return fallback
     const parsed = parseFloat(raw)
     return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback
@@ -53,13 +54,13 @@ export function loadSubtitleStyle(): SubtitleStyleSettings {
   let textColor = DEFAULT_SUBTITLE_STYLE.textColor
   let bold = DEFAULT_SUBTITLE_STYLE.bold
   try {
-    const rawEdge = localStorage.getItem('subtitleEdge')
+    const rawEdge = profileStorage.getItem('subtitleEdge')
     if (rawEdge === 'shadow' || rawEdge === 'outline' || rawEdge === 'none') edge = rawEdge
-    const rawBg = localStorage.getItem('subtitleBgColor')
+    const rawBg = profileStorage.getItem('subtitleBgColor')
     if (isHexColor(rawBg)) bgColor = rawBg
-    const rawText = localStorage.getItem('subtitleTextColor')
+    const rawText = profileStorage.getItem('subtitleTextColor')
     if (isHexColor(rawText)) textColor = rawText
-    const rawBold = localStorage.getItem('subtitleBold')
+    const rawBold = profileStorage.getItem('subtitleBold')
     if (rawBold !== null) bold = rawBold === 'true'
   } catch {
     // ignore

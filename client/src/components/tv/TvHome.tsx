@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import HomeEmptyState from '../common/HomeEmptyState'
@@ -41,7 +42,7 @@ const TvHome: React.FC = () => {
   const [resetTarget, setResetTarget] = useState<{ libId: string; title: string } | null>(null)
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    return (localStorage.getItem('tv_home_activeTab') as ActiveTab) || 'latest'
+    return (profileStorage.getItem('tv_home_activeTab') as ActiveTab) || 'latest'
   })
 
   const [latestType, setLatestType] = useState<'tv' | 'movie'>('tv')
@@ -51,7 +52,7 @@ const TvHome: React.FC = () => {
   const items = cwData?.data ?? []
 
   React.useEffect(() => {
-    localStorage.setItem('tv_home_activeTab', activeTab)
+    profileStorage.setItem('tv_home_activeTab', activeTab)
   }, [activeTab])
 
   const isTrendingTm = trendingSort.startsWith('trending_')

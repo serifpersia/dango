@@ -1,3 +1,4 @@
+import { profileService } from './profile-scope.js'
 import { spawn, execFile } from 'child_process'
 import logger from './logger.js'
 import { CONFIG } from './config.js'
@@ -41,6 +42,7 @@ class RcloneService {
   }
 
   public async init(): Promise<boolean> {
+    this.activeRemote = null
     try {
       await this.executeCommand(['version'])
 
@@ -130,4 +132,4 @@ class RcloneService {
   }
 }
 
-export const rcloneService = new RcloneService()
+export const getRcloneService = profileService(() => new RcloneService())

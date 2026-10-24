@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import React, { useCallback, useEffect, useState } from 'react'
 import Icon from '../components/common/Icon'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
@@ -95,7 +96,7 @@ const Asmr: React.FC = () => {
   } | null>(null)
   const [playerExpanded, setPlayerExpanded] = useState(true)
   const [translateEN, setTranslateEN] = useState(
-    () => localStorage.getItem('asmrTranslateEN') === 'true'
+    () => profileStorage.getItem('asmrTranslateEN') === 'true'
   )
   const [showJasmrModal, setShowJasmrModal] = useState(false)
   const queryClient = useQueryClient()
@@ -107,7 +108,7 @@ const Asmr: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('asmrTranslateEN', String(translateEN))
+    profileStorage.setItem('asmrTranslateEN', String(translateEN))
   }, [translateEN])
 
   const showMature = hasConsent

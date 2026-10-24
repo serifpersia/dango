@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useState, useEffect, useRef } from 'react'
 import { Modal } from '../common/Modal'
 import styles from '../anime/AnimePaheCookieModal.module.css'
@@ -65,7 +66,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
   }, [])
 
   const handleStartVerification = async () => {
-    localStorage.setItem('jasmr_ua', userAgent)
+    profileStorage.setItem('jasmr_ua', userAgent)
     window.open('https://japaneseasmr.com', '_blank', 'noopener,noreferrer')
     setStep(2)
   }
@@ -115,7 +116,7 @@ const JasmrCookieModal: React.FC<JasmrCookieModalProps> = ({ isOpen, onClose, on
 
     setIsSubmitting(true)
     try {
-      localStorage.setItem('jasmr_cookie', cookie.trim())
+      profileStorage.setItem('jasmr_cookie', cookie.trim())
       toast.success('Cookie updated successfully!')
       onSuccess?.()
       onClose()

@@ -1,3 +1,4 @@
+import { profileStorage } from '../../lib/profileStorage'
 import React, { useState, useEffect, useRef } from 'react'
 import { Modal } from '../common/Modal'
 import styles from './AnimePaheCookieModal.module.css'
@@ -115,8 +116,8 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
     }
 
     try {
-      localStorage.setItem('animepahe_ua', userAgent)
-      localStorage.setItem('animepahe_cookie', trimmed)
+      profileStorage.setItem('animepahe_ua', userAgent)
+      profileStorage.setItem('animepahe_cookie', trimmed)
       toast.success('Cookie updated successfully! Reloading…')
       onSuccess?.()
       onClose()

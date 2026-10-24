@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect } from 'react'
 import { pickSubtitleIndex } from '../lib/subtitles'
 import type { SubtitleTrack } from '../types/player'
@@ -44,11 +45,11 @@ export function useSubtitleTracks({
     if (
       activeSubtitleTrack === null &&
       availableSubtitles.length > 0 &&
-      localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+      profileStorage.getItem('playerSubtitlesEnabled') !== 'false'
     ) {
       let lastKey: string | null = null
       try {
-        lastKey = localStorage.getItem('playerLastSubtitle')
+        lastKey = profileStorage.getItem('playerLastSubtitle')
       } catch {
         // ignore
       }
@@ -69,7 +70,7 @@ export function useSubtitleTracks({
     const video = videoRef.current
     if (!video || availableSubtitles.length === 0) return
     const active = activeSubtitleTrack
-    const enabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+    const enabled = profileStorage.getItem('playerSubtitlesEnabled') !== 'false'
     if (!enabled || active === 'off' || active === null) {
       Array.from(video.textTracks).forEach((t) => {
         t.mode = 'hidden'

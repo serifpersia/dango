@@ -1,3 +1,4 @@
+import { profileStorage } from './profileStorage'
 const thumbnailCache = new Map<string, string>()
 const MAX_CACHE_SIZE = 500
 
@@ -67,8 +68,8 @@ export const fixThumbnailUrl = (
     }
   } else if (finalUrl.includes('animepahe')) {
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
-    const cookie = localStorage.getItem('animepahe_cookie')
-    const ua = localStorage.getItem('animepahe_ua')
+    const cookie = profileStorage.getItem('animepahe_cookie')
+    const ua = profileStorage.getItem('animepahe_ua')
     if (cookie) proxiedUrl += `&cookie=${encodeURIComponent(cookie)}`
     if (ua) proxiedUrl += `&ua=${encodeURIComponent(ua)}`
   } else if (finalUrl.startsWith('http')) {

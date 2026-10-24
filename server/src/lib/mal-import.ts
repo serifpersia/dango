@@ -1,3 +1,4 @@
+import { profileService } from '../profile-scope.js'
 import { XMLParser } from 'fast-xml-parser'
 import { searchAnilistByTitle, isAnilistRateLimited, getShowMetaById } from './anilist/index.js'
 import { kitsuSearchAnime } from './kitsu/index.js'
@@ -37,24 +38,26 @@ interface ActiveImportStatus {
   skipped?: number
 }
 
-let activeImportStatus: ActiveImportStatus = {
-  running: false,
-  current: 0,
-  total: 0,
-  phase: 'done',
-  source: null,
-}
-let activeImportCancelled = false
+const importState = profileService(() => ({
+  status: {
+    running: false,
+    current: 0,
+    total: 0,
+    phase: 'done',
+    source: null,
+  } as ActiveImportStatus,
+  cancelled: false,
+}))
 
 export function getMalImportStatus(): ActiveImportStatus {
-  return activeImportStatus
+  return importState().status
 }
 
 export function requestMalImportCancel(): { success: boolean; message: string } {
-  if (!activeImportStatus.running) {
+  if (!importState().status.running) {
     return { success: true, message: 'No import running' }
   }
-  activeImportCancelled = true
+  importState().cancelled = true
   return { success: true, message: 'Import cancellation requested' }
 }
 
@@ -75,7 +78,7 @@ export function prepareMalImport(
   fileBuffer: Buffer | undefined,
   flags: MalImportFlags
 ): { ok: true; import: PreparedMalImport } | { ok: false; status: 400 | 409; body: unknown } {
-  if (activeImportStatus.running) {
+  if (importState().status.running) {
     return { ok: false, status: 409, body: { error: 'An import is already in progress' } }
   }
   if (!fileBuffer) return { ok: false, status: 400, body: { error: 'No file' } }
@@ -99,8 +102,8 @@ export function prepareMalImport(
     return { ok: false, status: 400, body: { error: 'No anime found in XML' } }
   }
 
-  activeImportCancelled = false
-  activeImportStatus = {
+  importState().cancelled = false
+  importState().status = {
     running: true,
     current: 0,
     total: animeList.length,
@@ -130,7 +133,7 @@ export async function executeMalImport(
       found: boolean
     }
   ): void => {
-    activeImportStatus = {
+    importState().status = {
       running: true,
       current: progress.current,
       total,
@@ -207,13 +210,13 @@ export async function executeMalImport(
   }
 
   let fallbackImported = 0
-  if (shouldSkipFallback || activeImportCancelled) {
+  if (shouldSkipFallback || importState().cancelled) {
     skippedCount += fallbackQueue.length
   } else if (fallbackQueue.length > 0) {
-    activeImportStatus = { ...activeImportStatus, phase: 'fallback', source: null }
+    importState().status = { ...importState().status, phase: 'fallback', source: null }
     const BATCH_SIZE = 5
     for (let i = 0; i < fallbackQueue.length; i += BATCH_SIZE) {
-      if (activeImportCancelled) {
+      if (importState().cancelled) {
         skippedCount += fallbackQueue.length - i
         break
       }
@@ -292,7 +295,7 @@ export async function executeMalImport(
   }
 
   const imported = offlineShows.length + fallbackImported
-  activeImportStatus = {
+  importState().status = {
     running: false,
     current: total,
     total,

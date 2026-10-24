@@ -1,3 +1,4 @@
+import { profileStorage } from '../lib/profileStorage'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { ModeA, ModeB, ModeC, ModeAA } from 'anime4k-webgpu-async'
 
@@ -67,7 +68,7 @@ export default function useAnime4K({
   const [isWebGPUSupported, setIsWebGPUSupported] = useState(false)
   const [isEnabled, setIsEnabled] = useState(() => {
     try {
-      return localStorage.getItem('anime4kEnabled') === 'true'
+      return profileStorage.getItem('anime4kEnabled') === 'true'
     } catch {
       return false
     }
@@ -648,7 +649,7 @@ export default function useAnime4K({
   const setEnabled = useCallback((next: boolean) => {
     setIsEnabled(next)
     try {
-      localStorage.setItem('anime4kEnabled', String(next))
+      profileStorage.setItem('anime4kEnabled', String(next))
     } catch {
       // ignore
     }
@@ -658,7 +659,7 @@ export default function useAnime4K({
     setIsEnabled((prev) => {
       const next = !prev
       try {
-        localStorage.setItem('anime4kEnabled', String(next))
+        profileStorage.setItem('anime4kEnabled', String(next))
       } catch {
         // ignore
       }

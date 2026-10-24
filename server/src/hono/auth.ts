@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import logger from '../logger.js'
-import { googleDriveService } from '../google.js'
+import { getGoogleDriveService } from '../google.js'
 import type { DatabaseWrapper } from '../db.js'
 import type { HonoDbs } from '../app-hono.js'
 import { updateEnvFile } from '../utils/env.utils.js'
@@ -18,8 +18,8 @@ export function registerAuth(app: Hono, getDbs: () => HonoDbs, runSync: RunSyncS
       return c.text('No code provided', 400)
     }
 
-    await googleDriveService.handleCallback(code)
-    const user = await googleDriveService.getUserProfile()
+    await getGoogleDriveService().handleCallback(code)
+    const user = await getGoogleDriveService().getUserProfile()
 
     await updateEnvFile({ SYNC_PROVIDER: 'google' })
 
