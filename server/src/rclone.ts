@@ -11,7 +11,7 @@ class RcloneService {
       execFile('rclone', args, (err, stdout, stderr) => {
         if (err) {
           if (stderr) logger.warn({ stderr }, 'Rclone command warning')
-          return reject(new Error(stderr || err.message))
+          return reject(err)
         }
         resolve(stdout.trim())
       })
@@ -68,7 +68,8 @@ class RcloneService {
 
       return false
     } catch (error) {
-      logger.warn({ err: error }, 'Rclone initialization failed')
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        logger.warn({ err: error }, 'Rclone initialization failed')
       return false
     }
   }
