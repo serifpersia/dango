@@ -10,7 +10,7 @@ const LIFE = 6 * 60 * 60 * 1000
 const RECONNECT_GRACE = 60 * 1000
 const headers = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Cache-Control': 'no-store',
   'Referrer-Policy': 'no-referrer',
@@ -20,6 +20,60 @@ const token = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
     b.toString(16).padStart(2, '0')
   ).join('')
+const sameSecret = (a, b) => {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+const indexFetch = (env, body) =>
+  env.ROOMS_INDEX.get(env.ROOMS_INDEX.idFromName('index')).fetch(
+    new Request(`https://index/${body.action}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  )
+
+async function roomState(env, id) {
+  const response = await env.ROOMS.get(env.ROOMS.idFromName(id)).fetch(
+    new Request(`https://room/${id}/state`, {
+      headers: { 'X-Room-Admin': env.ADMIN_TOKEN },
+    })
+  )
+  return response.status === 404 ? null : response.ok ? await response.json() : undefined
+}
+
+async function roomIds(env) {
+  const response = await env.ROOMS_INDEX.get(env.ROOMS_INDEX.idFromName('index')).fetch(
+    new Request('https://index/list')
+  )
+  return response.json()
+}
+
+async function endRoom(env, id) {
+  await env.ROOMS.get(env.ROOMS.idFromName(id)).fetch(
+    new Request(`https://room/${id}/end`, {
+      method: 'POST',
+      headers: { 'X-Room-Admin': env.ADMIN_TOKEN },
+    })
+  )
+  await indexFetch(env, { action: 'remove', id }).catch(() => {})
+}
+
+async function adminRooms(env) {
+  const rooms = await Promise.all(
+    (await roomIds(env)).map(async ({ id }) => {
+      const state = await roomState(env, id)
+      if (state === null) {
+        await indexFetch(env, { action: 'remove', id }).catch(() => {})
+        return null
+      }
+      return state ? { id, ...state } : null
+    })
+  )
+  return rooms.filter(Boolean)
+}
 
 export default {
   async fetch(request, env) {
@@ -36,6 +90,32 @@ export default {
             "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
         },
       })
+    if (url.pathname.startsWith('/admin/')) {
+      if (!env?.ADMIN_TOKEN) return json({ error: 'Not found' }, 404)
+      const credential = request.headers.get('Authorization')?.replace(/^Bearer /, '')
+      if (!sameSecret(credential, env.ADMIN_TOKEN)) return json({ error: 'Unauthorized' }, 401)
+      const room = url.pathname.match(/^\/admin\/rooms\/([0-9a-f-]{36})$/)
+      if (request.method === 'GET' && url.pathname === '/admin/rooms')
+        return json(await adminRooms(env))
+      if (request.method === 'DELETE' && room) {
+        await endRoom(env, room[1])
+        return json({ ok: true })
+      }
+      if (request.method === 'DELETE' && url.pathname === '/admin/rooms') {
+        const idle = url.searchParams.get('idleMinutes')
+        const minutes = idle === null ? null : Number(idle)
+        if (minutes !== null && !(Number.isFinite(minutes) && minutes > 0))
+          return json({ error: 'idleMinutes must be a positive number' }, 400)
+        const rooms = await adminRooms(env)
+        const targets =
+          minutes === null
+            ? rooms
+            : rooms.filter((room) => Date.now() - room.updatedAt >= minutes * 60000)
+        await Promise.all(targets.map(({ id }) => endRoom(env, id)))
+        return json({ ok: true, ended: targets.length })
+      }
+      return json({ error: 'Not found' }, 404)
+    }
     const match =
       request.method === 'GET' && url.pathname.match(/^\/rooms\/([0-9a-f-]{36})(\/ws)?$/)
     if ((request.method === 'POST' && url.pathname === '/rooms') || match) {
@@ -70,8 +150,9 @@ export default {
 }
 
 export class WatchRoom {
-  constructor(ctx) {
+  constructor(ctx, env) {
     this.ctx = ctx
+    this.env = env
     this.state = null
     ctx.blockConcurrencyWhile(async () => {
       this.state = (await ctx.storage.get('room')) || null
@@ -79,6 +160,15 @@ export class WatchRoom {
   }
 
   async fetch(request) {
+    const action = new URL(request.url).pathname.split('/').pop()
+    const admin = request.headers.get('X-Room-Admin')
+    if (admin && this.env?.ADMIN_TOKEN && sameSecret(admin, this.env.ADMIN_TOKEN)) {
+      if (action === 'state') return this.state ? json(this.snapshot()) : json(null, 404)
+      if (action === 'end') {
+        await this.end('Room ended by admin')
+        return json({ ok: true })
+      }
+    }
     if (request.method === 'POST') {
       if (this.state) return json({ error: 'Room already exists' }, 409)
       const id = new URL(request.url).pathname.slice(1)
@@ -97,6 +187,7 @@ export class WatchRoom {
         hostReconnectUntil: Date.now() + RECONNECT_GRACE,
       }
       await this.save()
+      await this.index('add', { id, expiresAt: this.state.expiresAt })
       await this.ctx.storage.setAlarm(this.deadline())
       return json({ id, hostToken, guestToken, expiresAt: this.state.expiresAt }, 201)
     }
@@ -297,14 +388,40 @@ export class WatchRoom {
     ws.close(1011, 'Connection error')
   }
 
+  index(action, body) {
+    if (!this.env?.ROOMS_INDEX) return
+    return indexFetch(this.env, { action, ...body }).catch(() => {})
+  }
+
   async end(reason) {
+    const id = this.state?.id
     for (const ws of this.ctx.getWebSockets()) ws.close(4004, reason)
     this.state = null
     await this.ctx.storage.deleteAll()
+    if (id) await this.index('remove', { id })
   }
 
   async alarm() {
     if (!this.state || Date.now() >= this.deadline()) await this.end('Room expired')
     else await this.ctx.storage.setAlarm(this.deadline())
+  }
+}
+
+export class RoomsIndex {
+  constructor(ctx) {
+    this.ctx = ctx
+  }
+
+  async fetch(request) {
+    const action = new URL(request.url).pathname.slice(1)
+    if (action === 'list') {
+      const entries = await this.ctx.storage.list({ prefix: 'room:' })
+      return json([...entries].map(([key, expiresAt]) => ({ id: key.slice(5), expiresAt })))
+    }
+    if (action !== 'add' && action !== 'remove') return json({ error: 'Not found' }, 404)
+    const { id, expiresAt } = await request.json()
+    if (action === 'add') await this.ctx.storage.put(`room:${id}`, expiresAt)
+    else await this.ctx.storage.delete(`room:${id}`)
+    return json({ ok: true })
   }
 }

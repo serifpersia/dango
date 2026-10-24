@@ -21,3 +21,21 @@ storage immediately; abandoned rooms are deleted by their expiry alarm. The host
 controls playback and source selection; guests keep personal quality and subtitles.
 Display names are remembered per profile on each browser.
 Host disconnects pause the room; reconnect within 60 seconds or it is deleted.
+
+## Admin
+
+Admin routes stay disabled until the `ADMIN_TOKEN` secret is set:
+
+```bash
+pnpm dlx wrangler secret put ADMIN_TOKEN --config worker/dango-watch-along/wrangler.jsonc
+```
+
+They list every active room with its live member count, `updatedAt` (last playback
+change), and `expiresAt`, so idle rooms can be spotted before their six-hour expiry:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<worker>/admin/rooms
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://<worker>/admin/rooms/<room-id>
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" "https://<worker>/admin/rooms?idleMinutes=120"
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://<worker>/admin/rooms
+```

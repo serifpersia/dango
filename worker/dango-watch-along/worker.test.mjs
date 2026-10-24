@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import worker, { WatchRoom } from './worker.mjs'
+import worker, { RoomsIndex, WatchRoom } from './worker.mjs'
 
 const playback = {
   selection: {
@@ -16,7 +16,7 @@ const playback = {
   rate: 1,
 }
 
-function setup() {
+function setup(env) {
   const values = new Map()
   const sockets = []
   let alarmAt = null
@@ -36,7 +36,7 @@ function setup() {
     getWebSockets: () => sockets,
     acceptWebSocket: () => {},
   }
-  const room = new WatchRoom(ctx)
+  const room = new WatchRoom(ctx, env)
   const socket = (host) => {
     let attachment = {
       id: crypto.randomUUID(),
@@ -247,6 +247,55 @@ test('a missed reconnect deadline deletes the room and rejects late host recover
   assert.equal(setupRoom.values.size, 0)
   assert.equal(setupRoom.room.state, null)
   assert.equal(setupRoom.alarmAt(), null)
+})
+
+test('admin can list and end active rooms', async () => {
+  const values = new Map()
+  const index = new RoomsIndex({
+    storage: {
+      put: async (key, value) => values.set(key, value),
+      delete: async (key) => values.delete(key),
+      list: async ({ prefix } = {}) =>
+        new Map([...values].filter(([key]) => key.startsWith(prefix || ''))),
+    },
+  })
+  const rooms = new Map()
+  const env = {
+    ADMIN_TOKEN: 'test-admin-token',
+    ROOMS: { idFromName: (name) => name, get: (name) => rooms.get(name) },
+    ROOMS_INDEX: { idFromName: (name) => name, get: () => index },
+  }
+  const { room, socket } = setup(env)
+  await Promise.resolve()
+  const id = crypto.randomUUID()
+  const created = await room.fetch(
+    new Request(`https://room/${id}`, { method: 'POST', body: JSON.stringify(playback) })
+  )
+  assert.equal(created.status, 201)
+  assert.equal(values.get(`room:${id}`), room.state.expiresAt)
+  rooms.set(id, room)
+  socket(true)
+  const admin = (method, path, token = env.ADMIN_TOKEN) =>
+    worker.fetch(
+      new Request(`https://worker${path}`, {
+        method,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+      env
+    )
+  assert.equal((await admin('GET', '/admin/rooms', '')).status, 401)
+  const listed = await (await admin('GET', '/admin/rooms')).json()
+  assert.equal(listed.length, 1)
+  assert.equal(listed[0].id, id)
+  assert.equal(listed[0].members.length, 1)
+  const idle = await admin('DELETE', '/admin/rooms?idleMinutes=60')
+  assert.deepEqual(await idle.json(), { ok: true, ended: 0 })
+  assert.ok(room.state)
+  assert.equal((await admin('DELETE', '/admin/rooms?idleMinutes=nope')).status, 400)
+  assert.equal((await admin('DELETE', `/admin/rooms/${id}`)).status, 200)
+  assert.equal(room.state, null)
+  assert.deepEqual(await (await admin('GET', '/admin/rooms')).json(), [])
+  assert.equal(values.size, 0)
 })
 
 test('a room that never receives its host connection is also cleaned up after 60 seconds', async (t) => {

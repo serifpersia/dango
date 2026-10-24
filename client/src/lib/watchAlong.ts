@@ -16,6 +16,52 @@ export interface WatchSession {
   host: boolean
 }
 
+const SESSION_KEY = 'dango-watch-along'
+const HOST_KEY = 'dango-watch-along-host'
+
+function decodeWatchSession(value: unknown): WatchSession | null {
+  if (!value || typeof value !== 'object') return null
+  const saved = value as Record<string, unknown>
+  if (
+    typeof saved.id !== 'string' ||
+    typeof saved.token !== 'string' ||
+    typeof saved.guestToken !== 'string'
+  )
+    return null
+  const guest = parseWatchInvite(`${saved.id}.${saved.guestToken}`, '')
+  const auth = parseWatchInvite(`${saved.id}.${saved.token}`, '')
+  return { ...guest, token: auth.token, host: saved.host === true }
+}
+
+export function readWatchSession(): WatchSession | null {
+  try {
+    return (
+      decodeWatchSession(JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')) ??
+      decodeWatchSession(JSON.parse(localStorage.getItem(HOST_KEY) || 'null'))
+    )
+  } catch {
+    return null
+  }
+}
+
+export function rememberWatchSession(session: WatchSession | null) {
+  try {
+    if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    else sessionStorage.removeItem(SESSION_KEY)
+    if (session?.host) localStorage.setItem(HOST_KEY, JSON.stringify(session))
+  } catch {
+    // ignore
+  }
+}
+
+export function forgetWatchHost() {
+  try {
+    localStorage.removeItem(HOST_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function watchAlongPath(selection: WatchSelection): string {
   return selection.kind === 'tv' || selection.kind === 'movie'
     ? tvWatchPath(

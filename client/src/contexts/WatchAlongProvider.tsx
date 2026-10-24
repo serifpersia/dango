@@ -4,27 +4,21 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { trpcClient } from '../lib/trpc'
 import { WatchAlongContext } from './WatchAlongContext'
-import { parseWatchInvite, watchAlongPath } from '../lib/watchAlong'
+import {
+  forgetWatchHost,
+  parseWatchInvite,
+  readWatchSession,
+  rememberWatchSession,
+  watchAlongPath,
+} from '../lib/watchAlong'
 import type { WatchPlayback, WatchRoom, WatchSession } from '../lib/watchAlong'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-
-const SESSION_KEY = 'dango-watch-along'
 
 export function WatchAlongProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [displayName, setDisplayName] = useLocalStorage('watchAlongName', '')
-  const [session, setSession] = useState<WatchSession | null>(() => {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
-      if (!saved) return null
-      const guest = parseWatchInvite(`${saved.id}.${saved.guestToken}`, '')
-      const auth = parseWatchInvite(`${saved.id}.${saved.token}`, '')
-      return { ...guest, token: auth.token, host: saved.host === true }
-    } catch {
-      return null
-    }
-  })
+  const [session, setSession] = useState<WatchSession | null>(readWatchSession)
   const [room, setRoom] = useState<WatchRoom | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState('')
@@ -38,12 +32,7 @@ export function WatchAlongProvider({ children }: { children: ReactNode }) {
   const workerUrl = config?.workerUrl.replace(/\/$/, '') || ''
 
   useEffect(() => {
-    try {
-      if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
-      else sessionStorage.removeItem(SESSION_KEY)
-    } catch {
-      /* ignore */
-    }
+    rememberWatchSession(session)
   }, [session])
 
   const send = useCallback((message: object) => {
@@ -59,6 +48,7 @@ export function WatchAlongProvider({ children }: { children: ReactNode }) {
   const leave = useCallback(() => {
     if (session?.host) send({ type: 'end' })
     socket.current?.close(1000, 'Left room')
+    forgetWatchHost()
     setSession(null)
     setRoom(null)
     setConnected(false)
@@ -85,6 +75,7 @@ export function WatchAlongProvider({ children }: { children: ReactNode }) {
   const join = (invite: string) => {
     if (!workerUrl) throw new Error('Watch along is unavailable. Check your server configuration.')
     const next = parseWatchInvite(invite, workerUrl)
+    forgetWatchHost()
     setError('')
     setRoom(null)
     setSession(next)
@@ -109,6 +100,7 @@ export function WatchAlongProvider({ children }: { children: ReactNode }) {
           const data = await response.json()
           if ([403, 404, 409].includes(response.status)) {
             setError(data.error || 'Unable to join room')
+            forgetWatchHost()
             setSession(null)
             setRoom(null)
             return
@@ -161,6 +153,7 @@ export function WatchAlongProvider({ children }: { children: ReactNode }) {
         setConnected(false)
         if ([4003, 4004, 4009].includes(event.code)) {
           setError(event.reason || 'Room closed')
+          if (event.code !== 4009) forgetWatchHost()
           setSession(null)
           setRoom(null)
           return

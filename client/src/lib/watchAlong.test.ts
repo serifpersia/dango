@@ -1,10 +1,62 @@
-import { describe, expect, it } from 'vitest'
-import { parseWatchInvite, watchAlongPath } from './watchAlong'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  forgetWatchHost,
+  parseWatchInvite,
+  readWatchSession,
+  rememberWatchSession,
+  watchAlongPath,
+} from './watchAlong'
+
+const id = '12f45a67-89ab-4cde-8fab-123456789abc'
+const token = 'a'.repeat(64)
+const guestToken = 'b'.repeat(64)
+const hostSession = { id, token, guestToken, host: true }
+const guestSession = { id, token: guestToken, guestToken, host: false }
+
+function memoryStorage() {
+  const map = new Map<string, string>()
+  return {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, value),
+    removeItem: (key: string) => void map.delete(key),
+  }
+}
+
+describe('watch-along session storage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('recovers a host session from localStorage when the tab storage is empty', () => {
+    vi.stubGlobal('sessionStorage', memoryStorage())
+    vi.stubGlobal('localStorage', memoryStorage())
+    rememberWatchSession(hostSession)
+    sessionStorage.removeItem('dango-watch-along')
+    expect(readWatchSession()).toEqual(hostSession)
+  })
+
+  it('prefers the current tab session over a stale host entry', () => {
+    vi.stubGlobal('sessionStorage', memoryStorage())
+    vi.stubGlobal('localStorage', memoryStorage())
+    rememberWatchSession(hostSession)
+    rememberWatchSession(guestSession)
+    expect(readWatchSession()).toEqual(guestSession)
+  })
+
+  it('keeps guests out of the host store and forgets host intent on request', () => {
+    vi.stubGlobal('sessionStorage', memoryStorage())
+    vi.stubGlobal('localStorage', memoryStorage())
+    rememberWatchSession(guestSession)
+    expect(localStorage.getItem('dango-watch-along-host')).toBeNull()
+    rememberWatchSession(hostSession)
+    forgetWatchHost()
+    expect(readWatchSession()).toEqual(hostSession)
+    expect(localStorage.getItem('dango-watch-along-host')).toBeNull()
+  })
+})
 
 describe('watch-along invites', () => {
   const worker = 'https://rooms.example.com'
-  const id = '12f45a67-89ab-4cde-8fab-123456789abc'
-  const token = 'a'.repeat(64)
   it('accepts a code or an invite from the configured service', () => {
     expect(parseWatchInvite(`${worker}/join#${id}.${token}`, worker)).toEqual({
       id,

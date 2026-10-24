@@ -4,9 +4,15 @@
   "compatibility_date": "2026-10-24",
   "workers_dev": true,
   "durable_objects": {
-    "bindings": [{ "name": "ROOMS", "class_name": "WatchRoom" }],
+    "bindings": [
+      { "name": "ROOMS", "class_name": "WatchRoom" },
+      { "name": "ROOMS_INDEX", "class_name": "RoomsIndex" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WatchRoom"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["WatchRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["RoomsIndex"] },
+  ],
   "ratelimits": [
     {
       "name": "ROOM_LIMIT",
