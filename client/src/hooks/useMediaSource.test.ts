@@ -15,6 +15,33 @@ describe('anime source resume position', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
+  it.each([79, 80, 100])(
+    'loads saved progress at %s percent with the correct pause state',
+    (time) => {
+      const loadSource = vi.fn()
+      useMediaSource({
+        engine: { loadSource } as unknown as PlayerEngine,
+        videoRef: { current: { firstChild: null } as HTMLVideoElement },
+        selectedSource: { sourceName: 'Source', links: [] },
+        selectedLink: { link: 'https://example.com/video.mp4', hls: false, resolutionStr: '720p' },
+        loadingVideo: false,
+        testClipActive: false,
+        resumeTime: time,
+        resumeDuration: 100,
+        showResumeModal: time < 80,
+        calibReturnRef: { current: null },
+        setAvailableSubtitles: vi.fn(),
+        setActiveSubtitleTrack: vi.fn(),
+        onFatalError: vi.fn(),
+      })
+      effects[1]()
+      expect(loadSource).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ initialTime: 0, autoPlay: false })
+      )
+    }
+  )
+
   it.each([0, 45, 240])(
     'keeps an explicit quality-switch position of %s over saved progress',
     (position) => {

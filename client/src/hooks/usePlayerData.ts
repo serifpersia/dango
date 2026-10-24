@@ -19,6 +19,7 @@ import { normalizeScore } from '../lib/utils'
 import { useShowMeta } from './useShowMeta'
 import { useProviders } from './useProviders'
 import { qk } from '../lib/queryKeys'
+import { isProgressCompleted } from '../lib/playbackCompletion'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -159,7 +160,10 @@ async function fetchVideoSources(
       selectedLink,
       resumeTime,
       resumeDuration,
-      showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+      showResumeModal:
+        resumeTime > 5 &&
+        !isProgressCompleted(resumeTime, resumeDuration) &&
+        sourceToSelect?.type !== 'iframe',
       skipIntervals,
       fetchedEpisodeNumber: episodeNumber,
     }
@@ -333,6 +337,7 @@ export const usePlayerData = (
   const {
     data: videoData,
     isLoading: loadingVideo,
+    isFetching: fetchingVideo,
     error: videoError,
   } = useQuery({
     queryKey: [
@@ -517,6 +522,7 @@ export const usePlayerData = (
       selectedLink: uiState.selectedLink || videoDataForEpisode?.selectedLink || null,
       resumeTime: videoDataForEpisode?.resumeTime || 0,
       resumeDuration: videoDataForEpisode?.resumeDuration || 0,
+      resumeProgressPending: fetchingVideo,
       showResumeModal: uiState.showResumeModal && (videoDataForEpisode?.showResumeModal ?? false),
       skipIntervals: videoDataForEpisode?.skipIntervals || [],
       loadingShowData,
@@ -531,6 +537,7 @@ export const usePlayerData = (
     videoData,
     loadingShowData,
     loadingVideo,
+    fetchingVideo,
     showDataError,
     videoError,
     currentEpisode,

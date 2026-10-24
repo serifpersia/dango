@@ -12,6 +12,7 @@ import {
   type SubtitleStyleKey,
 } from '../lib/subtitleStyle'
 import { qk } from '../lib/queryKeys'
+import { isProgressCompleted } from '../lib/playbackCompletion'
 
 interface VideoPlayerProps {
   skipIntervals: SkipInterval[]
@@ -190,6 +191,7 @@ const useVideoPlayer = ({
       const saveProgress = async () => {
         try {
           await trpcKeepalive('progress.updateProgress', payload)
+          queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
           queryClient.invalidateQueries({ queryKey: [qk.videoSources, showId, episodeNumber] })
           queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
           queryClient.invalidateQueries({ queryKey: [qk.thisWeekSchedule] })
@@ -202,9 +204,13 @@ const useVideoPlayer = ({
       if (isFinalUpdate) {
         saveProgress()
       } else {
-        trpcKeepalive('progress.updateProgress', payload).catch((err) =>
-          console.error('Failed to update progress:', err)
-        )
+        trpcKeepalive('progress.updateProgress', payload)
+          .then(() => {
+            if (isProgressCompleted(payload.currentTime, payload.duration)) {
+              void queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
+            }
+          })
+          .catch((err) => console.error('Failed to update progress:', err))
       }
 
       return true
@@ -308,7 +314,13 @@ const useVideoPlayer = ({
     if (!video) return
     const time = video.currentTime || 0
     const now = Date.now()
-    if (now - lastThrottledUpdateTime.current > 60000 && sendProgressUpdate()) {
+    const crossedCompletionThreshold =
+      isProgressCompleted(time, video.duration) &&
+      !isProgressCompleted(lastReportedTime.current, video.duration)
+    if (
+      (crossedCompletionThreshold || now - lastThrottledUpdateTime.current > 60000) &&
+      sendProgressUpdate(false, crossedCompletionThreshold)
+    ) {
       lastThrottledUpdateTime.current = now
     }
     const activeSkip =
@@ -334,6 +346,7 @@ const useVideoPlayer = ({
     trpcClient.progress.updateProgress
       .mutate(payload)
       .then(() => {
+        queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
         queryClient.invalidateQueries({ queryKey: [qk.videoSources, showId, episodeNumber] })
         queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
       })

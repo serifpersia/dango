@@ -43,6 +43,7 @@ export const createInitialState = (): PlayerState => ({
   selectedLink: null,
   isAutoplayEnabled: loadAutoplayEnabled(),
   showResumeModal: true,
+  resumeProgressPending: true,
   resumeTime: 0,
   resumeDuration: 0,
   skipIntervals: [],

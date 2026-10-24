@@ -367,11 +367,11 @@ const Tv: React.FC = () => {
       adult: details.adult,
     })
   }, [details, id, typeParam, toggleTvWatchlist])
-  const { data: savedProgress, isFetched: resumeFetched } = useTvLatestProgress(
-    mediaId || undefined,
-    season,
-    episode
-  )
+  const {
+    data: savedProgress,
+    isFetched: resumeFetched,
+    isFetching: resumeFetching,
+  } = useTvLatestProgress(mediaId || undefined, season, episode)
   const sortedEpisodeNumbers = useMemo(
     () => episodes.map((ep) => ep.episode_number).sort((a, b) => a - b),
     [episodes]
@@ -579,8 +579,9 @@ const Tv: React.FC = () => {
     if (video.duration > 0 && video.duration - video.currentTime <= 60) {
       prefetchNextTvEpisode()
     }
-    if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+    if (progressSaveTimerRef.current) return
     progressSaveTimerRef.current = setTimeout(() => {
+      progressSaveTimerRef.current = null
       saveVideoProgress(video.currentTime, video.duration || 0)
     }, 5000)
   }, [saveVideoProgress, videoRef, testClipActive, updateNextEpisodePrompt, prefetchNextTvEpisode])
@@ -589,6 +590,7 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     if (!video || !details) return
     if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+    progressSaveTimerRef.current = null
     saveVideoProgress(video.currentTime, video.duration || 0)
 
     if (nextEpisodeNumber != null) {
@@ -756,17 +758,21 @@ const Tv: React.FC = () => {
   }, [resumeFetched, mediaId, season, episode])
 
   useEffect(() => {
-    if (!savedProgress || hasResumedRef.current) return
+    if (resumeFetching || !savedProgress || hasResumedRef.current) return
     const epKey = `${mediaId}:${season}:${episode}`
     if (resumeEvaluatedKeyRef.current === epKey) return
     resumeEvaluatedKeyRef.current = epKey
-    const c = savedProgress as { currentTime?: number }
+    const c = savedProgress as { currentTime?: number; duration?: number; completed?: number }
     const ct = c.currentTime ?? 0
-    if (hasResumableProgress(ct)) {
+    if (
+      hasResumableProgress(ct) &&
+      c.completed !== 1 &&
+      !isProgressCompleted(ct, c.duration ?? 0)
+    ) {
       setResumeTime(ct)
       setShowResumeModal(true)
     }
-  }, [savedProgress, mediaId, season, episode])
+  }, [savedProgress, resumeFetching, mediaId, season, episode])
 
   useEffect(() => {
     if (showResumeModal && videoRef.current) {
@@ -778,6 +784,7 @@ const Tv: React.FC = () => {
     const video = videoRef.current
     return () => {
       if (progressSaveTimerRef.current) clearTimeout(progressSaveTimerRef.current)
+      progressSaveTimerRef.current = null
       if (!video?.ended && player.engine.getState().duration > 0) {
         saveVideoProgress(
           player.engine.getTimeline().currentTime,
@@ -836,9 +843,7 @@ const Tv: React.FC = () => {
       .filter(
         (row) =>
           row.season === season &&
-          (row.completed === 1 ||
-            row.completed === 1 ||
-            isProgressCompleted(row.currentTime, row.duration))
+          (row.completed === 1 || isProgressCompleted(row.currentTime, row.duration))
       )
       .map((row) => String(row.episode))
   }, [tvProgress, season])
@@ -2256,7 +2261,13 @@ const Tv: React.FC = () => {
         )}
 
         <ResumeModal
-          isOpen={showResumeModal}
+          isOpen={
+            showResumeModal &&
+            !resumeFetching &&
+            resumeEvaluatedKeyRef.current === `${mediaId}:${season}:${episode}` &&
+            savedProgress?.completed !== 1 &&
+            !isProgressCompleted(savedCt, savedProgress?.duration ?? 0)
+          }
           onClose={handleSkipResume}
           title="Resume Watching"
           message={

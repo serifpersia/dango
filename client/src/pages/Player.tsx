@@ -288,7 +288,7 @@ const Player: React.FC = () => {
     onEnd: handlePlaybackFinished,
   })
 
-  const shouldShowResumeModal = state.showResumeModal
+  const shouldShowResumeModal = state.showResumeModal && !state.resumeProgressPending
   const shouldShowCompleteModal = showCompleteModal
   const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal
 
@@ -329,6 +329,7 @@ const Player: React.FC = () => {
     loadingVideo: state.loadingVideo,
     testClipActive,
     resumeTime: state.resumeTime,
+    resumeDuration: state.resumeDuration,
     showResumeModal: state.showResumeModal,
     calibReturnRef,
     setAvailableSubtitles: actions.setAvailableSubtitles,

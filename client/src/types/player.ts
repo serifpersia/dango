@@ -72,6 +72,7 @@ export interface PlayerState {
   selectedProvider: string
   loadingShowData: boolean
   loadingVideo: boolean
+  resumeProgressPending: boolean
   error: string | null
   fetchedEpisodeNumber?: string
   showCookieModal?: boolean

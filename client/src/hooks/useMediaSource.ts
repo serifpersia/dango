@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { pickSubtitleIndex } from '../lib/subtitles'
+import { isProgressCompleted } from '../lib/playbackCompletion'
 import type { PlayerEngine } from '../lib/player/engine'
 import type { SubtitleTrack, VideoLink, VideoSource } from '../types/player'
 
@@ -11,6 +12,7 @@ interface UseMediaSourceOptions {
   loadingVideo: boolean
   testClipActive: boolean
   resumeTime: number
+  resumeDuration?: number
   showResumeModal: boolean
   calibReturnRef: { current: number | null }
   setAvailableSubtitles: (tracks: SubtitleTrack[]) => void
@@ -28,6 +30,7 @@ export function useMediaSource({
   loadingVideo,
   testClipActive,
   resumeTime,
+  resumeDuration = 0,
   showResumeModal,
   calibReturnRef,
   setAvailableSubtitles,
@@ -36,14 +39,16 @@ export function useMediaSource({
 }: UseMediaSourceOptions) {
   const seekToTimeRef = useRef<number | null>(null)
   const resumeTimeRef = useRef(resumeTime)
+  const resumeDurationRef = useRef(resumeDuration)
   const showResumeModalRef = useRef(showResumeModal)
   const onFatalErrorRef = useRef(onFatalError)
   onFatalErrorRef.current = onFatalError
 
   useEffect(() => {
     resumeTimeRef.current = resumeTime
+    resumeDurationRef.current = resumeDuration
     showResumeModalRef.current = showResumeModal
-  }, [resumeTime, showResumeModal])
+  }, [resumeTime, resumeDuration, showResumeModal])
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -64,7 +69,8 @@ export function useMediaSource({
     } else if (
       seekToTimeRef.current === null &&
       resumeTimeRef.current > 5 &&
-      !showResumeModalRef.current
+      !showResumeModalRef.current &&
+      !isProgressCompleted(resumeTimeRef.current, resumeDurationRef.current)
     ) {
       seekToTimeRef.current = resumeTimeRef.current
     } else if (seekToTimeRef.current === null && showResumeModalRef.current) {
@@ -127,7 +133,9 @@ export function useMediaSource({
       { url: proxiedUrl, hls: selectedLink.hls },
       {
         initialTime: targetTime,
-        autoPlay: !(showResumeModalRef.current && resumeTimeRef.current > 5),
+        autoPlay:
+          !(showResumeModalRef.current && resumeTimeRef.current > 5) &&
+          !isProgressCompleted(resumeTimeRef.current, resumeDurationRef.current),
         hlsConfig: {
           maxBufferLength: isLowEnd ? 15 : 30,
           maxMaxBufferLength: isLowEnd ? 30 : 60,
