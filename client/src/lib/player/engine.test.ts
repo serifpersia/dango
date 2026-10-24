@@ -131,6 +131,33 @@ describe('player engine', () => {
     }
   )
 
+  it('locks guest transport controls while allowing room updates and personal volume', async () => {
+    const { engine, media } = setup()
+    engine.setPlaybackLocked(true)
+    await engine.play()
+    engine.seek(50)
+    engine.setPlaybackRate(2)
+    engine.setSpeedBoost(true)
+    engine.startScrubbing()
+    expect(media.paused).toBe(true)
+    expect(media.currentTime).toBe(0)
+    expect(media.playbackRate).toBe(1)
+    expect(engine.getState().isScrubbing).toBe(false)
+    engine.setVolume(0.3)
+    expect(media.volume).toBe(0.3)
+    engine.applyRemotePlayback(40, true, 1.5)
+    expect(media.currentTime).toBe(40)
+    expect(media.playbackRate).toBe(1.5)
+    expect(media.paused).toBe(false)
+    engine.pause()
+    expect(media.paused).toBe(false)
+    engine.applyRemotePlayback(undefined, false, 1)
+    expect(media.paused).toBe(true)
+    engine.setPlaybackLocked(false)
+    engine.seek(60)
+    expect(media.currentTime).toBe(60)
+  })
+
   it('clamps seeks and volume and restores audible volume when unmuting', () => {
     const { engine, media } = setup()
     engine.seek(-10)

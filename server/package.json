@@ -10,7 +10,7 @@
     "start": "node --max-old-space-size=256 dist/server.js",
     "dev": "tsx watch src/server.ts --dev",
     "build": "tsc --noEmit && node build.mjs",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"../worker/dango-watch-along/*.test.mjs\"",
     "format": "prettier --write .",
     "lint": "eslint ."
   },

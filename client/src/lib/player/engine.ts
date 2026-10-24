@@ -49,6 +49,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     activeQuality: -1,
     error: null,
     playBlocked: false,
+    playbackLocked: false,
   }
   let timeline: PlayerTimeline = { currentTime: 0, bufferedEnd: 0 }
   const listeners = new Set<() => void>()
@@ -63,6 +64,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   let basePlaybackRate = 1
   let destroyed = false
   let hls: Hls | null = null
+  let applyingRemote = false
 
   function update(patch: Partial<PlayerState>) {
     if (
@@ -215,6 +217,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   }
 
   async function play() {
+    if (state.playbackLocked && !applyingRemote) return false
     const media = mediaRef.current
     if (!media) return false
     activeMedia = media
@@ -240,6 +243,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   }
 
   function pause() {
+    if (state.playbackLocked && !applyingRemote) return
     mediaRef.current?.pause()
   }
   function togglePlay() {
@@ -248,6 +252,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   }
 
   function seek(time: number) {
+    if (state.playbackLocked && !applyingRemote) return
     const media = mediaRef.current
     if (!media || !Number.isFinite(time)) return
     let target = Math.max(0, time)
@@ -290,6 +295,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   }
 
   function setPlaybackRate(rate: number) {
+    if (state.playbackLocked && !applyingRemote) return
     if (!Number.isFinite(rate) || rate < 0.25 || rate > 4) return
     basePlaybackRate = rate
     const playbackRate = state.isSpeedBoostActive ? 2 : rate
@@ -298,6 +304,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   }
 
   function startScrubbing() {
+    if (state.playbackLocked) return
     if (state.isScrubbing) return
     wasPlayingBeforeScrub = !!mediaRef.current && !mediaRef.current.paused
     update({ isScrubbing: true })
@@ -475,6 +482,18 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     setVolume,
     toggleMute,
     setPlaybackRate,
+    setPlaybackLocked: (playbackLocked: boolean) => update({ playbackLocked }),
+    applyRemotePlayback: (position: number | undefined, playing: boolean, rate: number) => {
+      applyingRemote = true
+      try {
+        if (position !== undefined) seek(position)
+        if (Math.abs(state.playbackRate - rate) > 0.001) setPlaybackRate(rate)
+        if (playing && mediaRef.current?.paused) void play()
+        else if (!playing && !mediaRef.current?.paused) pause()
+      } finally {
+        applyingRemote = false
+      }
+    },
     setAudioTrack: (id: number) => {
       if (hls && state.audioTracks.some((track) => track.id === id)) {
         hls.audioTrack = id
@@ -498,6 +517,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
       }
     },
     setSpeedBoost: (isSpeedBoostActive: boolean) => {
+      if (state.playbackLocked) return
       const playbackRate = isSpeedBoostActive ? 2 : basePlaybackRate
       update({ isSpeedBoostActive, playbackRate })
       if (mediaRef.current) mediaRef.current.playbackRate = playbackRate

@@ -11,6 +11,7 @@ import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TRPCProvider, trpcClient } from './lib/trpc'
 import ProfileGate from './components/ProfileGate'
+import { WatchAlongProvider } from './contexts/WatchAlongProvider'
 
 try {
   window.history.scrollRestoration = 'manual'
@@ -43,7 +44,9 @@ if (root) {
                   <TitlePreferenceProvider>
                     <LowEndModeProvider>
                       <ThemeProvider>
-                        <App />
+                        <WatchAlongProvider>
+                          <App />
+                        </WatchAlongProvider>
                       </ThemeProvider>
                     </LowEndModeProvider>
                   </TitlePreferenceProvider>

@@ -26,6 +26,7 @@ export interface PlayerState {
   activeQuality: number
   error: string | null
   playBlocked: boolean
+  playbackLocked: boolean
 }
 
 export interface PlayerTimeline {

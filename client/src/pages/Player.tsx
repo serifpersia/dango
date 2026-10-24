@@ -59,12 +59,19 @@ import QueueOptionsButton from '../components/anime/QueueOptionsButton'
 
 import { useProviders } from '../hooks/useProviders'
 import { qk } from '../lib/queryKeys'
+import { useWatchAlong } from '../contexts/WatchAlongContext'
+import { useWatchAlongPlayer } from '../hooks/useWatchAlongPlayer'
+import WatchAlongPanel from '../components/player/WatchAlongPanel'
+import type { WatchSelection } from '../lib/watchAlong'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const watchAlong = useWatchAlong()
+  const inRoom = !!watchAlong.session
+  const followingHost = inRoom && !watchAlong.session?.host
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const { options: providerOptions } = useProviders()
   const animeOptions = useMemo(
@@ -93,6 +100,7 @@ const Player: React.FC = () => {
     isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
     hasMatureConsent,
+    watchSelection: followingHost ? watchAlong.room?.selection : null,
   })
 
   useEffect(() => {
@@ -132,6 +140,38 @@ const Player: React.FC = () => {
     showMeta: memoizedShowMeta,
   })
   const { refs, actions } = player
+  const roomSelection = useMemo<WatchSelection | null>(() => {
+    if (
+      !showId ||
+      showId.startsWith('dango-mt-') ||
+      !state.currentEpisode ||
+      state.selectedSource?.type === 'iframe' ||
+      !state.selectedLink?.hls ||
+      !state.selectedSource
+    )
+      return null
+    return {
+      showId,
+      episode: state.currentEpisode,
+      provider: state.selectedProvider,
+      mode: state.currentMode,
+      source: state.selectedSource.sourceName,
+      title: state.showMeta.name || showId,
+    }
+  }, [
+    showId,
+    state.currentEpisode,
+    state.selectedProvider,
+    state.currentMode,
+    state.selectedSource,
+    state.selectedLink,
+    state.showMeta.name,
+  ])
+  const roomPlayer = useWatchAlongPlayer(
+    player.engine,
+    roomSelection,
+    state.loadingVideo || state.loadingShowData
+  )
 
   const isMobile = useIsMobile()
   const episodeSidebarRef = useRef<HTMLDivElement>(null)
@@ -261,7 +301,7 @@ const Player: React.FC = () => {
     showId,
     showMetaId: state.showMeta?.id,
     currentEpisode: state.currentEpisode,
-    isAutoplayEnabled: state.isAutoplayEnabled,
+    isAutoplayEnabled: !followingHost && state.isAutoplayEnabled,
     nextEpisode,
     previousEpisode,
     navigate,
@@ -286,10 +326,10 @@ const Player: React.FC = () => {
     videoRef: refs.videoRef,
     sourceType: state.selectedSource?.type,
     resetKey: `${showId}:${state.currentEpisode}`,
-    onEnd: handlePlaybackFinished,
+    onEnd: followingHost ? actions.onEnded : handlePlaybackFinished,
   })
 
-  const shouldShowResumeModal = state.showResumeModal && !state.resumeProgressPending
+  const shouldShowResumeModal = !inRoom && state.showResumeModal && !state.resumeProgressPending
   const shouldShowCompleteModal = showCompleteModal
   const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal
 
@@ -328,14 +368,14 @@ const Player: React.FC = () => {
     selectedSource: state.selectedSource,
     selectedLink: state.selectedLink,
     loadingVideo: state.loadingVideo,
-    testClipActive,
-    resumeTime: state.resumeTime,
+    testClipActive: !inRoom && testClipActive,
+    resumeTime: inRoom ? 0 : state.resumeTime,
     resumeDuration: state.resumeDuration,
-    showResumeModal: state.showResumeModal,
+    showResumeModal: !inRoom && state.showResumeModal,
     calibReturnRef,
     setAvailableSubtitles: actions.setAvailableSubtitles,
     setActiveSubtitleTrack: actions.setActiveSubtitleTrack,
-    onFatalError: handleVideoSourceError,
+    onFatalError: inRoom ? () => {} : handleVideoSourceError,
   })
 
   useEffect(() => {
@@ -375,7 +415,7 @@ const Player: React.FC = () => {
   }, [displayTitle, state.currentEpisode])
 
   usePlayerShortcuts({
-    onNext: handleNShortcut,
+    onNext: followingHost ? () => {} : handleNShortcut,
     onToggleTheater: toggleTheaterMode,
     flashControls: player.actions.flashControls,
   })
@@ -485,7 +525,7 @@ const Player: React.FC = () => {
       <button
         className={`${styles.episodeNavBtn} ${styles.secondary}`}
         onClick={handlePreviousEpisode}
-        disabled={!previousEpisode}
+        disabled={followingHost || !previousEpisode}
         type="button"
       >
         <Icon name="chevron-left" size={12} />
@@ -494,7 +534,7 @@ const Player: React.FC = () => {
       <button
         className={`${styles.episodeNavBtn} ${styles.primary}`}
         onClick={handleNextEpisode}
-        disabled={!nextEpisode}
+        disabled={followingHost || !nextEpisode}
         type="button"
       >
         Next EP
@@ -693,7 +733,9 @@ const Player: React.FC = () => {
               episodes={state.episodes}
               currentEpisode={state.currentEpisode ?? undefined}
               watchedEpisodes={state.watchedEpisodes}
-              onEpisodeClick={(ep) => navigate(`/watch/${showId}/${ep}`)}
+              onEpisodeClick={(ep) => {
+                if (!followingHost) navigate(`/watch/${showId}/${ep}`)
+              }}
             />
           )}
         </aside>
@@ -716,13 +758,26 @@ const Player: React.FC = () => {
             ambientSettings={ambientSettings}
             onAmbientChange={updateAmbient}
             showNextEpisodeButton={
-              !shouldPauseForModal && showNextEpisodePrompt && queue.length === 0
+              !followingHost && !shouldPauseForModal && showNextEpisodePrompt && queue.length === 0
             }
             onNextEpisode={handleNextEpisode}
-            videoSources={state.videoSources}
+            videoSources={
+              followingHost
+                ? []
+                : inRoom
+                  ? state.videoSources.filter(
+                      (source) => source.type !== 'iframe' && source.links.some((link) => link.hls)
+                    )
+                  : state.videoSources
+            }
             selectedSource={state.selectedSource}
             selectedLink={state.selectedLink}
             onSourceChange={(source, link) => {
+              if (
+                (followingHost && source.sourceName !== watchAlong.room?.selection.source) ||
+                (inRoom && (source.type === 'iframe' || !link.hls))
+              )
+                return
               if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                 seekToTimeRef.current = refs.videoRef.current.currentTime
               }
@@ -754,7 +809,7 @@ const Player: React.FC = () => {
             onVideoDelayToggle={setDelayEnabled}
             videoDelayMs={videoDelayMs}
             onVideoDelayChange={handleVideoDelayChange}
-            onCalibrateAvSync={openAvSyncCalibrator}
+            onCalibrateAvSync={inRoom ? () => {} : openAvSyncCalibrator}
             isInteractingExtra={isEpisodeDrawerOpen || isCalibrating}
             className={shellStyles.shellFill}
             hideChrome={state.selectedSource?.type === 'iframe'}
@@ -790,7 +845,7 @@ const Player: React.FC = () => {
                 </div>
               )}
 
-            {state.selectedSource?.type === 'iframe' ? (
+            {state.selectedSource?.type === 'iframe' && !inRoom ? (
               !isVideoLoading && (
                 <iframe
                   src={state.selectedLink?.link}
@@ -824,7 +879,7 @@ const Player: React.FC = () => {
                 )}
                 {!isVideoLoading && state.videoSources.length > 0 && (
                   <PlayerVideo
-                    controls={player.state.useNativeControls}
+                    controls={!player.state.playbackLocked && player.state.useNativeControls}
                     playsInline
                     webkit-playsinline="true"
                     disablePictureInPicture
@@ -860,7 +915,7 @@ const Player: React.FC = () => {
                         cancelQueueTransition()
                       }
                     }}
-                    onError={handleVideoSourceError}
+                    onError={inRoom ? undefined : handleVideoSourceError}
                     onContextMenu={(e) => e.preventDefault()}
                     className={canvasPresentationActive ? styles.videoElementHidden : ''}
                   />
@@ -897,6 +952,31 @@ const Player: React.FC = () => {
           </PlayerControls>
         </div>
 
+        <WatchAlongPanel
+          playback={
+            roomSelection && !isVideoLoading
+              ? {
+                  selection: roomSelection,
+                  position: refs.videoRef.current?.currentTime || 0,
+                  playing: false,
+                  rate: player.engine.getState().playbackRate,
+                }
+              : null
+          }
+          onCreate={() => {
+            stopCalibration()
+            player.engine.pause()
+          }}
+          needsPlayback={roomPlayer.needsPlayback}
+          onEnablePlayback={roomPlayer.enablePlayback}
+        />
+        {inRoom && !isVideoLoading && !roomSelection && (
+          <p role="alert">
+            This room requires the host's direct HLS source. It is unavailable here. Retry the
+            episode or leave the room to use another source.
+          </p>
+        )}
+
         {!isTheaterMode && <PlayerStatusArea />}
 
         {!isTheaterMode && (
@@ -909,7 +989,7 @@ const Player: React.FC = () => {
                 items={queue}
                 currentShowId={showId}
                 currentEpisode={state.currentEpisode ?? undefined}
-                onNextQueue={handleQueueTransition}
+                onNextQueue={followingHost ? () => {} : handleQueueTransition}
                 onRemove={(item) =>
                   removeQueue.mutate({
                     showId: item.showId,
@@ -931,25 +1011,27 @@ const Player: React.FC = () => {
             )}
 
             <div className={styles.streamPanel}>
-              <ProviderSelector
-                selectedProvider={state.selectedProvider}
-                isAdult={state.showMeta?.isAdult}
-                options={animeOptions}
-                onProviderChange={(newProvider) => {
-                  resetFallback()
-                  dispatch({
-                    type: 'SET_STATE',
-                    payload: {
-                      selectedProvider: newProvider,
-                      videoSources: [],
-                      selectedSource: null,
-                      selectedLink: null,
-                      loadingVideo: true,
-                    },
-                  })
-                  savePreferredProvider(newProvider, state.showMeta?.isAdult === true)
-                }}
-              />
+              {!followingHost && (
+                <ProviderSelector
+                  selectedProvider={state.selectedProvider}
+                  isAdult={state.showMeta?.isAdult}
+                  options={animeOptions}
+                  onProviderChange={(newProvider) => {
+                    resetFallback()
+                    dispatch({
+                      type: 'SET_STATE',
+                      payload: {
+                        selectedProvider: newProvider,
+                        videoSources: [],
+                        selectedSource: null,
+                        selectedLink: null,
+                        loadingVideo: true,
+                      },
+                    })
+                    savePreferredProvider(newProvider, state.showMeta?.isAdult === true)
+                  }}
+                />
+              )}
               {episodeNavControls(
                 `${styles.episodeActions} ${styles.desktopEpisodeActions}`,
                 'desktop'
@@ -959,17 +1041,31 @@ const Player: React.FC = () => {
                 <div className={styles.sourceLoader}>
                   <div className={styles.spinner}></div>
                 </div>
-              ) : (
+              ) : !followingHost ? (
                 <SourceSelector
-                  videoSources={state.videoSources}
+                  videoSources={
+                    inRoom
+                      ? state.videoSources.filter(
+                          (source) =>
+                            source.type !== 'iframe' && source.links.some((link) => link.hls)
+                        )
+                      : state.videoSources
+                  }
                   selectedSource={state.selectedSource}
                   selectedLink={state.selectedLink}
                   onSourceChange={(source) => {
+                    if (
+                      inRoom &&
+                      (source.type === 'iframe' || !source.links.some((link) => link.hls))
+                    )
+                      return
                     if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                       seekToTimeRef.current = refs.videoRef.current.currentTime
                     }
 
-                    const links = source.links || []
+                    const links = inRoom
+                      ? source.links.filter((link) => link.hls)
+                      : source.links || []
                     const bestLink =
                       links.sort(
                         (a: VideoLink, b: VideoLink) =>
@@ -995,6 +1091,11 @@ const Player: React.FC = () => {
                     })
                   }}
                 />
+              ) : (
+                <p>
+                  Provider: {state.selectedProvider} · Source: {watchAlong.room?.selection.source} ·{' '}
+                  {state.currentMode}
+                </p>
               )}
             </div>
 
@@ -1063,6 +1164,7 @@ const Player: React.FC = () => {
                     )}
                     <button
                       className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${state.currentMode === 'dub' ? styles.modeToggleActive : ''}`}
+                      disabled={followingHost}
                       onClick={() => {
                         const mode = state.currentMode === 'dub' ? 'sub' : 'dub'
                         resetFallback()
@@ -1076,6 +1178,7 @@ const Player: React.FC = () => {
                     </button>
                     {lowEndMode && (
                       <button
+                        disabled={followingHost}
                         className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${player.state.useNativeControls ? styles.modeToggleActive : ''}`}
                         onClick={() => {
                           const newValue = !player.state.useNativeControls

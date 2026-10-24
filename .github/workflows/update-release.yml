@@ -84,6 +84,7 @@ jobs:
         run: |
           pnpm --filter dango-client exec vitest run
           pnpm --filter dango-server exec node --import tsx --test "src/**/*.test.ts"
+          pnpm --filter dango-server exec node --import tsx --test "../worker/dango-watch-along/*.test.mjs"
         env:
           NODE_ENV: development
 
@@ -94,6 +95,7 @@ jobs:
           GOOGLE_AUTH_WORKER_URL: ${{ secrets.GOOGLE_AUTH_WORKER_URL }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
           MAL_AUTH_WORKER_URL: ${{ secrets.MAL_AUTH_WORKER_URL }}
+          WATCH_ALONG_WORKER_URL: ${{ secrets.WATCH_ALONG_WORKER_URL }}
 
       - name: Build Application
         # Direct exec calls: `pnpm run build` triggers pnpm's
@@ -114,6 +116,7 @@ jobs:
           test -f server/dist/server.js || (echo "missing server/dist/server.js" && exit 1)
           test -f server/dist/shipped-defaults.js || (echo "missing shipped defaults" && exit 1)
           grep -q "dango-providers" server/dist/shipped-defaults.js || (echo "shipped defaults missing provider URL" && exit 1)
+          grep -q "WATCH_ALONG_WORKER_URL.*https://" server/dist/shipped-defaults.js || (echo "shipped defaults missing watch-along URL" && exit 1)
           node --input-type=module -e "await import('./server/dist/shipped-defaults.js'); await import('./server/dist/config.js'); console.log('server entry imports OK')"
 
       - name: Sync root deps for npm channel

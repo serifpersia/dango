@@ -183,7 +183,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           bold: state.subtitleBold,
         }}
         onSubtitleSettingsChange={actions.setSubtitleStyle}
-        useNativeControls={state.useNativeControls}
+        useNativeControls={!state.playbackLocked && state.useNativeControls}
         onNativeControlsToggle={actions.setUseNativeControls}
         anime4kEnabled={anime4kEnabled}
         onAnime4kToggle={onAnime4kToggle}
@@ -232,7 +232,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       settingsPanel={settingsNodeWithGuard}
       overlays={overlays}
       isInteracting={isInteractingExtra || state.showSettings || state.showVolumeSlider}
-      nativeControls={state.useNativeControls}
+      nativeControls={!state.playbackLocked && state.useNativeControls}
       className={className}
       chromeDisabled={hideChrome}
     >

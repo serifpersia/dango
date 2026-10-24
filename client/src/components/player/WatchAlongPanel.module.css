@@ -1,0 +1,54 @@
+.panel {
+  padding: 1rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.heading,
+.actions,
+.members {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.name {
+  display: block;
+  margin: 0.75rem 0;
+}
+
+.name small {
+  color: var(--text-secondary);
+}
+
+.heading {
+  justify-content: space-between;
+}
+
+.panel p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
+  color: var(--text-secondary);
+}
+
+.panel input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.members {
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}

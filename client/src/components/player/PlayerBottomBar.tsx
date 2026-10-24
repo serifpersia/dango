@@ -31,7 +31,7 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
   settingsBtnRef,
   timeDisplayRef,
 }) => {
-  const { state, refs, actions } = player
+  const { state, actions } = player
   const { showSettings } = state
 
   return (
@@ -93,12 +93,12 @@ const PlayerBottomBar: React.FC<PlayerBottomBarProps> = ({
               {actions.formatTime(0)} / {actions.formatTime(state.duration)}
             </span>
 
-            {state.currentSkipInterval && !state.isAutoSkipEnabled && (
+            {state.currentSkipInterval && !state.isAutoSkipEnabled && !state.playbackLocked && (
               <button
                 className={styles.controlBtn}
                 onClick={() => {
-                  if (refs.videoRef.current && state.currentSkipInterval) {
-                    refs.videoRef.current.currentTime = state.currentSkipInterval.end_time
+                  if (state.currentSkipInterval) {
+                    player.engine.seek(state.currentSkipInterval.end_time)
                     actions.setCurrentSkipInterval(null)
                   }
                 }}

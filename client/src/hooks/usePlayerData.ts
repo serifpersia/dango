@@ -20,6 +20,7 @@ import { useShowMeta } from './useShowMeta'
 import { useProviders } from './useProviders'
 import { qk } from '../lib/queryKeys'
 import { isProgressCompleted } from '../lib/playbackCompletion'
+import type { WatchSelection } from '../lib/watchAlong'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -196,9 +197,9 @@ export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined,
   initialMeta?: Record<string, unknown> | null,
-  options?: { hasMatureConsent?: boolean }
+  options?: { hasMatureConsent?: boolean; watchSelection?: WatchSelection | null }
 ): UsePlayerDataReturn => {
-  const [uiState, dispatch] = useReducer(playerReducer, initialMeta, (meta) => ({
+  const [localUiState, dispatch] = useReducer(playerReducer, initialMeta, (meta) => ({
     ...createInitialState(),
     showMeta: meta?.name
       ? {
@@ -214,6 +215,18 @@ export const usePlayerData = (
         }
       : {},
   }))
+  const watchSelection = options?.watchSelection
+  const uiState = useMemo(
+    () =>
+      watchSelection
+        ? {
+            ...localUiState,
+            selectedProvider: watchSelection.provider,
+            currentMode: watchSelection.mode,
+          }
+        : localUiState,
+    [localUiState, watchSelection]
+  )
   const queryClient = useQueryClient()
   const trpc = useTRPC()
   const hasForcedProvider = useRef<string | null>(null)
@@ -226,18 +239,20 @@ export const usePlayerData = (
 
   const currentEpisode = episodeNumber || uiState.initialEpisode
 
-  const previousEpisodeRef = useRef(currentEpisode)
+  const episodeKey = `${showId}:${currentEpisode}`
+  const previousEpisodeRef = useRef(episodeKey)
 
   useEffect(() => {
-    if (previousEpisodeRef.current !== currentEpisode) {
-      previousEpisodeRef.current = currentEpisode
+    if (previousEpisodeRef.current !== episodeKey) {
+      previousEpisodeRef.current = episodeKey
       dispatch({ type: 'SET_STATE', payload: { selectedSource: null, selectedLink: null } })
     }
-  }, [currentEpisode, dispatch])
+  }, [episodeKey, dispatch])
 
   useEffect(() => {
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (
+      !watchSelection &&
       showId &&
       UUID_RE.test(showId) &&
       uiState.selectedProvider !== 'animepahe' &&
@@ -246,7 +261,7 @@ export const usePlayerData = (
       hasForcedProvider.current = showId
       dispatch({ type: 'SET_PROVIDER', payload: 'animepahe' })
     }
-  }, [showId, uiState.selectedProvider])
+  }, [showId, uiState.selectedProvider, watchSelection])
 
   const { data: showMeta, isLoading: loadingShowData, error: showDataError } = useShowMeta(showId)
 
@@ -309,6 +324,7 @@ export const usePlayerData = (
   }, [playerData, episodeNumber])
 
   useEffect(() => {
+    if (watchSelection) return
     if (showMeta?.isAdult === undefined) return
     if (hasForcedAdultProvider.current === showId) return
     const isMatureShow = showMeta.isAdult === true
@@ -321,9 +337,10 @@ export const usePlayerData = (
       type: 'SET_PROVIDER',
       payload: candidates.find((o) => o.id === stored)?.id ?? candidates[0].id,
     })
-  }, [showMeta?.isAdult, uiState.selectedProvider, showId, animeOptions])
+  }, [showMeta?.isAdult, uiState.selectedProvider, showId, animeOptions, watchSelection])
 
   useEffect(() => {
+    if (watchSelection) return
     if (!showId || !/^dango-mt-\d+$/.test(showId)) return
     if (hasForcedAdultProvider.current === `temp:${showId}`) return
     const origin = (showMeta as { provider?: string } | undefined)?.provider
@@ -332,7 +349,7 @@ export const usePlayerData = (
     if (origin !== uiState.selectedProvider) {
       dispatch({ type: 'SET_PROVIDER', payload: origin })
     }
-  }, [showId, showMeta, uiState.selectedProvider])
+  }, [showId, showMeta, uiState.selectedProvider, watchSelection])
 
   const {
     data: videoData,
@@ -505,6 +522,25 @@ export const usePlayerData = (
     const videoDataForEpisode =
       videoData && videoData.fetchedEpisodeNumber === currentEpisode ? videoData : null
     const videoDataMismatched = !!videoData && !videoDataForEpisode
+    const roomSource = watchSelection
+      ? (videoDataForEpisode?.videoSources?.find(
+          (source) =>
+            source.sourceName === watchSelection.source &&
+            source.type !== 'iframe' &&
+            source.links.some((link) => link.hls)
+        ) ?? null)
+      : null
+    const preferredRoomLink =
+      uiState.selectedSource?.sourceName === roomSource?.sourceName
+        ? roomSource?.links.find((link) => link.hls && link.link === uiState.selectedLink?.link)
+        : null
+    const roomLink =
+      preferredRoomLink ??
+      roomSource?.links
+        .filter((link) => link.hls)
+        .slice()
+        .sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0] ??
+      null
 
     return {
       ...uiState,
@@ -518,12 +554,19 @@ export const usePlayerData = (
       inWatchlist: !!playerData?.inWatchlist,
       watchlistStatus: playerData?.watchlistStatus ?? uiState.watchlistStatus ?? null,
       videoSources: videoDataForEpisode?.videoSources || [],
-      selectedSource: uiState.selectedSource || videoDataForEpisode?.selectedSource || null,
-      selectedLink: uiState.selectedLink || videoDataForEpisode?.selectedLink || null,
-      resumeTime: videoDataForEpisode?.resumeTime || 0,
+      selectedSource: watchSelection
+        ? roomSource
+        : uiState.selectedSource || videoDataForEpisode?.selectedSource || null,
+      selectedLink: watchSelection
+        ? roomLink
+        : uiState.selectedLink || videoDataForEpisode?.selectedLink || null,
+      resumeTime: watchSelection ? 0 : videoDataForEpisode?.resumeTime || 0,
       resumeDuration: videoDataForEpisode?.resumeDuration || 0,
       resumeProgressPending: fetchingVideo,
-      showResumeModal: uiState.showResumeModal && (videoDataForEpisode?.showResumeModal ?? false),
+      showResumeModal:
+        !watchSelection &&
+        uiState.showResumeModal &&
+        (videoDataForEpisode?.showResumeModal ?? false),
       skipIntervals: videoDataForEpisode?.skipIntervals || [],
       loadingShowData,
       loadingVideo: loadingVideo || videoDataMismatched,
@@ -541,6 +584,7 @@ export const usePlayerData = (
     showDataError,
     videoError,
     currentEpisode,
+    watchSelection,
   ])
 
   const prefetchEpisodeSources = useCallback(

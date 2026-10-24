@@ -6,6 +6,7 @@ const defaults = {
   GOOGLE_AUTH_WORKER_URL: process.env.GOOGLE_AUTH_WORKER_URL || '',
   DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID || '',
   MAL_AUTH_WORKER_URL: process.env.MAL_AUTH_WORKER_URL || '',
+  WATCH_ALONG_WORKER_URL: process.env.WATCH_ALONG_WORKER_URL || '',
   PROVIDER_REPO_URL:
     process.env.PROVIDER_REPO_URL ||
     'https://raw.githubusercontent.com/serifpersia/dango-providers/main/registry.json',

@@ -56,6 +56,7 @@ const useVideoPlayer = ({
     isFullscreen,
     isSpeedBoostActive,
     showControls,
+    playbackLocked,
   } = usePlayerState(engine)
   const playerContainerRef = engine.containerRef
   const debouncedUpdateTimer = useRef<NodeJS.Timeout | null>(null)
@@ -332,11 +333,11 @@ const useVideoPlayer = ({
       if (prev?.skip_id !== activeSkip?.skip_id) return activeSkip
       return prev
     })
-    if (isAutoSkipEnabled && activeSkip && !video.paused) {
-      video.currentTime = activeSkip.end_time
+    if (isAutoSkipEnabled && activeSkip && !video.paused && !engine.getState().playbackLocked) {
+      engine.seek(activeSkip.end_time)
       setCurrentSkipInterval(null)
     }
-  }, [videoRef, skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
+  }, [videoRef, skipIntervals, isAutoSkipEnabled, sendProgressUpdate, engine])
 
   const reportFinalProgress = useCallback(() => {
     const payload = buildProgressPayload()
@@ -412,6 +413,7 @@ const useVideoPlayer = ({
     engine,
     refs: { videoRef, playerContainerRef },
     state: {
+      playbackLocked,
       isPlaying,
       isMuted,
       volume,

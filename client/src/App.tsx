@@ -14,6 +14,7 @@ const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Player = lazy(() => import('./pages/Player'))
+const WatchAlong = lazy(() => import('./pages/WatchAlong'))
 const Search = lazy(() => import('./pages/Search'))
 const Mature = lazy(() => import('./pages/Mature'))
 const Asmr = lazy(() => import('./pages/Asmr'))
@@ -212,6 +213,7 @@ function App() {
               <Route path="/insights" element={<Insights />} />
               <Route path="/anime/:id" element={<AnimeInfoPage />} />
               <Route path="/watch/:id" element={<Player />} />
+              <Route path="/watch-along" element={<WatchAlong />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
               <Route path="/player/:id/:episodeNumber?" element={<PlayerRedirect />} />
               <Route path="*" element={<Navigate to="/" replace />} />

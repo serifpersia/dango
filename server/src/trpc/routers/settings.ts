@@ -1,4 +1,5 @@
 import { profileScope } from '../../profile-scope.js'
+import { CONFIG } from '../../config.js'
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, ownerProcedure, router } from '../index.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
@@ -38,6 +39,7 @@ const translateInput = () =>
   })
 
 export const settingsRouter = router({
+  watchAlong: protectedProcedure.query(() => ({ workerUrl: CONFIG.WATCH_ALONG_WORKER_URL })),
   getByKey: protectedProcedure.input(keyInput()).query(async ({ ctx, input }) => {
     if (isPrivateTrackerSetting(input.key))
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Tracker credentials are private.' })

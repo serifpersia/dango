@@ -23,6 +23,7 @@ _A local-first anime web app focused on performance, privacy, and personal libra
 - **Hardware Efficient:** Engineered with a minimal footprint to run effortlessly on low-spec hardware, SBCs, and mobile environments.
 - **Metadata & Discovery:** Browse trending titles, search catalog entries, and view release schedules locally.
 - **Multi-Provider Playback:** Switch seamlessly between multiple third-party streaming providers directly within the player interface.
+- **Watch Along:** Create a room below a direct HLS anime, TV, or movie player and share the invite. Each viewer uses their own Dango; the host controls playback. No port forwarding needed. End the room when finished, or it expires after six hours.
 - **Watchlist Tracking:** Categorize titles (Watching, Completed, Plan to Watch) with fine-grained progress states.
 - **Library Insights:** Built-in dashboard tracking viewing habits, personal stats, and completion ratios.
 - **Trackers & Sync:** Bi-directional AniList and MyAnimeList sync for anime and manga, plus username and XML list imports.

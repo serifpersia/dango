@@ -3,6 +3,7 @@ export const SHIPPED_DEFAULTS = {
   GOOGLE_AUTH_WORKER_URL: '',
   DISCORD_CLIENT_ID: '',
   MAL_AUTH_WORKER_URL: '',
+  WATCH_ALONG_WORKER_URL: '',
   PROVIDER_REPO_URL:
     'https://raw.githubusercontent.com/serifpersia/dango-providers/main/registry.json',
 } as const

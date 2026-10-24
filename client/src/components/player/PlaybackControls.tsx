@@ -11,12 +11,13 @@ type ButtonProps = Omit<ComponentProps<'button'>, 'onClick'>
 
 export function PlayPauseButton({ children, ...props }: ButtonProps) {
   const player = usePlayer()
-  const { isPlaying } = usePlayerState(player)
+  const { isPlaying, playbackLocked } = usePlayerState(player)
   return (
     <button
       type="button"
       aria-label={isPlaying ? 'Pause' : 'Play'}
       {...props}
+      disabled={playbackLocked || props.disabled}
       onClick={player.togglePlay}
     >
       {children ?? <Icon name={isPlaying ? 'pause' : 'play'} />}
@@ -26,11 +27,13 @@ export function PlayPauseButton({ children, ...props }: ButtonProps) {
 
 export function SeekButton({ seconds, children, ...props }: ButtonProps & { seconds: number }) {
   const player = usePlayer()
+  const { playbackLocked } = usePlayerState(player)
   return (
     <button
       type="button"
       aria-label={`Seek ${seconds < 0 ? 'back' : 'forward'} ${Math.abs(seconds)} seconds`}
       {...props}
+      disabled={playbackLocked || props.disabled}
       onClick={() => player.seekRelative(seconds)}
     >
       {children ?? <Icon name={seconds < 0 ? 'replay-10' : 'forward-10'} />}
@@ -109,34 +112,37 @@ export function PlayerTimeline({
   children?: ReactNode
 }) {
   const player = usePlayer()
-  const { duration, isScrubbing } = usePlayerState(player)
+  const { duration, isScrubbing, playbackLocked } = usePlayerState(player)
   return (
-    <SeekBar
-      classes={classes}
-      videoRef={player.mediaRef}
-      duration={duration}
-      formatTime={formatTime}
-      isScrubbing={isScrubbing}
-      onSeek={(percent) => player.seek(percent * duration)}
-      onScrubStart={player.startScrubbing}
-      onScrubMove={(percent) => player.seek(percent * duration)}
-      onScrubEnd={player.endScrubbing}
-      timeLabelRef={timeLabelRef}
-    >
-      {children}
-    </SeekBar>
+    <div inert={playbackLocked || undefined} style={{ display: 'contents' }}>
+      <SeekBar
+        classes={classes}
+        videoRef={player.mediaRef}
+        duration={duration}
+        formatTime={formatTime}
+        isScrubbing={isScrubbing}
+        onSeek={(percent) => player.seek(percent * duration)}
+        onScrubStart={player.startScrubbing}
+        onScrubMove={(percent) => player.seek(percent * duration)}
+        onScrubEnd={player.endScrubbing}
+        timeLabelRef={timeLabelRef}
+      >
+        {children}
+      </SeekBar>
+    </div>
   )
 }
 
 export function SeekSlider({ className }: { className?: string }) {
   const player = usePlayer()
   const { currentTime, bufferedEnd } = usePlayerTimeline(player)
-  const { duration } = usePlayerState(player)
+  const { duration, playbackLocked } = usePlayerState(player)
   const played = duration ? Math.min(100, (currentTime / duration) * 100) : 0
   const buffered = duration ? Math.min(100, Math.max(played, (bufferedEnd / duration) * 100)) : 0
   return (
     <input
       type="range"
+      disabled={playbackLocked}
       min={0}
       max={duration}
       step={0.1}
@@ -171,8 +177,9 @@ export function PlayerTime({
 
 export function PlayerStatus() {
   const player = usePlayer()
-  const { error, playBlocked, isBuffering } = usePlayerState(player)
+  const { error, playBlocked, isBuffering, playbackLocked } = usePlayerState(player)
   if (error) return <div role="alert">{error}</div>
+  if (playBlocked && playbackLocked) return <span>Enable playback from the watch-along panel.</span>
   if (playBlocked) return <PlayPauseButton>Tap to play</PlayPauseButton>
   if (isBuffering)
     return (
