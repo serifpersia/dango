@@ -393,6 +393,10 @@ export class MalTracker {
     ).then((page) => page.data.map((entry) => entry.node))
   }
 
+  getManga(id: number) {
+    return this.request<MalManga>(`manga/${id}?fields=my_list_status,num_chapters`)
+  }
+
   updateManga(id: number, progress: number, status: string, opts: { rewatching?: boolean } = {}) {
     const remoteStatus = DANGO_TO_MAL_MANGA[status]
     if (!remoteStatus) throw new Error(`Unsupported tracker status: ${status}`)

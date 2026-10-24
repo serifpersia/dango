@@ -1,3 +1,4 @@
+import { pushMangaEntry } from '../../lib/tracker/manga-push.js'
 import { router, protectedProcedure } from '../index.js'
 import { performMangaWriteTransactionAsync } from '../../db/transaction.js'
 import {
@@ -65,6 +66,9 @@ const shared = createLibraryRouter({
     deleteMany: (db, ids) => MangaProgressRepository.deleteMany(db, ids),
   },
   statuses: MANGA_STATUSES,
+  afterSave: (ctx, id) => {
+    void pushMangaEntry(ctx.db, ctx.mangaDb, id)
+  },
   defaultStatus: 'Reading',
   add: {
     input: mangaLibraryAddInput(),

@@ -22,6 +22,7 @@ import { readTrackerSyncState, resolveStatus } from '../sync-state.js'
 import type { TrackerSyncState, TrackerSyncStateEntry } from '../sync-state.js'
 import { assertDeleteCap, collectMediaIds, pushRemoteChanges } from '../sync-engine.js'
 import { clearRewatchForShow, isRewatching, readRewatchMarkers, setRewatching } from '../rewatch.js'
+import { withTrackerLock } from '../sync-lock.js'
 import {
   buildAnilistMangaId,
   buildSyntheticChapterId,
@@ -43,6 +44,14 @@ export async function syncAniListManga(
   db: DatabaseWrapper,
   mangaDb: DatabaseWrapper,
   opts: MangaSyncOptions = {}
+): Promise<MangaSyncResult> {
+  return withTrackerLock(db, 'anilist', () => syncMangaEntries(db, mangaDb, opts))
+}
+
+async function syncMangaEntries(
+  db: DatabaseWrapper,
+  mangaDb: DatabaseWrapper,
+  opts: MangaSyncOptions
 ): Promise<MangaSyncResult> {
   const direction: MangaSyncDirection = opts.direction === 'pull-only' ? 'pull-only' : 'two-way'
   const pullOnly = direction === 'pull-only'

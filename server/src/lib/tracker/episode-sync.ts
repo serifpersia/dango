@@ -23,7 +23,11 @@ export async function completedProgress(db: DatabaseWrapper, showId: string): Pr
   )
 }
 
-export async function trackerIds(db: DatabaseWrapper, showId: string) {
+export async function trackerIds(
+  db: DatabaseWrapper,
+  showId: string,
+  provider?: 'anilist' | 'mal'
+) {
   const meta = dbGet<{ anilistId?: number }>(db, 'SELECT anilistId FROM shows_meta WHERE id = ?', [
     showId,
   ])
@@ -32,7 +36,10 @@ export async function trackerIds(db: DatabaseWrapper, showId: string) {
       ? meta.anilistId
       : /^\d+$/.test(showId)
         ? Number(showId)
-        : undefined
+        : parseMalId(showId)
+          ? offlineDb.getByMalId(parseMalId(showId)!)?.anilistId
+          : undefined
+  if (provider === 'anilist') return { anilistId, malId: undefined }
   let malId =
     parseMalId(showId) ||
     Number((await SettingsRepository.getByKey(db, `tracker_mal_link_${showId}`))?.value) ||

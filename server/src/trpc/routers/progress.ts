@@ -89,17 +89,6 @@ export const progressRouter = router({
       const currentTime = input.currentTime || 0
       const duration = input.duration || 0
 
-      const previous = await WatchedEpisodesRepository.getByShowAndEpisode(
-        ctx.db,
-        showId,
-        episodeNumber
-      )
-      const wasCompleted =
-        !!previous &&
-        (previous.duration === 0
-          ? previous.currentTime === 0
-          : previous.currentTime >= previous.duration * 0.8)
-
       const titlePreferenceRow = await SettingsRepository.getByKey(ctx.db, 'titlePreference')
       const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
 
@@ -165,9 +154,7 @@ export const progressRouter = router({
         await NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber)
       })
 
-      const becameCompleted = !wasCompleted && duration > 0 && currentTime >= duration * 0.8
-
-      if (becameCompleted) {
+      if (duration > 0 && currentTime >= duration * 0.8) {
         void pushCompletedEpisode(ctx.db, showId, episodeNumber).catch(() => {})
       }
 

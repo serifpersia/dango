@@ -1,3 +1,4 @@
+import { pushCompletedEpisode } from '../../lib/tracker/episode-push.js'
 import { protectedProcedure, router } from '../index.js'
 import type { TrpcContext } from '../context.js'
 import type { DatabaseWrapper } from '../../db.js'
@@ -105,9 +106,12 @@ export const watchlistRouter = router({
           // ignore
         }
       }
-      void resolveAndSave().catch(() => {})
+      void resolveAndSave()
+        .then(() => pushCompletedEpisode(db, id))
+        .catch(() => {})
     }
 
+    void pushCompletedEpisode(ctx.db, id)
     return { success: true }
   }),
 
@@ -138,6 +142,7 @@ export const watchlistRouter = router({
     await performWriteTransactionAsync(ctx.db, async (tx) => {
       await WatchlistRepository.updateStatus(tx, id, input.status)
     })
+    void pushCompletedEpisode(ctx.db, id)
     return { success: true }
   }),
 
@@ -148,6 +153,7 @@ export const watchlistRouter = router({
       await performWriteTransactionAsync(ctx.db, async (tx) => {
         await WatchlistRepository.updateStatusMany(tx, ids, input.status)
       })
+      for (const id of ids) void pushCompletedEpisode(ctx.db, id)
       return { success: true, updated: ids.length }
     }),
 

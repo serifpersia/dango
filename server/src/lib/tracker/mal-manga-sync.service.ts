@@ -51,7 +51,7 @@ function remoteTitleKeys(candidate: MalManga): string[] {
   )
 }
 
-function matchesTitle(item: MangaLibraryRow, candidate: MalManga): boolean {
+export function matchesTitle(item: MangaLibraryRow, candidate: MalManga): boolean {
   const remote = new Set(remoteTitleKeys(candidate))
   return titleKeys(item.title, item.altTitle).some((key) => remote.has(key))
 }

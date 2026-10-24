@@ -40,6 +40,7 @@ export type LibraryRouterConfig<Row extends LibraryRow, Add, In extends { status
     deleteMany: (db: DatabaseWrapper, ids: string[]) => unknown
   }
   statuses: readonly string[]
+  afterSave?: (ctx: TrpcContext, id: string) => void
   defaultStatus: string
   add: {
     input: Schema<In, In>
@@ -127,6 +128,7 @@ export function createLibraryRouter<Row extends LibraryRow, Add, In extends { st
       await config.write(kindDb(ctx), async (tx) => {
         await repo.upsert(tx, row)
       })
+      config.afterSave?.(ctx, id)
       return { success: true, id }
     }),
 
@@ -145,6 +147,7 @@ export function createLibraryRouter<Row extends LibraryRow, Add, In extends { st
       await config.write(kindDb(ctx), async (tx) => {
         await repo.updateStatus(tx, input.id, input.status)
       })
+      config.afterSave?.(ctx, input.id)
       return { success: true }
     }),
 
@@ -156,6 +159,7 @@ export function createLibraryRouter<Row extends LibraryRow, Add, In extends { st
       await config.write(kindDb(ctx), async (tx) => {
         await repo.updateStatusMany(tx, ids, input.status)
       })
+      for (const id of ids) config.afterSave?.(ctx, id)
       return { success: true, updated: ids.length }
     }),
 

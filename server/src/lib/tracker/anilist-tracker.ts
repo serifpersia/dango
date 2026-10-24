@@ -289,6 +289,25 @@ export class AniListTracker {
     return entries
   }
 
+  async getMediaEntry(mediaId: number) {
+    const data = await this.request<{
+      Media: {
+        title: { romaji?: string; english?: string; native?: string }
+        coverImage?: { large?: string }
+        mediaListEntry: {
+          status: AniListMediaListStatus
+          progress: number
+          updatedAt: number
+        } | null
+      } | null
+    }>(
+      'query ($id: Int) { Media(id: $id) { title { romaji english native } coverImage { large } mediaListEntry { status progress updatedAt } } }',
+      { id: mediaId },
+      { retries: 0 }
+    )
+    return data.Media
+  }
+
   async updateMediaEntry(params: {
     mediaId: number
     status?: string
