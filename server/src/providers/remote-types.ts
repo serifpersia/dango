@@ -71,11 +71,22 @@ export interface ProviderCatalogItem {
 
 const ID_RE = /^[a-z0-9][a-z0-9-]*$/i
 const SHA_RE = /^[0-9a-f]{64}$/i
+const VERSION_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+
+export function meetsMinDango(version: string, minimum: string): boolean {
+  const current = version.split('.').map(Number)
+  const required = minimum.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if (current[i] !== required[i]) return current[i] > required[i]
+  }
+  return true
+}
 
 export function parseRegistry(raw: unknown): RemoteRegistry {
   if (!raw || typeof raw !== 'object') throw new Error('registry: not an object')
   const r = raw as Record<string, unknown>
-  if (typeof r.version !== 'number') throw new Error('registry.version must be a number')
+  if (!Number.isSafeInteger(r.version) || (r.version as number) < 0)
+    throw new Error('registry.version must be a non-negative integer')
   if (!Array.isArray(r.providers)) throw new Error('registry.providers must be an array')
   const providers = (r.providers as unknown[]).map((p, i) => parseEntry(p, i))
   const seen = new Set<string>()
@@ -85,7 +96,7 @@ export function parseRegistry(raw: unknown): RemoteRegistry {
     seen.add(key)
   }
   return {
-    version: r.version,
+    version: r.version as number,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : undefined,
     providers,
   }
@@ -105,8 +116,14 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
   if (typeof label !== 'string' || !label.trim()) {
     throw new Error(`registry.providers[${index}].label must be a non-empty string`)
   }
-  if (typeof version !== 'string' || !version.trim()) {
-    throw new Error(`registry.providers[${index}].version must be a non-empty string`)
+  if (typeof version !== 'string' || !VERSION_RE.test(version.trim())) {
+    throw new Error(`registry.providers[${index}].version must be major.minor.patch`)
+  }
+  if (
+    p.minDango !== undefined &&
+    (typeof p.minDango !== 'string' || !VERSION_RE.test(p.minDango))
+  ) {
+    throw new Error(`registry.providers[${index}].minDango must be major.minor.patch`)
   }
   const embedBase = p.embedBase
   if (embedBase !== undefined) {
@@ -159,7 +176,12 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     sha256: typeof p.sha256 === 'string' ? p.sha256.trim().toLowerCase() : undefined,
     minDango: typeof p.minDango === 'string' ? p.minDango : undefined,
     mature: typeof p.mature === 'boolean' ? p.mature : false,
-    kind: p.kind === 'asmr' || p.kind === 'manga' || p.kind === 'tv' ? p.kind : 'anime',
+    kind:
+      embedBase !== undefined
+        ? 'tv'
+        : p.kind === 'asmr' || p.kind === 'manga' || p.kind === 'tv'
+          ? p.kind
+          : 'anime',
     sub: p.sub as RemoteSubType | undefined,
     tier: p.tier as RemoteTier | undefined,
     modes,

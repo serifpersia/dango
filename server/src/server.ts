@@ -99,8 +99,8 @@ async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
       registryUrl: url,
       enabledProviders: parseEnabledProviders(),
     })
-    if (result.catalog.length === 0) {
-      logger.warn('remote providers refresh returned nothing, keeping current set')
+    if (!result.registryLoaded) {
+      logger.warn('remote providers registry unavailable, keeping current set')
       return getProviderCatalog()
     }
     for (const key of Object.keys(providers)) {

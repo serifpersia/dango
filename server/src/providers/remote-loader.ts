@@ -2,12 +2,12 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { execFileSync } from 'node:child_process'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import * as cheerio from 'cheerio'
 import { gotScraping } from 'got-scraping'
 import { AppCache } from '../utils/cache.utils.js'
 import logger from '../logger.js'
-import { CONFIG } from '../config.js'
+import { CONFIG, INSTALL_CONFIG } from '../config.js'
 import { requestContext } from '../utils/request-context.js'
 import { sanitizeCfClearance, buildCfClearanceCookie } from '../utils/cookie.utils.js'
 import { decodeMaybeGzip, parseJsonBody } from '../utils/http.utils.js'
@@ -22,6 +22,7 @@ import { isJasmrApi, type JasmrApi } from './asmr/asmr.types.js'
 import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import {
   parseRegistry,
+  meetsMinDango,
   type BrowseFacets,
   type ProviderCatalogItem,
   type RemoteProviderEntry,
@@ -30,6 +31,7 @@ import {
 } from './remote-types.js'
 
 export interface RemoteLoadResult {
+  registryLoaded: boolean
   providers: Record<string, Provider>
   mangaProviders: Record<string, MangaProvider>
   tvProviders: Record<string, TvProvider>
@@ -46,6 +48,19 @@ interface LoadOptions {
 }
 
 const FETCH_TIMEOUT_MS = 15000
+const DANGO_VERSION: string = JSON.parse(
+  fs.readFileSync(path.join(INSTALL_CONFIG.PACKAGE_ROOT, 'package.json'), 'utf8')
+).version
+
+async function writeAtomically(filePath: string, bytes: Buffer | string): Promise<void> {
+  const temporary = `${filePath}.${crypto.randomUUID()}.tmp`
+  try {
+    await fs.promises.writeFile(temporary, bytes)
+    await fs.promises.rename(temporary, filePath)
+  } finally {
+    await fs.promises.rm(temporary, { force: true })
+  }
+}
 
 const GENERIC_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -64,8 +79,7 @@ function isHttp(url: string): boolean {
 
 function stripFilePrefix(p: string): string {
   if (p.startsWith('file://')) {
-    const u = new URL(p)
-    return u.pathname
+    return fileURLToPath(p)
   }
   return p
 }
@@ -400,14 +414,17 @@ async function loadEntry(
   ctx: RemoteCtx,
   allowUnsigned: boolean
 ): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
+  if (item.minDango && !meetsMinDango(DANGO_VERSION, item.minDango)) {
+    return { provider: null, error: `requires dango ${item.minDango}, running ${DANGO_VERSION}` }
+  }
   if (item.embedBase) {
     return { provider: makeEmbedProvider(item.id, item.embedBase) }
   }
   const entryUrl = resolveEntryUrl(item.entry, registryUrl)
   await fs.promises.mkdir(cacheDir, { recursive: true })
-  const fileName = `${item.id}-${item.version}.mjs`
+  const fileName = moduleFileName(item)
   const filePath = path.join(cacheDir, fileName)
-  const instanceKey = `${item.kind ?? 'anime'}:${item.id}-${item.version}-${(item.sha256 ?? 'nosha').slice(0, 12)}`
+  const instanceKey = `${filePath}:${item.kind ?? 'anime'}`
   let bytes: Buffer | null = null
   try {
     const cached = await fs.promises.readFile(filePath)
@@ -445,9 +462,9 @@ async function loadEntry(
     } else if (!allowUnsigned) {
       return { provider: null, error: `missing sha256 for ${item.id}` }
     }
-    await fs.promises.writeFile(filePath, bytes)
+    await writeAtomically(filePath, bytes)
   }
-  const cacheBuster = `${item.version}-${(item.sha256 ?? 'nosha').slice(0, 12)}`
+  const cacheBuster = `${item.version}-${item.sha256 ?? 'nosha'}`
   const result = await instantiateModule(filePath, cacheBuster, ctx, item)
   if (result.provider && !result.error) {
     instanceCache.set(instanceKey, { provider: result.provider, facets: result.facets })
@@ -456,6 +473,10 @@ async function loadEntry(
 }
 
 const instanceCache = new Map<string, { provider: unknown; facets?: BrowseFacets }>()
+
+function moduleFileName(item: RemoteProviderEntry): string {
+  return `${item.id}-${item.version}-${item.sha256 ?? 'nosha'}.mjs`
+}
 
 function extractBrowseFacets(mod: Record<string, unknown>): BrowseFacets | undefined {
   let genres: string[] | undefined
@@ -520,13 +541,13 @@ async function instantiateModule(
 }
 
 async function loadCachedFallback(
-  item: RemoteProviderEntry,
   prev: RemoteProviderEntry,
   cacheDir: string,
   ctx: RemoteCtx
 ): Promise<{ provider: unknown; facets?: BrowseFacets; error?: string }> {
+  if (prev.embedBase) return loadEntry(prev, '', cacheDir, ctx, false)
   if (!prev.sha256) return { provider: null, error: 'no verified fallback' }
-  const filePath = path.join(cacheDir, `${prev.id}-${prev.version}.mjs`)
+  const filePath = path.join(cacheDir, moduleFileName(prev))
   let bytes: Buffer
   try {
     bytes = await fs.promises.readFile(filePath)
@@ -536,13 +557,21 @@ async function loadCachedFallback(
   if (sha256Hex(bytes) !== prev.sha256) {
     return { provider: null, error: 'cached fallback failed verification' }
   }
-  const cacheBuster = `${prev.version}-${prev.sha256.slice(0, 12)}`
-  return instantiateModule(filePath, cacheBuster, ctx, { ...item, version: prev.version })
+  return loadEntry(prev, '', cacheDir, ctx, false)
 }
 
-export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoadResult> {
+let pendingLoad: Promise<RemoteLoadResult> | undefined
+
+export function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoadResult> {
+  return (pendingLoad ??= loadProviders(opts).finally(() => {
+    pendingLoad = undefined
+  }))
+}
+
+async function loadProviders(opts: LoadOptions): Promise<RemoteLoadResult> {
   const registryUrl = (opts.registryUrl ?? CONFIG.PROVIDER_REPO_URL ?? '').trim()
   const out: RemoteLoadResult = {
+    registryLoaded: false,
     providers: {},
     mangaProviders: {},
     tvProviders: {},
@@ -551,48 +580,55 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
     proxyRules: [],
   }
   if (!registryUrl) return out
-  const cacheDir = path.join(CONFIG.ROOT, 'remote-providers')
+  const cacheDir = path.join(INSTALL_CONFIG.ROOT, 'remote-providers')
   const cachedManifestPath = path.join(cacheDir, 'registry.json')
+  const activeManifestPath = path.join(cacheDir, 'active.json')
   let prevRegistry: RemoteRegistry | null = null
   try {
-    prevRegistry = parseRegistry(
-      JSON.parse((await fs.promises.readFile(cachedManifestPath)).toString('utf8'))
-    )
+    prevRegistry = parseRegistry(JSON.parse(await fs.promises.readFile(activeManifestPath, 'utf8')))
   } catch {
-    // ignore
+    try {
+      prevRegistry = parseRegistry(
+        JSON.parse(await fs.promises.readFile(cachedManifestPath, 'utf8'))
+      )
+      for (const item of prevRegistry.providers) {
+        if (item.embedBase || !item.sha256) continue
+        const legacy = path.join(cacheDir, `${item.id}-${item.version}.mjs`)
+        try {
+          const bytes = await fs.promises.readFile(legacy)
+          if (sha256Hex(bytes) === item.sha256) {
+            await writeAtomically(path.join(cacheDir, moduleFileName(item)), bytes)
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
   const prevById = new Map((prevRegistry?.providers ?? []).map((p) => [p.id.toLowerCase(), p]))
-  let raw: unknown
+  let registry: RemoteRegistry
   try {
     const bytes = await readManifestBytes(registryUrl)
-    raw = JSON.parse(bytes.toString('utf8'))
-    await fs.promises.mkdir(cacheDir, { recursive: true })
-    await fs.promises.writeFile(cachedManifestPath, JSON.stringify(raw))
+    registry = parseRegistry(JSON.parse(bytes.toString('utf8')))
   } catch (err) {
     logger.error({ err, registryUrl }, 'remote providers: manifest fetch failed, trying disk cache')
     try {
-      raw = JSON.parse((await fs.promises.readFile(cachedManifestPath)).toString('utf8'))
+      registry = parseRegistry(JSON.parse(await fs.promises.readFile(cachedManifestPath, 'utf8')))
     } catch {
       return out
     }
   }
-  let registry
-  try {
-    registry = parseRegistry(raw)
-  } catch (err) {
-    logger.error({ err, registryUrl }, 'remote providers: manifest parse failed')
-    return out
-  }
+  out.registryLoaded = true
+  const activeEntries: RemoteProviderEntry[] = []
   const enabledSet = new Set((opts.enabledProviders ?? []).map((s) => s.toLowerCase()))
   const explicitFilter = enabledSet.size > 0
   const ctx = createCtx(opts.cache)
   const allowUnsigned =
     opts.allowUnsigned ??
     (process.env.DANGO_ALLOW_UNSIGNED_PROVIDERS === '1' || looksLikePath(registryUrl))
-  for (const rawItem of registry.providers) {
-    // an embedBase entry is a tv embed provider (the url builder is tmdb/season/episode
-    // shaped), so it is validated and bucketed as one whatever the registry says
-    const item = rawItem.embedBase ? { ...rawItem, kind: 'tv' as const } : rawItem
+  for (const item of registry.providers) {
     const key = item.id.toLowerCase()
     if (item.enabledByDefault === false && (!explicitFilter || !enabledSet.has(key))) {
       out.catalog.push(toCatalog(item, false, 'disabled by default'))
@@ -602,9 +638,6 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
       out.catalog.push(toCatalog(item, false, 'not in enabledProviders'))
       continue
     }
-    // keep the proxy rules even if the provider itself fails to load, otherwise
-    // requests for that host go out without a Referer and get 403'd
-    if (item.proxy) out.proxyRules.push(item.proxy)
     const { provider, facets, error } = await loadEntry(
       item,
       registryUrl,
@@ -619,24 +652,25 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
         continue
       }
       out.catalog.push(withFacets(facets, withServers(item, provider, toCatalog(item, true))))
+      activeEntries.push(item)
+      if (item.proxy) out.proxyRules.push(item.proxy)
       logger.info({ provider: item.id, version: item.version }, 'remote provider loaded')
     } else {
       const prev = prevById.get(key)
       if (prev) {
-        const fb = await loadCachedFallback(item, prev, cacheDir, ctx)
+        const fb = await loadCachedFallback(prev, cacheDir, ctx)
         if (fb.provider && !fb.error) {
-          if (!assignProvider(out, item, key, fb.provider)) {
+          if (!assignProvider(out, prev, key, fb.provider)) {
             fb.error = 'cached fallback failed validation'
           }
         }
         if (fb.provider && !fb.error) {
           out.catalog.push({
-            ...withFacets(
-              fb.facets,
-              withServers(item, fb.provider, toCatalog({ ...item, version: prev.version }, true))
-            ),
+            ...withFacets(fb.facets, withServers(prev, fb.provider, toCatalog(prev, true))),
             error: `serving cached ${prev.version}: ${error}`,
           })
+          activeEntries.push(prev)
+          if (prev.proxy) out.proxyRules.push(prev.proxy)
           logger.warn(
             { provider: item.id, error, fallback: prev.version },
             'remote provider update failed, serving cached version'
@@ -645,28 +679,34 @@ export async function loadRemoteProviders(opts: LoadOptions): Promise<RemoteLoad
         }
       }
       out.catalog.push(toCatalog(item, false, error))
+      if (prev) activeEntries.push(prev)
+      if (item.proxy) out.proxyRules.push(item.proxy)
       logger.warn({ provider: item.id, error }, 'remote provider skipped')
     }
   }
-  const failedIds = new Set(out.catalog.filter((c) => !c.loaded).map((c) => `${c.id}-`))
+  await fs.promises.mkdir(cacheDir, { recursive: true })
+  await writeAtomically(
+    activeManifestPath,
+    JSON.stringify({ ...registry, providers: activeEntries })
+  )
+  await writeAtomically(cachedManifestPath, JSON.stringify(registry))
   try {
     const expected = new Set(
-      registry.providers.map((item) => `${item.id}-${item.version}.mjs`.toLowerCase())
+      [...registry.providers, ...activeEntries].map((item) => moduleFileName(item))
     )
     const expectedInstances = new Set(
-      registry.providers.map((item) => {
+      [...registry.providers, ...activeEntries].map((item) => {
         const kind = item.embedBase ? 'tv' : (item.kind ?? 'anime')
-        return `${kind}:${item.id}-${item.version}-${(item.sha256 ?? 'nosha').slice(0, 12)}`.toLowerCase()
+        return `${path.join(cacheDir, moduleFileName(item))}:${kind}`
       })
     )
     for (const key of instanceCache.keys()) {
-      if (!expectedInstances.has(key.toLowerCase())) instanceCache.delete(key)
+      if (!expectedInstances.has(key)) instanceCache.delete(key)
     }
     const files = await fs.promises.readdir(cacheDir)
     for (const file of files) {
       if (!file.toLowerCase().endsWith('.mjs')) continue
-      if (!expected.has(file.toLowerCase())) {
-        if ([...failedIds].some((prefix) => file.toLowerCase().startsWith(prefix))) continue
+      if (!expected.has(file)) {
         await fs.promises.unlink(path.join(cacheDir, file))
         logger.info({ file }, 'remote providers: removed superseded module')
       }
