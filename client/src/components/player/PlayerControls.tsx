@@ -28,6 +28,7 @@ interface PlayerControlsProps {
   skipIntervals: SkipInterval[]
   animeTitle: string
   episodeNumber: string | undefined
+  mode: 'sub' | 'dub'
   isTheaterMode: boolean
   onTheaterModeToggle: () => void
   anime4kEnabled: boolean
@@ -67,6 +68,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   skipIntervals,
   animeTitle,
   episodeNumber,
+  mode,
   isTheaterMode,
   onTheaterModeToggle,
   anime4kEnabled,
@@ -123,12 +125,22 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   }, [showSettings, setShowSettings])
 
   const controlsVisible = state.showControls || showSettings || state.isScrubbing
+  const selectedSubtitle =
+    state.activeSubtitleTrack !== 'off'
+      ? state.availableSubtitles.find(
+          (track) =>
+            track.lang === state.activeSubtitleTrack || track.label === state.activeSubtitleTrack
+        )
+      : undefined
 
   const topBar = (
     <ControlTopBar
       visible={controlsVisible}
       title={animeTitle}
       episode={episodeNumber ? `Episode ${episodeNumber}` : undefined}
+      mode={mode}
+      server={loadingVideo ? undefined : selectedSource?.sourceName}
+      subtitles={loadingVideo ? undefined : selectedSubtitle?.label || selectedSubtitle?.lang}
       onBack={() => window.history.back()}
       classes={{
         overlay: styles.controlsOverlay,

@@ -56,6 +56,41 @@
   }
 }
 
+.topBarTitleInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.topBarTitleInfo > span,
+.streamDetails > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.streamDetails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  font-size: clamp(0.65rem, 1.4cqw, 0.8rem);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.streamDetails > span {
+  max-width: 100%;
+}
+
+.modeTag {
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
 .stage {
   position: absolute;
   inset: 0;

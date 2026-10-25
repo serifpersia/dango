@@ -796,6 +796,7 @@ const Player: React.FC = () => {
             skipIntervals={state.skipIntervals}
             animeTitle={displayTitle}
             episodeNumber={state.currentEpisode ?? undefined}
+            mode={state.currentMode}
             isTheaterMode={isTheaterMode}
             onTheaterModeToggle={toggleTheaterMode}
             anime4kEnabled={upscaler.isEnabled}

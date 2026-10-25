@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '../common/Button'
 import { useWatchAlong } from '../../contexts/WatchAlongContext'
 import type { WatchPlayback } from '../../lib/watchAlong'
@@ -37,17 +37,21 @@ export default function WatchAlongPanel({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [showInvite, setShowInvite] = useState(false)
+  const panelRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (panelRef.current && (watch.session || needsPlayback)) panelRef.current.open = true
+  }, [watch.session, needsPlayback])
   const invite = watch.session
     ? `${watch.workerUrl}/join#${watch.session.id}.${watch.session.guestToken}`
     : ''
 
   return (
-    <section className={styles.panel} aria-label="Watch along">
+    <details ref={panelRef} className={styles.panel} aria-label="Watch along">
+      <summary className={styles.summary}>
+        Watch along
+        {watch.session ? (watch.session.host ? ' · You are hosting' : ' · Following host') : ''}
+      </summary>
       <div className={styles.heading}>
-        <strong>
-          Watch along
-          {watch.session ? (watch.session.host ? ' · You are hosting' : ' · Following host') : ''}
-        </strong>
         {watch.session ? (
           <div className={styles.actions}>
             <Button
@@ -152,6 +156,6 @@ export default function WatchAlongPanel({
         />
       )}
       {(watch.error || message) && <p role="status">{watch.error || message}</p>}
-    </section>
+    </details>
   )
 }

@@ -193,6 +193,7 @@ const Tv: React.FC = () => {
   })
   const source = sharedSelection?.provider ?? localSource
   const [streams, setStreams] = useState<StreamSource[]>([])
+  const [streamServer, setStreamServer] = useState('')
   const [streamsEpisodeKey, setStreamsEpisodeKey] = useState('')
   const {
     options: providerOptions,
@@ -1123,6 +1124,7 @@ const Tv: React.FC = () => {
         return
       }
       setStreams(directSources)
+      setStreamServer(data.server || selectedServer)
       setStreamsEpisodeKey(episodeKey)
       if (data.servers?.length) setLiveServers(data.servers)
       if (data.embedUrl) setEmbedFallbackUrl(data.embedUrl)
@@ -2015,6 +2017,7 @@ const Tv: React.FC = () => {
                   player={player}
                   title={details.title}
                   episodeLabel={isMovie ? undefined : `S${season} E${episode}`}
+                  server={streamServer || activeProvider?.label || source}
                   audioTracks={audioTracks}
                   selectedAudioTrack={selectedAudioTrack}
                   onAudioTrackChange={handleAudioTrackChange}

@@ -7,6 +7,16 @@
   color: var(--text-primary);
 }
 
+.summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .heading,
 .actions,
 .members {
@@ -27,6 +37,7 @@
 
 .heading {
   justify-content: space-between;
+  margin-top: 0.75rem;
 }
 
 .panel p {

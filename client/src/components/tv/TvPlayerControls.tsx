@@ -8,12 +8,14 @@ import TvSettings, { type TvSettingsView } from './TvSettings'
 import PlayerSurface from '../player/PlayerSurface'
 import type { AmbientLightSettings } from '../../hooks/useAmbientLight'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
+import { usePlayerState } from '../../lib/player/usePlayerCore'
 import { buildCueCss, fitSubtitleSize, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
 
 interface TvPlayerControlsProps {
   player: ReturnType<typeof useVideoPlayer>
   title: string
   episodeLabel?: string
+  server?: string
   audioTracks: { language: string; label: string }[]
   selectedAudioTrack: number
   onAudioTrackChange: (index: number) => void
@@ -45,6 +47,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   player,
   title,
   episodeLabel,
+  server,
   audioTracks,
   selectedAudioTrack,
   onAudioTrackChange,
@@ -225,12 +228,24 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   }
 
   const controlsVisible = state.showControls || !!settingsView
+  const mediaState = usePlayerState(player.engine)
+  const audio =
+    mediaState.audioTracks.find((track) => track.id === mediaState.activeAudioTrack) ??
+    audioTracks[selectedAudioTrack]
+  const subtitle =
+    selectedSubtitle >= 0
+      ? (subtitles[selectedSubtitle] ??
+        mediaState.subtitleTracks.find((track) => track.id === selectedSubtitle))
+      : undefined
 
   const topBar = (
     <ControlTopBar
       visible={controlsVisible}
       title={title}
       episode={episodeLabel}
+      server={isLoading ? undefined : server}
+      audio={isLoading ? undefined : audio?.label || audio?.language}
+      subtitles={isLoading ? undefined : subtitle?.label || subtitle?.language}
       onBack={onBack}
       classes={{
         overlay: styles.controlsOverlay,
