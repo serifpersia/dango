@@ -90,13 +90,18 @@ test('provider updates keep verified fallbacks, metadata, and offline startup wo
       const { AppCache } = await import(${JSON.stringify(new URL('../utils/cache.utils.ts', import.meta.url).href)});
       const { loadRemoteProviders } = await import(${JSON.stringify(new URL('./remote-loader.ts', import.meta.url).href)});
       const result = await loadRemoteProviders({ cache: new AppCache(), registryUrl: ${JSON.stringify(path.join(root, 'missing.json'))} });
-      console.log(JSON.stringify(result.catalog));
+      console.log('RESULT:' + JSON.stringify(result.catalog));
     `,
     ],
     { encoding: 'utf8', env: { ...process.env, LOG_LEVEL: 'silent' } }
   )
   assert.equal(
-    JSON.parse(restarted.trim().split('\n').at(-1)!)[0].version,
+    JSON.parse(
+      restarted
+        .split('\n')
+        .find((line) => line.startsWith('RESULT:'))!
+        .slice(7)
+    )[0].version,
     '1.0.0',
     'restart uses the saved fallback'
   )
