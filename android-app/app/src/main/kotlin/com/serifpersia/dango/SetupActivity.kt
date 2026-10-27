@@ -41,7 +41,8 @@ class SetupActivity : AppCompatActivity() {
         const val RELEASE_API = "https://api.github.com/repos/serifpersia/dango/releases/latest"
         const val RELEASE_DOWNLOADS =
             "https://github.com/serifpersia/dango/releases/latest/download"
-        val APK_ASSET = Regex("com\\.serifpersia\\.dango-v(\\d+)\\.(\\d+)\\.(\\d+)-universal\\.apk")
+        val APK_ASSET =
+            Regex("com\\.serifpersia\\.dango-v(\\d+)\\.(\\d+)\\.(\\d+)-(?:universal|arm64-v8a|armeabi-v7a)\\.apk")
     }
 
     private lateinit var prefs: SharedPreferences
@@ -506,8 +507,12 @@ class SetupActivity : AppCompatActivity() {
             var version: String? = null
             for (i in 0 until assets.length()) {
                 val match = APK_ASSET.find(assets.getJSONObject(i).optString("name")) ?: continue
-                version = "${match.groupValues[1]}.${match.groupValues[2]}.${match.groupValues[3]}"
-                break
+                val candidate =
+                    "${match.groupValues[1]}.${match.groupValues[2]}.${match.groupValues[3]}"
+                val current = version
+                if (current == null || isNewerVersion(candidate, current)) {
+                    version = candidate
+                }
             }
             Log.i(TAG, "fetchLatestAppVersion: $version")
             version
@@ -544,18 +549,41 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun downloadApk(version: String): File? {
-        return try {
-            val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
-            val file = File(dir, "dango-app-v$version.apk")
-            val url = "$RELEASE_DOWNLOADS/com.serifpersia.dango-v$version-universal.apk"
-            URL(url).openStream().use { input ->
-                file.outputStream().use { output -> input.copyTo(output) }
+        val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
+        val file = File(dir, "dango-app-v$version.apk")
+        val assets = listOf(
+            "com.serifpersia.dango-v$version-${getDeviceAbi()}.apk",
+            "com.serifpersia.dango-v$version-universal.apk",
+        )
+        for (asset in assets) {
+            val conn = try {
+                (URL("$RELEASE_DOWNLOADS/$asset").openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    connect()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "APK download failed for $asset: ${e.message}")
+                continue
             }
-            file
-        } catch (e: Exception) {
-            Log.w(TAG, "APK download failed: ${e.message}")
-            null
+            try {
+                if (conn.responseCode !in 200..299) {
+                    Log.w(TAG, "APK download $asset returned HTTP ${conn.responseCode}")
+                    continue
+                }
+                conn.inputStream.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (file.length() > 0) return file
+            } catch (e: Exception) {
+                Log.w(TAG, "APK download failed for $asset: ${e.message}")
+            } finally {
+                conn.disconnect()
+            }
+            file.delete()
         }
+        return null
     }
 
     private fun cleanupStaleApkDownloads() {

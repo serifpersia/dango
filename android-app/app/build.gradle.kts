@@ -4,8 +4,13 @@ plugins {
 }
 
 // Standalone app version, independent from the dango node project version.
-val dangoVersionName = "1.1.1"
-val dangoVersionCode = 12
+val dangoVersionName = "1.1.2"
+val dangoVersionCode = 13
+
+val abiFlavors = mapOf(
+    "arm64" to "arm64-v8a",
+    "armv7" to "armeabi-v7a",
+)
 
 android {
     namespace = "com.serifpersia.dango"
@@ -17,9 +22,17 @@ android {
         targetSdk = 35
         versionCode = dangoVersionCode
         versionName = dangoVersionName
+    }
 
-        ndk {
-            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+    flavorDimensions += "abi"
+    productFlavors {
+        abiFlavors.forEach { (flavor, abi) ->
+            create(flavor) {
+                dimension = "abi"
+                ndk {
+                    abiFilters.add(abi)
+                }
+            }
         }
     }
 
@@ -51,20 +64,27 @@ android {
         jvmTarget = "17"
     }
 
+    packaging {
+        jniLibs.useLegacyPackaging = true
+    }
+
     sourceSets {
         getByName("main") {
-            assets.srcDirs("src/main/assets")
             jniLibs.srcDir(layout.buildDirectory.dir("generated/nodeLib"))
+        }
+        abiFlavors.keys.forEach { flavor ->
+            maybeCreate(flavor).assets.srcDir(layout.buildDirectory.dir("generated/payload/$flavor/assets"))
         }
     }
 
     applicationVariants.all {
+        val variant = this
         outputs.all {
-            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            if (buildType.name == "release") {
-                output?.outputFileName = "com.serifpersia.dango-v${dangoVersionName}-universal.apk"
-            } else if (buildType.name == "debug") {
-                output?.outputFileName = "com.serifpersia.dango-v${dangoVersionName}-universal-debug.apk"
+            val abi = abiFlavors[variant.flavorName]
+            if (abi != null) {
+                val suffix = if (variant.buildType.name == "release") "" else "-${variant.buildType.name}"
+                val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+                output?.outputFileName = "com.serifpersia.dango-v${dangoVersionName}-$abi$suffix.apk"
             }
         }
     }
@@ -72,25 +92,53 @@ android {
 
 tasks.register("syncPayload") {
     val payloadDir = rootProject.projectDir.toPath().resolve("payload").toFile()
-    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload").toFile()
-    description = "Copy Termux node payload into APK assets"
+    val generatedPayloadDir = layout.buildDirectory.dir("generated/payload")
+    description = "Copy Termux node payload into per-ABI APK assets"
     group = "dango"
 
     onlyIf { payloadDir.exists() }
 
     doLast {
-        assetsPayloadDir.deleteRecursively()
-        assetsPayloadDir.mkdirs()
-        payloadDir.copyRecursively(assetsPayloadDir, overwrite = true)
-        
-        // Remove only ABI bin directories since node binary is packaged via jniLibs as libnode.so
-        // (Do NOT delete common/npm/bin!)
-        listOf("arm64-v8a", "armeabi-v7a").forEach { abi ->
-            File(assetsPayloadDir, "$abi/bin").deleteRecursively()
+        val generatedRoot = generatedPayloadDir.get().asFile
+        generatedRoot.deleteRecursively()
+        generatedRoot.mkdirs()
+
+        val aliases = File(payloadDir, "aliases.txt")
+            .takeIf { it.isFile }
+            ?.readLines()
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+        abiFlavors.forEach { (flavor, abi) ->
+            val assetsDir = File(generatedRoot, "$flavor/assets")
+            val payloadOut = File(assetsDir, "payload")
+            payloadOut.mkdirs()
+
+            val commonSrc = File(payloadDir, "common")
+            if (commonSrc.exists()) {
+                commonSrc.copyRecursively(File(payloadOut, "common"), overwrite = true)
+            }
+
+            val libSrc = File(payloadDir, "$abi/lib")
+            if (libSrc.exists()) {
+                libSrc.copyRecursively(File(payloadOut, "$abi/lib"), overwrite = true)
+            }
+
+            File(payloadOut, "aliases.txt").writeText(
+                aliases.filter { it.startsWith("$abi/") }.joinToString("\n")
+            )
+
+            val files = payloadOut.walkTopDown()
+                .filter { it.isFile && it.name != "manifest.txt" && !it.name.startsWith(".") && !it.name.startsWith("_") }
+                .map { "payload/" + it.relativeTo(payloadOut).path.replace('\\', '/') }
+                .sorted()
+                .toList()
+            File(payloadOut, "manifest.txt").writeText(files.joinToString("\n"))
+            println("Payload synced for $flavor ($abi): ${files.size} files -> $assetsDir")
         }
-        File(assetsPayloadDir, "bin").deleteRecursively()
-        
-        println("Payload synced: ${payloadDir} -> ${assetsPayloadDir}")
+
+        // Legacy generated assets must never be packaged; each flavor has its own copy.
+        File(projectDir, "src/main/assets/payload").deleteRecursively()
     }
 }
 
@@ -109,10 +157,9 @@ tasks.register("syncNodeBinary") {
 
     doLast {
         val destDir = generatedNodeLibDir.get().asFile
-        val abis = listOf("arm64-v8a", "armeabi-v7a")
         var copiedAny = false
 
-        for (abi in abis) {
+        for (abi in abiFlavors.values) {
             val nodeBin = File(payloadDir, "$abi/bin/node")
             if (nodeBin.exists()) {
                 val targetDir = File(destDir, abi)
@@ -134,30 +181,8 @@ tasks.register("syncNodeBinary") {
     }
 }
 
-tasks.register("generateManifest") {
-    val assetsPayloadDir = projectDir.toPath().resolve("src/main/assets/payload").toFile()
-    val manifestFile = assetsPayloadDir.resolve("manifest.txt")
-    description = "Generate manifest.txt listing all payload files (workaround for assets.list() __-prefix bug)"
-    group = "dango"
-
-    dependsOn("syncPayload")
-    inputs.dir(assetsPayloadDir)
-    outputs.file(manifestFile)
-
-    doLast {
-        val files = assetsPayloadDir.walkTopDown()
-            .filter { it.isFile && it.name != "manifest.txt" && !it.name.startsWith(".") && !it.name.startsWith("_") }
-            .map { "payload/" + it.relativeTo(assetsPayloadDir).path.replace('\\', '/') }
-            .sorted()
-            .toList()
-        manifestFile.writeText(files.joinToString("\n"))
-        println("Manifest generated: ${files.size} files -> $manifestFile")
-    }
-}
-
 tasks.named("preBuild") {
     dependsOn("syncNodeBinary")
-    dependsOn("generateManifest")
 }
 
 dependencies {

@@ -41,20 +41,28 @@ if errorlevel 1 (
 )
 
 for /f "delims=" %%V in ('node "%~dp0app-version.js"') do set APP_VERSION=%%V
-set APK_NAME=com.serifpersia.dango-v%APP_VERSION%-universal-debug.apk
-set APK_PATH=app\build\outputs\apk\debug\%APK_NAME%
+set APK_ARM64=app\build\outputs\apk\arm64\debug\com.serifpersia.dango-v%APP_VERSION%-arm64-v8a-debug.apk
+set APK_ARMV7=app\build\outputs\apk\armv7\debug\com.serifpersia.dango-v%APP_VERSION%-armeabi-v7a-debug.apk
 
-if not exist "%APK_PATH%" (
+if not exist "%APK_ARM64%" (
     echo.
-    echo [!] Expected APK not found: %APK_PATH%
-    dir /b app\build\outputs\apk\debug\
+    echo [!] Expected APK not found: %APK_ARM64%
+    dir /b app\build\outputs\apk\arm64\debug\
+    exit /b 1
+)
+
+if not exist "%APK_ARMV7%" (
+    echo.
+    echo [!] Expected APK not found: %APK_ARMV7%
+    dir /b app\build\outputs\apk\armv7\debug\
     exit /b 1
 )
 
 echo.
 echo [2/2] Done!
-echo APK: android-app\%APK_PATH%
+echo APK (arm64-v8a): android-app\%APK_ARM64%
+echo APK (armeabi-v7a): android-app\%APK_ARMV7%
 echo Version: %APP_VERSION%
 echo.
-echo Install: adb install -r android-app\%APK_PATH%
+echo Install: adb install -r android-app\%APK_ARM64%
 echo.

@@ -23,19 +23,20 @@ echo "[1/2] Building debug APK..."
 ./gradlew app:clean app:assembleDebug --no-daemon
 
 APP_VERSION=$(node "$(dirname "$0")/app-version.js")
-APK_NAME="com.serifpersia.dango-v${APP_VERSION}-universal-debug.apk"
-APK_PATH="app/build/outputs/apk/debug/${APK_NAME}"
+APK_ARM64="app/build/outputs/apk/arm64/debug/com.serifpersia.dango-v${APP_VERSION}-arm64-v8a-debug.apk"
+APK_ARMV7="app/build/outputs/apk/armv7/debug/com.serifpersia.dango-v${APP_VERSION}-armeabi-v7a-debug.apk"
 
-if [ ! -f "$APK_PATH" ]; then
+if [ ! -f "$APK_ARM64" ] || [ ! -f "$APK_ARMV7" ]; then
     echo ""
-    echo "[!] Expected APK not found: $APK_PATH"
-    ls "app/build/outputs/apk/debug/"
+    echo "[!] Expected APKs not found"
+    ls "app/build/outputs/apk/arm64/debug/" "app/build/outputs/apk/armv7/debug/"
     exit 1
 fi
 
 echo ""
 echo "[2/2] Done!"
-echo "APK: $APK_PATH"
+echo "APK (arm64-v8a): $APK_ARM64"
+echo "APK (armeabi-v7a): $APK_ARMV7"
 echo "Version: $APP_VERSION"
 echo ""
-echo "Install: adb install -r $APK_PATH"
+echo "Install: adb install -r $APK_ARM64"

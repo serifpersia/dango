@@ -119,9 +119,11 @@ Run standard dango via Termux:
 
 A standalone bundle packaging Node.js, dango, and a local WebView container.
 
-1. Grab the latest `.apk` from [Releases](https://github.com/serifpersia/dango/releases).
+1. From [Releases](https://github.com/serifpersia/dango/releases), download the APK matching your device: `-arm64-v8a.apk` for almost all modern phones, or `-armeabi-v7a.apk` for older 32-bit devices.
 2. Install the APK (allow _Install from Unknown Sources_ when prompted).
 3. Open the app. Core runtimes auto-provision on first launch.
+
+> Updating from the old universal APK requires one manual install of the matching per-ABI APK. In-app updates work normally after that.
 
 **Compiling from Source:**
 

@@ -48,7 +48,7 @@ jobs:
           echo "4. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android APK" >> release_notes.md
-          echo "Universal APK is included in this release if available." >> release_notes.md
+          echo "APKs for arm64-v8a and armeabi-v7a are included in this release if available." >> release_notes.md
 
       - name: Inject Version Date
         run: |
@@ -205,15 +205,14 @@ jobs:
       - name: Create New Latest Release
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          APK_ARG=""
+          APK_FILES=()
           if ls apk-download/*.apk 1>/dev/null 2>&1; then
-            APK_FILE=$(ls apk-download/*.apk | head -1)
-            APK_ARG="$APK_FILE"
+            APK_FILES=(apk-download/*.apk)
           fi
           gh release create "latest" \
             "dango.zip" \
             "dango-extension.zip" \
-            $APK_ARG \
+            "${APK_FILES[@]}" \
             --title "latest (v$VERSION)" \
             --notes-file release_notes.md \
             --target ${{ github.sha }}
