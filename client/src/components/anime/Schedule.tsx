@@ -43,7 +43,6 @@ const fetchEpisodeSchedule = async (date: string, format: string): Promise<Anime
 const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
   const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
   const [format, setFormat] = useLocalStorage<string>('schedule_format', 'TV')
-  const { emblaRef, canScroll, stepBy, scrollToStart } = useCarousel()
   const dayRef = useRef<HTMLDivElement>(null)
   const isInitialMount = useRef(true)
 
@@ -55,6 +54,10 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
     queryKey: [qk.schedule, selectedDate, format],
     queryFn: () => fetchEpisodeSchedule(selectedDate, format),
     staleTime: 1000 * 60 * 5,
+  })
+
+  const { emblaRef, canScrollPrev, canScrollNext, stepBy, scrollToStart } = useCarousel({
+    slideCount: scheduleData.length,
   })
 
   const dayButtons = useMemo(() => {
@@ -85,16 +88,20 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
   }, [])
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-    if (dayRef.current) {
-      const active = dayRef.current.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
-      if (active) {
-        active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
-      }
-    }
+    const container = dayRef.current
+    const active = container?.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`)
+    if (!container || !active) return
+    const containerRect = container.getBoundingClientRect()
+    const activeRect = active.getBoundingClientRect()
+    const left =
+      container.scrollLeft +
+      (activeRect.left - containerRect.left) -
+      (containerRect.width - activeRect.width) / 2
+    container.scrollTo({
+      left: Math.max(0, left),
+      behavior: isInitialMount.current ? 'auto' : 'smooth',
+    })
+    isInitialMount.current = false
   }, [selectedDate])
 
   useEffect(() => {
@@ -118,24 +125,6 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
             {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
             <h2 className={`section-title ${styles.sectionTitleNoMargin}`}>Episode Schedule</h2>
           </div>
-          {scheduleData.length > 0 && canScroll && (
-            <div className={styles.navArrows}>
-              <button
-                className={styles.navButton}
-                onClick={() => stepBy('left')}
-                aria-label="Scroll left"
-              >
-                <Icon name="chevron-left" />
-              </button>
-              <button
-                className={styles.navButton}
-                onClick={() => stepBy('right')}
-                aria-label="Scroll right"
-              >
-                <Icon name="chevron-right" />
-              </button>
-            </div>
-          )}
         </div>
 
         <div className={styles.headerActions}>
@@ -146,6 +135,28 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
             options={formatOptions}
             onChange={setFormat}
           />
+          {scheduleData.length > 0 && (canScrollPrev || canScrollNext) && (
+            <div className={styles.navArrows}>
+              {canScrollPrev && (
+                <button
+                  className={styles.navButton}
+                  onClick={() => stepBy('left')}
+                  aria-label="Scroll left"
+                >
+                  <Icon name="chevron-left" />
+                </button>
+              )}
+              {canScrollNext && (
+                <button
+                  className={styles.navButton}
+                  onClick={() => stepBy('right')}
+                  aria-label="Scroll right"
+                >
+                  <Icon name="chevron-right" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

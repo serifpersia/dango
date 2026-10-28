@@ -8,21 +8,34 @@
   right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-secondary);
+  color: var(--control-text);
   pointer-events: none;
 }
 
 .select {
-  height: 34px;
-  padding: 0 8px;
-  padding-right: 1.5rem;
+  height: 40px;
+  padding: 0 10px;
+  padding-right: 1.75rem;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+  color: var(--control-text);
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.select:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--control-border-hover);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
 }

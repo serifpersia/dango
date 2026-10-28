@@ -40,7 +40,10 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
     }
   }, [hasNextPage, isFetchingNextPage, isLoading, fetchNextPage])
 
-  const { emblaRef, stepBy } = useCarousel({ onReachThreshold: handleReachThreshold })
+  const { emblaRef, stepBy, canScrollPrev, canScrollNext } = useCarousel({
+    onReachThreshold: handleReachThreshold,
+    slideCount: trendingList.length,
+  })
 
   return (
     <section className={styles.sectionWrapper}>
@@ -49,30 +52,6 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
           <div className="title-stack">
             {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
             <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
-          </div>
-          <div className={styles['nav-arrows']}>
-            <button
-              className={styles['nav-button']}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                stepBy('left', lowEndMode)
-              }}
-              aria-label="Scroll left"
-            >
-              <Icon name="chevron-left" />
-            </button>
-            <button
-              className={styles['nav-button']}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                stepBy('right', lowEndMode)
-              }}
-              aria-label="Scroll right"
-            >
-              <Icon name="chevron-right" />
-            </button>
           </div>
         </div>
 
@@ -84,6 +63,36 @@ export default function TrendingList({ title, eyebrow }: TrendingListProps) {
             options={sortOptions}
             onChange={setSort}
           />
+          {(canScrollPrev || canScrollNext) && (
+            <div className={styles['nav-arrows']}>
+              {canScrollPrev && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('left', lowEndMode)
+                  }}
+                  aria-label="Scroll left"
+                >
+                  <Icon name="chevron-left" />
+                </button>
+              )}
+              {canScrollNext && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('right', lowEndMode)
+                  }}
+                  aria-label="Scroll right"
+                >
+                  <Icon name="chevron-right" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

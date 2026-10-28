@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react'
 import Icon from '../common/Icon'
+import SectionSelect from '../common/SectionSelect'
 import AnimeCard from './AnimeCard'
 import ErrorMessage from '../common/ErrorMessage'
 import { useInfiniteLatestReleases } from '../../hooks/useAnimeData'
@@ -36,7 +37,10 @@ export default function LatestReleasesList({ eyebrow }: { eyebrow?: string }) {
     }
   }, [hasNextPage, isFetchingNextPage, isLoading, fetchNextPage])
 
-  const { emblaRef, stepBy } = useCarousel({ onReachThreshold: handleReachThreshold })
+  const { emblaRef, stepBy, canScrollPrev, canScrollNext } = useCarousel({
+    onReachThreshold: handleReachThreshold,
+    slideCount: animeList.length,
+  })
 
   return (
     <section className={styles.sectionWrapper}>
@@ -46,44 +50,46 @@ export default function LatestReleasesList({ eyebrow }: { eyebrow?: string }) {
             {eyebrow && <div className="section-eyebrow">{eyebrow}</div>}
             <div className={`section-title ${styles.sectionTitleNoMargin}`}>Latest Releases</div>
           </div>
-          <div className={styles['nav-arrows']}>
-            <button
-              className={styles['nav-button']}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                stepBy('left', lowEndMode)
-              }}
-              aria-label="Scroll left"
-            >
-              <Icon name="chevron-left" />
-            </button>
-            <button
-              className={styles['nav-button']}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                stepBy('right', lowEndMode)
-              }}
-              aria-label="Scroll right"
-            >
-              <Icon name="chevron-right" />
-            </button>
-          </div>
         </div>
 
         <div className={styles['header-actions']}>
-          <select
-            className={styles.timeSelect}
+          <SectionSelect
+            ariaLabel="Latest releases format"
+            width={120}
             value={format}
-            onChange={(e) => setFormat(e.currentTarget.value)}
-          >
-            {formatOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={formatOptions}
+            onChange={setFormat}
+          />
+          {(canScrollPrev || canScrollNext) && (
+            <div className={styles['nav-arrows']}>
+              {canScrollPrev && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('left', lowEndMode)
+                  }}
+                  aria-label="Scroll left"
+                >
+                  <Icon name="chevron-left" />
+                </button>
+              )}
+              {canScrollNext && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('right', lowEndMode)
+                  }}
+                  aria-label="Scroll right"
+                >
+                  <Icon name="chevron-right" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

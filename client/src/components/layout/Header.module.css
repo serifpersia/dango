@@ -23,9 +23,11 @@
 }
 
 .header.scrolled {
-  background-color: rgba(12, 12, 15, 0.82);
+  background-color: var(--bg-primary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --header-btn-bg: rgba(255, 255, 255, 0.08);
+  --header-btn-bg-hover: rgba(255, 255, 255, 0.16);
 }
 
 .logo {
@@ -142,7 +144,7 @@
 }
 
 .searchButton {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: none;
@@ -161,7 +163,7 @@
 }
 
 .searchButton:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
   border-color: rgba(255, 255, 255, 0.35);
 }
 
@@ -189,7 +191,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--text-primary);
@@ -198,7 +200,7 @@
 .profileBtn:hover {
   border-color: rgba(255, 255, 255, 0.35);
   transform: translateY(-2px);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
 }
 
 .profileBtn:active {

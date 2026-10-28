@@ -17,7 +17,6 @@ import {
   useRemoveTvBookmark,
   useRemoveTvProgress,
 } from '../../hooks/useTvLibrary'
-import styles from '../../pages/Home.module.css'
 import homeStyles from '../common/HomeLayout.module.css'
 
 type ActiveTab = 'latest' | 'trending'
@@ -112,69 +111,48 @@ const TvHome: React.FC = () => {
     switch (activeTab) {
       case 'latest':
         return (
-          <section>
-            <div className={styles['section-header']}>
-              <div className={styles['title-wrapper']}>
-                <div className="title-stack">
-                  <div className="section-eyebrow">Fresh picks</div>
-                  <div className="section-title" style={{ marginBottom: 0 }}>
-                    Latest Releases
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <SectionSelect
-                  ariaLabel="Latest type"
-                  value={latestType}
-                  onChange={(v) => setLatestType(v as 'tv' | 'movie')}
-                  options={[
-                    { value: 'tv', label: 'TV Shows' },
-                    { value: 'movie', label: 'Movies' },
-                  ]}
-                />
-              </div>
-            </div>
-
-            {latestLoading ? (
+          <MediaSection
+            title="Latest Releases"
+            eyebrow="Fresh picks"
+            loading={latestLoading}
+            carousel
+            itemCount={latestItems.length}
+            headerActions={
+              <SectionSelect
+                ariaLabel="Latest type"
+                value={latestType}
+                onChange={(v) => setLatestType(v as 'tv' | 'movie')}
+                options={[
+                  { value: 'tv', label: 'TV Shows' },
+                  { value: 'movie', label: 'Movies' },
+                ]}
+              />
+            }
+            loadingSkeleton={
               <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: 'var(--space-6)',
-                }}
-              >
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="skeleton"
-                    style={{ aspectRatio: '3 / 4', borderRadius: 'var(--radius-lg)' }}
-                  />
-                ))}
-              </div>
-            ) : latestItems.length > 0 ? (
-              <MediaSection carousel itemCount={latestItems.length}>
-                {latestItems.map(renderTvCard)}
-              </MediaSection>
-            ) : (
+                className="skeleton"
+                style={{ aspectRatio: '3 / 4', borderRadius: 'var(--radius-lg)' }}
+              />
+            }
+            emptyState={
               <div className={homeStyles.emptyState}>
                 <p>No latest releases available right now.</p>
               </div>
-            )}
-          </section>
+            }
+          >
+            {latestItems.map(renderTvCard)}
+          </MediaSection>
         )
       case 'trending':
         return (
-          <section>
-            <div className={styles['section-header']}>
-              <div className={styles['title-wrapper']}>
-                <div className="title-stack">
-                  <div className="section-eyebrow">Discover</div>
-                  <div className="section-title" style={{ marginBottom: 0 }}>
-                    Trending
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <MediaSection
+            title="Trending"
+            eyebrow="Discover"
+            loading={trendingLoading}
+            carousel
+            itemCount={trendingItems.length}
+            headerActions={
+              <>
                 <SectionSelect
                   ariaLabel="Trending sort"
                   value={trendingSort}
@@ -194,35 +172,22 @@ const TvHome: React.FC = () => {
                     { value: 'movie', label: 'Movies' },
                   ]}
                 />
-              </div>
-            </div>
-
-            {trendingLoading ? (
+              </>
+            }
+            loadingSkeleton={
               <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: 'var(--space-6)',
-                }}
-              >
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="skeleton"
-                    style={{ aspectRatio: '3 / 4', borderRadius: 'var(--radius-lg)' }}
-                  />
-                ))}
-              </div>
-            ) : trendingItems.length > 0 ? (
-              <MediaSection carousel itemCount={trendingItems.length}>
-                {trendingItems.map(renderTvCard)}
-              </MediaSection>
-            ) : (
+                className="skeleton"
+                style={{ aspectRatio: '3 / 4', borderRadius: 'var(--radius-lg)' }}
+              />
+            }
+            emptyState={
               <div className={homeStyles.emptyState}>
                 <p>No trending content available right now.</p>
               </div>
-            )}
-          </section>
+            }
+          >
+            {trendingItems.map(renderTvCard)}
+          </MediaSection>
         )
     }
   }

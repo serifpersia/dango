@@ -5,7 +5,7 @@
 }
 
 .bellBtn {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: none;
@@ -26,7 +26,7 @@
 }
 
 .bellBtn:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
   border-color: rgba(255, 255, 255, 0.35);
   transform: scale(1.05);
 }

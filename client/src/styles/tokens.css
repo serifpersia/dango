@@ -55,6 +55,11 @@
   --border-accent: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.3);
   --border: var(--border-primary);
 
+  /* Controls: arrow buttons, section dropdowns, collapse toggles */
+  --control-border: #4b5570;
+  --control-border-hover: #647093;
+  --control-text: #ffffff;
+
   /* ===== COMPONENT TOKENS ===== */
   --card-radius: var(--radius-lg);
   --border-light: var(--border-secondary);
@@ -239,6 +244,10 @@ html[data-theme='mochi'] {
   --border-primary: #2c2c33;
   --border-secondary: #3a3a43;
 
+  --control-border: #4c4c59;
+  --control-border-hover: #666675;
+  --control-text: #f2f2f5;
+
   --glass-bg: rgba(27, 27, 31, 0.96);
 
   --badge-info-bg: var(--accent);
@@ -281,6 +290,10 @@ html[data-theme='sakura'] {
 
   --border-primary: #322a34;
   --border-secondary: #403640;
+
+  --control-border: #524458;
+  --control-border-hover: #6b5872;
+  --control-text: #f3eaf3;
 
   --glass-bg: rgba(28, 23, 30, 0.96);
 

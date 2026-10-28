@@ -10,6 +10,7 @@ interface UseCarouselOptions {
   scrollFraction?: number
   threshold?: number
   onReachThreshold?: () => void
+  slideCount?: number
 }
 
 export function useCarousel({
@@ -18,9 +19,11 @@ export function useCarousel({
   scrollFraction = 0.8,
   threshold = 0.6,
   onReachThreshold,
+  slideCount = 0,
 }: UseCarouselOptions = {}) {
   const [emblaRef, api] = useEmblaCarousel({ align, containScroll, dragFree: true })
-  const [canScroll, setCanScroll] = useState(false)
+  const [canScrollPrev, setCanScrollPrev] = useState(false)
+  const [canScrollNext, setCanScrollNext] = useState(false)
   const optionsRef = useRef({ scrollFraction, threshold, onReachThreshold })
   const thresholdCrossed = useRef(false)
 
@@ -29,7 +32,8 @@ export function useCarousel({
   })
 
   const updateCanScroll = useCallback((instance: EmblaCarouselType) => {
-    setCanScroll(instance.canScrollPrev() || instance.canScrollNext())
+    setCanScrollPrev(instance.canScrollPrev())
+    setCanScrollNext(instance.canScrollNext())
   }, [])
 
   useEffect(() => {
@@ -59,6 +63,10 @@ export function useCarousel({
     }
   }, [api, updateCanScroll])
 
+  useEffect(() => {
+    api?.reInit()
+  }, [api, slideCount])
+
   const slidesPerView = useCallback((instance: EmblaCarouselType) => {
     const slide = instance.containerNode().firstElementChild as HTMLElement | null
     if (!slide) return 1
@@ -85,5 +93,5 @@ export function useCarousel({
     [api]
   )
 
-  return { emblaRef, api, canScroll, stepBy, scrollToStart }
+  return { emblaRef, api, canScrollPrev, canScrollNext, stepBy, scrollToStart }
 }

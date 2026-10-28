@@ -5,6 +5,16 @@
   margin-bottom: var(--space-8);
 }
 
+.content-type-nav {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.content-type-nav :global(.tabBar) {
+  margin-bottom: 0;
+}
+
 .title-wrapper {
   display: flex;
   align-items: center;
@@ -25,4 +35,30 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .seasonGrid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .seasonGrid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .seasonGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  .seasonGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
 }

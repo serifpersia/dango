@@ -295,12 +295,14 @@ const Home: React.FC = () => {
           asmrSpotlight && asmrSpotlight.length > 0 && <AsmrSpotlightBanner works={asmrSpotlight} />
         ))}
 
-      <OptionTabs
-        ariaLabel="Content type"
-        options={CONTENT_OPTIONS}
-        value={contentType}
-        onChange={setContentType}
-      />
+      <div className={styles['content-type-nav']}>
+        <OptionTabs
+          ariaLabel="Content type"
+          options={CONTENT_OPTIONS}
+          value={contentType}
+          onChange={setContentType}
+        />
+      </div>
 
       {contentType === 'manga' ? (
         <MangaHome />

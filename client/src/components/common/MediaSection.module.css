@@ -25,18 +25,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
 }
 
 .header-select {
   width: auto;
   min-width: 120px;
-  height: 34px;
-  padding: 0 var(--space-3);
+  height: 40px;
+  padding: 0 10px;
   padding-right: 2rem;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  color: var(--control-text);
   font-size: var(--font-size-sm);
   font-weight: 700;
   cursor: pointer;
@@ -49,7 +50,7 @@
 }
 
 .header-select:hover {
-  border-color: var(--border-secondary);
+  border-color: var(--control-border-hover);
   background-color: var(--bg-elevated);
 }
 
@@ -80,8 +81,8 @@
   width: 40px;
   height: 40px;
   border: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--control-text);
   border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
@@ -92,7 +93,8 @@
 
 .collapse-button:hover {
   background: var(--bg-elevated);
-  color: var(--text-primary);
+  border-color: var(--border-primary);
+  color: var(--control-text);
 }
 
 .title-link {
@@ -138,40 +140,49 @@
 
 .nav-arrows {
   display: flex;
-  gap: 8px;
-  background: var(--bg-tertiary);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-primary);
+  height: 40px;
+  gap: 6px;
 }
 
 .nav-button {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--control-text);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .nav-button:hover {
   background: var(--bg-elevated);
-  color: var(--accent);
+  border-color: var(--border-primary);
+  color: var(--control-text);
 }
 
 .nav-button:active {
-  transform: scale(0.9);
+  background: var(--bg-elevated);
+}
+
+.nav-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 @media (hover: none), (pointer: coarse) {
+  .nav-arrows {
+    height: 36px;
+  }
+
   .nav-button {
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
   }
 }
 

@@ -50,9 +50,10 @@ const MediaSection: React.FC<MediaSectionProps> = ({
   children,
 }) => {
   const { lowEndMode } = useLowEndMode()
-  const { emblaRef, stepBy, scrollToStart } = useCarousel({
+  const { emblaRef, stepBy, scrollToStart, canScrollPrev, canScrollNext } = useCarousel({
     onReachThreshold,
     threshold: scrollThreshold,
+    slideCount: itemCount,
   })
   const [isExpanded, setIsExpanded] = React.useState(defaultExpanded)
 
@@ -88,35 +89,39 @@ const MediaSection: React.FC<MediaSectionProps> = ({
               <div className={`section-title ${styles.sectionTitleNoMargin}`}>{title}</div>
             )}
           </div>
-          {carousel && itemCount > 0 && isExpanded && (
-            <div className={styles['nav-arrows']}>
-              <button
-                className={styles['nav-button']}
-                type="button"
-                aria-label="Scroll left"
-                onClick={(e) => {
-                  e.preventDefault()
-                  stepBy('left', lowEndMode)
-                }}
-              >
-                <Icon name="chevron-left" />
-              </button>
-              <button
-                className={styles['nav-button']}
-                type="button"
-                aria-label="Scroll right"
-                onClick={(e) => {
-                  e.preventDefault()
-                  stepBy('right', lowEndMode)
-                }}
-              >
-                <Icon name="chevron-right" />
-              </button>
-            </div>
-          )}
         </div>
         <div className={styles['header-controls']}>
           {headerActions}
+          {carousel && itemCount > 0 && isExpanded && (canScrollPrev || canScrollNext) && (
+            <div className={styles['nav-arrows']}>
+              {canScrollPrev && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  aria-label="Scroll left"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('left', lowEndMode)
+                  }}
+                >
+                  <Icon name="chevron-left" />
+                </button>
+              )}
+              {canScrollNext && (
+                <button
+                  className={styles['nav-button']}
+                  type="button"
+                  aria-label="Scroll right"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    stepBy('right', lowEndMode)
+                  }}
+                >
+                  <Icon name="chevron-right" />
+                </button>
+              )}
+            </div>
+          )}
           {collapsible && (
             <button
               className={styles['collapse-button']}
