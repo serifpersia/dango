@@ -14,8 +14,22 @@ import {
   dataMatureAllocateInput,
 } from '../schemas/data.js'
 import { isMatureStreamingProvider, parseListParam } from '../../lib/resolve-show.js'
+import { rankByTitleMatch } from '../../providers/title-matching.js'
+import type { Show } from '../../providers/provider.interface.js'
 
 const defaultValidate = (d: unknown) => Array.isArray(d) && d.length > 0
+
+function rankMatureResults(shows: Show[], query: string): Show[] {
+  return rankByTitleMatch(shows, query, (show) =>
+    [
+      show.name,
+      show.names?.romaji,
+      show.names?.english,
+      show.names?.native,
+      ...(show.names?.synonyms ?? []),
+    ].filter((title): title is string => !!title)
+  )
+}
 
 export const dataMatureRouter = router({
   matureResolve: protectedProcedure
@@ -83,7 +97,7 @@ export const dataMatureRouter = router({
               isAdult: true,
               sort: input.sortBy,
             })
-            return { data: result, hasMore: result.length >= limit }
+            return { data: rankMatureResults(result, query), hasMore: result.length >= limit }
           }
           if (isMatureStreamingProvider(ctx, provider)) {
             const streaming = ctx.getProviders()[provider]
@@ -102,14 +116,20 @@ export const dataMatureRouter = router({
                 blacklist: input.blacklist || undefined,
               })
               return {
-                data: result.shows,
+                data: rankMatureResults(result.shows, query),
                 hasMore: result.hasMore,
                 ...(result.total !== undefined ? { total: result.total } : {}),
                 ...(result.genres ? { genres: result.genres } : {}),
               }
             }
             const shows = await streaming.search({ query })
-            return { data: shows.map((s) => ({ ...s, isAdult: true })), hasMore: false }
+            return {
+              data: rankMatureResults(
+                shows.map((s) => ({ ...s, isAdult: true })),
+                query
+              ),
+              hasMore: false,
+            }
           }
           if (provider === 'mal') {
             let result: AnilistMedia[] = []
@@ -135,7 +155,7 @@ export const dataMatureRouter = router({
               return { ...show, isAdult: true }
             })
             const sliced = shows.slice(0, limit)
-            return { data: sliced, hasMore: shows.length >= limit }
+            return { data: rankMatureResults(sliced, query), hasMore: shows.length >= limit }
           }
           return { data: [], hasMore: false }
         } catch (e) {

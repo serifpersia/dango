@@ -415,6 +415,7 @@ const Player: React.FC = () => {
   }, [displayTitle, state.currentEpisode])
 
   usePlayerShortcuts({
+    onPrevious: followingHost ? () => {} : handlePreviousEpisode,
     onNext: followingHost ? () => {} : handleNShortcut,
     onToggleTheater: toggleTheaterMode,
     flashControls: player.actions.flashControls,

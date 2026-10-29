@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 
 interface UsePlayerShortcutsOptions {
+  onPrevious: () => void
   onNext: () => void
   onToggleTheater: () => void
   flashControls: () => void
 }
 
 export function usePlayerShortcuts({
+  onPrevious,
   onNext,
   onToggleTheater,
   flashControls,
@@ -30,6 +32,10 @@ export function usePlayerShortcuts({
         onNext()
       }
 
+      if (e.key.toLowerCase() === 'p') {
+        onPrevious()
+      }
+
       if (e.key.toLowerCase() === 't') {
         onToggleTheater()
       }
@@ -38,5 +44,5 @@ export function usePlayerShortcuts({
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [flashControls, onNext, onToggleTheater])
+  }, [flashControls, onNext, onPrevious, onToggleTheater])
 }

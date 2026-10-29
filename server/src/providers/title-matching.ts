@@ -207,6 +207,22 @@ export function pickBestMatch<T extends MatchCandidate>(
   return best && best.score >= minScore ? best : null
 }
 
+export function rankByTitleMatch<T>(
+  items: T[],
+  query: string,
+  getTitles: (item: T) => string[]
+): T[] {
+  if (!query.trim()) return items
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      score: Math.max(0, ...getTitles(item).map((title) => titleSimilarity(query, title))),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ item }) => item)
+}
+
 export function buildQueryVariants(title: string, romaji?: string): string[] {
   const seen = new Set<string>()
   const out: string[] = []

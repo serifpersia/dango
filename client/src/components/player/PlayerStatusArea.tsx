@@ -54,6 +54,10 @@ const PlayerStatusArea: React.FC<{ showTheater?: boolean }> = ({ showTheater = t
               </div>
             )}
             <div className={styles.shortcut}>
+              <span className={styles.key}>P</span>
+              <span className={styles.label}>Previous</span>
+            </div>
+            <div className={styles.shortcut}>
               <span className={styles.key}>N</span>
               <span className={styles.label}>Next</span>
             </div>

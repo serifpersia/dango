@@ -6,6 +6,7 @@ import { profileQuery } from '../../hooks/useProfile'
 import { Button } from '../common/Button'
 import ProfileAvatar from '../common/ProfileAvatar'
 import { Modal } from '../common/Modal'
+import Icon from '../common/Icon'
 import type { Profile } from '../../../../server/src/profile.types'
 import styles from './Profiles.module.css'
 import sharedStyles from './Settings.module.css'
@@ -53,9 +54,11 @@ export default function ProfileSettings() {
       </p>
       <div className={styles.avatarRow}>
         <ProfileAvatar image={profile.image} name={profile.name} />
-        <label className={styles.field}>
-          Upload image
+        <label className={styles.uploadButton}>
+          <Icon name="upload" />
+          <span>Upload image</span>
           <input
+            className={styles.fileInput}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
             disabled={busy}

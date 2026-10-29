@@ -33,6 +33,7 @@ import { Alert } from '../components/common/Alert'
 import { useContentType } from '../contexts/ContentTypeContext'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import sharedStyles from '../components/settings/Settings.module.css'
+import MatureConsentModal from '../components/common/MatureConsentModal'
 
 const LIST_TAB_LABELS = {
   anime: 'Watchlist',
@@ -41,7 +42,15 @@ const LIST_TAB_LABELS = {
   asmr: 'Listening List',
 } as const
 
-type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
+type SettingsTab = 'general' | 'presence' | 'server' | 'sync' | 'watchlist' | 'database'
+const SETTINGS_TABS: SettingsTab[] = [
+  'general',
+  'presence',
+  'server',
+  'sync',
+  'watchlist',
+  'database',
+]
 
 const Settings: React.FC = () => {
   const { data: profile } = useQuery(profileQuery)
@@ -49,9 +58,7 @@ const Settings: React.FC = () => {
   const { contentType } = useContentType()
   const initialTab = searchParams.get('tab') as SettingsTab | null
   const [activeTab, setActiveTab] = useState<SettingsTab>(
-    initialTab && ['general', 'sync', 'watchlist', 'database'].includes(initialTab)
-      ? initialTab
-      : 'general'
+    initialTab && SETTINGS_TABS.includes(initialTab) ? initialTab : 'general'
   )
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -59,7 +66,12 @@ const Settings: React.FC = () => {
   const tabBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const [sidebarIndicator, setSidebarIndicator] = useState({ top: 0, height: 0, left: 0, width: 0 })
   const { lowEndMode, setLowEndMode } = useLowEndMode()
-  const { hasConsent: hasMatureConsent, revoke: revokeMatureConsent } = useMatureConsent()
+  const {
+    hasConsent: hasMatureConsent,
+    grant: grantMatureConsent,
+    revoke: revokeMatureConsent,
+  } = useMatureConsent()
+  const [showMatureConsentModal, setShowMatureConsentModal] = useState(false)
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
 
   const [discordEnabled, setDiscordEnabled] = useState(true)
@@ -143,7 +155,7 @@ const Settings: React.FC = () => {
 
   React.useEffect(() => {
     const tab = searchParams.get('tab') as SettingsTab | null
-    if (tab && ['general', 'sync', 'watchlist', 'database'].includes(tab)) {
+    if (tab && SETTINGS_TABS.includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -340,7 +352,55 @@ const Settings: React.FC = () => {
                   />
                 </div>
               </div>
-
+            </div>
+            <section className={sharedStyles.sectionCard}>
+              <h3>Keyboard Shortcuts</h3>
+              <p>Use S to focus search outside controls, or use the listed keys while watching.</p>
+              <div className={styles.shortcutList}>
+                <h4>Search</h4>
+                <div className={styles.shortcutRow}>
+                  <kbd>S</kbd>
+                  <span>Focus search</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>Ctrl + K / ⌘ + K</kbd>
+                  <span>Focus search</span>
+                </div>
+                <h4>Player</h4>
+                <div className={styles.shortcutRow}>
+                  <kbd>Space / K</kbd>
+                  <span>Play or pause</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>J / L or ← / →</kbd>
+                  <span>Seek backward or forward</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>↑ / ↓</kbd>
+                  <span>Adjust volume</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>M / F</kbd>
+                  <span>Mute / fullscreen</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>N / T</kbd>
+                  <span>Next episode / theater mode</span>
+                </div>
+                <div className={styles.shortcutRow}>
+                  <kbd>P</kbd>
+                  <span>Previous episode</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        )
+      case 'presence':
+        return (
+          <div className={styles.tabContent}>
+            <div className={sharedStyles.sectionCard}>
+              <h3>Presence & Content</h3>
+              <p>Control what Dango shares on Discord and your mature-content preference.</p>
               {profile?.owner && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                   <div className={sharedStyles.settingRow}>
@@ -364,11 +424,6 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              <div style={{ marginTop: '2rem' }}>{profile?.owner && <LanAuthSettings />}</div>
-
-              <div style={{ marginTop: '2rem' }}>{profile?.owner && <ServerPortSettings />}</div>
-
               {profile?.owner && discordEnabled && (
                 <div className={styles.settingItem} style={{ marginTop: '1rem' }}>
                   <div className={sharedStyles.settingRow}>
@@ -510,36 +565,42 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              {hasMatureConsent && (
-                <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                  <div className={sharedStyles.settingRow}>
-                    <div style={{ minWidth: 0 }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
-                      <p
-                        style={{
-                          margin: '0.25rem 0 0',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        You have previously agreed to view 18+ content. Toggle this off to re-enable
-                        the blur gate and filtering.
-                      </p>
-                    </div>
-                    <ToggleSwitch
-                      isChecked={true}
-                      onChange={(e) => {
-                        if (!e.currentTarget.checked) {
-                          revokeMatureConsent()
-                          window.location.reload()
-                        }
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
                       }}
-                      id="mature-content-enabled"
-                    />
+                    >
+                      Allow mature content intended for adults 18 and older. Turning this off
+                      restores filtering and blur gates.
+                    </p>
                   </div>
+                  <ToggleSwitch
+                    isChecked={hasMatureConsent}
+                    onChange={(e) => {
+                      if (e.currentTarget.checked) setShowMatureConsentModal(true)
+                      else {
+                        revokeMatureConsent()
+                        window.location.reload()
+                      }
+                    }}
+                    id="mature-content-enabled"
+                  />
                 </div>
-              )}
+              </div>
             </div>
+          </div>
+        )
+      case 'server':
+        return (
+          <div className={styles.tabContent}>
+            {profile?.owner && <LanAuthSettings />}
+            {profile?.owner && <ServerPortSettings />}
           </div>
         )
       case 'sync':
@@ -625,6 +686,24 @@ const Settings: React.FC = () => {
           </button>
           <button
             ref={(el) => {
+              if (el) tabBtnRefs.current.set('presence', el)
+            }}
+            className={`${styles.sidebarItem} ${activeTab === 'presence' ? styles.active : ''}`}
+            onClick={() => selectTab('presence')}
+          >
+            <Icon name="discord" /> <span>Presence</span>
+          </button>
+          <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('server', el)
+            }}
+            className={`${styles.sidebarItem} ${activeTab === 'server' ? styles.active : ''}`}
+            onClick={() => selectTab('server')}
+          >
+            <Icon name="server" /> <span>Server</span>
+          </button>
+          <button
+            ref={(el) => {
               if (el) tabBtnRefs.current.set('sync', el)
             }}
             className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
@@ -658,6 +737,15 @@ const Settings: React.FC = () => {
           </div>
         </main>
       </div>
+      <MatureConsentModal
+        isOpen={showMatureConsentModal}
+        onClose={() => setShowMatureConsentModal(false)}
+        onGrant={() => {
+          grantMatureConsent()
+          setShowMatureConsentModal(false)
+        }}
+        scope="section"
+      />
     </div>
   )
 }

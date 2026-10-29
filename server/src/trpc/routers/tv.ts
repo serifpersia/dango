@@ -15,6 +15,7 @@ import {
 } from '../../lib/tmdb.js'
 import { fetchWithRetry, parseJsonBody } from '../../utils/http.utils.js'
 import { buildTvMediaRequest } from '../../lib/tv-media.js'
+import { rankByTitleMatch } from '../../providers/title-matching.js'
 import logger from '../../logger.js'
 
 async function resolveTvMeta(
@@ -227,6 +228,7 @@ export const tvRouter = router({
             ) => toSearchResult(item, item.media_type || 'tv')
           )
       }
+      results = rankByTitleMatch(results, query, (item) => [item.title])
       const payload: TvSearchPayload = {
         results,
         total_results: d.total_results || 0,

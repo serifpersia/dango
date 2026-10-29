@@ -1,9 +1,6 @@
 .sectionCard {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-bottom: var(--space-4);
+  padding: 0 0 var(--space-6);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .sectionCard h3 {
@@ -21,7 +18,10 @@
 }
 
 .dangerCard {
-  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  padding: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-danger) 4%, transparent);
 }
 
 .dangerCard h3 {

@@ -105,6 +105,37 @@
   padding-top: var(--space-6);
 }
 
+.shortcutList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.shortcutList h4 {
+  margin: var(--space-3) 0 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.shortcutRow {
+  display: grid;
+  grid-template-columns: minmax(150px, max-content) 1fr;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.shortcutRow kbd {
+  width: fit-content;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font: inherit;
+  white-space: nowrap;
+}
+
 .controls {
   display: flex;
   gap: var(--space-4);
@@ -179,5 +210,10 @@
   .sidebarItem {
     padding: var(--space-4);
     justify-content: center;
+  }
+
+  .shortcutRow {
+    grid-template-columns: minmax(125px, max-content) 1fr;
+    gap: var(--space-2);
   }
 }

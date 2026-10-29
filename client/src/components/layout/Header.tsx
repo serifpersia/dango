@@ -56,7 +56,7 @@ const Header: React.FC = () => {
 
     const scheduleHide = () => {
       clearTimer()
-      if (window.scrollY <= 10) return
+      if (window.scrollY <= 10 || isSearchFocused) return
       autoHideTimer.current = window.setTimeout(() => {
         if (!overHeader.current) setVisible(false)
       }, 2500)
@@ -76,9 +76,26 @@ const Header: React.FC = () => {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const target = e.target
+      const typing =
+        target instanceof HTMLElement &&
+        !!target.closest(
+          'input, textarea, select, button, a, [role="button"], [contenteditable="true"]'
+        )
+      const focusSearch = () => {
+        if (window.innerWidth <= 1024) {
+          setMobileSearchOpen(true)
+          setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
+        } else {
+          searchInputRef.current?.focus({ preventScroll: true })
+        }
+      }
+      if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey && !e.altKey && !typing) {
         e.preventDefault()
-        searchInputRef.current?.focus({ preventScroll: true })
+        focusSearch()
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        focusSearch()
       } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
         searchInputRef.current?.blur()
       }
@@ -155,6 +172,8 @@ const Header: React.FC = () => {
     hideVirtualKeyboard()
     const trimmed = query.trim()
     if (!trimmed) return
+    searchInputRef.current?.blur()
+    setIsSearchFocused(false)
     if (contentType === 'manga') {
       navigate(`/manga?q=${encodeURIComponent(trimmed)}`)
     } else if (contentType === 'tv') {
@@ -270,12 +289,16 @@ const Header: React.FC = () => {
                 placeholder={searchPlaceholder}
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleSearch()
                     setMobileSearchOpen(false)
+                    setIsSearchFocused(false)
                   } else if (e.key === 'Escape') {
                     setMobileSearchOpen(false)
+                    setIsSearchFocused(false)
                   }
                 }}
               />

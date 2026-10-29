@@ -15,6 +15,27 @@
   user-select: none;
 }
 
+.small {
+  --keyboard-width: 500px;
+  --key-size: 34px;
+  --key-font: 0.8rem;
+  --keyboard-gap: 5px;
+}
+
+.medium {
+  --keyboard-width: 650px;
+  --key-size: 42px;
+  --key-font: 0.95rem;
+  --keyboard-gap: 7px;
+}
+
+.large {
+  --keyboard-width: 820px;
+  --key-size: 52px;
+  --key-font: 1.08rem;
+  --keyboard-gap: 9px;
+}
+
 .topBar {
   display: flex;
   align-items: center;
@@ -89,6 +110,7 @@
 
 .row {
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: var(--keyboard-gap);
   width: 100%;
@@ -96,6 +118,10 @@
 }
 
 .key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   min-width: var(--key-size);
   height: var(--key-size);
   border-radius: var(--radius-sm);
@@ -116,7 +142,8 @@
 }
 
 .spaceIcon {
-  width: 14%;
+  width: 24%;
+  max-width: 72px;
   height: 12px;
   border-bottom: 2px solid currentColor;
   display: inline-block;
