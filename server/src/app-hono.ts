@@ -456,7 +456,7 @@ export function createHonoApp(
   app.post('/api/auth/app-setup', async (c) => {
     if (getProfiles && !getProfiles()?.resolve(profileToken(c))?.owner)
       return c.json({ error: 'Owner access required' }, 403)
-    if (!isLoopbackIp(c.req.header('x-dango-client-ip'))) {
+    if (!isLoopbackIp(getHonoClientIp(c))) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     const body = (await c.req.json().catch(() => undefined)) as { password?: unknown } | undefined
