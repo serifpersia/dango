@@ -154,16 +154,19 @@ export async function getWatchInsights(db: DatabaseWrapper) {
 
   const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
   const personaMap: Record<string, string> = {
-    Action: 'Shonen Warrior',
-    Romance: 'Hopeless Romantic',
-    Comedy: 'Chaos Enjoyer',
-    'Slice of Life': 'Vibe Seeker',
-    Horror: 'Fearless Watcher',
-    Fantasy: 'Isekai Traveller',
-    'Sci-Fi': 'Future Scientist',
-    Drama: 'Feels Collector',
+    Action: 'Battle Shōnen Fan',
+    Romance: 'Romance Anime Fan',
+    Comedy: 'Comedy Anime Fan',
+    'Slice of Life': 'Iyashikei Fan',
+    Horror: 'Horror Anime Fan',
+    Fantasy: 'Isekai Fan',
+    'Sci-Fi': 'Sci-Fi Anime Fan',
+    Drama: 'Drama Anime Fan',
+    Mecha: 'Mecha Fan',
+    Mystery: 'Mystery Anime Fan',
+    Sports: 'Sports Anime Fan',
   }
-  const persona = personaMap[topGenre || ''] || 'Anime Enthusiast'
+  const persona = personaMap[topGenre || ''] || 'Anime Fan'
 
   const avgCompletionDays =
     velocities.length > 0

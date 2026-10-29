@@ -301,7 +301,12 @@ async function refreshCandidatesIfNeeded(
   return recCache?.candidates || []
 }
 
-export async function getCachedRecommendations(db: DatabaseWrapper): Promise<RecCandidate[]> {
+export async function getCachedRecommendations(
+  db: DatabaseWrapper,
+  refresh = false
+): Promise<RecCandidate[]> {
   const taste = await computeTasteProfile(db)
-  return refreshCandidatesIfNeeded(db, taste, tasteHashOf(taste))
+  const hash = tasteHashOf(taste)
+  if (refresh) recommendationsByDb.delete(db)
+  return refreshCandidatesIfNeeded(db, taste, hash)
 }

@@ -3,30 +3,25 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-8);
-  animation: fadeIn 0.8s var(--ease-smooth);
+  animation: fadeIn 0.45s var(--ease-smooth);
 }
 
 .personaBadge {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  color: var(--accent-light);
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
   font-weight: 700;
-  border: 1px solid var(--border-accent);
-  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--border-primary);
   cursor: default;
   transition: all var(--transition-base);
 }
 
 .personaBadge:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 0 20px var(--accent-glow);
+  border-color: var(--border-accent);
 }
 
 .personaBadge svg {
@@ -56,43 +51,32 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--space-6);
+  row-gap: 0;
   margin-bottom: var(--space-10);
-  animation: slideUpIn 0.8s var(--ease-smooth);
+  border-top: 1px solid var(--border-primary);
+  animation: slideUpIn 0.45s var(--ease-smooth);
 }
 
 .statCard {
-  background: var(--glass-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
+  min-height: 92px;
+  padding: var(--space-4) 0;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  transition: all var(--transition-base);
-}
-
-.statCard:hover {
-  transform: translateY(-5px);
-  border-color: var(--border-accent);
-  background: var(--bg-tertiary);
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .statIcon {
-  width: 54px;
-  height: 54px;
-  border-radius: var(--radius-lg);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   flex-shrink: 0;
-  transition: transform var(--transition-base);
-}
-
-.statCard:hover .statIcon {
-  transform: scale(1.1) rotate(-5deg);
 }
 
 .statInfo {
@@ -101,7 +85,7 @@
 }
 
 .statValue {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1;
@@ -119,14 +103,11 @@
 
 .wideSection {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
   margin-bottom: var(--space-10);
-  box-shadow: var(--glass-shadow);
-  animation: slideUpIn 0.8s var(--ease-smooth) 0.1s both;
+  animation: slideUpIn 0.45s var(--ease-smooth) 0.05s both;
 }
 
 .sectionHeader {
@@ -138,7 +119,7 @@
 }
 
 .sectionHeader h3 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -276,27 +257,19 @@
 
 .chartsContainer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: var(--space-8);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
   margin-bottom: var(--space-10);
-  animation: slideUpIn 0.8s var(--ease-smooth) 0.2s both;
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+  animation: slideUpIn 0.45s var(--ease-smooth) 0.1s both;
 }
 
 .chartWrapper {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  box-shadow: var(--glass-shadow);
-  transition: transform var(--transition-base);
-}
-
-.chartWrapper:hover {
-  transform: translateY(-4px);
+  min-width: 0;
 }
 
 .chartWrapper h3 {
@@ -304,8 +277,8 @@
   font-size: 1.25rem;
   font-weight: 800;
   color: var(--text-primary);
-  border-left: 4px solid var(--accent);
-  padding-left: var(--space-4);
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: var(--space-3);
   letter-spacing: -0.01em;
 }
 
@@ -353,9 +326,10 @@
 .chartSubtext {
   margin-top: var(--space-8);
   padding: var(--space-4);
-  background: var(--accent-subtle);
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-lg);
+  background: transparent;
+  border-top: 1px solid var(--border-primary);
+  border-radius: 0;
+  padding: var(--space-3) 0 0;
   font-size: 0.9rem;
   color: var(--accent-light);
   font-weight: 600;
@@ -400,10 +374,8 @@
   font-size: 0.95rem;
   color: var(--text-secondary);
   line-height: 1.6;
-  background: var(--bg-secondary);
-  padding: var(--space-5);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-primary);
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border-primary);
 }
 
 .popDescription strong {
@@ -497,14 +469,9 @@
 }
 
 .warningSection {
-  background: color-mix(in srgb, var(--color-danger) 3%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
-  border-radius: var(--radius-xl);
-  padding: var(--space-10);
-  box-shadow: 0 20px 50px -20px color-mix(in srgb, var(--color-danger) 15%, transparent);
-  animation: slideUpIn 0.8s var(--ease-smooth) 0.3s both;
+  border-top: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  padding-top: var(--space-6);
+  animation: slideUpIn 0.45s var(--ease-smooth) 0.15s both;
 }
 
 .warningHeader {
@@ -516,7 +483,7 @@
 }
 
 .warningHeader h3 {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.03em;
@@ -524,32 +491,23 @@
 }
 
 .droppedGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
 }
 
 .droppedCard {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  padding: var(--space-6);
-  border-radius: var(--radius-lg);
+  padding: var(--space-3) 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: all var(--transition-base);
-}
-
-.droppedCard:hover {
-  transform: translateY(-4px) scale(1.02);
-  background: var(--bg-tertiary);
-  border-color: var(--border-secondary);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .droppedName {
   font-weight: 800;
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   letter-spacing: -0.01em;
 }
 
@@ -586,10 +544,16 @@
     gap: var(--space-6);
   }
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .chartsContainer {
     grid-template-columns: 1fr;
+  }
+  .chartWrapper + .chartWrapper {
+    border-top: 1px solid var(--border-primary);
+  }
+  .chartWrapper {
+    padding: var(--space-5) 0;
   }
   .heatmapLayout {
     flex-direction: column-reverse;
@@ -597,22 +561,25 @@
   .genreGrid {
     grid-template-columns: 1fr;
   }
+  .droppedCard {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
 }
 
 .genreGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0 var(--space-6);
   margin-bottom: var(--space-10);
+  border-top: 1px solid var(--border-primary);
 }
 
 .genreCard {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  padding: var(--space-5) 0;
   position: relative;
-  box-shadow: var(--glass-shadow);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .rankBadge {
@@ -672,10 +639,8 @@
 }
 
 .genreCardSkeleton {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--border-primary);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -753,6 +718,14 @@
   margin-top: 2rem;
 }
 
+.recHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
 .recSection h3 {
   font-size: 1.5rem;
   font-weight: 800;
@@ -766,25 +739,81 @@
   margin-bottom: 1rem;
 }
 
+.recControls {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.recControlBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.recControlBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-accent);
+  background: var(--bg-tertiary);
+}
+
+.recControlBtn:focus-visible,
+.recPosterButton:focus-visible,
+.recAddBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.recControlBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .recGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-primary);
+}
+
+.recEmpty {
+  margin: 0;
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .recCard {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  padding: var(--space-5) 0;
   display: flex;
   gap: var(--space-5);
-  transition: all var(--transition-base);
+  border-bottom: 1px solid var(--border-primary);
 }
 
-.recCard:hover {
-  transform: translateY(-4px);
-  border-color: var(--border-secondary);
+.recPosterButton {
+  display: block;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  flex: none;
 }
 
 .recCover {
@@ -829,6 +858,10 @@
   color: var(--text-secondary);
 }
 
+.recWhy strong {
+  color: var(--accent-light);
+}
+
 .recNote {
   font-size: 0.8rem;
   color: var(--text-tertiary);
@@ -855,6 +888,13 @@
 .recAddBtn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+@media (max-width: 768px) {
+  .recHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .loading {

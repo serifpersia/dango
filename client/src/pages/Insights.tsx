@@ -7,6 +7,7 @@ import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeDa
 import { fixThumbnailUrl } from '../lib/utils'
 import { trpcClient } from '../lib/trpc'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useMatureConsent } from '../hooks/useMatureConsent'
 import styles from './Insights.module.css'
 import { qk } from '../lib/queryKeys'
 
@@ -71,6 +72,7 @@ interface RecCandidate {
 }
 
 const Insights: React.FC = () => {
+  const [recOffset, setRecOffset] = useState(0)
   useEffect(() => {
     document.title = 'Insights - dango'
   }, [])
@@ -84,10 +86,16 @@ const Insights: React.FC = () => {
   })
 
   const { data: genreCardsData, isLoading: isLoadingGenreCards } = useGenreCards()
+  const { hasConsent: hasMatureConsent } = useMatureConsent()
   const { titlePreference } = useTitlePreference()
   const queryClient = useQueryClient()
 
-  const { data: recsData } = useQuery<{ candidates: RecCandidate[] }>({
+  const {
+    data: recsData,
+    isLoading: loadingRecs,
+    isFetching: fetchingRecs,
+    isError: recsError,
+  } = useQuery<{ candidates: RecCandidate[] }>({
     queryKey: [qk.insightsRecommendations],
     queryFn: async () => {
       const data = await trpcClient.insights.recommendations.query()
@@ -95,6 +103,15 @@ const Insights: React.FC = () => {
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
+  })
+
+  const refreshRecs = useMutation({
+    mutationFn: () => trpcClient.insights.recommendations.query({ refresh: true }),
+    onSuccess: (result) => {
+      queryClient.setQueryData([qk.insightsRecommendations], result)
+      setRecOffset(0)
+    },
+    onError: () => toast.error('Could not refresh recommendations'),
   })
 
   const addToPlan = useMutation({
@@ -115,10 +132,18 @@ const Insights: React.FC = () => {
     onError: () => toast.error('Could not add to watchlist'),
   })
 
-  const topRecs = useMemo(
-    () => [...(recsData?.candidates || [])].sort((a, b) => b.matchPct - a.matchPct).slice(0, 6),
+  const recCandidates = useMemo(
+    () => [...(recsData?.candidates || [])].sort((a, b) => b.matchPct - a.matchPct),
     [recsData]
   )
+  const topRecs = useMemo(() => {
+    if (!recCandidates.length) return []
+    const start = recOffset % recCandidates.length
+    return [...recCandidates, ...recCandidates].slice(
+      start,
+      start + Math.min(6, recCandidates.length)
+    )
+  }, [recCandidates, recOffset])
 
   const getShowTitle = (show: TopShow) => {
     const fallback = show.name || show.englishName || show.nativeName || ''
@@ -193,7 +218,10 @@ const Insights: React.FC = () => {
   return (
     <div className="page-container">
       <div className={styles.header}>
-        <h2 className="section-title">Watch Insights</h2>
+        <div className="title-stack">
+          <div className="section-eyebrow">Your viewing habits</div>
+          <h2 className="section-title">Watch Insights</h2>
+        </div>
         <div className={styles.personaBadge}>
           <Icon name="user-astronaut" />
           <div className={styles.personaInfo}>
@@ -487,85 +515,127 @@ const Insights: React.FC = () => {
                 <div className={styles.skeletonPosters} />
               </div>
             ))
-          : genreCardsData?.map((card: GenreCard) => (
-              <div key={card.name} className={styles.genreCard}>
-                <div className={styles.rankBadge}>
-                  <span className={styles.rankNumber}>{card.rank}</span>
+          : genreCardsData
+              ?.filter(
+                (card: GenreCard) => hasMatureConsent || card.name.toLowerCase() !== 'hentai'
+              )
+              .map((card: GenreCard) => (
+                <div key={card.name} className={styles.genreCard}>
+                  <div className={styles.rankBadge}>
+                    <span className={styles.rankNumber}>{card.rank}</span>
+                  </div>
+                  <h3 className={styles.genreTitle}>{card.name}</h3>
+                  <div className={styles.genreStats}>
+                    <span>{card.count} episodes</span>
+                    <span>
+                      {card.meanScore > 0 ? `${card.meanScore.toFixed(1)} avg score` : '-'}
+                    </span>
+                    <span>{card.timeWatched}</span>
+                  </div>
+                  <div className={styles.posterRow}>
+                    {card.topShows.map((show: TopShow) => (
+                      <img
+                        key={show.id}
+                        src={fixThumbnailUrl(show.thumbnail)}
+                        alt={getShowTitle(show)}
+                        className={styles.miniPoster}
+                        title={getShowTitle(show)}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ))}
+                  </div>
                 </div>
-                <h3 className={styles.genreTitle}>{card.name}</h3>
-                <div className={styles.genreStats}>
-                  <span>{card.count} episodes</span>
-                  <span>{card.meanScore > 0 ? `${card.meanScore.toFixed(1)} avg score` : '-'}</span>
-                  <span>{card.timeWatched}</span>
-                </div>
-                <div className={styles.posterRow}>
-                  {card.topShows.map((show: TopShow) => (
-                    <img
-                      key={show.id}
-                      src={fixThumbnailUrl(show.thumbnail)}
-                      alt={getShowTitle(show)}
-                      className={styles.miniPoster}
-                      title={getShowTitle(show)}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
       </div>
 
-      {topRecs.length > 0 && (
+      {(topRecs.length > 0 || loadingRecs || recsError || recsData) && (
         <div className={styles.recSection}>
-          <h3>Recommended For You</h3>
-          <p className={styles.recSubtext}>
-            From your library taste - updates automatically as you watch
-          </p>
-          <div className={styles.recGrid}>
-            {topRecs.map((c) => (
-              <div key={c.id} className={styles.recCard}>
-                {c.cover && (
-                  <img
-                    src={fixThumbnailUrl(c.cover)}
-                    alt={c.title}
-                    className={styles.recCover}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                )}
-                <div className={styles.recInfo}>
-                  <Link to={`/anime/${c.id}`} className={styles.recTitle}>
-                    {c.title}
-                  </Link>
-                  <span className={styles.recMatch}>{c.matchPct}% match</span>
-                  <span className={styles.recMeta}>
-                    {[c.year, c.format, c.episodes ? `${c.episodes}ep` : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                  <span className={styles.recWhy}>
-                    Shares {c.sharedGenres.join(', ')}
-                    {c.exemplars.length > 0 && ` - like ${c.exemplars.join(', ')}`}
-                  </span>
-                  {c.kind === 'continue' && (
-                    <span className={styles.recNote}>Continue - you watched the earlier part.</span>
-                  )}
-                  {c.kind === 'sequel' && c.prequelTitle && (
-                    <span className={styles.recNote}>
-                      Sequel - start with &quot;{c.prequelTitle}&quot; first.
-                    </span>
-                  )}
-                  <button
-                    className={styles.recAddBtn}
-                    onClick={() => addToPlan.mutate(c)}
-                    disabled={addToPlan.isPending}
-                  >
-                    + Plan to Watch
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className={styles.recHeader}>
+            <div>
+              <h3>Recommended For You</h3>
+              <p className={styles.recSubtext}>Based on your completed shows and genre taste</p>
+            </div>
+            <div className={styles.recControls}>
+              {recCandidates.length > 6 && (
+                <button
+                  className={styles.recControlBtn}
+                  onClick={() => setRecOffset((offset) => (offset + 6) % recCandidates.length)}
+                >
+                  Different picks
+                </button>
+              )}
+              <button
+                className={styles.recControlBtn}
+                onClick={() => refreshRecs.mutate()}
+                disabled={fetchingRecs || refreshRecs.isPending}
+              >
+                <Icon name="sync-alt" />
+                {fetchingRecs || refreshRecs.isPending ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
           </div>
+          {recsError || (!loadingRecs && topRecs.length === 0) ? (
+            <p className={styles.recEmpty}>
+              {recsError
+                ? 'Recommendations could not load. Try refreshing.'
+                : 'No new recommendations yet. Keep watching or try again later.'}
+            </p>
+          ) : (
+            <div className={styles.recGrid}>
+              {topRecs.map((c) => (
+                <div key={c.id} className={styles.recCard}>
+                  {c.cover && (
+                    <Link
+                      to={`/anime/${c.id}`}
+                      className={styles.recPosterButton}
+                      aria-label={`View ${c.title}`}
+                    >
+                      <img
+                        src={fixThumbnailUrl(c.cover)}
+                        alt=""
+                        className={styles.recCover}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </Link>
+                  )}
+                  <div className={styles.recInfo}>
+                    <Link to={`/anime/${c.id}`} className={styles.recTitle}>
+                      {c.title}
+                    </Link>
+                    <span className={styles.recMatch}>{c.matchPct}% taste match</span>
+                    <span className={styles.recMeta}>
+                      {[c.year, c.format, c.episodes ? `${c.episodes}ep` : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                    <span className={styles.recWhy}>
+                      Shares {c.sharedGenres.join(', ')}
+                      {c.exemplars.length > 0 && ` - like ${c.exemplars.join(', ')}`}
+                    </span>
+                    {c.kind === 'continue' && (
+                      <span className={styles.recNote}>
+                        Continue - you watched the earlier part.
+                      </span>
+                    )}
+                    {c.kind === 'sequel' && c.prequelTitle && (
+                      <span className={styles.recNote}>
+                        Sequel - start with &quot;{c.prequelTitle}&quot; first.
+                      </span>
+                    )}
+                    <button
+                      className={styles.recAddBtn}
+                      onClick={() => addToPlan.mutate(c)}
+                      disabled={addToPlan.isPending}
+                    >
+                      <Icon name="plus" /> Plan to Watch
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
