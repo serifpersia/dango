@@ -25,13 +25,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
     })
   }
 
-  const handleClick = () => {
-    dismissMutation.mutate({
-      showId: notification.showId,
-      episodeNumber: notification.episodeNumber,
-    })
-  }
-
   const handleQueue = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault()
     e.stopPropagation()
@@ -60,11 +53,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         : notification.name
 
   return (
-    <Link
-      to={`/watch/${notification.showId}/${notification.episodeNumber}`}
-      className={styles.item}
-      onClick={handleClick}
-    >
+    <div className={styles.item}>
       <img
         src={fixThumbnailUrl(notification.thumbnail, 48, 64)}
         alt={notification.name}
@@ -73,7 +62,18 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         decoding="async"
       />
       <div className={styles.itemInfo}>
-        <span className={styles.itemTitle}>{displayTitle}</span>
+        <Link
+          to={`/watch/${notification.showId}/${notification.episodeNumber}`}
+          className={styles.itemTitleLink}
+          onClick={() =>
+            dismissMutation.mutate({
+              showId: notification.showId,
+              episodeNumber: notification.episodeNumber,
+            })
+          }
+        >
+          <span className={styles.itemTitle}>{displayTitle}</span>
+        </Link>
         <span className={styles.itemMeta}>New Episode {notification.episodeNumber}</span>
       </div>
       <button
@@ -90,7 +90,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
       >
         <Icon name="times" />
       </button>
-    </Link>
+    </div>
   )
 }
 

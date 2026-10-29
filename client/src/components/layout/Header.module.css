@@ -26,8 +26,10 @@
   background-color: var(--bg-primary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --header-btn-bg: rgba(255, 255, 255, 0.08);
-  --header-btn-bg-hover: rgba(255, 255, 255, 0.16);
+  --header-control-bg: rgba(255, 255, 255, 0.045);
+  --header-control-border: rgba(255, 255, 255, 0.055);
+  --header-btn-bg: rgba(255, 255, 255, 0.045);
+  --header-btn-bg-hover: rgba(255, 255, 255, 0.1);
 }
 
 .logo {
@@ -36,11 +38,14 @@
   justify-content: center;
   padding: 4px;
   border-radius: var(--radius-md);
-  transition: opacity var(--transition-base);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-fast);
 }
 
 .logo:hover {
-  opacity: 0.8;
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .headerInner {
@@ -147,7 +152,7 @@
   background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-primary);
   padding: 0;
   display: flex;
@@ -165,6 +170,7 @@
 .searchButton:hover {
   background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
   border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
 }
 
 .searchIcon {
@@ -184,7 +190,7 @@
   padding-right: var(--space-3);
   text-decoration: none;
   overflow: hidden;
-  border: none;
+  border: 1px solid var(--header-control-border, transparent);
   cursor: pointer;
   transition: all var(--transition-base);
   display: flex;
@@ -199,7 +205,7 @@
 
 .profileBtn:hover {
   border-color: rgba(255, 255, 255, 0.35);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
 }
 
@@ -229,8 +235,8 @@
 }
 
 .hamburgerBtn {
-  background: none;
-  border: none;
+  background: var(--header-control-bg, transparent);
+  border: 1px solid var(--header-control-border, transparent);
   color: var(--text-primary);
   font-size: 1.25rem;
   padding: var(--space-2);
@@ -248,7 +254,34 @@
 }
 
 .hamburgerBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--header-btn-bg-hover, rgba(255, 255, 255, 0.08));
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.searchButton:focus-visible,
+.profileBtn:focus-visible,
+.hamburgerBtn:focus-visible,
+.logo:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.logo:active,
+.searchButton:active,
+.profileBtn:active,
+.hamburgerBtn:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .searchButton,
+  .profileBtn,
+  .hamburgerBtn,
+  .searchIcon {
+    transition: none;
+  }
 }
 
 .hamburgerBtn:active {

@@ -11,6 +11,8 @@ import {
 } from '../../hooks/useAnimeData'
 import styles from './Notification.module.css'
 
+const NOTIFICATION_PANEL_ID = 'notification-panel'
+
 const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const bellRef = useRef<HTMLDivElement>(null)
@@ -56,12 +58,23 @@ const NotificationBell: React.FC = () => {
 
   return (
     <div className={styles.container} ref={bellRef}>
-      <button className={styles.bellBtn} onClick={handleToggle} aria-label="Notifications">
+      <button
+        className={styles.bellBtn}
+        onClick={handleToggle}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={NOTIFICATION_PANEL_ID}
+        aria-label="Notifications"
+      >
         <Icon name="bell" />
-        {count > 0 && <span className={styles.badge}>{displayCount}</span>}
+        {count > 0 && (
+          <span className={styles.badge} aria-hidden="true">
+            {displayCount}
+          </span>
+        )}
       </button>
 
-      {isOpen && <NotificationDropdown />}
+      {isOpen && <NotificationDropdown onClose={() => setIsOpen(false)} />}
     </div>
   )
 }

@@ -56,6 +56,9 @@ function App() {
   const navigationType = useNavigationType()
   const scrollPositions = useRef(new Map<string, number>())
   const prevPathname = useRef(location.pathname)
+  const prevLocationKey = useRef(location.key)
+  const navigationProgressTimer = useRef<number | null>(null)
+  const [navigationPending, setNavigationPending] = useState(false)
   const virtualKeyboard = useVirtualKeyboard()
   useDiscordPageStatus()
 
@@ -123,6 +126,70 @@ function App() {
   }, [location.key, location.pathname, navigationType])
 
   useEffect(() => {
+    const startProgress = () => {
+      setNavigationPending(true)
+      if (navigationProgressTimer.current !== null) {
+        window.clearTimeout(navigationProgressTimer.current)
+      }
+      navigationProgressTimer.current = window.setTimeout(() => {
+        setNavigationPending(false)
+        navigationProgressTimer.current = null
+      }, 10000)
+    }
+
+    const handleLinkClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return
+      }
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const link = target.closest<HTMLAnchorElement>('a[href]')
+      if (!link || link.hasAttribute('download') || link.getAttribute('target') === '_blank') return
+
+      const url = new URL(link.href, window.location.href)
+      if (
+        url.origin === window.location.origin &&
+        `${url.pathname}${url.search}${url.hash}` !==
+          `${window.location.pathname}${window.location.search}${window.location.hash}`
+      ) {
+        startProgress()
+      }
+    }
+
+    const handlePopState = () => startProgress()
+    document.addEventListener('click', handleLinkClick, true)
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      document.removeEventListener('click', handleLinkClick, true)
+      window.removeEventListener('popstate', handlePopState)
+      if (navigationProgressTimer.current !== null) {
+        window.clearTimeout(navigationProgressTimer.current)
+        navigationProgressTimer.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (prevLocationKey.current === location.key) return
+    prevLocationKey.current = location.key
+    if (!navigationPending) return
+    if (navigationProgressTimer.current !== null) {
+      window.clearTimeout(navigationProgressTimer.current)
+    }
+    navigationProgressTimer.current = window.setTimeout(() => {
+      setNavigationPending(false)
+      navigationProgressTimer.current = null
+    }, 500)
+  }, [location.key, navigationPending])
+
+  useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
       if (sidebarOpen && event.key === 'Escape') {
         setIsOpen(false)
@@ -184,6 +251,7 @@ function App() {
           },
         }}
       />
+      {navigationPending && <TopProgressBar />}
       <TrackerSyncNotice enabled={!lanLocked && !lanAuthOpen} />
       <Header />
       <Sidebar />

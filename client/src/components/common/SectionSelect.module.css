@@ -32,7 +32,12 @@
 
 .select:hover {
   background-color: var(--bg-elevated);
-  border-color: var(--control-border-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.wrapper:hover .arrow {
+  color: var(--accent-light);
 }
 
 .select:focus-visible {

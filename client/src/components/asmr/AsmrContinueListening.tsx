@@ -4,8 +4,10 @@ import HomeEmptyState from '../common/HomeEmptyState'
 import MediaSection from '../common/MediaSection'
 import MediaCard from '../common/MediaCard'
 import AsmrResetProgressModal from './AsmrResetProgressModal'
+import AsmrPopup from './AsmrPopup'
 import { formatTime } from '../../lib/utils'
 import { useAsmrContinueListening, type ContinueListeningItem } from '../../hooks/useAsmrLibrary'
+import { asmrLibraryId, useToggleAsmrBookmark } from '../../hooks/useAsmrLibrary'
 
 function progressLabel(item: ContinueListeningItem): string | undefined {
   const current = item.currentTime ?? 0
@@ -24,6 +26,7 @@ const AsmrContinueListening: React.FC<{
 }> = ({ title = 'Continue Listening', limit = 24, titleLink, showEmptyState = true }) => {
   const navigate = useNavigate()
   const { data, isLoading } = useAsmrContinueListening(limit)
+  const { toggle, bookmarkedIds } = useToggleAsmrBookmark()
   const [resetTarget, setResetTarget] = useState<{
     workId: string
     title: string
@@ -94,6 +97,31 @@ const AsmrContinueListening: React.FC<{
                 },
               }}
               onRemove={() => setResetTarget({ workId: item.id, title: item.title || '' })}
+              renderPopup={(anchorRect, helpers) => (
+                <AsmrPopup
+                  data={{
+                    rjCode: item.rjCode || item.id,
+                    title: item.title || '',
+                    thumbnail: item.thumbnail || '',
+                    isAdult: !!item.isAdult,
+                    listenTarget: `/asmr/${encodeURIComponent(item.rjCode || item.id)}`,
+                    progressLabel: progressLabel(item as ContinueListeningItem),
+                  }}
+                  anchorRect={anchorRect}
+                  bookmarked={bookmarkedIds.has(asmrLibraryId(item.rjCode || item.id))}
+                  onToggleBookmark={() =>
+                    toggle({
+                      rjCode: item.rjCode || item.id,
+                      title: item.title || '',
+                      thumbnail: item.thumbnail || '',
+                      isAdult: !!item.isAdult,
+                    })
+                  }
+                  onMouseEnter={helpers.onMouseEnter}
+                  onMouseLeave={helpers.onMouseLeave}
+                  onRequestClose={helpers.close}
+                />
+              )}
               rawThumbnail
             />
           )

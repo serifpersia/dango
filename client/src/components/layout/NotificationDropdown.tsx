@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { createPortal } from 'preact/compat'
+import React, { useEffect, useRef, useState } from 'react'
 import Icon from '../common/Icon'
+import Modal from '../common/Modal'
 import NotificationItem from './NotificationItem'
 import NotificationSkeleton from './NotificationSkeleton'
 import {
@@ -14,206 +14,162 @@ import styles from './Notification.module.css'
 import { qk } from '../../lib/queryKeys'
 import { truncate } from '../../lib/utils'
 
-const NotificationDropdown: React.FC = () => {
+interface NotificationDropdownProps {
+  onClose: () => void
+}
+
+const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) => {
   const { data: notifications = [], isLoading } = useNotifications()
   const { data: systemNotifications = [] } = useSystemNotifications()
   const { data: status } = useDiscoveryStatus()
   const clearAllMutation = useClearAllNotifications()
   const queryClient = useQueryClient()
   const [fullMessageId, setFullMessageId] = useState<string | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: [qk.notifications] })
+    dropdownRef.current?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: [qk.notifications] })
   }, [queryClient])
 
-  const handleClearAll = () => {
-    clearAllMutation.mutate(undefined)
-  }
-
   const fullNotification = systemNotifications.find((sn) => sn.id === fullMessageId) ?? null
+  const updateCount = notifications.length + systemNotifications.length
+  const statusMessage = status?.running
+    ? status.total > 0
+      ? `Checking ${Math.min(status.done, status.total)}/${status.total} shows...`
+      : 'Checking for new episodes...'
+    : status?.state === 'complete'
+      ? `Discovery complete · checked ${status.total} ${status.total === 1 ? 'show' : 'shows'}`
+      : status?.state === 'empty'
+        ? 'No shows set to Watching'
+        : status?.state === 'error'
+          ? 'Last check failed · will retry automatically'
+          : status?.lastRunAt
+            ? `Last checked ${Math.max(1, Math.round((Date.now() - status.lastRunAt) / 1000))}s ago`
+            : 'Auto-checks every few minutes'
 
   return (
-    <div className={styles.dropdown}>
+    <div
+      id="notification-panel"
+      ref={dropdownRef}
+      className={styles.dropdown}
+      role="dialog"
+      aria-label="Notifications"
+      tabIndex={-1}
+    >
       <div className={styles.dropdownHeader}>
-        <h4>Notifications</h4>
-        {notifications.length > 0 && (
-          <button className={styles.clearAllBtn} onClick={handleClearAll}>
-            Clear All
+        <div>
+          <h4>Notifications</h4>
+          <span className={styles.headerSubtitle}>{updateCount} updates</span>
+        </div>
+        <div className={styles.headerActions}>
+          {notifications.length > 0 && (
+            <button
+              className={styles.clearAllBtn}
+              onClick={() => clearAllMutation.mutate(undefined)}
+            >
+              Clear all
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Close notifications"
+          >
+            <Icon name="times" />
           </button>
-        )}
+        </div>
       </div>
+
       <div className={styles.discoveryStatusRow}>
-        {status?.running ? (
-          <>
-            <span className={`${styles.statusDot} ${styles.statusDotRunning}`} aria-hidden="true" />
-            <span>
-              {status.total > 0
-                ? `Checking ${Math.min(status.done, status.total)}/${status.total} shows...`
-                : 'Checking for new episodes...'}
-            </span>
-          </>
-        ) : status?.state === 'complete' ? (
-          <>
-            <span className={`${styles.statusDot} ${styles.statusDotOk}`} aria-hidden="true" />
-            <span>
-              Discovery complete - checked {status.total} {status.total === 1 ? 'show' : 'shows'}
-            </span>
-          </>
-        ) : status?.state === 'empty' ? (
-          <>
-            <span className={`${styles.statusDot} ${styles.statusDotInfo}`} aria-hidden="true" />
-            <span>No shows set to Watching - nothing to check</span>
-          </>
-        ) : status?.state === 'error' ? (
-          <>
-            <span className={`${styles.statusDot} ${styles.statusDotError}`} aria-hidden="true" />
-            <span>Last check failed - will retry automatically</span>
-          </>
-        ) : (
-          <>
-            <span className={`${styles.statusDot} ${styles.statusDotIdle}`} aria-hidden="true" />
-            <span>
-              {status?.lastRunAt
-                ? `Last checked ${Math.max(
-                    1,
-                    Math.round((Date.now() - status.lastRunAt) / 1000)
-                  )}s ago`
-                : 'Auto-checks every few minutes'}
-            </span>
-          </>
-        )}
+        <span
+          className={`${styles.statusDot} ${status?.running ? styles.statusDotRunning : status?.state === 'complete' ? styles.statusDotOk : status?.state === 'error' ? styles.statusDotError : styles.statusDotIdle}`}
+          aria-hidden="true"
+        />
+        <span>{statusMessage}</span>
       </div>
+
       <div className={styles.list}>
-        {isLoading && systemNotifications.length === 0 ? (
+        {isLoading && updateCount === 0 ? (
           <NotificationSkeleton count={4} />
         ) : (
           <>
-            {systemNotifications.map((sn) => (
-              <div key={sn.id} className={styles.item}>
-                <div
-                  className={styles.thumbnail}
-                  style={{
-                    background: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 0,
-                    boxShadow: 'none',
-                  }}
-                >
-                  <Icon name="info-circle" size={32} color="#6c9fff" />
-                </div>
-                <div className={styles.itemInfo}>
-                  <span className={styles.itemTitle}>{sn.title}</span>
-                  <button
-                    type="button"
-                    className={styles.systemItemMeta}
-                    onClick={() => setFullMessageId(sn.id)}
-                    title="View full status"
-                  >
-                    {truncate(sn.message, 40, '…')}
-                  </button>
-                </div>
-                <button
-                  className={styles.removeItem}
-                  disabled
-                  style={{ opacity: 0.3, cursor: 'not-allowed' }}
-                  aria-hidden="true"
-                >
-                  <Icon name="plus" />
-                </button>
-                <button
-                  className={styles.removeItem}
-                  disabled
-                  style={{ opacity: 0.3, cursor: 'not-allowed' }}
-                  aria-hidden="true"
-                >
-                  <Icon name="times" />
-                </button>
-              </div>
-            ))}
-            {systemNotifications.length > 0 && notifications.length > 0 && (
-              <div className={styles.notificationDivider} />
+            {systemNotifications.length > 0 && (
+              <section aria-labelledby="system-notifications-heading">
+                <h5 id="system-notifications-heading" className={styles.sectionHeading}>
+                  App updates
+                </h5>
+                {systemNotifications.map((notification) => (
+                  <div key={notification.id} className={`${styles.item} ${styles.systemItem}`}>
+                    <div className={styles.systemIcon}>
+                      <Icon name="info-circle" size={20} />
+                    </div>
+                    <div className={styles.itemInfo}>
+                      <span className={styles.itemTitle}>{notification.title}</span>
+                      <button
+                        type="button"
+                        className={styles.systemItemMeta}
+                        onClick={() => setFullMessageId(notification.id)}
+                        title="View full message"
+                      >
+                        {truncate(notification.message, 72, '…')} <span>Read more</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </section>
             )}
-            {notifications.length > 0
-              ? notifications.map((notification) => (
+
+            {notifications.length > 0 && (
+              <section aria-labelledby="new-episodes-heading">
+                <h5 id="new-episodes-heading" className={styles.sectionHeading}>
+                  New episodes
+                </h5>
+                {notifications.map((notification) => (
                   <NotificationItem key={notification.id} notification={notification} />
-                ))
-              : !isLoading &&
-                systemNotifications.length === 0 && (
-                  <div className={styles.emptyState}>No new notifications</div>
-                )}
+                ))}
+              </section>
+            )}
+
+            {!isLoading && updateCount === 0 && (
+              <div className={styles.emptyState}>
+                <span className={styles.emptyIcon}>
+                  <Icon name="bell" size={22} />
+                </span>
+                <strong>You’re all caught up</strong>
+                <span>New episode alerts and app updates will show up here.</span>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {fullNotification &&
-        createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: '1rem',
-              backdropFilter: 'blur(3px)',
-            }}
+      <Modal
+        isOpen={!!fullNotification}
+        onClose={() => setFullMessageId(null)}
+        title={fullNotification?.title}
+        width="sm"
+        footer={
+          <button
+            type="button"
+            className={styles.modalButton}
             onClick={() => setFullMessageId(null)}
           >
-            <div
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                padding: '1.5rem',
-                borderRadius: 'var(--radius-lg)',
-                maxWidth: '420px',
-                width: '100%',
-                boxShadow: 'var(--shadow-xl)',
-                border: '1px solid var(--border-primary)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '1rem',
-                }}
-              >
-                <Icon name="info-circle" color="#6c9fff" />
-                <span style={{ color: '#fff', fontWeight: 600, fontSize: '1rem' }}>
-                  {fullNotification.title}
-                </span>
-              </div>
-              <p
-                style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.5 }}
-              >
-                {fullNotification.message}
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={() => setFullMessageId(null)}
-                  style={{
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+            OK
+          </button>
+        }
+      >
+        {fullNotification && <p className={styles.fullMessage}>{fullNotification.message}</p>}
+      </Modal>
     </div>
   )
 }

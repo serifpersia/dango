@@ -50,10 +50,10 @@
   flex-shrink: 0;
 }
 
-.tabButton:hover:not(:disabled) {
-  background: transparent !important;
-  color: var(--text-muted) !important;
-  box-shadow: none !important;
+.tabButton:hover:not(:disabled):not(.tabActive) {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-primary) !important;
+  box-shadow: inset 0 0 0 1px var(--border-secondary) !important;
   transform: none !important;
 }
 

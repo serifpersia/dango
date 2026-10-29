@@ -5,10 +5,10 @@
 }
 
 .bellBtn {
-  background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
+  background: var(--header-control-bg, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: none;
+  border: 1px solid var(--header-control-border, transparent);
   color: var(--text-primary);
   font-size: 1.25rem;
   cursor: pointer;
@@ -28,7 +28,7 @@
 .bellBtn:hover {
   background: var(--header-btn-bg-hover, rgba(0, 0, 0, 0.25));
   border-color: rgba(255, 255, 255, 0.35);
-  transform: scale(1.05);
+  transform: translateY(-1px);
 }
 
 .bellBtn:focus-visible {
@@ -71,45 +71,33 @@
   text-align: center;
   border: none;
   pointer-events: none;
-  animation: bounce 0.5s ease-out;
+  animation: badgePulse 1.8s ease-in-out 2;
   line-height: 1;
 }
 
-@keyframes bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
-
-  40% {
-    transform: translateY(-5px);
-  }
-
-  60% {
-    transform: translateY(-3px);
+@keyframes badgePulse {
+  50% {
+    box-shadow: 0 0 0 4px var(--accent-subtle);
   }
 }
 
 .dropdown {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  right: 0;
-  width: 320px;
-  max-height: 480px;
+  position: fixed;
+  top: calc(var(--vv-top, 0px) + var(--header-height, 64px) + var(--space-3));
+  right: max(var(--space-4), calc((100vw - var(--max-width)) / 2 + var(--space-8)));
+  width: min(420px, calc(100vw - 2rem));
+  max-height: min(620px, calc(100vh - var(--header-height, 64px) - 2rem));
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
   z-index: var(--z-header);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease;
+  animation: slideIn 0.18s ease-out;
 }
 
 @keyframes slideIn {
@@ -130,6 +118,42 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border-primary);
+}
+
+.headerSubtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.closeBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.sectionHeading {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .dropdownHeader h4 {
@@ -230,8 +254,38 @@
   position: relative;
 }
 
+.itemTitleLink {
+  display: block;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.itemTitleLink:focus-visible,
+.systemItemMeta:focus-visible,
+.removeItem:focus-visible,
+.clearAllBtn:focus-visible,
+.modalButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .item:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.systemItem {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.systemIcon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--accent-light);
+  background: var(--accent-subtle);
+  flex-shrink: 0;
 }
 
 .thumbnail {
@@ -272,18 +326,25 @@
 .systemItemMeta {
   display: inline-block;
   font-size: 0.7rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  border: 0;
   cursor: pointer;
   transition: background var(--transition-fast);
 }
 
 .systemItemMeta:hover {
-  background: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.systemItemMeta span {
+  color: var(--accent-light);
+  white-space: nowrap;
 }
 
 .removeItem {
@@ -297,6 +358,7 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
+  border-radius: var(--radius-sm);
   transition:
     opacity var(--transition-fast),
     color var(--transition-fast);
@@ -320,22 +382,63 @@
   color: var(--color-success);
 }
 
+.modalButton {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fullMessage {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .emptyState {
-  padding: var(--space-10) var(--space-4);
+  min-height: 260px;
+  padding: var(--space-10) var(--space-6);
   text-align: center;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.emptyState strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.emptyIcon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  color: var(--accent-light);
+  background: var(--accent-subtle);
 }
 
 @media (max-width: 768px) {
   .dropdown {
     position: fixed;
-    top: var(--header-height, 60px);
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: calc(100vh - var(--header-height, 60px));
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    top: calc(var(--header-height, 64px) + env(safe-area-inset-top, 0px));
+    left: env(safe-area-inset-left, 0px);
+    right: env(safe-area-inset-right, 0px);
+    width: auto;
+    height: calc(100dvh - var(--header-height, 64px) - env(safe-area-inset-top, 0px));
+    max-height: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    animation: mobileSheetIn 0.2s ease-out;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .bellBtn {
@@ -357,6 +460,40 @@
     min-width: 16px;
     height: 16px;
     padding: 0 3px;
+  }
+
+  .list {
+    overscroll-behavior: contain;
+  }
+
+  .dropdownHeader,
+  .discoveryStatusRow {
+    flex-shrink: 0;
+  }
+
+  .closeBtn {
+    display: flex;
+  }
+}
+
+@keyframes mobileSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown,
+  .bellBtn,
+  .badge,
+  .statusDotRunning {
+    animation: none;
+    transition: none;
   }
 }
 
