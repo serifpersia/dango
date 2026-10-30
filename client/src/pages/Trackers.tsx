@@ -404,12 +404,10 @@ const Trackers: React.FC = () => {
       <div
         style={{
           marginBottom: '16px',
-          padding: '10px 14px',
-          borderRadius: '8px',
-          fontSize: '0.85rem',
-          background: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
-          color: 'var(--text-secondary)',
+          fontSize: '0.8rem',
+          color: 'var(--color-warning)',
+          borderBottom: '1px solid var(--border-primary)',
+          paddingBottom: '12px',
         }}
       >
         ⚠ Syncing writes directly to your AniList and MyAnimeList entries, and dango may not always
@@ -420,17 +418,16 @@ const Trackers: React.FC = () => {
         <div
           style={{
             marginBottom: '16px',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid var(--glass-border)',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '10px',
             fontSize: '0.85rem',
           }}
         >
-          <label htmlFor="active-tracker-select" style={{ fontWeight: 600 }}>
+          <label
+            htmlFor="active-tracker-select"
+            style={{ fontWeight: 600, color: 'var(--text-secondary)' }}
+          >
             Active tracker:
           </label>
           <select
@@ -438,11 +435,11 @@ const Trackers: React.FC = () => {
             value={activeTracker}
             onChange={(e) => activeTrackerMutation.mutate(e.currentTarget.value)}
             style={{
-              padding: '0.4rem 0.6rem',
+              padding: '0.3rem 0.5rem',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'var(--bg-tertiary)',
               color: 'var(--text-primary)',
-              border: '1px solid var(--glass-border)',
+              border: '1px solid var(--border-primary)',
               fontSize: 'var(--font-size-sm)',
               cursor: 'pointer',
             }}

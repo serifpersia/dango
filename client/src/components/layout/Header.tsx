@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import Icon from '../common/Icon'
@@ -9,16 +9,23 @@ import { useContentType } from '../../contexts/ContentTypeContext'
 import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
 import { profileQuery } from '../../hooks/useProfile'
 import ProfileAvatar from '../common/ProfileAvatar'
+import { useTRPC } from '../../lib/trpc'
+import { fixThumbnailUrl } from '../../lib/utils'
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './Header.module.css'
 
 const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar()
   const { contentType } = useContentType()
+  const trpc = useTRPC()
+  const { titlePreference } = useTitlePreference()
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [visible, setVisible] = useState(true)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [isAtTop, setIsAtTop] = useState(true)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const autoHideTimer = useRef<number | null>(null)
@@ -28,8 +35,17 @@ const Header: React.FC = () => {
   const mobileInputRef = useRef<HTMLInputElement>(null)
   const headerRef = useRef<HTMLElement>(null)
   const overHeader = useRef(false)
+  const debounceTimer = useRef<number | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const { data: user } = useQuery(profileQuery)
+
+  const canInstantSearch = contentType === 'anime'
+
+  const { data: instantResults } = useQuery({
+    ...trpc.data.search.queryOptions({ query: debouncedQuery, page: 1, limit: 6 }),
+    enabled: canInstantSearch && debouncedQuery.length >= 2,
+  })
 
   useEffect(() => {
     const vv = window.visualViewport
@@ -132,6 +148,31 @@ const Header: React.FC = () => {
 
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (debounceTimer.current) window.clearTimeout(debounceTimer.current)
+    if (!query.trim() || query.trim().length < 2) {
+      setDebouncedQuery('')
+      setDropdownOpen(false)
+      return
+    }
+    debounceTimer.current = window.setTimeout(() => {
+      setDebouncedQuery(query.trim())
+      if (isSearchFocused && canInstantSearch) setDropdownOpen(true)
+    }, 500)
+    return () => {
+      if (debounceTimer.current) window.clearTimeout(debounceTimer.current)
+    }
+  }, [query, isSearchFocused, canInstantSearch])
+
+  const closeDropdown = useCallback(() => {
+    setDropdownOpen(false)
+  }, [])
+
+  useEffect(() => {
+    setDropdownOpen(false)
+    setMobileSearchOpen(false)
+  }, [location.pathname, location.search])
+
   const isMobile = () => window.innerWidth <= 1024
 
   const handleSearchButtonClick = () => {
@@ -139,8 +180,6 @@ const Header: React.FC = () => {
     if (isMobile()) {
       setMobileSearchOpen(true)
       setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
-    } else if (document.activeElement === searchInputRef.current && query.trim()) {
-      handleSearch()
     } else {
       searchInputRef.current?.focus({ preventScroll: true })
     }
@@ -175,6 +214,7 @@ const Header: React.FC = () => {
     hideVirtualKeyboard()
     const trimmed = query.trim()
     if (!trimmed) return
+    closeDropdown()
     searchInputRef.current?.blur()
     setIsSearchFocused(false)
     if (contentType === 'manga') {
@@ -233,8 +273,23 @@ const Header: React.FC = () => {
           </div>
 
           <div className={styles.rightSection}>
-            <div className={styles.searchWrapper} onClick={() => searchInputRef.current?.focus()}>
-              <Icon name="search" className={styles.searchIcon} />
+            <div
+              className={styles.searchWrapper}
+              ref={dropdownRef}
+              onClick={() => searchInputRef.current?.focus()}
+            >
+              <button
+                type="button"
+                className={styles.searchIconButton}
+                aria-label="Search"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSearch()
+                }}
+              >
+                <Icon name="search" className={styles.searchIcon} />
+              </button>
               <input
                 ref={searchInputRef}
                 type="text"
@@ -246,11 +301,20 @@ const Header: React.FC = () => {
                 onFocus={() => {
                   setIsSearchFocused(true)
                   setVisible(true)
+                  if (debouncedQuery.length >= 2 && canInstantSearch) setDropdownOpen(true)
                 }}
-                onBlur={() => setIsSearchFocused(false)}
+                onBlur={(e) => {
+                  setIsSearchFocused(false)
+                  if (!dropdownRef.current?.contains(e.relatedTarget as Node)) {
+                    closeDropdown()
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleSearch()
+                  } else if (e.key === 'Escape') {
+                    closeDropdown()
+                    searchInputRef.current?.blur()
                   }
                 }}
               />
@@ -272,6 +336,69 @@ const Header: React.FC = () => {
               >
                 <Icon name="search" className={styles.searchIconMobile} />
               </button>
+
+              {dropdownOpen && instantResults && instantResults.length > 0 && (
+                <div
+                  className={`${styles.searchDropdown} ${mobileSearchOpen ? '' : styles.searchDropdownNoBar}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={styles.searchDropdownHeader}>
+                    <span className={styles.searchDropdownQuery}>
+                      Results for &ldquo;{debouncedQuery}&rdquo;
+                    </span>
+                    <button
+                      className={styles.searchDropdownSeeAll}
+                      onClick={() => {
+                        closeDropdown()
+                        setMobileSearchOpen(false)
+                        setIsSearchFocused(false)
+                        handleSearch()
+                      }}
+                    >
+                      See all
+                    </button>
+                  </div>
+                  <div className={styles.searchDropdownList}>
+                    {instantResults.map((item) => (
+                      <button
+                        key={item.id}
+                        className={styles.searchDropdownItem}
+                        onClick={() => {
+                          closeDropdown()
+                          setMobileSearchOpen(false)
+                          setIsSearchFocused(false)
+                          setQuery('')
+                          searchInputRef.current?.blur()
+                          navigate(`/anime/${item.id}`)
+                        }}
+                      >
+                        {item.thumbnail && (
+                          <img
+                            src={fixThumbnailUrl(item.thumbnail, 48, 64)}
+                            alt={item.name}
+                            className={styles.searchDropdownThumb}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
+                        <div className={styles.searchDropdownItemInfo}>
+                          <span className={styles.searchDropdownItemTitle}>
+                            {titlePreference === 'nativeName'
+                              ? item.nativeName || item.name
+                              : titlePreference === 'englishName'
+                                ? item.englishName || item.name
+                                : item.name}
+                          </span>
+                          {item.year && (
+                            <span className={styles.searchDropdownItemMeta}>{item.year}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <NotificationBell />

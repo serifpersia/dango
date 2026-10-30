@@ -67,13 +67,27 @@
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  background: rgba(15, 15, 19, 0.45);
-  backdrop-filter: blur(4px);
+  background: rgba(12, 13, 18, 0.52);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s var(--ease-smooth);
   pointer-events: none;
   z-index: 8;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.hoverOverlay svg {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+  transform: scale(0.9);
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.cardWrapper:hover .hoverOverlay svg,
+.cardWrapper:focus-within .hoverOverlay svg {
+  transform: scale(1.1);
 }
 
 .cardWrapper:hover .hoverOverlay,

@@ -3,20 +3,22 @@
   bottom: clamp(5.5rem, 13vh, 7.25rem);
   right: clamp(1rem, 3vw, 2rem);
   width: max-content;
-  min-width: 12rem;
-  max-width: min(19rem, calc(100vw - 1.5rem));
+  min-width: 13rem;
+  max-width: min(20rem, calc(100vw - 1.5rem));
   font-size: 0.85rem;
-  background: var(--glass-bg);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  background: rgba(18, 20, 28, 0.94);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--glass-shadow);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
   z-index: 60;
-  animation: slideUp 0.3s var(--ease-smooth);
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slideUp {
@@ -90,15 +92,15 @@
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  padding: 0.5rem 0.75rem;
-  min-height: 2rem;
+  padding: 0.55rem 0.85rem;
+  min-height: 2.125rem;
   text-align: left;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
@@ -106,14 +108,14 @@
 }
 
 .menuItem:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
-  transform: translateX(4px);
+  transform: translateX(3px);
 }
 
 .menuItem.selected {
-  color: var(--accent-lighter);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: #ffffff;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .presetSelect {
