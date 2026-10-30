@@ -26,7 +26,8 @@
   border: 1px solid var(--border-secondary);
   transition:
     border-color var(--transition-base),
-    background-color var(--transition-base);
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
@@ -48,9 +49,11 @@
 
 .cardWrapper:hover .card,
 .cardWrapper:focus-within .card {
-  border-color: var(--border-accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background-color: var(--bg-tertiary);
-  box-shadow: var(--shadow-active);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .cardWrapper:focus-within {
@@ -145,7 +148,8 @@
 }
 
 .cardWrapper:hover .posterImg {
-  transform: scale(1.05);
+  transform: scale(1.06);
+  filter: brightness(1.05);
 }
 
 .progressSection {
@@ -294,8 +298,9 @@
 
 .progressBar {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
   border-radius: var(--radius-sm);
+  box-shadow: 0 0 8px var(--accent-glow);
   transition: width 0.3s ease;
 }
 

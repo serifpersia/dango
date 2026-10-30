@@ -158,7 +158,9 @@
   background: var(--accent);
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
   z-index: 12;
-  box-shadow: 0 0 15px var(--accent-glow);
+  box-shadow:
+    0 0 18px var(--accent-glow),
+    0 0 4px var(--accent);
 }
 
 .bufferedBar {
@@ -172,11 +174,13 @@
   transform: translate(-50%, -50%) scale(0);
   width: 14px;
   height: 14px;
-  background-color: white;
+  background: white;
   border-radius: 50%;
   z-index: 15;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.25),
+    0 0 12px rgba(0, 0, 0, 0.5);
 }
 
 .progressBarContainer:hover .thumb,
@@ -223,9 +227,24 @@
   top: 0;
   height: 100%;
   z-index: 10;
-  opacity: 0.4;
+  opacity: 0.65;
   transition: opacity 0.2s;
   border-radius: 4px;
+}
+
+.skipSegment.op,
+.skipSegment.mixed_op {
+  background-color: var(--color-success);
+}
+
+.skipSegment.ed,
+.skipSegment.mixed_ed {
+  background-color: var(--accent-blue);
+}
+
+.skipSegment.recap,
+.skipSegment.mixed_recap {
+  background-color: var(--color-warning);
 }
 
 .bottomControlsRow {

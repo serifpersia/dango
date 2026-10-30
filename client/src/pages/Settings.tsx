@@ -355,41 +355,50 @@ const Settings: React.FC = () => {
             </div>
             <section className={sharedStyles.sectionCard}>
               <h3>Keyboard Shortcuts</h3>
-              <p>Use S to focus search outside controls, or use the listed keys while watching.</p>
-              <div className={styles.shortcutList}>
-                <h4>Search</h4>
-                <div className={styles.shortcutRow}>
-                  <kbd>S</kbd>
-                  <span>Focus search</span>
+              <p>Use S or Ctrl+K to focus search anywhere, or use player keys while watching.</p>
+              <div className={styles.shortcutContainer}>
+                <div className={styles.shortcutGroup}>
+                  <h4 className={styles.shortcutGroupTitle}>Search</h4>
+                  <div className={styles.shortcutGrid}>
+                    <div className={styles.shortcutCard}>
+                      <kbd>S</kbd>
+                      <span>Focus search</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>Ctrl + K / ⌘ + K</kbd>
+                      <span>Focus search</span>
+                    </div>
+                  </div>
                 </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>Ctrl + K / ⌘ + K</kbd>
-                  <span>Focus search</span>
-                </div>
-                <h4>Player</h4>
-                <div className={styles.shortcutRow}>
-                  <kbd>Space / K</kbd>
-                  <span>Play or pause</span>
-                </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>J / L or ← / →</kbd>
-                  <span>Seek backward or forward</span>
-                </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>↑ / ↓</kbd>
-                  <span>Adjust volume</span>
-                </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>M / F</kbd>
-                  <span>Mute / fullscreen</span>
-                </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>N / T</kbd>
-                  <span>Next episode / theater mode</span>
-                </div>
-                <div className={styles.shortcutRow}>
-                  <kbd>P</kbd>
-                  <span>Previous episode</span>
+
+                <div className={styles.shortcutGroup}>
+                  <h4 className={styles.shortcutGroupTitle}>Player</h4>
+                  <div className={styles.shortcutGrid}>
+                    <div className={styles.shortcutCard}>
+                      <kbd>Space / K</kbd>
+                      <span>Play / pause</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>J / L · ← / →</kbd>
+                      <span>Seek back / fwd</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>↑ / ↓</kbd>
+                      <span>Adjust volume</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>M / F</kbd>
+                      <span>Mute / fullscreen</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>N / P</kbd>
+                      <span>Next / prev episode</span>
+                    </div>
+                    <div className={styles.shortcutCard}>
+                      <kbd>T</kbd>
+                      <span>Theater mode</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>

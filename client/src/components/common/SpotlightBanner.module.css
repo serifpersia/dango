@@ -57,12 +57,13 @@
   background:
     linear-gradient(
       90deg,
-      rgba(5, 5, 8, 0.78) 0%,
-      rgba(5, 5, 8, 0.42) 42%,
-      rgba(5, 5, 8, 0.06) 70%
+      rgba(5, 5, 8, 0.88) 0%,
+      rgba(5, 5, 8, 0.52) 38%,
+      rgba(5, 5, 8, 0.12) 65%,
+      transparent 100%
     ),
-    linear-gradient(0deg, var(--bg-main) 0%, rgba(12, 13, 18, 0.82) 16%, transparent 46%),
-    linear-gradient(180deg, transparent 0%, transparent 72px, rgba(5, 5, 8, 0.22) 100%);
+    linear-gradient(0deg, var(--bg-main) 0%, rgba(12, 13, 18, 0.75) 18%, transparent 52%),
+    linear-gradient(180deg, rgba(5, 5, 8, 0.35) 0%, transparent 80px);
 }
 
 /* Autoplay progress fused to the hero bottom edge */
@@ -385,21 +386,28 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: 0.85rem 2.1rem;
+  padding: 0.9rem 2.2rem;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
   color: var(--accent-text);
-  font-size: 0.94rem;
+  font-size: 0.95rem;
   font-weight: 700;
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  box-shadow: 0 6px 24px var(--accent-glow);
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 8px 28px var(--accent-glow),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease;
   letter-spacing: 0.02em;
 }
 
 .watchBtn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 36px var(--accent-glow),
+    0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .detailsBtn {

@@ -81,6 +81,24 @@
   box-shadow: var(--glass-shadow);
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.playerInfoContainer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 40%, transparent) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .infoColumns {

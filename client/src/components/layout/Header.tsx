@@ -83,11 +83,13 @@ const Header: React.FC = () => {
           'input, textarea, select, button, a, [role="button"], [contenteditable="true"]'
         )
       const focusSearch = () => {
+        clearTimer()
+        setVisible(true)
         if (window.innerWidth <= 1024) {
           setMobileSearchOpen(true)
           setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
         } else {
-          searchInputRef.current?.focus({ preventScroll: true })
+          setTimeout(() => searchInputRef.current?.focus({ preventScroll: true }), 10)
         }
       }
       if (e.key.toLowerCase() === 's' && !e.metaKey && !e.ctrlKey && !e.altKey && !typing) {
@@ -133,6 +135,7 @@ const Header: React.FC = () => {
   const isMobile = () => window.innerWidth <= 1024
 
   const handleSearchButtonClick = () => {
+    setVisible(true)
     if (isMobile()) {
       setMobileSearchOpen(true)
       setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
@@ -230,7 +233,8 @@ const Header: React.FC = () => {
           </div>
 
           <div className={styles.rightSection}>
-            <div className={styles.searchWrapper}>
+            <div className={styles.searchWrapper} onClick={() => searchInputRef.current?.focus()}>
+              <Icon name="search" className={styles.searchIcon} />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -239,7 +243,10 @@ const Header: React.FC = () => {
                 placeholder={searchPlaceholder}
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
-                onFocus={() => setIsSearchFocused(true)}
+                onFocus={() => {
+                  setIsSearchFocused(true)
+                  setVisible(true)
+                }}
                 onBlur={() => setIsSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -247,14 +254,23 @@ const Header: React.FC = () => {
                   }
                 }}
               />
+              <span
+                className={`${styles.searchKbd} ${query || isSearchFocused ? styles.searchKbdHidden : ''}`}
+                aria-hidden="true"
+              >
+                Ctrl K
+              </span>
               <button
                 type="button"
                 className={styles.searchButton}
                 aria-label="Search"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={handleSearchButtonClick}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSearchButtonClick()
+                }}
               >
-                <Icon name="search" className={styles.searchIcon} />
+                <Icon name="search" className={styles.searchIconMobile} />
               </button>
             </div>
 
@@ -289,7 +305,10 @@ const Header: React.FC = () => {
                 placeholder={searchPlaceholder}
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
-                onFocus={() => setIsSearchFocused(true)}
+                onFocus={() => {
+                  setIsSearchFocused(true)
+                  setVisible(true)
+                }}
                 onBlur={() => setIsSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
