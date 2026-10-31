@@ -1541,7 +1541,7 @@ const Tv: React.FC = () => {
         // ignore
       }
     }
-  }, [subtitles, referer, isEmbedProvider, source, videoRef])
+  }, [subtitles, referer, isEmbedProvider, source, selectedServer, videoRef])
 
   useEffect(() => {
     const video = videoRef.current
