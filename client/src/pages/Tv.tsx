@@ -904,6 +904,35 @@ const Tv: React.FC = () => {
     return pickSubtitleIndex(tracks, { lastKey: null, enabled: true })
   }, [])
 
+  const pickDefaultQuality = useCallback((streams: { quality?: string }[]): number => {
+    let lastQuality: string | null = null
+    try {
+      lastQuality = profileStorage.getItem('tvLastQuality')
+    } catch {
+      // ignore
+    }
+    if (!lastQuality || streams.length === 0) return 0
+    const exact = streams.findIndex((s) => (s.quality || '') === lastQuality)
+    if (exact >= 0) return exact
+    const pickHeight = (q?: string): number => {
+      const m = /(\d{3,4})/.exec(q || '')
+      return m ? parseInt(m[1], 10) : 0
+    }
+    const wanted = pickHeight(lastQuality)
+    if (!wanted) return 0
+    let best = 0
+    let bestDiff = Infinity
+    streams.forEach((s, i) => {
+      const h = pickHeight(s.quality)
+      const diff = Math.abs(h - wanted)
+      if (h > 0 && diff < bestDiff) {
+        bestDiff = diff
+        best = i
+      }
+    })
+    return best
+  }, [])
+
   const { data: tvProgress } = useTvProgress(mediaId || undefined)
   const watchedEpisodeIds = useMemo(() => {
     const rows = tvProgress?.progress ?? []
@@ -1129,7 +1158,7 @@ const Tv: React.FC = () => {
       setStreamsEpisodeKey(episodeKey)
       if (data.servers?.length) setLiveServers(data.servers)
       if (data.embedUrl) setEmbedFallbackUrl(data.embedUrl)
-      setQualityIdx(0)
+      setQualityIdx(pickDefaultQuality(directSources))
       if (data.referer) setReferer(data.referer)
       const tracks = data.audioTracks || []
       setAudioTracks(tracks)
@@ -1182,6 +1211,7 @@ const Tv: React.FC = () => {
     pickDefaultSubtitle,
     persistSubtitlePick,
     pickDefaultAudio,
+    pickDefaultQuality,
     queryClient,
     tvStreamQueryKey,
     fetchTvStreams,
@@ -2030,6 +2060,12 @@ const Tv: React.FC = () => {
                   onResolutionChange={(idx) => {
                     rememberPosition()
                     setQualityIdx(idx)
+                    try {
+                      const q = streams[idx]?.quality
+                      if (q) profileStorage.setItem('tvLastQuality', q)
+                    } catch {
+                      // ignore
+                    }
                   }}
                   onBack={handleBack}
                   videoDelayEnabled={videoDelayEnabled}
