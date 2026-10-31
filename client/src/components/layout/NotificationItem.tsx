@@ -79,6 +79,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
       <button
         className={`${styles.removeItem} ${styles.queueItem}`}
         onClick={handleQueue}
+        title="Add to queue"
         aria-label="Add notification to queue"
       >
         {justQueued ? <Icon name="check" /> : <Icon name="plus" />}
@@ -86,6 +87,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
       <button
         className={styles.removeItem}
         onClick={handleDismiss}
+        title="Dismiss"
         aria-label="Remove notification"
       >
         <Icon name="times" />

@@ -1,5 +1,6 @@
 import React from 'react'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import {
   mangaCoverSrc,
   type MangaChapter,
@@ -42,7 +43,7 @@ const MangaDetail: React.FC<MangaDetailProps> = ({
       </button>
       <div className={styles.detail}>
         {detail.cover && (
-          <img
+          <FadeImage
             className={styles.detailCover}
             src={mangaCoverSrc(detail.provider, detail.cover)}
             alt={detail.title}

@@ -9,6 +9,7 @@ import {
   useTriggerDiscovery,
   useSystemNotifications,
 } from '../../hooks/useAnimeData'
+import { qk } from '../../lib/queryKeys'
 import styles from './Notification.module.css'
 
 const NOTIFICATION_PANEL_ID = 'notification-panel'
@@ -25,7 +26,7 @@ const NotificationBell: React.FC = () => {
   const { data: discoveryStatus } = useDiscoveryStatus()
   const count = notifications.length + systemNotifications.length
 
-  const displayCount = count > 5 ? '5+' : count
+  const displayCount = count > 9 ? '9+' : count
 
   const wasDiscoveryRunning = useRef(false)
 
@@ -44,6 +45,10 @@ const NotificationBell: React.FC = () => {
     if (wasDiscoveryRunning.current && !running) {
       void queryClient.invalidateQueries(trpc.notifications.pathFilter())
       void queryClient.invalidateQueries(trpc.discovery.pathFilter())
+      void queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
+      void queryClient.invalidateQueries({ queryKey: [qk.thisWeekSchedule] })
+      void queryClient.invalidateQueries(trpc.continueWatching.pathFilter())
+      queryClient.invalidateQueries({ queryKey: [qk.notifications] })
     }
     wasDiscoveryRunning.current = running
   }, [discoveryStatus?.running, queryClient, trpc])

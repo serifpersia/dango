@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import Icon from '../components/common/Icon'
+import FadeImage from '../components/common/FadeImage'
 import { Button } from '../components/common/Button'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import { useToggleTvBookmark, useTvLibraryCheck } from '../hooks/useTvLibrary'
@@ -190,7 +191,12 @@ export default function TvInfo() {
         <div className={styles.heroContent}>
           <div className={styles.posterContainer}>
             {posterUrl && (
-              <img src={posterUrl} alt={details.title} className={styles.poster} decoding="async" />
+              <FadeImage
+                src={posterUrl}
+                alt={details.title}
+                className={styles.poster}
+                decoding="async"
+              />
             )}
           </div>
 

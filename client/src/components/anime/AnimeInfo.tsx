@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
@@ -90,7 +91,7 @@ export default function AnimeInfo() {
 
         <div className={styles.heroContent}>
           <div className={styles.posterContainer}>
-            <img
+            <FadeImage
               src={fixThumbnailUrl(showMeta.thumbnail || '', 320, 480)}
               alt={showMeta.name}
               className={styles.poster}

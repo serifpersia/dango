@@ -7,6 +7,7 @@ import { trpcClient } from '../lib/trpc'
 import { fetchApi } from '../lib/fetchApi'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
+import FadeImage from '../components/common/FadeImage'
 import TvPlayerControls from '../components/tv/TvPlayerControls'
 import TvSourceSelector from '../components/tv/SourceSelector'
 import { Button } from '../components/common/Button'
@@ -2202,7 +2203,7 @@ const Tv: React.FC = () => {
             <div className={layoutStyles.playerInfoHeader}>
               <div className={layoutStyles.playerAnimeCard}>
                 {details.poster && (
-                  <img
+                  <FadeImage
                     src={`https://image.tmdb.org/t/p/w342${details.poster}`}
                     alt={details.title}
                     loading="lazy"

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../contexts/SidebarContext'
@@ -9,10 +10,18 @@ import { useContentType } from '../../contexts/ContentTypeContext'
 import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
 import { profileQuery } from '../../hooks/useProfile'
 import ProfileAvatar from '../common/ProfileAvatar'
-import { useTRPC } from '../../lib/trpc'
+import { useTRPC, trpcClient } from '../../lib/trpc'
+import { qk } from '../../lib/queryKeys'
 import { fixThumbnailUrl } from '../../lib/utils'
+import { tvDetailPath } from '../../lib/tv'
+import { mangaCoverSrc } from '../../hooks/useManga'
+import { asmrWorkId } from '../../lib/asmr'
+import type { MangaBrowseResult } from '../../hooks/useManga'
+import type { AsmrBrowseResult } from '../../hooks/useAsmr'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './Header.module.css'
+
+const STALE_5_MIN = 5 * 60 * 1000
 
 const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar()
@@ -40,12 +49,79 @@ const Header: React.FC = () => {
 
   const { data: user } = useQuery(profileQuery)
 
-  const canInstantSearch = contentType === 'anime'
+  const instantEnabled = debouncedQuery.length >= 2
 
   const { data: instantResults } = useQuery({
     ...trpc.data.search.queryOptions({ query: debouncedQuery, page: 1, limit: 6 }),
-    enabled: canInstantSearch && debouncedQuery.length >= 2,
+    enabled: instantEnabled && contentType === 'anime',
   })
+  const { data: tvResults } = useQuery({
+    ...trpc.tv.search.queryOptions({ q: debouncedQuery, page: 1, type: 'multi' }),
+    enabled: instantEnabled && contentType === 'tv',
+  })
+  const { data: mangaResults } = useQuery({
+    queryFn: () =>
+      trpcClient.manga.search.query({
+        q: debouncedQuery,
+        page: 1,
+        limit: 6,
+        rating: 'safe',
+      }) as Promise<MangaBrowseResult>,
+    queryKey: [qk.mangaBrowse, '', debouncedQuery, 1, '', '', '', 'safe', false],
+    staleTime: STALE_5_MIN,
+    enabled: instantEnabled && contentType === 'manga',
+  })
+  const { data: asmrResults } = useQuery({
+    queryFn: () =>
+      trpcClient.asmr.browse.query({ q: debouncedQuery, page: 1 }) as Promise<AsmrBrowseResult>,
+    queryKey: [qk.asmrBrowse, debouncedQuery, 1, '', ''],
+    staleTime: STALE_5_MIN,
+    enabled: instantEnabled && contentType === 'asmr',
+  })
+
+  interface InstantItem {
+    key: string
+    name: string
+    meta?: string
+    thumb?: string
+    href: string
+  }
+  const instantItems: InstantItem[] =
+    contentType === 'anime'
+      ? (instantResults ?? []).map((item) => ({
+          key: String(item.id),
+          name:
+            titlePreference === 'nativeName'
+              ? item.nativeName || item.name
+              : titlePreference === 'englishName'
+                ? item.englishName || item.name
+                : item.name,
+          meta: item.year,
+          thumb: item.thumbnail ? fixThumbnailUrl(item.thumbnail, 48, 64) : undefined,
+          href: `/anime/${item.id}`,
+        }))
+      : contentType === 'tv'
+        ? (tvResults?.results ?? []).map((item) => ({
+            key: `${item.type}-${item.id}`,
+            name: item.title,
+            meta: item.year,
+            thumb: item.image || undefined,
+            href: tvDetailPath(item.type, item.id),
+          }))
+        : contentType === 'manga'
+          ? (mangaResults?.items ?? []).map((item) => ({
+              key: `${item.provider}-${item.id}`,
+              name: item.title,
+              meta: item.year,
+              thumb: item.cover ? mangaCoverSrc(item.provider, item.cover) : undefined,
+              href: `/manga/${item.provider}/${encodeURIComponent(item.id)}`,
+            }))
+          : (asmrResults?.shows ?? []).map((item) => ({
+              key: asmrWorkId(item),
+              name: item.name,
+              thumb: item.thumbnail || undefined,
+              href: `/asmr/${encodeURIComponent(asmrWorkId(item))}`,
+            }))
 
   useEffect(() => {
     const vv = window.visualViewport
@@ -157,12 +233,12 @@ const Header: React.FC = () => {
     }
     debounceTimer.current = window.setTimeout(() => {
       setDebouncedQuery(query.trim())
-      if (isSearchFocused && canInstantSearch) setDropdownOpen(true)
+      if (isSearchFocused) setDropdownOpen(true)
     }, 500)
     return () => {
       if (debounceTimer.current) window.clearTimeout(debounceTimer.current)
     }
-  }, [query, isSearchFocused, canInstantSearch])
+  }, [query, isSearchFocused])
 
   const closeDropdown = useCallback(() => {
     setDropdownOpen(false)
@@ -301,7 +377,7 @@ const Header: React.FC = () => {
                 onFocus={() => {
                   setIsSearchFocused(true)
                   setVisible(true)
-                  if (debouncedQuery.length >= 2 && canInstantSearch) setDropdownOpen(true)
+                  if (debouncedQuery.length >= 2) setDropdownOpen(true)
                 }}
                 onBlur={(e) => {
                   setIsSearchFocused(false)
@@ -337,7 +413,7 @@ const Header: React.FC = () => {
                 <Icon name="search" className={styles.searchIconMobile} />
               </button>
 
-              {dropdownOpen && instantResults && instantResults.length > 0 && (
+              {dropdownOpen && instantItems.length > 0 && (
                 <div
                   className={`${styles.searchDropdown} ${mobileSearchOpen ? '' : styles.searchDropdownNoBar}`}
                   onMouseDown={(e) => e.preventDefault()}
@@ -360,9 +436,9 @@ const Header: React.FC = () => {
                     </button>
                   </div>
                   <div className={styles.searchDropdownList}>
-                    {instantResults.map((item) => (
+                    {instantItems.map((item) => (
                       <button
-                        key={item.id}
+                        key={item.key}
                         className={styles.searchDropdownItem}
                         onClick={() => {
                           closeDropdown()
@@ -370,12 +446,12 @@ const Header: React.FC = () => {
                           setIsSearchFocused(false)
                           setQuery('')
                           searchInputRef.current?.blur()
-                          navigate(`/anime/${item.id}`)
+                          navigate(item.href)
                         }}
                       >
-                        {item.thumbnail && (
-                          <img
-                            src={fixThumbnailUrl(item.thumbnail, 48, 64)}
+                        {item.thumb && (
+                          <FadeImage
+                            src={item.thumb}
                             alt={item.name}
                             className={styles.searchDropdownThumb}
                             loading="lazy"
@@ -383,15 +459,9 @@ const Header: React.FC = () => {
                           />
                         )}
                         <div className={styles.searchDropdownItemInfo}>
-                          <span className={styles.searchDropdownItemTitle}>
-                            {titlePreference === 'nativeName'
-                              ? item.nativeName || item.name
-                              : titlePreference === 'englishName'
-                                ? item.englishName || item.name
-                                : item.name}
-                          </span>
-                          {item.year && (
-                            <span className={styles.searchDropdownItemMeta}>{item.year}</span>
+                          <span className={styles.searchDropdownItemTitle}>{item.name}</span>
+                          {item.meta && (
+                            <span className={styles.searchDropdownItemMeta}>{item.meta}</span>
                           )}
                         </div>
                       </button>

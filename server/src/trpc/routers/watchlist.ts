@@ -12,6 +12,7 @@ import { NotificationsRepository } from '../../repositories/notifications.reposi
 import { QueueRepository } from '../../repositories/queue.repository.js'
 import { SettingsRepository } from '../../repositories/settings.repository.js'
 import { performWriteTransactionAsync } from '../../db/transaction.js'
+import { markWatchlistChanged } from '../../lib/watchlist-discovery.js'
 import { getMigratedId } from '../../lib/migration.js'
 import {
   isAnilistRateLimited,
@@ -84,6 +85,7 @@ export const watchlistRouter = router({
         await ShowsMetaRepository.upsert(tx, { id, isAdult: input.isAdult ? 1 : 0 })
       }
     })
+    markWatchlistChanged()
 
     if (input.name && !/^\d+$/.test(id)) {
       const db = ctx.db
@@ -122,6 +124,7 @@ export const watchlistRouter = router({
       await WatchedEpisodesRepository.deleteByShow(tx, id)
       await NotificationsRepository.deleteByShow(tx, id)
     })
+    markWatchlistChanged()
     return { success: true }
   }),
 
@@ -134,6 +137,7 @@ export const watchlistRouter = router({
         await NotificationsRepository.deleteByShow(tx, id)
       }
     })
+    markWatchlistChanged()
     return { success: true, removed: ids.length }
   }),
 
@@ -142,6 +146,7 @@ export const watchlistRouter = router({
     await performWriteTransactionAsync(ctx.db, async (tx) => {
       await WatchlistRepository.updateStatus(tx, id, input.status)
     })
+    markWatchlistChanged()
     void pushCompletedEpisode(ctx.db, id)
     return { success: true }
   }),
@@ -153,6 +158,7 @@ export const watchlistRouter = router({
       await performWriteTransactionAsync(ctx.db, async (tx) => {
         await WatchlistRepository.updateStatusMany(tx, ids, input.status)
       })
+      markWatchlistChanged()
       for (const id of ids) void pushCompletedEpisode(ctx.db, id)
       return { success: true, updated: ids.length }
     }),

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react'
 import { Link } from 'react-router'
 import Icon, { type IconName } from './Icon'
+import FadeImage from './FadeImage'
 import MediaPopupShell from './MediaPopupShell'
 import styles from './MediaPopup.module.css'
 
@@ -97,7 +98,7 @@ const MediaPopup: React.FC<MediaPopupProps> = ({
           {title && (
             <div className={styles.header}>
               {cover && (
-                <img
+                <FadeImage
                   src={cover}
                   alt={title}
                   loading="lazy"

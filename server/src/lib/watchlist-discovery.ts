@@ -64,12 +64,17 @@ const state = profileService(() => ({
   lastExternalDiscoveryAt: 0,
   discoveryBusy: false,
   lastDiscoveryRunAt: 0,
+  watchlistChangedSinceDiscovery: false,
   discoveryState: 'idle' as 'idle' | 'running' | 'complete' | 'empty' | 'error',
   discoveryTotal: 0,
   discoveryDone: 0,
   discoveryStopped: false,
   triggerImpl: null as (() => boolean) | null,
 }))
+
+export function markWatchlistChanged(): void {
+  state().watchlistChangedSinceDiscovery = true
+}
 
 export function triggerWatchlistDiscovery(): boolean {
   return state().triggerImpl?.() ?? false
@@ -259,6 +264,7 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
     } finally {
       state().discoveryBusy = false
       state().lastDiscoveryRunAt = Date.now()
+      state().watchlistChangedSinceDiscovery = false
       if (state().discoveryState === 'running') {
         state().discoveryState = state().discoveryTotal === 0 ? 'empty' : 'complete'
       }
@@ -267,7 +273,9 @@ export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
 
   state().triggerImpl = () => {
     if (state().discoveryStopped || state().discoveryBusy) return false
-    if (Date.now() - state().lastExternalDiscoveryAt < NUDGE_THROTTLE_MS) return false
+    const listChanged = state().watchlistChangedSinceDiscovery
+    if (!listChanged && Date.now() - state().lastExternalDiscoveryAt < NUDGE_THROTTLE_MS)
+      return false
     state().lastExternalDiscoveryAt = Date.now()
     runDiscovery(true)
     return true

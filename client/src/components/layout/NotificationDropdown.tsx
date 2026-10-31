@@ -83,6 +83,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) 
             type="button"
             className={styles.closeBtn}
             onClick={onClose}
+            title="Close"
             aria-label="Close notifications"
           >
             <Icon name="times" />

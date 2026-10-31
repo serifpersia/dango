@@ -7,6 +7,7 @@ import styles from '../components/player/Player.module.css'
 import layoutStyles from '../components/player/PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
+import FadeImage from '../components/common/FadeImage'
 import { fixThumbnailUrl } from '../lib/utils'
 import { storeAutoplayEnabled } from '../lib/playbackCompletion'
 import { type SubtitleStyleSettings } from '../lib/subtitleStyle'
@@ -1104,7 +1105,7 @@ const Player: React.FC = () => {
             <div className={layoutStyles.playerInfoContainer}>
               <div className={layoutStyles.playerInfoHeader}>
                 <div className={layoutStyles.playerAnimeCard}>
-                  <img
+                  <FadeImage
                     src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
                     alt={displayTitle}
                     loading="lazy"

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import { useAsmrWork } from '../../hooks/useAsmr'
 import {
   useAsmrLibraryCheck,
@@ -55,7 +56,12 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
 
         <div className={styles.detailHeader}>
           {cover ? (
-            <img className={styles.detailCover} src={cover} alt={work.name} decoding="async" />
+            <FadeImage
+              className={styles.detailCover}
+              src={cover}
+              alt={work.name}
+              decoding="async"
+            />
           ) : (
             <div className={`${styles.detailCover} ${styles.thumbPlaceholder}`} />
           )}
