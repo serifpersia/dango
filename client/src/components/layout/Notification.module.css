@@ -5,10 +5,10 @@
 }
 
 .bellBtn {
-  background: var(--header-control-bg, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--header-control-border, transparent);
+  background: var(--header-btn-bg, rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.08));
   color: var(--text-primary);
   font-size: 1.25rem;
   cursor: pointer;
@@ -34,23 +34,6 @@
 .bellBtn:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
-}
-
-@media (max-width: 848px) {
-  .bellBtn {
-    width: 36px;
-    height: 36px;
-    font-size: 1.05rem;
-    padding: var(--space-1);
-  }
-}
-
-@media (max-width: 480px) {
-  .bellBtn {
-    width: 36px;
-    height: 36px;
-    font-size: 0.95rem;
-  }
 }
 
 .badge {
@@ -224,6 +207,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.35;
   }
@@ -441,12 +425,6 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .bellBtn {
-    width: 36px;
-    height: 36px;
-    font-size: 1rem;
-  }
-
   .removeItem {
     padding: var(--space-2);
     min-width: 36px;
@@ -481,6 +459,7 @@
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -494,14 +473,6 @@
   .statusDotRunning {
     animation: none;
     transition: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .bellBtn {
-    width: 38px;
-    height: 38px;
-    font-size: 1.1rem;
   }
 }
 

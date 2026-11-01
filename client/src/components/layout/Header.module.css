@@ -72,42 +72,55 @@
   align-items: center;
   gap: var(--space-1);
   margin-left: var(--space-6);
+  padding: 4px 6px;
+  background: var(--header-btn-bg, rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-full);
 }
 
 .navLink {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-weight: 500;
   font-size: var(--font-size-sm);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   text-decoration: none;
   transition: all var(--transition-fast);
   position: relative;
   letter-spacing: 0.01em;
+  background: none;
+  z-index: 1;
 }
 
 .navLink:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .navLinkActive {
   color: #ffffff;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.09);
+  background: transparent;
+}
+
+.navPill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-full);
+  transition:
+    left 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .navLinkActive::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
-  border-radius: var(--radius-full);
-  box-shadow: 0 0 10px var(--accent-glow);
+  display: none;
 }
 
 .rightSection {
@@ -125,7 +138,7 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-full);
-  height: 42px;
+  height: 50px;
   padding: 0 10px 0 14px;
   gap: 8px;
   transition: all var(--transition-base);
@@ -243,16 +256,16 @@ input.searchInput:focus-visible {
   padding-right: var(--space-3);
   text-decoration: none;
   overflow: hidden;
-  border: 1px solid var(--header-control-border, transparent);
+  border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.08));
   cursor: pointer;
   transition: all var(--transition-base);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--header-btn-bg, rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--text-primary);
 }
 
@@ -288,8 +301,8 @@ input.searchInput:focus-visible {
 }
 
 .hamburgerBtn {
-  background: var(--header-control-bg, transparent);
-  border: 1px solid var(--header-control-border, transparent);
+  background: transparent;
+  border: none;
   color: var(--text-primary);
   font-size: 1.25rem;
   padding: var(--space-2);
@@ -298,18 +311,13 @@ input.searchInput:focus-visible {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast);
   height: 40px;
   width: 40px;
   flex-shrink: 0;
 }
 
 .hamburgerBtn:hover {
-  background: var(--header-btn-bg-hover, rgba(255, 255, 255, 0.08));
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+  opacity: 0.8;
 }
 
 .searchButton:focus-visible,
@@ -340,7 +348,7 @@ input.searchInput:focus-visible {
   animation: slideIn 0.18s ease-out;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .searchDropdown {
     position: fixed;
     top: calc(var(--header-height, 64px) + env(safe-area-inset-top, 0px) + 56px);
@@ -459,6 +467,7 @@ input.searchInput:focus-visible {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -490,7 +499,7 @@ input.searchInput:focus-visible {
   display: none;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .searchWrapper {
     background: transparent;
     border: none;
@@ -534,7 +543,7 @@ input.searchInput:focus-visible {
 
   .searchButton {
     display: flex;
-    background: var(--header-btn-bg, rgba(0, 0, 0, 0.15));
+    background: var(--header-btn-bg, rgba(255, 255, 255, 0.05));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid transparent;
@@ -544,8 +553,8 @@ input.searchInput:focus-visible {
     justify-content: center;
     cursor: pointer;
     pointer-events: auto;
-    width: 44px;
-    height: 44px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     transition: all var(--transition-base);
     flex-shrink: 0;
@@ -649,74 +658,25 @@ input.searchInput:focus-visible {
   }
 }
 
-@media (max-width: 848px) {
-  .header {
-    height: 64px;
-    padding: 0 var(--space-3);
-    --logo-height: 36px;
-  }
-
-  .searchDropdown {
-    top: calc(64px + env(safe-area-inset-top, 0px) + 56px);
-    max-height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - 56px);
-  }
-
-  .searchDropdownNoBar {
-    top: calc(64px + env(safe-area-inset-top, 0px) + var(--space-3));
-    max-height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - var(--space-3));
-  }
-
-  .headerInner {
-    padding: 0;
-    max-width: none;
-  }
-
-  .leftSection {
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .hamburgerBtn {
-    height: 36px;
-    width: 36px;
-    font-size: 0.9rem;
-  }
-
-  .logo {
-    padding: 2px;
-    min-width: 0;
-  }
-
-  .searchButton {
-    width: 36px;
-    height: 36px;
-  }
-
-  .rightSection {
-    gap: 2px;
-  }
-
+@media (max-width: 920px) {
   .profileBtn {
-    height: 36px;
-  }
-
-  .profileAvatar {
-    width: 36px;
-    height: 36px;
+    width: 50px;
+    height: 50px;
+    padding: 0;
   }
 
   .profileName {
-    max-width: 84px;
+    display: none;
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 805px) {
   .desktopNav {
     display: none;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 542px) {
   .rightSection {
     gap: 4px;
   }
@@ -730,24 +690,5 @@ input.searchInput:focus-visible {
   .logo {
     padding: 2px;
     min-width: 0;
-  }
-
-  .searchButton {
-    width: 38px;
-    height: 38px;
-  }
-
-  .profileBtn {
-    width: 38px;
-    height: 38px;
-    padding: 0;
-  }
-
-  .profileAvatar {
-    width: 38px;
-    height: 38px;
-  }
-  .profileName {
-    display: none;
   }
 }

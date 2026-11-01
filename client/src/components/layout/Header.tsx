@@ -34,6 +34,7 @@ const Header: React.FC = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [isAtTop, setIsAtTop] = useState(true)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 })
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -45,6 +46,7 @@ const Header: React.FC = () => {
   const headerRef = useRef<HTMLElement>(null)
   const overHeader = useRef(false)
   const debounceTimer = useRef<number | null>(null)
+  const navContainerRef = useRef<HTMLElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const { data: user } = useQuery(profileQuery)
@@ -177,7 +179,7 @@ const Header: React.FC = () => {
       const focusSearch = () => {
         clearTimer()
         setVisible(true)
-        if (window.innerWidth <= 1024) {
+        if (window.innerWidth <= 1200) {
           setMobileSearchOpen(true)
           setTimeout(() => mobileInputRef.current?.focus({ preventScroll: true }), 50)
         } else {
@@ -249,7 +251,20 @@ const Header: React.FC = () => {
     setMobileSearchOpen(false)
   }, [location.pathname, location.search])
 
-  const isMobile = () => window.innerWidth <= 1024
+  useEffect(() => {
+    const container = navContainerRef.current
+    if (!container) return
+    const active = container.querySelector(`.${styles.navLinkActive}`) as HTMLElement | null
+    if (!active) {
+      setPillStyle((p) => ({ ...p, opacity: 0 }))
+      return
+    }
+    const cRect = container.getBoundingClientRect()
+    const aRect = active.getBoundingClientRect()
+    setPillStyle({ left: aRect.left - cRect.left, width: aRect.width, opacity: 1 })
+  }, [location.pathname])
+
+  const isMobile = () => window.innerWidth <= 1200
 
   const handleSearchButtonClick = () => {
     setVisible(true)
@@ -264,6 +279,7 @@ const Header: React.FC = () => {
   const handleMobileSearchBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     if (!mobileSearchRef.current?.contains(e.relatedTarget as Node)) {
       setMobileSearchOpen(false)
+      closeDropdown()
     }
   }
 
@@ -318,7 +334,8 @@ const Header: React.FC = () => {
             <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
               <Logo />
             </Link>
-            <nav className={styles.desktopNav}>
+            <nav className={styles.desktopNav} ref={navContainerRef}>
+              <span className={styles.navPill} style={pillStyle} aria-hidden="true" />
               <Link
                 to="/"
                 className={`${styles.navLink} ${location.pathname === '/' ? styles.navLinkActive : ''}`}
@@ -515,6 +532,7 @@ const Header: React.FC = () => {
                   } else if (e.key === 'Escape') {
                     setMobileSearchOpen(false)
                     setIsSearchFocused(false)
+                    closeDropdown()
                   }
                 }}
               />

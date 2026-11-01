@@ -18,6 +18,7 @@ export interface SpotlightSlide {
   primaryIcon: IconName
   onPrimary: () => void
   onDetails: () => void
+  onWatchlist?: () => void
 }
 
 interface SpotlightBannerProps {
@@ -368,14 +369,26 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
                         <Icon name={slide.primaryIcon} size={14} />
                         <span>{slide.primaryLabel}</span>
                       </button>
-                      <button
-                        className={styles.detailsBtn}
-                        onClick={slide.onDetails}
-                        tabIndex={index === safeIndex ? 0 : -1}
-                      >
-                        <Icon name="info-circle" size={15} />
-                        <span>Details</span>
-                      </button>
+                      <div className={styles.secondaryRow}>
+                        <button
+                          className={styles.detailsBtn}
+                          onClick={slide.onDetails}
+                          tabIndex={index === safeIndex ? 0 : -1}
+                        >
+                          <Icon name="info-circle" size={15} />
+                          <span>Details</span>
+                        </button>
+                        {slide.onWatchlist && (
+                          <button
+                            className={styles.secondaryBtn}
+                            onClick={slide.onWatchlist}
+                            tabIndex={index === safeIndex ? 0 : -1}
+                          >
+                            <Icon name="plus" size={14} />
+                            <span>Watchlist</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
