@@ -15,6 +15,8 @@ interface UseMediaSourceOptions {
   resumeTime: number
   resumeDuration?: number
   showResumeModal: boolean
+  disabled?: boolean
+  startOver?: boolean
   calibReturnRef: { current: number | null }
   setAvailableSubtitles: (tracks: SubtitleTrack[]) => void
   setActiveSubtitleTrack: (track: string) => void
@@ -33,6 +35,8 @@ export function useMediaSource({
   resumeTime,
   resumeDuration = 0,
   showResumeModal,
+  disabled = false,
+  startOver = false,
   calibReturnRef,
   setAvailableSubtitles,
   setActiveSubtitleTrack,
@@ -52,6 +56,11 @@ export function useMediaSource({
   }, [resumeTime, resumeDuration, showResumeModal])
 
   useEffect(() => {
+    if (disabled) {
+      engine.unload()
+      return
+    }
+
     const videoElement = videoRef.current
     if (!videoElement) return
 
@@ -64,7 +73,9 @@ export function useMediaSource({
       return
     }
 
-    if (calibReturnRef.current != null) {
+    if (startOver) {
+      seekToTimeRef.current = 0
+    } else if (calibReturnRef.current != null) {
       seekToTimeRef.current = calibReturnRef.current
       calibReturnRef.current = null
     } else if (
@@ -135,8 +146,9 @@ export function useMediaSource({
       {
         initialTime: targetTime,
         autoPlay:
-          !(showResumeModalRef.current && resumeTimeRef.current > 5) &&
-          !isProgressCompleted(resumeTimeRef.current, resumeDurationRef.current),
+          startOver ||
+          (!(showResumeModalRef.current && resumeTimeRef.current > 5) &&
+            !isProgressCompleted(resumeTimeRef.current, resumeDurationRef.current)),
         hlsConfig: {
           maxBufferLength: isLowEnd ? 15 : 30,
           maxMaxBufferLength: isLowEnd ? 30 : 60,
@@ -162,6 +174,8 @@ export function useMediaSource({
     calibReturnRef,
     loadingVideo,
     testClipActive,
+    disabled,
+    startOver,
     setActiveSubtitleTrack,
     setAvailableSubtitles,
   ])

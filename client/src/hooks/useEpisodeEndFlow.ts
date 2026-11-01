@@ -17,6 +17,7 @@ interface UseEpisodeEndFlowOptions {
   removeFromQueue: (vars: { showId: string; episodeNumber: string }) => void
   showId: string | undefined
   showMetaId?: string
+  showStatus?: string
   currentEpisode?: string | null
   isAutoplayEnabled: boolean
   nextEpisode: string | null
@@ -36,6 +37,7 @@ export function useEpisodeEndFlow({
   removeFromQueue,
   showId,
   showMetaId,
+  showStatus,
   currentEpisode,
   isAutoplayEnabled,
   nextEpisode,
@@ -53,6 +55,7 @@ export function useEpisodeEndFlow({
   const removeFromQueueRef = useRef(removeFromQueue)
   removeFromQueueRef.current = removeFromQueue
   const handledEndRef = useRef(false)
+  const isShowFinished = showStatus?.toUpperCase() === 'FINISHED'
 
   useEffect(() => {
     handledEndRef.current = false
@@ -94,7 +97,7 @@ export function useEpisodeEndFlow({
       return
     }
 
-    if (!nextEpisode) setShowCompleteModal(true)
+    if (!nextEpisode && isShowFinished) setShowCompleteModal(true)
   }, [
     onEnded,
     navigate,
@@ -106,6 +109,7 @@ export function useEpisodeEndFlow({
     isAutoplayEnabled,
     invalidateContinueWatching,
     testClipActive,
+    isShowFinished,
   ])
 
   const handleQueueTransition = useCallback(() => {
@@ -130,10 +134,20 @@ export function useEpisodeEndFlow({
 
     if (nextItem) {
       navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
-    } else if (!nextEpisode) {
+    } else if (!nextEpisode && isShowFinished) {
       setShowCompleteModal(true)
     }
-  }, [onEnded, navigate, queue, removeFromQueue, showId, showMetaId, currentEpisode, nextEpisode])
+  }, [
+    onEnded,
+    navigate,
+    queue,
+    removeFromQueue,
+    showId,
+    showMetaId,
+    currentEpisode,
+    nextEpisode,
+    isShowFinished,
+  ])
 
   const handleNextEpisode = useCallback(() => {
     if (nextEpisode) {
@@ -197,7 +211,7 @@ export function useEpisodeEndFlow({
 
       if (nextItem) {
         navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
-      } else if (!nextEpisode) {
+      } else if (!nextEpisode && isShowFinished) {
         setShowCompleteModal(true)
       }
       return
@@ -208,7 +222,7 @@ export function useEpisodeEndFlow({
     }, 1000)
 
     return () => window.clearTimeout(timer)
-  }, [pendingQueueTransition, queueCountdown, navigate, nextEpisode])
+  }, [pendingQueueTransition, queueCountdown, navigate, nextEpisode, isShowFinished])
 
   return {
     showCompleteModal,

@@ -41,6 +41,7 @@ interface TvPlayerControlsProps {
   onTheaterModeToggle: () => void
   ambientSettings?: AmbientLightSettings
   onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
+  hideChrome?: boolean
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -73,6 +74,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   onTheaterModeToggle,
   ambientSettings,
   onAmbientChange,
+  hideChrome = false,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -350,6 +352,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       nativeControls={state.useNativeControls}
       onStageClick={closeSettings}
       className={state.isFullscreen ? styles.fullscreenFlat : ''}
+      chromeDisabled={hideChrome}
     >
       {children}
     </PlayerSurface>

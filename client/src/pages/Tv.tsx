@@ -466,7 +466,15 @@ const Tv: React.FC = () => {
   const [completeTitle, setCompleteTitle] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
+  const [replayRequested, setReplayRequested] = useState(false)
   const { isTheaterMode, toggleTheaterMode, handleLayoutClick } = useTheaterMode()
+
+  const savedDuration = (savedProgress as { duration?: number } | undefined)?.duration ?? 0
+  const savedCompleted = (savedProgress as { completed?: number } | undefined)?.completed === 1
+  const episodeWatched =
+    resumeFetched && (savedCompleted || isProgressCompleted(savedCt, savedDuration))
+  const showWatchedOverlay = !inRoom && !testClipActive && episodeWatched && !replayRequested
+  const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
 
   useEffect(() => {
     const handleTheaterKey = (e: KeyboardEvent) => {
@@ -490,7 +498,8 @@ const Tv: React.FC = () => {
     (streams.length > 0 || iframeUrl !== '') &&
       !isTheaterMode &&
       !showResumeModal &&
-      !showCompleteModal
+      !showCompleteModal &&
+      !showWatchedOverlay
   )
   const isMobile = useIsMobile()
   const [isAutoplayEnabled, setIsAutoplayEnabled] = useState(loadAutoplayEnabled)
@@ -507,7 +516,8 @@ const Tv: React.FC = () => {
   const playbackPromptBlocked =
     !inRoom &&
     !hasResumedRef.current &&
-    (showResumeModal || showCompleteModal || hasSavedResumableProgress)
+    !replayRequested &&
+    (showResumeModal || showCompleteModal || hasSavedResumableProgress || showWatchedOverlay)
   const playbackPromptBlockedRef = useRef(playbackPromptBlocked)
   playbackPromptBlockedRef.current = playbackPromptBlocked
   const resumeCheckedRef = useRef(false)
@@ -808,6 +818,7 @@ const Tv: React.FC = () => {
     setShowNextEpisodePrompt(false)
     setResumeTime(0)
     setResumeChecked(false)
+    setReplayRequested(false)
     resumeCheckedRef.current = false
     pendingSeekRef.current = null
     lastSavedTimeRef.current = 0
@@ -1261,6 +1272,10 @@ const Tv: React.FC = () => {
   }, [source, details, loadStreams, isEmbedProvider])
 
   useEffect(() => {
+    if (showWatchedOverlay) {
+      player.engine.unload()
+      return
+    }
     if (!videoRef.current) return
     hlsRef.current = null
     if (isEmbedProvider || selectedIsIframe || (inRoom && streams[qualityIdx]?.type !== 'hls')) {
@@ -1462,6 +1477,7 @@ const Tv: React.FC = () => {
     player.engine,
     currentStreamKey,
     inRoom,
+    showWatchedOverlay,
   ])
 
   useEffect(() => {
@@ -2087,57 +2103,88 @@ const Tv: React.FC = () => {
                   onTheaterModeToggle={toggleTheaterMode}
                   ambientSettings={ambientSettings}
                   onAmbientChange={updateAmbient}
+                  hideChrome={showWatchedOverlay}
                 >
-                  <PlayerVideo
-                    autoPlay={!inRoom && resumeChecked && !playbackPromptBlocked}
-                    playsInline
-                    disablePictureInPicture
-                    className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
-                    onTimeUpdate={() => {
-                      if (testClipActive) return
-                      handleVideoTimeUpdate()
-                      checkEnd()
-                    }}
-                    onEnded={() => {
-                      if (!testClipActive) checkEnd(true)
-                    }}
-                    onPlay={handleVideoPlay}
-                    onPause={handleVideoPause}
-                    onSeeked={() => {
-                      if (testClipActive) return
-                      updateNextEpisodePrompt()
-                      checkEnd()
-                    }}
-                    onLoadedMetadata={() => {
-                      handleVideoLoadedMetadata()
-                      logDuration()
-                      checkEnd()
-                    }}
-                    onDurationChange={() => {
-                      logDuration()
-                    }}
-                    onContextMenu={(e) => e.preventDefault()}
-                    onError={() => {
-                      setStreamError('Video failed to load. Try another server or reload.')
-                      setStreamLoading(false)
-                    }}
-                  />
-                  <canvas
-                    ref={delayCanvasRef}
-                    className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
-                  />
-                  {subtitleOverlayActive && (
-                    <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                  {showWatchedOverlay ? (
+                    <div className={styles.watchedOverlay}>
+                      <Icon
+                        name="check-circle"
+                        size={48}
+                        style={{ color: 'var(--accent-lighter)' }}
+                      />
+                      <p className={styles.watchedTitle}>
+                        {isMovie ? 'Movie watched' : `S${season} E${episode} watched`}
+                      </p>
+                      <p className={styles.watchedSubtext}>
+                        Replay from the beginning or continue with the next episode.
+                      </p>
+                      <div className={styles.watchedActions}>
+                        <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
+                        {nextEpisodeNumber != null ? (
+                          <Button variant="secondary" onClick={handleWatchNextEpisode}>
+                            Next Episode
+                          </Button>
+                        ) : nextSeasonNumber != null ? (
+                          <Button variant="secondary" onClick={handleStartNextSeason}>
+                            Next Season
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <PlayerVideo
+                        autoPlay={!inRoom && resumeChecked && !playbackPromptBlocked}
+                        playsInline
+                        disablePictureInPicture
+                        className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
+                        onTimeUpdate={() => {
+                          if (testClipActive) return
+                          handleVideoTimeUpdate()
+                          checkEnd()
+                        }}
+                        onEnded={() => {
+                          if (!testClipActive) checkEnd(true)
+                        }}
+                        onPlay={handleVideoPlay}
+                        onPause={handleVideoPause}
+                        onSeeked={() => {
+                          if (testClipActive) return
+                          updateNextEpisodePrompt()
+                          checkEnd()
+                        }}
+                        onLoadedMetadata={() => {
+                          handleVideoLoadedMetadata()
+                          logDuration()
+                          checkEnd()
+                        }}
+                        onDurationChange={() => {
+                          logDuration()
+                        }}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onError={() => {
+                          setStreamError('Video failed to load. Try another server or reload.')
+                          setStreamLoading(false)
+                        }}
+                      />
+                      <canvas
+                        ref={delayCanvasRef}
+                        className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
+                      />
+                      {subtitleOverlayActive && (
+                        <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                      )}
+                      <AvSyncCalibrator
+                        isOpen={isCalibrating}
+                        ms={videoDelayMs}
+                        onChange={handleVideoDelayChange}
+                        onApply={applyAvSyncCalibrator}
+                        onClose={cancelAvSyncCalibrator}
+                        testClipActive={testClipActive}
+                        onTestClip={toggleTestClip}
+                      />
+                    </>
                   )}
-                  <AvSyncCalibrator
-                    isOpen={isCalibrating}
-                    ms={videoDelayMs}
-                    onChange={handleVideoDelayChange}
-                    onApply={applyAvSyncCalibrator}
-                    onClose={cancelAvSyncCalibrator}
-                    testClipActive={testClipActive}
-                    onTestClip={toggleTestClip}
-                  />
                 </TvPlayerControls>
               </>
             ) : streamError && !isEmbedProvider ? (

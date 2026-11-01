@@ -9,7 +9,7 @@ import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
 import FadeImage from '../components/common/FadeImage'
 import { fixThumbnailUrl } from '../lib/utils'
-import { storeAutoplayEnabled } from '../lib/playbackCompletion'
+import { isProgressCompleted, storeAutoplayEnabled } from '../lib/playbackCompletion'
 import { type SubtitleStyleSettings } from '../lib/subtitleStyle'
 import { Modal } from '../components/common/Modal'
 import CompletionModal from '../components/common/CompletionModal'
@@ -207,6 +207,21 @@ const Player: React.FC = () => {
   } = useAvSync(refs.videoRef, () => actions.setShowSettings(false))
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
 
+  const [replayRequested, setReplayRequested] = useState(false)
+  useEffect(() => {
+    setReplayRequested(false)
+  }, [showId, state.currentEpisode])
+
+  const episodeProgressCompleted =
+    !state.loadingVideo && isProgressCompleted(state.resumeTime, state.resumeDuration)
+  const showWatchedOverlay =
+    !inRoom &&
+    !testClipActive &&
+    episodeProgressCompleted &&
+    state.videoSources.length > 0 &&
+    !replayRequested
+  const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
+
   const upscaler = useAnime4K({
     videoRef: refs.videoRef,
     canvasRef,
@@ -301,6 +316,7 @@ const Player: React.FC = () => {
     removeFromQueue: removeQueue.mutate,
     showId,
     showMetaId: state.showMeta?.id,
+    showStatus: state.showMeta?.status,
     currentEpisode: state.currentEpisode,
     isAutoplayEnabled: !followingHost && state.isAutoplayEnabled,
     nextEpisode,
@@ -334,7 +350,10 @@ const Player: React.FC = () => {
   const shouldShowCompleteModal = showCompleteModal
   const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal
 
-  useAutoRotateFullscreen(player, !!state.selectedLink && !isTheaterMode && !shouldPauseForModal)
+  useAutoRotateFullscreen(
+    player,
+    !!state.selectedLink && !isTheaterMode && !shouldPauseForModal && !showWatchedOverlay
+  )
 
   const {
     fallbackPrompt,
@@ -373,6 +392,8 @@ const Player: React.FC = () => {
     resumeTime: inRoom ? 0 : state.resumeTime,
     resumeDuration: state.resumeDuration,
     showResumeModal: !inRoom && state.showResumeModal,
+    disabled: showWatchedOverlay,
+    startOver: replayRequested,
     calibReturnRef,
     setAvailableSubtitles: actions.setAvailableSubtitles,
     setActiveSubtitleTrack: actions.setActiveSubtitleTrack,
@@ -815,7 +836,7 @@ const Player: React.FC = () => {
             onCalibrateAvSync={inRoom ? () => {} : openAvSyncCalibrator}
             isInteractingExtra={isEpisodeDrawerOpen || isCalibrating}
             className={shellStyles.shellFill}
-            hideChrome={state.selectedSource?.type === 'iframe'}
+            hideChrome={showWatchedOverlay || state.selectedSource?.type === 'iframe'}
             overlays={
               <>
                 {player.state.isSpeedBoostActive && (
@@ -830,126 +851,152 @@ const Player: React.FC = () => {
               </>
             }
           >
-            {isVideoLoading && (
-              <div className={styles.loadingOverlay}>
-                <div className={styles.loadingDots}>
-                  <div className={styles.dot}></div>
-                  <div className={styles.dot}></div>
-                  <div className={styles.dot}></div>
+            {showWatchedOverlay ? (
+              <div className={styles.watchedOverlay}>
+                <Icon name="check-circle" size={48} style={{ color: 'var(--accent-lighter)' }} />
+                <p className={styles.watchedTitle}>
+                  {state.currentEpisode ? `Episode ${state.currentEpisode} watched` : 'Watched'}
+                </p>
+                <p className={styles.watchedSubtext}>
+                  Replay from the beginning or continue with the next episode.
+                </p>
+                <div className={styles.watchedActions}>
+                  <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
+                  {nextEpisode && (
+                    <Button variant="secondary" onClick={handleNextEpisode}>
+                      Next Episode
+                    </Button>
+                  )}
                 </div>
               </div>
-            )}
-
-            {player.state.isBuffering &&
-              !isVideoLoading &&
-              state.selectedSource?.type !== 'iframe' && (
-                <div className={styles.bufferingOverlay}>
-                  <div className={styles.bufferingSpinner}></div>
-                </div>
-              )}
-
-            {state.selectedSource?.type === 'iframe' && !inRoom ? (
-              !isVideoLoading && (
-                <iframe
-                  src={state.selectedLink?.link}
-                  className={styles.videoIframe}
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  sandbox={
-                    state.selectedSource.sandbox
-                      ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox`
-                      : undefined
-                  }
-                ></iframe>
-              )
             ) : (
               <>
-                {!isVideoLoading && state.videoSources.length === 0 && (
-                  <div className={styles.errorOverlay}>
-                    <p>No sources found for this episode with {state.selectedProvider}.</p>
-                    <p className={styles.errorSubtext}>
-                      Please try selecting a different provider below.
-                    </p>
-                    <button
-                      className={styles.retryButton}
-                      onClick={() => window.location.reload()}
-                      data-speed-boost-ignore="true"
-                      style={{ marginTop: 8 }}
-                    >
-                      Retry
-                    </button>
+                {isVideoLoading && (
+                  <div className={styles.loadingOverlay}>
+                    <div className={styles.loadingDots}>
+                      <div className={styles.dot}></div>
+                      <div className={styles.dot}></div>
+                      <div className={styles.dot}></div>
+                    </div>
                   </div>
                 )}
-                {!isVideoLoading && state.videoSources.length > 0 && (
-                  <PlayerVideo
-                    controls={!player.state.playbackLocked && player.state.useNativeControls}
-                    playsInline
-                    webkit-playsinline="true"
-                    disablePictureInPicture
-                    disableRemotePlayback
-                    onPlay={actions.onPlay}
-                    onPause={actions.onPause}
-                    onEnded={() => {
-                      if (!testClipActive) checkEnd(true)
-                    }}
-                    onDurationChange={() => {
-                      logDuration()
-                    }}
-                    onSeeked={() => {
-                      if (testClipActive) return
-                      handleThresholds()
-                      checkEnd()
-                    }}
-                    onLoadedMetadata={() => {
-                      handleThresholds()
-                      logDuration()
-                      if (!testClipActive) checkEnd()
-                    }}
-                    onTimeUpdate={() => {
-                      if (testClipActive) return
-                      actions.onTimeUpdate()
-                      handleThresholds()
-                      checkEnd()
-                      if (
-                        pendingQueueTransition &&
-                        refs.videoRef.current &&
-                        refs.videoRef.current.currentTime < refs.videoRef.current.duration - 1
-                      ) {
-                        cancelQueueTransition()
+
+                {player.state.isBuffering &&
+                  !isVideoLoading &&
+                  state.selectedSource?.type !== 'iframe' && (
+                    <div className={styles.bufferingOverlay}>
+                      <div className={styles.bufferingSpinner}></div>
+                    </div>
+                  )}
+
+                {state.selectedSource?.type === 'iframe' && !inRoom ? (
+                  !isVideoLoading && (
+                    <iframe
+                      src={state.selectedLink?.link}
+                      className={styles.videoIframe}
+                      allow="autoplay; fullscreen; picture-in-picture"
+                      allowFullScreen
+                      sandbox={
+                        state.selectedSource.sandbox
+                          ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox`
+                          : undefined
                       }
-                    }}
-                    onError={inRoom ? undefined : handleVideoSourceError}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className={canvasPresentationActive ? styles.videoElementHidden : ''}
-                  />
+                    ></iframe>
+                  )
+                ) : (
+                  <>
+                    {!isVideoLoading && state.videoSources.length === 0 && (
+                      <div className={styles.errorOverlay}>
+                        <p>No sources found for this episode with {state.selectedProvider}.</p>
+                        <p className={styles.errorSubtext}>
+                          Please try selecting a different provider below.
+                        </p>
+                        <button
+                          className={styles.retryButton}
+                          onClick={() => window.location.reload()}
+                          data-speed-boost-ignore="true"
+                          style={{ marginTop: 8 }}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                    {!isVideoLoading && state.videoSources.length > 0 && (
+                      <PlayerVideo
+                        controls={!player.state.playbackLocked && player.state.useNativeControls}
+                        playsInline
+                        webkit-playsinline="true"
+                        disablePictureInPicture
+                        disableRemotePlayback
+                        onPlay={actions.onPlay}
+                        onPause={actions.onPause}
+                        onEnded={() => {
+                          if (!testClipActive) checkEnd(true)
+                        }}
+                        onDurationChange={() => {
+                          logDuration()
+                        }}
+                        onSeeked={() => {
+                          if (testClipActive) return
+                          handleThresholds()
+                          checkEnd()
+                        }}
+                        onLoadedMetadata={() => {
+                          handleThresholds()
+                          logDuration()
+                          if (!testClipActive) checkEnd()
+                        }}
+                        onTimeUpdate={() => {
+                          if (testClipActive) return
+                          actions.onTimeUpdate()
+                          handleThresholds()
+                          checkEnd()
+                          if (
+                            pendingQueueTransition &&
+                            refs.videoRef.current &&
+                            refs.videoRef.current.currentTime < refs.videoRef.current.duration - 1
+                          ) {
+                            cancelQueueTransition()
+                          }
+                        }}
+                        onError={inRoom ? undefined : handleVideoSourceError}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className={canvasPresentationActive ? styles.videoElementHidden : ''}
+                      />
+                    )}
+                    {upscaler.isWebGPUSupported &&
+                      !isVideoLoading &&
+                      state.videoSources.length > 0 && (
+                        <canvas
+                          ref={canvasRef}
+                          className={`${styles.upscalerCanvas} ${upscalerActive ? styles.upscalerActive : ''}`}
+                        />
+                      )}
+                    {!upscalerActive && !isVideoLoading && state.videoSources.length > 0 && (
+                      <canvas
+                        ref={delayCanvasRef}
+                        className={`${styles.upscalerCanvas} ${delayCanvasActive ? styles.upscalerActive : ''}`}
+                      />
+                    )}
+                    {upscaler.isEnabled &&
+                      upscaler.isWebGPUSupported &&
+                      upscaler.isInitializing && (
+                        <div className={styles.upscalerStatusBadge}>Preparing upscaler…</div>
+                      )}
+                    {canvasPresentationActive && (
+                      <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                    )}
+                    <AvSyncCalibrator
+                      isOpen={isCalibrating}
+                      ms={videoDelayMs}
+                      onChange={handleVideoDelayChange}
+                      onApply={applyAvSyncCalibrator}
+                      onClose={cancelAvSyncCalibrator}
+                      testClipActive={testClipActive}
+                      onTestClip={toggleTestClip}
+                    />
+                  </>
                 )}
-                {upscaler.isWebGPUSupported && !isVideoLoading && state.videoSources.length > 0 && (
-                  <canvas
-                    ref={canvasRef}
-                    className={`${styles.upscalerCanvas} ${upscalerActive ? styles.upscalerActive : ''}`}
-                  />
-                )}
-                {!upscalerActive && !isVideoLoading && state.videoSources.length > 0 && (
-                  <canvas
-                    ref={delayCanvasRef}
-                    className={`${styles.upscalerCanvas} ${delayCanvasActive ? styles.upscalerActive : ''}`}
-                  />
-                )}
-                {upscaler.isEnabled && upscaler.isWebGPUSupported && upscaler.isInitializing && (
-                  <div className={styles.upscalerStatusBadge}>Preparing upscaler…</div>
-                )}
-                {canvasPresentationActive && (
-                  <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
-                )}
-                <AvSyncCalibrator
-                  isOpen={isCalibrating}
-                  ms={videoDelayMs}
-                  onChange={handleVideoDelayChange}
-                  onApply={applyAvSyncCalibrator}
-                  onClose={cancelAvSyncCalibrator}
-                  testClipActive={testClipActive}
-                  onTestClip={toggleTestClip}
-                />
               </>
             )}
           </PlayerControls>

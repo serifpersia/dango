@@ -53,12 +53,17 @@ const PROVIDER_REFERER: Record<string, string> = {
   mangapill: 'https://www.mangapill.com/',
 }
 
+const MANGA_COVER_UA = 'Dango/3.0 (+https://github.com/serifpersia/dango)'
+
 export const mangaPageSrc = (provider: MangaProviderName, url: string) =>
   `/api/proxy?url=${encodeURIComponent(url)}&referer=${encodeURIComponent(PROVIDER_REFERER[provider])}`
 
 export const mangaCoverSrc = (provider: MangaProviderName, url: string) => {
   if (!url) return url
-  if (provider === 'mangapill' || provider === 'mangadex') return mangaPageSrc(provider, url)
+  if (provider === 'mangadex') {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}&ua=${encodeURIComponent(MANGA_COVER_UA)}`
+  }
+  if (provider === 'mangapill') return mangaPageSrc(provider, url)
   return url
 }
 

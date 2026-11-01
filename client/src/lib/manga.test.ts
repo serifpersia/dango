@@ -9,15 +9,22 @@ import {
 } from './manga'
 
 describe('mangaCoverSrc', () => {
-  it.each([
-    ['mangadex', 'https://uploads.mangadex.org/covers/id/cover.jpg', 'https://mangadex.org/'],
-    ['mangapill', 'https://cdn.example.com/cover.jpg', 'https://www.mangapill.com/'],
-  ])('proxies %s covers with their provider Referer', (provider, cover, referer) => {
-    const result = new URL(mangaCoverSrc(provider, cover), 'http://192.168.1.20:3000')
+  it('proxies mangadex covers through the image proxy with a non-browser UA', () => {
+    const cover = 'https://uploads.mangadex.org/covers/id/cover.jpg'
+    const result = new URL(mangaCoverSrc('mangadex', cover), 'http://192.168.1.20:3000')
+    expect(result.origin).toBe('http://192.168.1.20:3000')
+    expect(result.pathname).toBe('/api/image-proxy')
+    expect(result.searchParams.get('url')).toBe(cover)
+    expect(result.searchParams.get('ua')).toBe('Dango/3.0 (+https://github.com/serifpersia/dango)')
+  })
+
+  it('proxies mangapill covers with their provider Referer', () => {
+    const cover = 'https://cdn.example.com/cover.jpg'
+    const result = new URL(mangaCoverSrc('mangapill', cover), 'http://192.168.1.20:3000')
     expect(result.origin).toBe('http://192.168.1.20:3000')
     expect(result.pathname).toBe('/api/proxy')
     expect(result.searchParams.get('url')).toBe(cover)
-    expect(result.searchParams.get('referer')).toBe(referer)
+    expect(result.searchParams.get('referer')).toBe('https://www.mangapill.com/')
   })
 
   it('leaves empty and unrelated provider covers unchanged', () => {
