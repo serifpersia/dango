@@ -147,9 +147,7 @@ class DiscordGatewayService {
         : 3
 
     const imageUrl = this.resolveImageUrl(data)
-    let assets:
-      | { large_image?: string; large_text?: string; small_image?: string; small_text?: string }
-      | undefined
+    let assets: { large_image?: string; large_text?: string } | undefined
 
     if (imageUrl) {
       if (CONFIG.DISCORD_CLIENT_ID) {
@@ -158,8 +156,6 @@ class DiscordGatewayService {
           assets = {
             large_image: proxied,
             large_text: data.title.slice(0, 128),
-            small_image: 'small',
-            small_text: 'dango',
           }
         } else {
           assets = { large_image: 'logo', large_text: data.title.slice(0, 128) }
@@ -181,8 +177,6 @@ class DiscordGatewayService {
         assets?: {
           large_image?: string
           large_text?: string
-          small_image?: string
-          small_text?: string
         }
         buttons?: string[]
         metadata?: { button_urls?: string[] }

@@ -335,7 +335,6 @@ class DiscordRPCService {
             : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
           largeImageKey: imageKey,
           largeImageText: data.title,
-          ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
           type:
             data.providerName === 'ASMR' ||
             data.providerName === 'Radio' ||
@@ -363,8 +362,6 @@ class DiscordRPCService {
         endTimestamp?: number
         largeImageKey: string
         largeImageText: string
-        smallImageKey?: string
-        smallImageText?: string
         type: number
         statusDisplayType?: number
         buttons: { label: string; url: string }[]
@@ -375,7 +372,6 @@ class DiscordRPCService {
           : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
         largeImageKey: imageKey,
         largeImageText: data.title,
-        ...(imageKey !== 'logo' ? { smallImageKey: 'small', smallImageText: 'dango' } : {}),
         type:
           data.providerName === 'ASMR' ||
           data.providerName === 'Radio' ||
