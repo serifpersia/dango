@@ -27,7 +27,7 @@ function releaseLock(handle: fs.promises.FileHandle, lockPath: string) {
 export async function updateEnvFile(updates: Record<string, string>) {
   if (profileScope.getStore()?.deleted) throw new Error('Profile has been deleted')
   const installation = Object.keys(updates).some((key) =>
-    ['PORT', 'APP_PASSWORD_HASH', 'DISCORD_GATEWAY_TOKEN'].includes(key)
+    ['PORT', 'APP_PASSWORD_HASH', 'DISCORD_GATEWAY_TOKEN', 'ALLOWED_ORIGINS'].includes(key)
   )
   const envPath = installation ? INSTALL_CONFIG.ENV_PATH : CONFIG.ENV_PATH
   const lockPath = `${envPath}.lock`

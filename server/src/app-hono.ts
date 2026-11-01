@@ -6,7 +6,7 @@ import path from 'path'
 import fs from 'fs'
 import { XMLParser } from 'fast-xml-parser'
 import { CONFIG } from './config.js'
-import { isAllowedOrigin } from './utils/security.utils.js'
+import { isAllowedOrigin, requestOrigin } from './utils/security.utils.js'
 import { requestContext } from './utils/request-context.js'
 import logger from './logger.js'
 import {
@@ -324,6 +324,8 @@ export function createHonoApp(
 ): Hono {
   const app = new Hono()
   const getDbs = () => profileScope.getStore()?.dbs ?? getDefaultDbs()
+  const requestUrlForOrigin = (c: Context) =>
+    requestOrigin(c.req.url, c.req.header('x-forwarded-proto'), c.req.header('x-forwarded-host'))
 
   app.use(honoRequestLogger)
   app.use(honoRequestContextMiddleware)
@@ -379,7 +381,7 @@ export function createHonoApp(
   app.use(async (c, next) => {
     const origin = c.req.header('origin')
     if (c.req.method === 'OPTIONS') {
-      if (!origin || !isAllowedOrigin(origin, c.req.url)) {
+      if (!origin || !isAllowedOrigin(origin, requestUrlForOrigin(c))) {
         await next()
         return
       }
@@ -395,7 +397,7 @@ export function createHonoApp(
         },
       })
     }
-    if (!origin || isAllowedOrigin(origin, c.req.url)) {
+    if (!origin || isAllowedOrigin(origin, requestUrlForOrigin(c))) {
       if (origin) c.header('Access-Control-Allow-Origin', origin)
       c.header('Access-Control-Allow-Credentials', 'true')
       c.header('Vary', 'Origin')
@@ -412,12 +414,12 @@ export function createHonoApp(
     const secFetchSite = c.req.header('sec-fetch-site')
     if (secFetchSite === 'cross-site') {
       const origin = c.req.header('origin')
-      if (!origin || !isAllowedOrigin(origin, c.req.url)) {
+      if (!origin || !isAllowedOrigin(origin, requestUrlForOrigin(c))) {
         return c.json({ error: 'Forbidden: cross-site request rejected' }, 403)
       }
     }
     const origin = c.req.header('origin')
-    if (origin && !isAllowedOrigin(origin, c.req.url)) {
+    if (origin && !isAllowedOrigin(origin, requestUrlForOrigin(c))) {
       return c.json({ error: 'Forbidden: cross-origin request rejected' }, 403)
     }
     await next()

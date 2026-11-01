@@ -141,6 +141,21 @@ const IS_DEV = process.argv.includes('--dev')
 const PORT = Number(process.env.PORT) || 3000
 const DEV_PORT = Number(process.env.DEV_PORT) || 5173
 const HOST = process.env.HOST || '0.0.0.0'
+
+export function parseAllowedOrigins(raw: string | undefined): string[] {
+  return (raw || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => {
+      try {
+        return new URL(value).origin
+      } catch {
+        return ''
+      }
+    })
+    .filter(Boolean)
+}
 const GOOGLE_REDIRECT_URI = IS_DEV
   ? `http://localhost:${DEV_PORT}/api/auth/google/callback`
   : `http://localhost:${PORT}/api/auth/google/callback`
@@ -195,6 +210,7 @@ export const INSTALL_CONFIG = {
   PORT,
   DEV_PORT,
   HOST,
+  ALLOWED_ORIGINS: parseAllowedOrigins(process.env.ALLOWED_ORIGINS),
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI,

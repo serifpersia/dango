@@ -434,3 +434,132 @@ test('avatars reject executable and oversized input, and origins must match the 
   assert.equal(isAllowedOrigin('http://192.168.1.4:3000', 'http://192.168.1.4:3000/api'), true)
   assert.equal(isAllowedOrigin('https://untrusted.example', 'http://192.168.1.4:3000/api'), false)
 })
+
+test('allowed origins are queryable and mutable by the owner, and cross-origin requests are blocked', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dango-profile-origins-'))
+  const store = new ProfileStore(root, false)
+  const previousHash = INSTALL_CONFIG.APP_PASSWORD_HASH
+  const previousEnvHash = process.env.APP_PASSWORD_HASH
+  const previousOrigins = INSTALL_CONFIG.ALLOWED_ORIGINS
+  INSTALL_CONFIG.APP_PASSWORD_HASH = ''
+  process.env.APP_PASSWORD_HASH = ''
+  INSTALL_CONFIG.ALLOWED_ORIGINS = []
+  const dbs = await store.load('default')
+  store.attachDefault(dbs)
+  store.update('default', { password: 'owner-password' })
+  const second = store.create('Second', 'second-password')
+  const ownerToken = store.login('default', 'owner-password')
+  const memberToken = store.login(second.id, 'second-password')
+  const app = createHonoApp(
+    () => ({ shuttingDown: false, dbReady: true }),
+    () => ({ shuttingDown: false, dbsReady: true, bootSyncing: false }),
+    () => dbs,
+    {
+      initializeDatabase,
+      setDb: (db) => {
+        dbs.db = db
+      },
+    },
+    { getCatalog: () => [], refresh: async () => [] },
+    async () => {},
+    {
+      getApiCache: () => new AppCache(),
+      getProviders: () => ({}),
+      getMangaProvider: () => undefined,
+      getTvProvider: () => undefined,
+      getProxyRules: () => [],
+      getJasmr: () => undefined,
+    },
+    () => store
+  )
+  const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 })
+  await once(server, 'listening')
+  const address = server.address() as { port: number }
+  const base = `http://127.0.0.1:${address.port}`
+  const request = (url: string, token?: string, body?: unknown, extra?: Record<string, string>) =>
+    fetch(base + url, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: {
+        ...(token ? { cookie: `dango_profile=${token}` } : {}),
+        'content-type': 'application/json',
+        ...extra,
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  try {
+    assert.deepEqual(
+      (await (await request('/api/trpc/auth.allowedOrigins', ownerToken)).json()).result.data
+        .origins,
+      []
+    )
+    assert.equal((await request('/api/trpc/auth.allowedOrigins', memberToken)).status, 403)
+    assert.equal(
+      (
+        await request('/api/trpc/auth.setAllowedOrigins', memberToken, {
+          origins: 'https://evil.example',
+        })
+      ).status,
+      403
+    )
+    const set = await request('/api/trpc/auth.setAllowedOrigins', ownerToken, {
+      origins: 'https://dango.example, https://other.example,',
+    })
+    assert.equal(set.status, 200)
+    assert.deepEqual(
+      (await (await request('/api/trpc/auth.allowedOrigins', ownerToken)).json()).result.data
+        .origins,
+      ['https://dango.example', 'https://other.example']
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/profiles/update',
+          ownerToken,
+          { name: 'X' },
+          {
+            origin: 'https://dango.example',
+          }
+        )
+      ).status,
+      200
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/profiles/update',
+          ownerToken,
+          { name: 'X' },
+          {
+            origin: 'https://untrusted.example',
+          }
+        )
+      ).status,
+      403
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/profiles/update',
+          ownerToken,
+          { name: 'X' },
+          {
+            origin: 'https://untrusted.example',
+            'sec-fetch-site': 'cross-site',
+          }
+        )
+      ).status,
+      403
+    )
+    assert.equal(INSTALL_CONFIG.ALLOWED_ORIGINS.length, 2)
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    )
+    await store.close()
+    INSTALL_CONFIG.APP_PASSWORD_HASH = previousHash
+    if (previousEnvHash === undefined) delete process.env.APP_PASSWORD_HASH
+    else process.env.APP_PASSWORD_HASH = previousEnvHash
+    INSTALL_CONFIG.ALLOWED_ORIGINS = previousOrigins
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})

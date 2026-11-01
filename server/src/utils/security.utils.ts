@@ -74,11 +74,29 @@ export function isSafeExternalUrl(rawUrl: unknown): { safe: boolean; url?: URL; 
   return { safe: true, url: parsed }
 }
 
+export function requestOrigin(
+  requestUrl: string,
+  forwardedProto?: string,
+  forwardedHost?: string
+): string {
+  const first = (value?: string) => value?.split(',')[0]?.trim()
+  const host = first(forwardedHost)
+  if (!host) return requestUrl
+  try {
+    const fallback = new URL(requestUrl)
+    const proto = first(forwardedProto) || fallback.protocol.slice(0, -1)
+    return new URL(`${proto}://${host}`).origin
+  } catch {
+    return requestUrl
+  }
+}
+
 export function isAllowedOrigin(origin: string | undefined, requestUrl?: string): boolean {
   if (!origin) return true // Non-browser clients, same-origin, or mobile webview
 
   try {
     const parsed = new URL(origin)
+    if (CONFIG.ALLOWED_ORIGINS.includes(parsed.origin)) return true
     if (!requestUrl) return false
     const request = new URL(requestUrl)
     if (parsed.origin === request.origin) return true

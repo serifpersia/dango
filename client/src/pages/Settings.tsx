@@ -17,6 +17,7 @@ import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmarklet'
 import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ServerPortSettings from '../components/settings/ServerPortSettings'
+import AllowedOriginsSettings from '../components/settings/AllowedOriginsSettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
 import Icon from '../components/common/Icon'
 import { trpcClient } from '../lib/trpc'
@@ -610,6 +611,7 @@ const Settings: React.FC = () => {
           <div className={styles.tabContent}>
             {profile?.owner && <LanAuthSettings />}
             {profile?.owner && <ServerPortSettings />}
+            {profile?.owner && <AllowedOriginsSettings />}
           </div>
         )
       case 'sync':

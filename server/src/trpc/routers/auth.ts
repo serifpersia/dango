@@ -4,7 +4,7 @@ import { getGoogleDriveService } from '../../google.js'
 import { getGitHubSyncService } from '../../github-sync.js'
 import type { DatabaseWrapper } from '../../db.js'
 import { initSyncProvider, getActiveProvider, runFullSyncSequence } from '../../sync.js'
-import { CONFIG } from '../../config.js'
+import { CONFIG, INSTALL_CONFIG, parseAllowedOrigins } from '../../config.js'
 import { getRcloneService } from '../../rclone.js'
 import { updateEnvFile } from '../../utils/env.utils.js'
 import { protectedProcedure, ownerProcedure, router } from '../index.js'
@@ -57,6 +57,11 @@ const rcloneSaveInput = () =>
 const serverPortInput = () =>
   defineSchema<{ port?: unknown }, { port?: unknown }>((value) => ({
     port: reqObj(value).port,
+  }))
+
+const allowedOriginsInput = () =>
+  defineSchema<{ origins?: unknown }, { origins?: unknown }>((value) => ({
+    origins: reqObj(value).origins,
   }))
 
 export const authRouter = router({
@@ -203,6 +208,20 @@ export const authRouter = router({
     await updateEnvFile({ PORT: String(port) })
     logger.info({ port }, 'Server port saved. Restart required to apply.')
     return { success: true, port }
+  }),
+
+  allowedOrigins: ownerProcedure.query(async () => {
+    return { origins: CONFIG.ALLOWED_ORIGINS }
+  }),
+
+  setAllowedOrigins: ownerProcedure.input(allowedOriginsInput()).mutation(async ({ input }) => {
+    const raw = Array.isArray(input.origins)
+      ? input.origins.map((value) => String(value)).join(',')
+      : String(input.origins ?? '')
+    const origins = parseAllowedOrigins(raw)
+    await updateEnvFile({ ALLOWED_ORIGINS: origins.join(',') })
+    INSTALL_CONFIG.ALLOWED_ORIGINS = origins
+    return { origins }
   }),
 
   googleLogin: protectedProcedure.mutation(async ({ ctx }) => {
