@@ -185,21 +185,20 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
   )
 
   const renderQuality = () => {
-    const links =
-      currentSource?.links.sort(
-        (a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-      ) || []
+    const links = [...(currentSource?.links ?? [])].sort(
+      (a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+    )
     return (
       <div className={styles.menuContent}>
         <OptionListMenu
           classes={{ item: styles.menuItem, active: styles.selected }}
           options={links.map((link) => ({
-            key: link.resolutionStr,
+            key: link.link,
             label: link.resolutionStr,
-            selected: currentLink?.resolutionStr === link.resolutionStr,
+            selected: currentLink?.link === link.link,
           }))}
           onSelect={(key) => {
-            const link = links.find((l) => l.resolutionStr === key)
+            const link = links.find((l) => l.link === key)
             if (link) onSourceChange(currentSource!, link)
           }}
         />

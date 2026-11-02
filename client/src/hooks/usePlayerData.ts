@@ -127,7 +127,7 @@ async function fetchVideoSources(
 
     const selectedLink =
       sourceToSelect && sourceToSelect.links.length > 0
-        ? sourceToSelect.links.sort(
+        ? [...sourceToSelect.links].sort(
             (a: VideoLink, b: VideoLink) =>
               (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
           )[0]
