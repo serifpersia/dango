@@ -30,8 +30,10 @@ interface UsePlayerDataReturn {
   setPreferredSource: (sourceName: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
   markEpisodeWatched: (episodeNumber: string, duration: number) => Promise<void>
+  resetEpisodeProgress: (episodeNumber: string) => Promise<void>
   prefetchEpisodeSources: (episodeNumber: string, targetShowId?: string) => void
   isMarkingWatched: boolean
+  isResettingProgress: boolean
   isUpdatingWatchlistStatus: boolean
 }
 
@@ -510,6 +512,27 @@ export const usePlayerData = (
     [showId, showMeta, playerData?.episodes, markEpisodeWatchedMutation]
   )
 
+  const { mutateAsync: resetEpisodeProgressMutation, isPending: isResettingProgress } = useMutation({
+    mutationFn: async ({ episodeNumber }: { episodeNumber: string }) => {
+      await trpcClient.progress.resetProgress.mutate({ showId: showId ?? '', episodeNumber })
+    },
+    onSuccess: () => {
+      toast.success('Episode progress reset')
+      queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
+      queryClient.invalidateQueries({ queryKey: [qk.showMeta, showId] })
+      queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
+    },
+    onError: () => toast.error('Failed to reset progress'),
+  })
+
+  const resetEpisodeProgress = useCallback(
+    async (episodeNumber: string) => {
+      if (!showId) return
+      await resetEpisodeProgressMutation({ episodeNumber })
+    },
+    [showId, resetEpisodeProgressMutation]
+  )
+
   const handleToggleDetails = useCallback(async () => {
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !uiState.showCombinedDetails } })
   }, [uiState.showCombinedDetails])
@@ -628,8 +651,10 @@ export const usePlayerData = (
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
+    resetEpisodeProgress,
     prefetchEpisodeSources,
     isMarkingWatched,
+    isResettingProgress,
     isUpdatingWatchlistStatus,
   }
 }

@@ -100,8 +100,10 @@ const Player: React.FC = () => {
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
+    resetEpisodeProgress,
     prefetchEpisodeSources,
     isMarkingWatched,
+    isResettingProgress,
     isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
     hasMatureConsent,
@@ -617,8 +619,16 @@ const Player: React.FC = () => {
         >
           <Icon name="list-ul" size={12} />
           Episodes
-        </button>
-      )}
+                      </button>
+                    )}
+                    <button
+                      className={`${styles.watchlistBtn}`}
+                      onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
+                      disabled={isResettingProgress || !state.currentEpisode}
+                    >
+                      <Icon name="undo" size={14} />
+                      {isResettingProgress ? 'Resetting...' : 'Reset Progress'}
+                    </button>
     </div>
   )
 

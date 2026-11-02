@@ -20,7 +20,7 @@ import { useProviders } from '../hooks/useProviders'
 import {
   useAddTvBookmark,
   useSaveTvProgress,
-  useTvLatestProgress,
+  useRemoveTvProgress,  useTvLatestProgress,
   useTvProgress,
   useToggleTvBookmark,
   useUpdateTvStatus,
@@ -402,6 +402,7 @@ const Tv: React.FC = () => {
   ])
   const roomPlayer = useWatchAlongPlayer(player.engine, roomSelection, streamLoading || !details)
   const saveProgress = useSaveTvProgress()
+  const resetProgress = useRemoveTvProgress()
   const updateTvStatus = useUpdateTvStatus()
   const addTvBookmark = useAddTvBookmark()
   const {
@@ -2406,7 +2407,7 @@ const Tv: React.FC = () => {
                   {!isMovie && (
                     <>
                       <button
-                        className={`${playerStyles.watchlistBtn}`}
+                        className={`${playerStyles.episodeNavBtn} ${playerStyles.secondary}`}
                         onClick={() =>
                           prevEpisodeNumber != null &&
                           handleTvEpisodeClick(String(prevEpisodeNumber))
@@ -2418,7 +2419,7 @@ const Tv: React.FC = () => {
                         Prev EP
                       </button>
                       <button
-                        className={`${playerStyles.watchlistBtn}`}
+                        className={`${playerStyles.episodeNavBtn} ${playerStyles.primary}`}
                         onClick={() =>
                           nextEpisodeNumber != null &&
                           handleTvEpisodeClick(String(nextEpisodeNumber))
@@ -2449,6 +2450,17 @@ const Tv: React.FC = () => {
                           Episodes
                         </button>
                       )}
+                      <button
+                        className={`${playerStyles.watchlistBtn}`}
+                        onClick={() =>
+                          resetProgress.mutate({ mediaId: mediaId ?? '', season, episode })
+                        }
+                        disabled={resetProgress.isPending}
+                        type="button"
+                      >
+                        <Icon name="undo" size={14} />
+                        {resetProgress.isPending ? 'Resetting...' : 'Reset Progress'}
+                      </button>
                     </>
                   )}
                 </div>

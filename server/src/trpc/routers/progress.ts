@@ -81,6 +81,14 @@ export const progressRouter = router({
     return WatchedEpisodesRepository.getWatchedEpisodeNumbers(ctx.db, showId)
   }),
 
+  resetProgress: protectedProcedure.input(episodeProgressInput()).mutation(async ({ ctx, input }) => {
+    const showId = await getMigratedId(ctx.db, input.showId)
+    await performWriteTransactionAsync(ctx.db, async (tx) => {
+      await WatchedEpisodesRepository.deleteByShowAndEpisode(tx, showId, input.episodeNumber)
+    })
+    return { success: true }
+  }),
+
   updateProgress: protectedProcedure
     .input(progressUpdateInput())
     .mutation(async ({ ctx, input }) => {
