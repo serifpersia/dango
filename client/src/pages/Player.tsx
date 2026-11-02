@@ -8,8 +8,12 @@ import layoutStyles from '../components/player/PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
 import FadeImage from '../components/common/FadeImage'
-import { fixThumbnailUrl } from '../lib/utils'
-import { isProgressCompleted, storeAutoplayEnabled } from '../lib/playbackCompletion'
+import { fixThumbnailUrl, formatTime } from '../lib/utils'
+import {
+  isProgressCompleted,
+  loadWatchedOverlayEnabled,
+  storeAutoplayEnabled,
+} from '../lib/playbackCompletion'
 import { type SubtitleStyleSettings } from '../lib/subtitleStyle'
 import { Modal } from '../components/common/Modal'
 import CompletionModal from '../components/common/CompletionModal'
@@ -208,8 +212,10 @@ const Player: React.FC = () => {
   const delayCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const [replayRequested, setReplayRequested] = useState(false)
+  const [watchedResumeTime, setWatchedResumeTime] = useState<number | null>(null)
   useEffect(() => {
     setReplayRequested(false)
+    setWatchedResumeTime(null)
   }, [showId, state.currentEpisode])
 
   const episodeKey = `${showId ?? ''}:${state.currentEpisode ?? ''}`
@@ -235,13 +241,27 @@ const Player: React.FC = () => {
   ])
 
   const episodeProgressCompleted = watchedAtEntry?.key === episodeKey && watchedAtEntry.watched
-  const showWatchedOverlay =
+  const [watchedOverlayEnabled] = useState(loadWatchedOverlayEnabled)
+  const [watchedPopupDismissed, setWatchedPopupDismissed] = useState(false)
+  useEffect(() => {
+    setWatchedPopupDismissed(false)
+  }, [showId, state.currentEpisode])
+  const watchedEpisodePrompt =
     !inRoom &&
     !testClipActive &&
     episodeProgressCompleted &&
     state.videoSources.length > 0 &&
     !replayRequested
-  const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
+  const showWatchedOverlay = watchedEpisodePrompt && watchedOverlayEnabled
+  const showWatchedPopup = watchedEpisodePrompt && !watchedOverlayEnabled && !watchedPopupDismissed
+  const handleReplayWatchedEpisode = useCallback(() => {
+    setWatchedResumeTime(null)
+    setReplayRequested(true)
+  }, [])
+  const handleResumeWatchedEpisode = useCallback(() => {
+    setWatchedResumeTime(state.resumeTime)
+    setReplayRequested(true)
+  }, [state.resumeTime])
 
   const upscaler = useAnime4K({
     videoRef: refs.videoRef,
@@ -369,11 +389,15 @@ const Player: React.FC = () => {
 
   const shouldShowResumeModal = !inRoom && state.showResumeModal && !state.resumeProgressPending
   const shouldShowCompleteModal = showCompleteModal
-  const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal
+  const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal || showWatchedPopup
 
   useAutoRotateFullscreen(
     player,
-    !!state.selectedLink && !isTheaterMode && !shouldPauseForModal && !showWatchedOverlay
+    !!state.selectedLink &&
+      !isTheaterMode &&
+      !shouldPauseForModal &&
+      !showWatchedOverlay &&
+      !showWatchedPopup
   )
 
   const {
@@ -414,7 +438,8 @@ const Player: React.FC = () => {
     resumeDuration: state.resumeDuration,
     showResumeModal: !inRoom && state.showResumeModal,
     disabled: showWatchedOverlay,
-    startOver: replayRequested,
+    startOver: replayRequested && watchedResumeTime == null,
+    resumeAt: watchedResumeTime,
     calibReturnRef,
     setAvailableSubtitles: actions.setAvailableSubtitles,
     setActiveSubtitleTrack: actions.setActiveSubtitleTrack,
@@ -422,10 +447,10 @@ const Player: React.FC = () => {
   })
 
   useEffect(() => {
-    if (shouldPauseForModal && player.state.isFullscreen) {
+    if ((shouldPauseForModal || showWatchedOverlay) && player.state.isFullscreen) {
       player.actions.toggleFullscreen()
     }
-  }, [shouldPauseForModal, player.state.isFullscreen, player.actions])
+  }, [shouldPauseForModal, showWatchedOverlay, player.state.isFullscreen, player.actions])
 
   useEffect(() => {
     if (shouldPauseForModal && refs.videoRef.current) {
@@ -676,6 +701,24 @@ const Player: React.FC = () => {
         <Button onClick={handleMoveToCompletedAndNavigate} disabled={isUpdatingWatchlistStatus}>
           {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
         </Button>
+      </CompletionModal>
+
+      <CompletionModal
+        isOpen={showWatchedPopup}
+        onClose={() => setWatchedPopupDismissed(true)}
+        title="Episode Completed"
+        heading={state.currentEpisode ? `Episode ${state.currentEpisode}` : displayTitle}
+        message="You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
+      >
+        {state.resumeTime > 5 && (
+          <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+            {`Resume ${formatTime(state.resumeTime)}`}
+          </Button>
+        )}
+        <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
+          Replay
+        </Button>
+        {nextEpisode && <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>}
       </CompletionModal>
 
       <ResumeModal
@@ -1004,15 +1047,30 @@ const Player: React.FC = () => {
                     {state.currentEpisode ? `Episode ${state.currentEpisode} watched` : 'Watched'}
                   </p>
                   <p className={styles.watchedSubtext}>
-                    Replay from the beginning or continue with the next episode.
+                    Resume where you left off, replay from the beginning, or continue with the next
+                    episode.
                   </p>
                   <div className={styles.watchedActions}>
-                    <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
-                    {nextEpisode && (
-                      <Button variant="secondary" onClick={handleNextEpisode}>
-                        Next Episode
+                    <div>
+                      {state.resumeTime > 5 && (
+                        <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+                          {`Resume ${formatTime(state.resumeTime)}`}
+                        </Button>
+                      )}
+                    </div>
+                    <div>
+                      {nextEpisode && (
+                        <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>
+                      )}
+                    </div>
+                    <div>
+                      <Button
+                        variant={nextEpisode ? 'secondary' : undefined}
+                        onClick={handleReplayWatchedEpisode}
+                      >
+                        Replay
                       </Button>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}

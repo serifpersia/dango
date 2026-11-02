@@ -31,6 +31,7 @@ import {
   hasResumableProgress,
   isProgressCompleted,
   loadAutoplayEnabled,
+  loadWatchedOverlayEnabled,
   storeAutoplayEnabled,
 } from '../lib/playbackCompletion'
 import { formatTime } from '../lib/utils'
@@ -488,7 +489,14 @@ const Tv: React.FC = () => {
   }, [resumeFetched, episodeKey, savedCompleted, savedCt, savedDuration])
   const episodeWatched =
     resumeFetched && watchedAtEntry?.key === episodeKey && watchedAtEntry.watched
-  const showWatchedOverlay = !inRoom && !testClipActive && episodeWatched && !replayRequested
+  const [watchedOverlayEnabled] = useState(loadWatchedOverlayEnabled)
+  const [watchedPopupDismissed, setWatchedPopupDismissed] = useState(false)
+  useEffect(() => {
+    setWatchedPopupDismissed(false)
+  }, [episodeKey])
+  const watchedEpisodePrompt = !inRoom && !testClipActive && episodeWatched && !replayRequested
+  const showWatchedOverlay = watchedEpisodePrompt && watchedOverlayEnabled
+  const showWatchedPopup = watchedEpisodePrompt && !watchedOverlayEnabled && !watchedPopupDismissed
   const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
 
   useEffect(() => {
@@ -514,7 +522,8 @@ const Tv: React.FC = () => {
       !isTheaterMode &&
       !showResumeModal &&
       !showCompleteModal &&
-      !showWatchedOverlay
+      !showWatchedOverlay &&
+      !showWatchedPopup
   )
   const isMobile = useIsMobile()
   const [isAutoplayEnabled, setIsAutoplayEnabled] = useState(loadAutoplayEnabled)
@@ -526,13 +535,21 @@ const Tv: React.FC = () => {
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedTimeRef = useRef(0)
   const pendingSeekRef = useRef<number | null>(null)
+  const handleResumeWatchedEpisode = useCallback(() => {
+    pendingSeekRef.current = savedCt
+    setReplayRequested(true)
+  }, [savedCt])
   const streamKeyRef = useRef('')
   const hasSavedResumableProgress = hasResumableProgress(savedCt)
   const playbackPromptBlocked =
     !inRoom &&
     !hasResumedRef.current &&
     !replayRequested &&
-    (showResumeModal || showCompleteModal || hasSavedResumableProgress || showWatchedOverlay)
+    (showResumeModal ||
+      showCompleteModal ||
+      hasSavedResumableProgress ||
+      showWatchedOverlay ||
+      showWatchedPopup)
   const playbackPromptBlockedRef = useRef(playbackPromptBlocked)
   playbackPromptBlockedRef.current = playbackPromptBlocked
   const resumeCheckedRef = useRef(false)
@@ -873,6 +890,18 @@ const Tv: React.FC = () => {
       videoRef.current.pause()
     }
   }, [showResumeModal, videoRef, inRoom])
+
+  useEffect(() => {
+    if (!inRoom && showWatchedPopup && videoRef.current) {
+      videoRef.current.pause()
+    }
+  }, [showWatchedPopup, videoRef, inRoom])
+
+  useEffect(() => {
+    if ((showWatchedOverlay || showWatchedPopup) && player.state.isFullscreen) {
+      player.actions.toggleFullscreen()
+    }
+  }, [showWatchedOverlay, showWatchedPopup, player.state.isFullscreen, player.actions])
 
   useEffect(() => {
     const video = videoRef.current
@@ -2182,19 +2211,40 @@ const Tv: React.FC = () => {
                           {isMovie ? 'Movie watched' : `S${season} E${episode} watched`}
                         </p>
                         <p className={styles.watchedSubtext}>
-                          Replay from the beginning or continue with the next episode.
+                          Resume where you left off, replay from the beginning, or continue with the
+                          next episode.
                         </p>
                         <div className={styles.watchedActions}>
-                          <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
-                          {nextEpisodeNumber != null ? (
-                            <Button variant="secondary" onClick={handleWatchNextEpisode}>
-                              Next Episode
+                          <div>
+                            {savedCt > 5 && (
+                              <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+                                {`Resume ${formatTime(savedCt)}`}
+                              </Button>
+                            )}
+                          </div>
+                          <div>
+                            {nextEpisodeNumber != null ? (
+                              <Button onClick={handleWatchNextEpisode}>
+                                {`Watch EP ${nextEpisodeNumber}`}
+                              </Button>
+                            ) : nextSeasonNumber != null ? (
+                              <Button onClick={handleStartNextSeason}>
+                                {`Start Season ${nextSeasonNumber}`}
+                              </Button>
+                            ) : null}
+                          </div>
+                          <div>
+                            <Button
+                              variant={
+                                nextEpisodeNumber != null || nextSeasonNumber != null
+                                  ? 'secondary'
+                                  : undefined
+                              }
+                              onClick={handleReplayWatchedEpisode}
+                            >
+                              Replay
                             </Button>
-                          ) : nextSeasonNumber != null ? (
-                            <Button variant="secondary" onClick={handleStartNextSeason}>
-                              Next Season
-                            </Button>
-                          ) : null}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2506,6 +2556,32 @@ const Tv: React.FC = () => {
           onResume={handleResume}
           onRestart={handleSkipResume}
         />
+
+        <CompletionModal
+          isOpen={showWatchedPopup}
+          onClose={() => setWatchedPopupDismissed(true)}
+          title="Episode Completed"
+          heading={isMovie ? (details?.title ?? 'Movie') : `S${season} E${episode}`}
+          message={
+            isMovie
+              ? "You've already watched this movie. Resume where you left off or replay it."
+              : "You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
+          }
+        >
+          {savedCt > 5 && (
+            <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+              {`Resume ${formatTime(savedCt)}`}
+            </Button>
+          )}
+          <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
+            Replay
+          </Button>
+          {nextEpisodeNumber != null ? (
+            <Button onClick={handleWatchNextEpisode}>Watch EP {nextEpisodeNumber}</Button>
+          ) : nextSeasonNumber != null ? (
+            <Button onClick={handleStartNextSeason}>Start Season {nextSeasonNumber}</Button>
+          ) : null}
+        </CompletionModal>
 
         <CompletionModal
           isOpen={showCompleteModal}

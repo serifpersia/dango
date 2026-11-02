@@ -45,6 +45,32 @@
   color: var(--text-primary);
 }
 
+.closeButton {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.closeButton:hover {
+  opacity: 1;
+  background-color: var(--bg-tertiary);
+}
+
 .body {
   color: var(--text-secondary);
 }

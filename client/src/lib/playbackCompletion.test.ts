@@ -5,7 +5,9 @@ import {
   hasResumableProgress,
   isPlaybackEnded,
   loadAutoplayEnabled,
+  loadWatchedOverlayEnabled,
   storeAutoplayEnabled,
+  storeWatchedOverlayEnabled,
 } from './playbackCompletion'
 
 describe('isProgressCompleted', () => {
@@ -58,5 +60,13 @@ describe('autoplay setting', () => {
     expect(loadAutoplayEnabled()).toBe(false)
     storeAutoplayEnabled(true)
     expect(loadAutoplayEnabled()).toBe(true)
+  })
+
+  it('defaults the watched overlay to on and round-trips', () => {
+    expect(loadWatchedOverlayEnabled()).toBe(true)
+    storeWatchedOverlayEnabled(false)
+    expect(loadWatchedOverlayEnabled()).toBe(false)
+    storeWatchedOverlayEnabled(true)
+    expect(loadWatchedOverlayEnabled()).toBe(true)
   })
 })

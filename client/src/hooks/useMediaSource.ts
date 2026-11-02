@@ -17,6 +17,7 @@ interface UseMediaSourceOptions {
   showResumeModal: boolean
   disabled?: boolean
   startOver?: boolean
+  resumeAt?: number | null
   calibReturnRef: { current: number | null }
   setAvailableSubtitles: (tracks: SubtitleTrack[]) => void
   setActiveSubtitleTrack: (track: string) => void
@@ -37,6 +38,7 @@ export function useMediaSource({
   showResumeModal,
   disabled = false,
   startOver = false,
+  resumeAt = null,
   calibReturnRef,
   setAvailableSubtitles,
   setActiveSubtitleTrack,
@@ -78,6 +80,8 @@ export function useMediaSource({
     } else if (calibReturnRef.current != null) {
       seekToTimeRef.current = calibReturnRef.current
       calibReturnRef.current = null
+    } else if (seekToTimeRef.current === null && resumeAt != null) {
+      seekToTimeRef.current = resumeAt
     } else if (
       seekToTimeRef.current === null &&
       resumeTimeRef.current > 5 &&
@@ -147,6 +151,7 @@ export function useMediaSource({
         initialTime: targetTime,
         autoPlay:
           startOver ||
+          resumeAt != null ||
           (!(showResumeModalRef.current && resumeTimeRef.current > 5) &&
             !isProgressCompleted(resumeTimeRef.current, resumeDurationRef.current)),
         hlsConfig: {
@@ -176,6 +181,7 @@ export function useMediaSource({
     testClipActive,
     disabled,
     startOver,
+    resumeAt,
     setActiveSubtitleTrack,
     setAvailableSubtitles,
   ])

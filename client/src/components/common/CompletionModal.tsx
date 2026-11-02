@@ -1,6 +1,7 @@
 import React from 'react'
 import { Modal } from './Modal'
 import Icon from './Icon'
+import styles from './Modal.module.css'
 
 interface CompletionModalProps {
   isOpen: boolean
@@ -21,6 +22,9 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 }) => (
   <Modal isOpen={isOpen} onClose={onClose} title={title} width="sm">
     <div style={{ padding: '1rem', textAlign: 'center' }}>
+      <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close">
+        <Icon name="times" size={16} />
+      </button>
       <Icon
         name="check-circle"
         size={48}

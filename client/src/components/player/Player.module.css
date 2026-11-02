@@ -692,9 +692,31 @@
 }
 
 .watchedActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
   margin-top: 0.5rem;
+  width: 100%;
+  max-width: 560px;
+}
+
+.watchedActions > :first-child {
+  justify-self: end;
+}
+
+.watchedActions > :last-child {
+  justify-self: start;
+}
+
+@media (max-width: 480px) {
+  .watchedActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .watchedActions > div {
+    display: contents;
+  }
 }

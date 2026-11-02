@@ -30,6 +30,7 @@ import {
   VIRTUAL_KEYBOARD_ENABLED_KEY,
 } from '../hooks/useVirtualKeyboard'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
+import { loadWatchedOverlayEnabled, storeWatchedOverlayEnabled } from '../lib/playbackCompletion'
 import { Alert } from '../components/common/Alert'
 import { useContentType } from '../contexts/ContentTypeContext'
 import { useMatureConsent } from '../hooks/useMatureConsent'
@@ -74,6 +75,7 @@ const Settings: React.FC = () => {
   } = useMatureConsent()
   const [showMatureConsentModal, setShowMatureConsentModal] = useState(false)
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
+  const [watchedOverlayEnabled, setWatchedOverlayEnabled] = useState(loadWatchedOverlayEnabled)
 
   const [discordEnabled, setDiscordEnabled] = useState(true)
   const { data: discordSetting } = useSetting('discordRPCEnabled')
@@ -148,6 +150,11 @@ const Settings: React.FC = () => {
     setVirtualKeyboardEnabled(enabled)
     profileStorage.setItem(VIRTUAL_KEYBOARD_ENABLED_KEY, String(enabled))
     window.dispatchEvent(new CustomEvent(VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT))
+  }
+
+  const toggleWatchedOverlay = (enabled: boolean) => {
+    setWatchedOverlayEnabled(enabled)
+    storeWatchedOverlayEnabled(enabled)
   }
 
   React.useEffect(() => {
@@ -305,6 +312,29 @@ const Settings: React.FC = () => {
                     isChecked={lowEndMode}
                     onChange={(e) => setLowEndMode(e.currentTarget.checked)}
                     id="low-end-mode"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Watched Episode Overlay</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Shows watched and completed episodes as an overlay on the player. Turn this
+                      off to use a popup instead.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={watchedOverlayEnabled}
+                    onChange={(e) => toggleWatchedOverlay(e.currentTarget.checked)}
+                    id="watched-overlay-enabled"
                   />
                 </div>
               </div>
