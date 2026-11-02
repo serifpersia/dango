@@ -120,9 +120,11 @@ export const WatchedEpisodesRepository = {
     getDrizzle(db).delete(watchedEpisodes).where(eq(watchedEpisodes.showId, showId)),
 
   deleteByShowAndEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
-    getDrizzle(db).delete(watchedEpisodes).where(
-      sql`${watchedEpisodes.showId} = ${showId} AND ${watchedEpisodes.episodeNumber} = ${episodeNumber}`
-    ),
+    getDrizzle(db)
+      .delete(watchedEpisodes)
+      .where(
+        sql`${watchedEpisodes.showId} = ${showId} AND ${watchedEpisodes.episodeNumber} = ${episodeNumber}`
+      ),
 
   getContinueWatching: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''

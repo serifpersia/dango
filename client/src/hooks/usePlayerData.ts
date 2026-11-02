@@ -512,18 +512,20 @@ export const usePlayerData = (
     [showId, showMeta, playerData?.episodes, markEpisodeWatchedMutation]
   )
 
-  const { mutateAsync: resetEpisodeProgressMutation, isPending: isResettingProgress } = useMutation({
-    mutationFn: async ({ episodeNumber }: { episodeNumber: string }) => {
-      await trpcClient.progress.resetProgress.mutate({ showId: showId ?? '', episodeNumber })
-    },
-    onSuccess: () => {
-      toast.success('Episode progress reset')
-      queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
-      queryClient.invalidateQueries({ queryKey: [qk.showMeta, showId] })
-      queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
-    },
-    onError: () => toast.error('Failed to reset progress'),
-  })
+  const { mutateAsync: resetEpisodeProgressMutation, isPending: isResettingProgress } = useMutation(
+    {
+      mutationFn: async ({ episodeNumber }: { episodeNumber: string }) => {
+        await trpcClient.progress.resetProgress.mutate({ showId: showId ?? '', episodeNumber })
+      },
+      onSuccess: () => {
+        toast.success('Episode progress reset')
+        queryClient.invalidateQueries({ queryKey: [qk.playerData, showId] })
+        queryClient.invalidateQueries({ queryKey: [qk.showMeta, showId] })
+        queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
+      },
+      onError: () => toast.error('Failed to reset progress'),
+    }
+  )
 
   const resetEpisodeProgress = useCallback(
     async (episodeNumber: string) => {

@@ -619,16 +619,16 @@ const Player: React.FC = () => {
         >
           <Icon name="list-ul" size={12} />
           Episodes
-                      </button>
-                    )}
-                    <button
-                      className={`${styles.watchlistBtn}`}
-                      onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
-                      disabled={isResettingProgress || !state.currentEpisode}
-                    >
-                      <Icon name="undo" size={14} />
-                      {isResettingProgress ? 'Resetting...' : 'Reset Progress'}
-                    </button>
+        </button>
+      )}
+      <button
+        className={`${styles.watchlistBtn}`}
+        onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
+        disabled={isResettingProgress || !state.currentEpisode}
+      >
+        <Icon name="undo" size={14} />
+        {isResettingProgress ? 'Resetting...' : 'Reset Progress'}
+      </button>
     </div>
   )
 
@@ -729,6 +729,11 @@ const Player: React.FC = () => {
           Replay
         </Button>
         {nextEpisode && <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>}
+        {!nextEpisode && (
+          <Button onClick={handleMoveToCompletedAndNavigate} disabled={isUpdatingWatchlistStatus}>
+            {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
+          </Button>
+        )}
       </CompletionModal>
 
       <ResumeModal
@@ -1072,12 +1077,17 @@ const Player: React.FC = () => {
                       {nextEpisode && (
                         <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>
                       )}
+                      {!nextEpisode && (
+                        <Button
+                          onClick={handleMoveToCompletedAndNavigate}
+                          disabled={isUpdatingWatchlistStatus}
+                        >
+                          {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
+                        </Button>
+                      )}
                     </div>
                     <div>
-                      <Button
-                        variant={nextEpisode ? 'secondary' : undefined}
-                        onClick={handleReplayWatchedEpisode}
-                      >
+                      <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
                         Replay
                       </Button>
                     </div>

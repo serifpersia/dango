@@ -20,7 +20,8 @@ import { useProviders } from '../hooks/useProviders'
 import {
   useAddTvBookmark,
   useSaveTvProgress,
-  useRemoveTvProgress,  useTvLatestProgress,
+  useRemoveTvProgress,
+  useTvLatestProgress,
   useTvProgress,
   useToggleTvBookmark,
   useUpdateTvStatus,
@@ -2235,16 +2236,19 @@ const Tv: React.FC = () => {
                             ) : null}
                           </div>
                           <div>
-                            <Button
-                              variant={
-                                nextEpisodeNumber != null || nextSeasonNumber != null
-                                  ? 'secondary'
-                                  : undefined
-                              }
-                              onClick={handleReplayWatchedEpisode}
-                            >
+                            <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
                               Replay
                             </Button>
+                            {nextEpisodeNumber == null && nextSeasonNumber == null && (
+                              <Button
+                                onClick={handleMoveTvToCompletedAndHome}
+                                disabled={updateTvStatus.isPending || addTvBookmark.isPending}
+                              >
+                                {updateTvStatus.isPending || addTvBookmark.isPending
+                                  ? 'Saving...'
+                                  : 'Move to Completed'}
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2592,7 +2596,16 @@ const Tv: React.FC = () => {
             <Button onClick={handleWatchNextEpisode}>Watch EP {nextEpisodeNumber}</Button>
           ) : nextSeasonNumber != null ? (
             <Button onClick={handleStartNextSeason}>Start Season {nextSeasonNumber}</Button>
-          ) : null}
+          ) : (
+            <Button
+              onClick={handleMoveTvToCompletedAndHome}
+              disabled={updateTvStatus.isPending || addTvBookmark.isPending}
+            >
+              {updateTvStatus.isPending || addTvBookmark.isPending
+                ? 'Saving...'
+                : 'Move to Completed'}
+            </Button>
+          )}
         </CompletionModal>
 
         <CompletionModal
