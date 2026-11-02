@@ -471,8 +471,23 @@ const Tv: React.FC = () => {
 
   const savedDuration = (savedProgress as { duration?: number } | undefined)?.duration ?? 0
   const savedCompleted = (savedProgress as { completed?: number } | undefined)?.completed === 1
+  const episodeKey = `${mediaId}:${season}:${episode}`
+  const [watchedAtEntry, setWatchedAtEntry] = useState<{ key: string; watched: boolean } | null>(
+    null
+  )
+  useEffect(() => {
+    if (!resumeFetched) return
+    setWatchedAtEntry((prev) =>
+      prev?.key === episodeKey
+        ? prev
+        : {
+            key: episodeKey,
+            watched: savedCompleted || isProgressCompleted(savedCt, savedDuration),
+          }
+    )
+  }, [resumeFetched, episodeKey, savedCompleted, savedCt, savedDuration])
   const episodeWatched =
-    resumeFetched && (savedCompleted || isProgressCompleted(savedCt, savedDuration))
+    resumeFetched && watchedAtEntry?.key === episodeKey && watchedAtEntry.watched
   const showWatchedOverlay = !inRoom && !testClipActive && episodeWatched && !replayRequested
   const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
 
@@ -692,7 +707,7 @@ const Tv: React.FC = () => {
   const { checkEnd, logDuration } = usePlaybackEnd({
     videoRef,
     sourceType: isEmbedProvider ? 'iframe' : undefined,
-    resetKey: `${mediaId}:${season}:${episode}`,
+    resetKey: `${mediaId}:${season}:${episode}:${replayRequested}`,
     onEnd: handleVideoEnded,
   })
 
@@ -2105,86 +2120,85 @@ const Tv: React.FC = () => {
                   onAmbientChange={updateAmbient}
                   hideChrome={showWatchedOverlay}
                 >
-                  {showWatchedOverlay ? (
-                    <div className={styles.watchedOverlay}>
-                      <Icon
-                        name="check-circle"
-                        size={48}
-                        style={{ color: 'var(--accent-lighter)' }}
-                      />
-                      <p className={styles.watchedTitle}>
-                        {isMovie ? 'Movie watched' : `S${season} E${episode} watched`}
-                      </p>
-                      <p className={styles.watchedSubtext}>
-                        Replay from the beginning or continue with the next episode.
-                      </p>
-                      <div className={styles.watchedActions}>
-                        <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
-                        {nextEpisodeNumber != null ? (
-                          <Button variant="secondary" onClick={handleWatchNextEpisode}>
-                            Next Episode
-                          </Button>
-                        ) : nextSeasonNumber != null ? (
-                          <Button variant="secondary" onClick={handleStartNextSeason}>
-                            Next Season
-                          </Button>
-                        ) : null}
+                  <>
+                    <PlayerVideo
+                      autoPlay={!inRoom && resumeChecked && !playbackPromptBlocked}
+                      playsInline
+                      disablePictureInPicture
+                      className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
+                      onTimeUpdate={() => {
+                        if (testClipActive) return
+                        handleVideoTimeUpdate()
+                        checkEnd()
+                      }}
+                      onEnded={() => {
+                        if (!testClipActive) checkEnd(true)
+                      }}
+                      onPlay={handleVideoPlay}
+                      onPause={handleVideoPause}
+                      onSeeked={() => {
+                        if (testClipActive) return
+                        updateNextEpisodePrompt()
+                        checkEnd()
+                      }}
+                      onLoadedMetadata={() => {
+                        handleVideoLoadedMetadata()
+                        logDuration()
+                        checkEnd()
+                      }}
+                      onDurationChange={() => {
+                        logDuration()
+                      }}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onError={() => {
+                        setStreamError('Video failed to load. Try another server or reload.')
+                        setStreamLoading(false)
+                      }}
+                    />
+                    <canvas
+                      ref={delayCanvasRef}
+                      className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
+                    />
+                    {subtitleOverlayActive && (
+                      <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
+                    )}
+                    <AvSyncCalibrator
+                      isOpen={isCalibrating}
+                      ms={videoDelayMs}
+                      onChange={handleVideoDelayChange}
+                      onApply={applyAvSyncCalibrator}
+                      onClose={cancelAvSyncCalibrator}
+                      testClipActive={testClipActive}
+                      onTestClip={toggleTestClip}
+                    />
+                    {showWatchedOverlay && (
+                      <div className={styles.watchedOverlay}>
+                        <Icon
+                          name="check-circle"
+                          size={48}
+                          style={{ color: 'var(--accent-lighter)' }}
+                        />
+                        <p className={styles.watchedTitle}>
+                          {isMovie ? 'Movie watched' : `S${season} E${episode} watched`}
+                        </p>
+                        <p className={styles.watchedSubtext}>
+                          Replay from the beginning or continue with the next episode.
+                        </p>
+                        <div className={styles.watchedActions}>
+                          <Button onClick={handleReplayWatchedEpisode}>Replay</Button>
+                          {nextEpisodeNumber != null ? (
+                            <Button variant="secondary" onClick={handleWatchNextEpisode}>
+                              Next Episode
+                            </Button>
+                          ) : nextSeasonNumber != null ? (
+                            <Button variant="secondary" onClick={handleStartNextSeason}>
+                              Next Season
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                      <PlayerVideo
-                        autoPlay={!inRoom && resumeChecked && !playbackPromptBlocked}
-                        playsInline
-                        disablePictureInPicture
-                        className={`${styles.video} ${delayCanvasActive ? styles.videoHidden : ''}`}
-                        onTimeUpdate={() => {
-                          if (testClipActive) return
-                          handleVideoTimeUpdate()
-                          checkEnd()
-                        }}
-                        onEnded={() => {
-                          if (!testClipActive) checkEnd(true)
-                        }}
-                        onPlay={handleVideoPlay}
-                        onPause={handleVideoPause}
-                        onSeeked={() => {
-                          if (testClipActive) return
-                          updateNextEpisodePrompt()
-                          checkEnd()
-                        }}
-                        onLoadedMetadata={() => {
-                          handleVideoLoadedMetadata()
-                          logDuration()
-                          checkEnd()
-                        }}
-                        onDurationChange={() => {
-                          logDuration()
-                        }}
-                        onContextMenu={(e) => e.preventDefault()}
-                        onError={() => {
-                          setStreamError('Video failed to load. Try another server or reload.')
-                          setStreamLoading(false)
-                        }}
-                      />
-                      <canvas
-                        ref={delayCanvasRef}
-                        className={`${styles.delayCanvas} ${delayCanvasActive ? styles.delayCanvasActive : ''}`}
-                      />
-                      {subtitleOverlayActive && (
-                        <div ref={subtitleOverlayRef} className={styles.subtitleOverlay} />
-                      )}
-                      <AvSyncCalibrator
-                        isOpen={isCalibrating}
-                        ms={videoDelayMs}
-                        onChange={handleVideoDelayChange}
-                        onApply={applyAvSyncCalibrator}
-                        onClose={cancelAvSyncCalibrator}
-                        testClipActive={testClipActive}
-                        onTestClip={toggleTestClip}
-                      />
-                    </>
-                  )}
+                    )}
+                  </>
                 </TvPlayerControls>
               </>
             ) : streamError && !isEmbedProvider ? (
