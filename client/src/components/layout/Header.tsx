@@ -356,12 +356,6 @@ const Header: React.FC = () => {
                   Insights
                 </Link>
               )}
-              <Link
-                to="/settings"
-                className={`${styles.navLink} ${location.pathname.startsWith('/settings') ? styles.navLinkActive : ''}`}
-              >
-                Settings
-              </Link>
             </nav>
           </div>
 
