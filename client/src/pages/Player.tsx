@@ -100,10 +100,8 @@ const Player: React.FC = () => {
     moveToCompleted,
     setPreferredSource,
     handleToggleDetails,
-    markEpisodeWatched,
     resetEpisodeProgress,
     prefetchEpisodeSources,
-    isMarkingWatched,
     isResettingProgress,
     isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
@@ -637,14 +635,6 @@ const Player: React.FC = () => {
           Episodes
         </button>
       )}
-      <button
-        className={`${styles.watchlistBtn}`}
-        onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
-        disabled={isResettingProgress || !state.currentEpisode}
-      >
-        <Icon name="undo" size={14} />
-        {isResettingProgress ? 'Resetting...' : 'Reset Progress'}
-      </button>
     </div>
   )
 
@@ -652,35 +642,6 @@ const Player: React.FC = () => {
     dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } })
     storeAutoplayEnabled(checked)
   }
-
-  const isCurrentEpisodeWatched = !!(
-    state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
-  )
-
-  const showManualWatchedButton =
-    state.selectedProvider !== 'megaplay' || state.selectedSource?.type === 'iframe'
-
-  const handleMarkEpisodeWatched = useCallback(async () => {
-    if (!showId || !state.currentEpisode || !state.showMeta.name || isMarkingWatched) return
-
-    const videoDuration = refs.videoRef.current?.duration
-    const fallbackDuration = Math.max(
-      videoDuration || 0,
-      state.resumeDuration || 0,
-      Number(state.showMeta.episodeDuration || 0) * 60,
-      1
-    )
-
-    await markEpisodeWatched(state.currentEpisode, fallbackDuration)
-  }, [
-    showId,
-    state.currentEpisode,
-    state.showMeta,
-    state.resumeDuration,
-    markEpisodeWatched,
-    isMarkingWatched,
-    refs.videoRef,
-  ])
 
   if (
     state.error &&
@@ -1332,20 +1293,6 @@ const Player: React.FC = () => {
                       className={`${styles.watchlistBtn} ${styles.queueBtn}`}
                       activeClassName={styles.queueActive}
                     />
-                    {showManualWatchedButton && (
-                      <button
-                        className={`${styles.watchlistBtn} ${styles.markWatchedBtn} ${isCurrentEpisodeWatched ? styles.markWatchedDone : ''}`}
-                        onClick={handleMarkEpisodeWatched}
-                        disabled={isMarkingWatched || !state.currentEpisode}
-                      >
-                        <Icon name="check" size={14} />
-                        {isMarkingWatched
-                          ? 'Saving...'
-                          : isCurrentEpisodeWatched
-                            ? 'Watched'
-                            : 'Mark Watched'}
-                      </button>
-                    )}
                     <button
                       className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${state.currentMode === 'dub' ? styles.modeToggleActive : ''}`}
                       disabled={followingHost}
@@ -1360,23 +1307,19 @@ const Player: React.FC = () => {
                     >
                       {state.currentMode === 'dub' ? 'DUB' : 'SUB'}
                     </button>
-                    {lowEndMode && (
-                      <button
-                        disabled={followingHost}
-                        className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${player.state.useNativeControls ? styles.modeToggleActive : ''}`}
-                        onClick={() => {
-                          const newValue = !player.state.useNativeControls
-                          player.actions.setUseNativeControls(newValue)
-                          profileStorage.setItem('playerUseNativeControls', newValue.toString())
-                        }}
-                        type="button"
-                      >
-                        {player.state.useNativeControls ? 'NATIVE: ON' : 'NATIVE: OFF'}
-                      </button>
-                    )}
+                    <button
+                      className={`${styles.watchlistBtn} ${styles.modeToggleBtn}`}
+                      onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
+                      disabled={isResettingProgress || !state.currentEpisode}
+                      type="button"
+                    >
+                      <Icon name="undo" size={14} />
+                      {isResettingProgress ? 'Resetting...' : 'Reset Progress'}
+                    </button>
                   </div>
                 </div>
               </div>
+
               {episodeNavControls(
                 `${styles.episodeActions} ${styles.mobileEpisodeActions}`,
                 'mobile'

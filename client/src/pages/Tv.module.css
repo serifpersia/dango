@@ -79,8 +79,8 @@
 
 .controlLabel {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  align-items: center;
+  gap: 0.6rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -217,14 +217,42 @@
   .mobileSeasonRow .sidebarSeason {
     margin-bottom: 0;
   }
+
+  .providerActions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
 }
 
-.providerSelectWrap {
+.providerRow {
+  grid-column: 1 / -1;
   display: flex;
-  align-items: flex-end;
-  gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
   min-width: 0;
+}
+
+.providerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.providerActions .autoplayActive {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 45%, transparent);
+  color: #dbeafe;
+}
+
+.providerActions .autoplayActive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-info) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 65%, transparent);
 }
 
 .genreRow {

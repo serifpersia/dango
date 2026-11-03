@@ -544,6 +544,57 @@ const Tv: React.FC = () => {
     setIsAutoplayEnabled(checked)
     storeAutoplayEnabled(checked)
   }, [])
+  const tvEpisodeNavControls = (className: string) => (
+    <div className={className}>
+      <button
+        className={`${playerStyles.episodeNavBtn} ${playerStyles.secondary} ${
+          isAutoplayEnabled ? styles.autoplayActive : ''
+        }`}
+        onClick={() => handleAutoplayChange(!isAutoplayEnabled)}
+        type="button"
+        aria-pressed={isAutoplayEnabled}
+      >
+        {isAutoplayEnabled ? 'AUTOPLAY: ON' : 'AUTOPLAY: OFF'}
+      </button>
+      <button
+        className={`${playerStyles.episodeNavBtn} ${playerStyles.secondary}`}
+        onClick={() => resetProgress.mutate({ mediaId: mediaId ?? '', season, episode })}
+        disabled={resetProgress.isPending}
+        type="button"
+      >
+        <Icon name="undo" size={14} />
+        {resetProgress.isPending ? 'Resetting...' : 'Reset Progress'}
+      </button>
+      <button
+        className={`${playerStyles.episodeNavBtn} ${playerStyles.secondary}`}
+        onClick={() => prevEpisodeNumber != null && handleTvEpisodeClick(String(prevEpisodeNumber))}
+        disabled={followingHost || prevEpisodeNumber == null}
+        type="button"
+      >
+        <Icon name="chevron-left" size={12} />
+        Prev EP
+      </button>
+      <button
+        className={`${playerStyles.episodeNavBtn} ${playerStyles.primary}`}
+        onClick={() => nextEpisodeNumber != null && handleTvEpisodeClick(String(nextEpisodeNumber))}
+        disabled={followingHost || nextEpisodeNumber == null}
+        type="button"
+      >
+        Next EP
+        <Icon name="chevron-right" size={12} />
+      </button>
+      {isMobile && (
+        <button
+          className={`${playerStyles.episodeNavBtn} ${playerStyles.episodePickerBtn}`}
+          onClick={() => setIsEpisodeDrawerOpen(true)}
+          type="button"
+        >
+          <Icon name="list-ul" size={12} />
+          Episodes
+        </button>
+      )}
+    </div>
+  )
   const hasResumedRef = useRef(false)
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedTimeRef = useRef(0)
@@ -2339,7 +2390,7 @@ const Tv: React.FC = () => {
 
         {!isTheaterMode && details && (
           <div className={playerStyles.streamPanel}>
-            <div className={styles.providerSelectWrap}>
+            <div className={styles.providerRow}>
               <label className={styles.controlLabel}>
                 Provider
                 <select
@@ -2376,6 +2427,7 @@ const Tv: React.FC = () => {
                   )}
                 </select>
               </label>
+              {!isMovie && tvEpisodeNavControls(styles.providerActions)}
             </div>
 
             {!followingHost &&
@@ -2452,65 +2504,6 @@ const Tv: React.FC = () => {
                     {inTvLibrary ? <Icon name="check" size={14} /> : <Icon name="plus" size={14} />}
                     {inTvLibrary ? 'In Watchlist' : 'Add to Watchlist'}
                   </button>
-                  {!isMovie && (
-                    <>
-                      <button
-                        className={`${playerStyles.episodeNavBtn} ${playerStyles.secondary}`}
-                        onClick={() =>
-                          prevEpisodeNumber != null &&
-                          handleTvEpisodeClick(String(prevEpisodeNumber))
-                        }
-                        disabled={followingHost || prevEpisodeNumber == null}
-                        type="button"
-                      >
-                        <Icon name="chevron-left" size={14} />
-                        Prev EP
-                      </button>
-                      <button
-                        className={`${playerStyles.episodeNavBtn} ${playerStyles.primary}`}
-                        onClick={() =>
-                          nextEpisodeNumber != null &&
-                          handleTvEpisodeClick(String(nextEpisodeNumber))
-                        }
-                        disabled={followingHost || nextEpisodeNumber == null}
-                        type="button"
-                      >
-                        Next EP
-                        <Icon name="chevron-right" size={14} />
-                      </button>
-                      {!isMovie && (
-                        <button
-                          className={`${playerStyles.watchlistBtn} ${playerStyles.modeToggleBtn} ${isAutoplayEnabled ? playerStyles.modeToggleActive : ''}`}
-                          onClick={() => handleAutoplayChange(!isAutoplayEnabled)}
-                          type="button"
-                          aria-pressed={isAutoplayEnabled}
-                        >
-                          {isAutoplayEnabled ? 'AUTOPLAY: ON' : 'AUTOPLAY: OFF'}
-                        </button>
-                      )}
-                      {isMobile && (
-                        <button
-                          className={`${playerStyles.watchlistBtn}`}
-                          onClick={() => setIsEpisodeDrawerOpen(true)}
-                          type="button"
-                        >
-                          <Icon name="list-ul" size={14} />
-                          Episodes
-                        </button>
-                      )}
-                      <button
-                        className={`${playerStyles.watchlistBtn}`}
-                        onClick={() =>
-                          resetProgress.mutate({ mediaId: mediaId ?? '', season, episode })
-                        }
-                        disabled={resetProgress.isPending}
-                        type="button"
-                      >
-                        <Icon name="undo" size={14} />
-                        {resetProgress.isPending ? 'Resetting...' : 'Reset Progress'}
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
             </div>

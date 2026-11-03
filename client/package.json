@@ -1,7 +1,7 @@
 {
   "name": "dango-client",
   "private": true,
-  "version": "3.9.2",
+  "version": "3.9.4",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
