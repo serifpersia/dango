@@ -317,7 +317,7 @@ input.searchInput:focus-visible {
 }
 
 .hamburgerBtn:hover {
-  opacity: 0.8;
+  background: var(--header-btn-bg-hover, rgba(255, 255, 255, 0.08));
 }
 
 .searchButton:focus-visible,

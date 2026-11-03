@@ -326,7 +326,10 @@
 }
 
 .title {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: clamp(1.6rem, 4.6vw, 3rem);
   line-height: 1.04;
   cursor: pointer;
