@@ -454,6 +454,13 @@
   }
 }
 
+@media (max-width: 480px) {
+  .bellBtn {
+    width: 42px;
+    height: 42px;
+  }
+}
+
 @keyframes mobileSheetIn {
   from {
     opacity: 0;

@@ -1,6 +1,9 @@
 .header {
   height: var(--header-height);
   --logo-height: 42px;
+  --header-control-bg: rgba(255, 255, 255, 0.045);
+  --header-control-border: rgba(255, 255, 255, 0.07);
+  --header-btn-bg: rgba(255, 255, 255, 0.045);
   background: transparent;
   border-bottom: 1px solid transparent;
   position: fixed;
@@ -14,7 +17,6 @@
   transition:
     transform var(--transition-slow),
     background-color var(--transition-base),
-    backdrop-filter var(--transition-base),
     border-color var(--transition-base),
     box-shadow var(--transition-base);
 }
@@ -29,9 +31,6 @@
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --header-control-bg: rgba(255, 255, 255, 0.045);
-  --header-control-border: rgba(255, 255, 255, 0.07);
-  --header-btn-bg: rgba(255, 255, 255, 0.045);
   --header-btn-bg-hover: rgba(255, 255, 255, 0.1);
 }
 
@@ -690,5 +689,18 @@ input.searchInput:focus-visible {
   .logo {
     padding: 2px;
     min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .searchButton,
+  .profileBtn {
+    width: 42px;
+    height: 42px;
+  }
+
+  .profileAvatar {
+    width: 42px;
+    height: 42px;
   }
 }
