@@ -221,6 +221,18 @@ export default function Search() {
       .filter(([, s]) => s === 'exclude')
       .map(([g]) => g)
 
+    if (anilistGenres.some((g) => g.toLowerCase() === 'hentai')) {
+      const matureParams = new URLSearchParams()
+      matureParams.set('provider', 'anilist')
+      if (query.trim()) matureParams.set('query', query.trim())
+      if (effStatus) matureParams.set('status', effStatus)
+      if (effSeason !== 'ALL') matureParams.set('season', effSeason)
+      if (effYear !== 'ALL') matureParams.set('year', effYear)
+      if (effSort !== 'POPULARITY_DESC') matureParams.set('sortBy', effSort)
+      navigate(`/mature?${matureParams.toString()}`)
+      return
+    }
+
     if (anilistGenres.length > 0) params.set('genres', anilistGenres.join(','))
     if (anilistExclude.length > 0) params.set('excludeGenres', anilistExclude.join(','))
     if (effType !== 'ADULT' && !effShowMature) params.set('adult', 'false')
