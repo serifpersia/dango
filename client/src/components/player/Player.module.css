@@ -708,6 +708,16 @@
   justify-self: start;
 }
 
+.watchedActionsCentered {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.watchedActionsCentered > div {
+  display: contents;
+}
+
 @media (max-width: 480px) {
   .watchedActions {
     display: flex;

@@ -120,6 +120,7 @@ export interface TmdbDetailsBody extends TmdbMetaBody {
   poster_path?: string | null
   backdrop_path?: string | null
   adult?: boolean
+  status?: string
   seasons?: TmdbSeason[]
 }
 

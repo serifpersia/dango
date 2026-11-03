@@ -4,6 +4,7 @@ import {
   isProgressCompleted,
   hasResumableProgress,
   isPlaybackEnded,
+  isShowFinishedStatus,
   loadAutoplayEnabled,
   loadWatchedOverlayEnabled,
   storeAutoplayEnabled,
@@ -27,6 +28,19 @@ describe('isPlaybackEnded', () => {
     expect(isPlaybackEnded(99.5, 100)).toBe(false)
     expect(isPlaybackEnded(0, 0)).toBe(false)
     expect(isPlaybackEnded(10, Infinity)).toBe(false)
+  })
+})
+
+describe('isShowFinishedStatus', () => {
+  it('only treats known finished statuses as finished', () => {
+    expect(isShowFinishedStatus('FINISHED')).toBe(true)
+    expect(isShowFinishedStatus('Ended')).toBe(true)
+    expect(isShowFinishedStatus('Completed')).toBe(true)
+    expect(isShowFinishedStatus('Canceled')).toBe(true)
+    expect(isShowFinishedStatus('Returning Series')).toBe(false)
+    expect(isShowFinishedStatus('RELEASING')).toBe(false)
+    expect(isShowFinishedStatus(undefined)).toBe(false)
+    expect(isShowFinishedStatus(null)).toBe(false)
   })
 })
 

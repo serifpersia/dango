@@ -292,6 +292,7 @@ export const tvRouter = router({
         poster: string
         backdrop: string
         adult: boolean
+        status?: string
         seasons?: TmdbSeason[]
         number_of_seasons?: number
       } = {
@@ -304,6 +305,7 @@ export const tvRouter = router({
         poster: d.poster_path ? `${TMDB_IMAGE}/w500${d.poster_path}` : '',
         backdrop: d.backdrop_path ? `${TMDB_IMAGE}/original${d.backdrop_path}` : '',
         adult: d.adult === true,
+        status: d.status,
       }
       if (type === 'tv') {
         result.seasons = (d.seasons || [])

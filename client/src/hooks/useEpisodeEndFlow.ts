@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import type { Action } from '../reducers/playerReducer'
 import type { QueueItem } from '../hooks/useAnimeData'
+import { isShowFinishedStatus } from '../lib/playbackCompletion'
 
 export const matchesQueueItem = (
   item: QueueItem,
@@ -55,7 +56,7 @@ export function useEpisodeEndFlow({
   const removeFromQueueRef = useRef(removeFromQueue)
   removeFromQueueRef.current = removeFromQueue
   const handledEndRef = useRef(false)
-  const isShowFinished = showStatus?.toUpperCase() === 'FINISHED'
+  const isShowFinished = isShowFinishedStatus(showStatus)
 
   useEffect(() => {
     handledEndRef.current = false

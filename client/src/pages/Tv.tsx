@@ -31,6 +31,7 @@ import { buildTvId } from '../lib/tv'
 import {
   hasResumableProgress,
   isProgressCompleted,
+  isShowFinishedStatus,
   loadAutoplayEnabled,
   loadWatchedOverlayEnabled,
   storeAutoplayEnabled,
@@ -458,6 +459,11 @@ const Tv: React.FC = () => {
     const totalSeasons = details?.number_of_seasons ?? 0
     return totalSeasons > season ? season + 1 : null
   }, [isMovie, nextEpisodeNumber, sortedSeasons, season, details?.number_of_seasons])
+  const isShowFinished = isShowFinishedStatus(details?.status)
+  const showCompletedState =
+    isMovie || (nextEpisodeNumber == null && nextSeasonNumber == null && isShowFinished)
+  const resumeIsPrimary =
+    nextEpisodeNumber == null && nextSeasonNumber == null && !showCompletedState
   const savedCt = (savedProgress as { currentTime?: number } | undefined)?.currentTime ?? 0
   const resumeEvaluatedKeyRef = useRef<string | null>(null)
 
@@ -499,7 +505,12 @@ const Tv: React.FC = () => {
   const watchedEpisodePrompt = !inRoom && !testClipActive && episodeWatched && !replayRequested
   const showWatchedOverlay = watchedEpisodePrompt && watchedOverlayEnabled
   const showWatchedPopup = watchedEpisodePrompt && !watchedOverlayEnabled && !watchedPopupDismissed
-  const handleReplayWatchedEpisode = useCallback(() => setReplayRequested(true), [])
+  const showCompleteOverlay = showCompleteModal && watchedOverlayEnabled
+  const shouldShowCompleteModal = showCompleteModal && !watchedOverlayEnabled
+  const handleReplayWatchedEpisode = useCallback(() => {
+    setReplayRequested(true)
+    setShowCompleteModal(false)
+  }, [])
 
   useEffect(() => {
     const handleTheaterKey = (e: KeyboardEvent) => {
@@ -540,6 +551,7 @@ const Tv: React.FC = () => {
   const handleResumeWatchedEpisode = useCallback(() => {
     pendingSeekRef.current = savedCt
     setReplayRequested(true)
+    setShowCompleteModal(false)
   }, [savedCt])
   const streamKeyRef = useRef('')
   const hasSavedResumableProgress = hasResumableProgress(savedCt)
@@ -708,6 +720,8 @@ const Tv: React.FC = () => {
       return
     }
 
+    if (!isMovie && nextSeasonNumber == null && !isShowFinished) return
+
     setCompleteTitle(isMovie ? details.title : `${details.title} - Season ${season}`)
     setShowCompleteModal(true)
     hasResumedRef.current = true
@@ -716,6 +730,8 @@ const Tv: React.FC = () => {
     details,
     season,
     nextEpisodeNumber,
+    nextSeasonNumber,
+    isShowFinished,
     isAutoplayEnabled,
     saveVideoProgress,
     updateUrlEpisode,
@@ -900,10 +916,19 @@ const Tv: React.FC = () => {
   }, [showWatchedPopup, videoRef, inRoom])
 
   useEffect(() => {
-    if ((showWatchedOverlay || showWatchedPopup) && player.state.isFullscreen) {
+    if (
+      (showWatchedOverlay || showWatchedPopup || showCompleteOverlay) &&
+      player.state.isFullscreen
+    ) {
       player.actions.toggleFullscreen()
     }
-  }, [showWatchedOverlay, showWatchedPopup, player.state.isFullscreen, player.actions])
+  }, [
+    showWatchedOverlay,
+    showWatchedPopup,
+    showCompleteOverlay,
+    player.state.isFullscreen,
+    player.actions,
+  ])
 
   useEffect(() => {
     const video = videoRef.current
@@ -1100,6 +1125,7 @@ const Tv: React.FC = () => {
           backdrop: d.backdrop,
           imdb_id: d.imdb_id || undefined,
           adult: d.adult,
+          status: d.status,
           seasons: d.seasons,
           number_of_seasons: d.number_of_seasons,
         }
@@ -2149,7 +2175,7 @@ const Tv: React.FC = () => {
                   onTheaterModeToggle={toggleTheaterMode}
                   ambientSettings={ambientSettings}
                   onAmbientChange={updateAmbient}
-                  hideChrome={showWatchedOverlay}
+                  hideChrome={showWatchedOverlay || showCompleteOverlay}
                 >
                   <>
                     <PlayerVideo
@@ -2202,7 +2228,7 @@ const Tv: React.FC = () => {
                       testClipActive={testClipActive}
                       onTestClip={toggleTestClip}
                     />
-                    {showWatchedOverlay && (
+                    {(showWatchedOverlay || showCompleteOverlay) && (
                       <div className={styles.watchedOverlay}>
                         <Icon
                           name="check-circle"
@@ -2210,16 +2236,34 @@ const Tv: React.FC = () => {
                           style={{ color: 'var(--accent-lighter)' }}
                         />
                         <p className={styles.watchedTitle}>
-                          {isMovie ? 'Movie watched' : `S${season} E${episode} watched`}
+                          {showCompleteOverlay || showCompletedState
+                            ? nextSeasonNumber != null
+                              ? 'Season Complete!'
+                              : isMovie
+                                ? 'Movie Completed!'
+                                : 'Show Completed!'
+                            : isMovie
+                              ? 'Movie watched'
+                              : `S${season} E${episode} watched`}
                         </p>
                         <p className={styles.watchedSubtext}>
-                          Resume where you left off, replay from the beginning, or continue with the
-                          next episode.
+                          {showCompleteOverlay || showCompletedState
+                            ? nextSeasonNumber != null
+                              ? `You finished Season ${season}.`
+                              : isMovie
+                                ? 'You finished this movie!'
+                                : 'Congratulations! You finished all available episodes.'
+                            : 'Resume where you left off, replay from the beginning, or continue with the next episode.'}
                         </p>
-                        <div className={styles.watchedActions}>
+                        <div
+                          className={`${styles.watchedActions} ${showCompleteOverlay ? styles.watchedActionsCentered : ''}`}
+                        >
                           <div>
-                            {savedCt > 5 && (
-                              <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+                            {savedCt > 5 && !showCompleteOverlay && (
+                              <Button
+                                variant={resumeIsPrimary ? undefined : 'secondary'}
+                                onClick={handleResumeWatchedEpisode}
+                              >
                                 {`Resume ${formatTime(savedCt)}`}
                               </Button>
                             )}
@@ -2239,7 +2283,7 @@ const Tv: React.FC = () => {
                             <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
                               Replay
                             </Button>
-                            {nextEpisodeNumber == null && nextSeasonNumber == null && (
+                            {showCompletedState && (
                               <Button
                                 onClick={handleMoveTvToCompletedAndHome}
                                 disabled={updateTvStatus.isPending || addTvBookmark.isPending}
@@ -2576,16 +2620,29 @@ const Tv: React.FC = () => {
         <CompletionModal
           isOpen={showWatchedPopup}
           onClose={() => setWatchedPopupDismissed(true)}
-          title="Episode Completed"
+          title={
+            showCompletedState
+              ? isMovie
+                ? 'Movie Completed!'
+                : 'Show Completed!'
+              : 'Episode Completed'
+          }
           heading={isMovie ? (details?.title ?? 'Movie') : `S${season} E${episode}`}
           message={
-            isMovie
-              ? "You've already watched this movie. Resume where you left off or replay it."
-              : "You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
+            showCompletedState
+              ? isMovie
+                ? 'You finished this movie!'
+                : 'Congratulations! You finished all available episodes.'
+              : isMovie
+                ? "You've already watched this movie. Resume where you left off or replay it."
+                : "You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
           }
         >
           {savedCt > 5 && (
-            <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+            <Button
+              variant={resumeIsPrimary ? undefined : 'secondary'}
+              onClick={handleResumeWatchedEpisode}
+            >
               {`Resume ${formatTime(savedCt)}`}
             </Button>
           )}
@@ -2596,7 +2653,7 @@ const Tv: React.FC = () => {
             <Button onClick={handleWatchNextEpisode}>Watch EP {nextEpisodeNumber}</Button>
           ) : nextSeasonNumber != null ? (
             <Button onClick={handleStartNextSeason}>Start Season {nextSeasonNumber}</Button>
-          ) : (
+          ) : showCompletedState ? (
             <Button
               onClick={handleMoveTvToCompletedAndHome}
               disabled={updateTvStatus.isPending || addTvBookmark.isPending}
@@ -2605,11 +2662,11 @@ const Tv: React.FC = () => {
                 ? 'Saving...'
                 : 'Move to Completed'}
             </Button>
-          )}
+          ) : null}
         </CompletionModal>
 
         <CompletionModal
-          isOpen={showCompleteModal}
+          isOpen={shouldShowCompleteModal}
           onClose={() => setShowCompleteModal(false)}
           title={
             isMovie
@@ -2627,9 +2684,6 @@ const Tv: React.FC = () => {
                 : 'Congratulations! You finished all available episodes.'
           }
         >
-          <Button variant="secondary" onClick={() => setShowCompleteModal(false)}>
-            Close
-          </Button>
           {nextSeasonNumber != null ? (
             <Button onClick={handleStartNextSeason}>Start Season {nextSeasonNumber}</Button>
           ) : (

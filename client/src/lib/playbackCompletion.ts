@@ -9,6 +9,18 @@ const WATCHED_OVERLAY_KEY = 'watchedOverlayEnabled'
 export const isProgressCompleted = (currentTime: number, duration: number): boolean =>
   duration > 0 && currentTime >= duration * COMPLETION_THRESHOLD
 
+const FINISHED_SHOW_STATUSES = new Set([
+  'FINISHED',
+  'ENDED',
+  'COMPLETED',
+  'CANCELED',
+  'CANCELLED',
+  'RELEASED',
+])
+
+export const isShowFinishedStatus = (status?: string | null): boolean =>
+  !!status && FINISHED_SHOW_STATUSES.has(status.trim().toUpperCase())
+
 export const END_TOLERANCE_SECONDS = 0.25
 
 export const isPlaybackEnded = (currentTime: number, duration: number): boolean =>

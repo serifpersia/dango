@@ -11,6 +11,7 @@ import FadeImage from '../components/common/FadeImage'
 import { fixThumbnailUrl, formatTime } from '../lib/utils'
 import {
   isProgressCompleted,
+  isShowFinishedStatus,
   loadWatchedOverlayEnabled,
   storeAutoplayEnabled,
 } from '../lib/playbackCompletion'
@@ -340,6 +341,10 @@ const Player: React.FC = () => {
       : null
   const hasNextEpisode = currentEpisodeIndex > -1 && currentEpisodeIndex < state.episodes.length - 1
 
+  const isShowFinished = isShowFinishedStatus(state.showMeta?.status)
+  const showCompletedState = !nextEpisode && isShowFinished
+  const resumeIsPrimary = !nextEpisode && !showCompletedState
+
   const {
     showCompleteModal,
     queueCountdown,
@@ -390,8 +395,9 @@ const Player: React.FC = () => {
   })
 
   const shouldShowResumeModal = !inRoom && state.showResumeModal && !state.resumeProgressPending
-  const shouldShowCompleteModal = showCompleteModal
-  const shouldPauseForModal = shouldShowResumeModal || shouldShowCompleteModal || showWatchedPopup
+  const showCompleteOverlay = showCompleteModal && watchedOverlayEnabled
+  const shouldShowCompleteModal = showCompleteModal && !watchedOverlayEnabled
+  const shouldPauseForModal = shouldShowResumeModal || showCompleteModal || showWatchedPopup
 
   useAutoRotateFullscreen(
     player,
@@ -399,6 +405,7 @@ const Player: React.FC = () => {
       !isTheaterMode &&
       !shouldPauseForModal &&
       !showWatchedOverlay &&
+      !showCompleteOverlay &&
       !showWatchedPopup
   )
 
@@ -439,7 +446,7 @@ const Player: React.FC = () => {
     resumeTime: inRoom ? 0 : state.resumeTime,
     resumeDuration: state.resumeDuration,
     showResumeModal: !inRoom && state.showResumeModal,
-    disabled: showWatchedOverlay,
+    disabled: showWatchedOverlay || showCompleteOverlay,
     startOver: replayRequested && watchedResumeTime == null,
     resumeAt: watchedResumeTime,
     calibReturnRef,
@@ -449,10 +456,19 @@ const Player: React.FC = () => {
   })
 
   useEffect(() => {
-    if ((shouldPauseForModal || showWatchedOverlay) && player.state.isFullscreen) {
+    if (
+      (shouldPauseForModal || showWatchedOverlay || showCompleteOverlay) &&
+      player.state.isFullscreen
+    ) {
       player.actions.toggleFullscreen()
     }
-  }, [shouldPauseForModal, showWatchedOverlay, player.state.isFullscreen, player.actions])
+  }, [
+    shouldPauseForModal,
+    showWatchedOverlay,
+    showCompleteOverlay,
+    player.state.isFullscreen,
+    player.actions,
+  ])
 
   useEffect(() => {
     if (shouldPauseForModal && refs.videoRef.current) {
@@ -705,9 +721,6 @@ const Player: React.FC = () => {
         heading={displayTitle}
         message="Congratulations! You finished all available episodes."
       >
-        <Button variant="secondary" onClick={closeCompleteModal}>
-          Close
-        </Button>
         <Button onClick={handleMoveToCompletedAndNavigate} disabled={isUpdatingWatchlistStatus}>
           {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
         </Button>
@@ -716,12 +729,19 @@ const Player: React.FC = () => {
       <CompletionModal
         isOpen={showWatchedPopup}
         onClose={() => setWatchedPopupDismissed(true)}
-        title="Episode Completed"
+        title={showCompletedState ? 'Show Completed!' : 'Episode Completed'}
         heading={state.currentEpisode ? `Episode ${state.currentEpisode}` : displayTitle}
-        message="You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
+        message={
+          showCompletedState
+            ? 'Congratulations! You finished all available episodes.'
+            : "You've already watched this episode. Resume where you left off, replay it, or continue with the next episode."
+        }
       >
         {state.resumeTime > 5 && (
-          <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+          <Button
+            variant={resumeIsPrimary ? undefined : 'secondary'}
+            onClick={handleResumeWatchedEpisode}
+          >
             {`Resume ${formatTime(state.resumeTime)}`}
           </Button>
         )}
@@ -729,7 +749,7 @@ const Player: React.FC = () => {
           Replay
         </Button>
         {nextEpisode && <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>}
-        {!nextEpisode && (
+        {showCompletedState && (
           <Button onClick={handleMoveToCompletedAndNavigate} disabled={isUpdatingWatchlistStatus}>
             {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
           </Button>
@@ -915,7 +935,9 @@ const Player: React.FC = () => {
             onCalibrateAvSync={inRoom ? () => {} : openAvSyncCalibrator}
             isInteractingExtra={isEpisodeDrawerOpen || isCalibrating}
             className={shellStyles.shellFill}
-            hideChrome={showWatchedOverlay || state.selectedSource?.type === 'iframe'}
+            hideChrome={
+              showWatchedOverlay || showCompleteOverlay || state.selectedSource?.type === 'iframe'
+            }
             overlays={
               <>
                 {player.state.isSpeedBoostActive && (
@@ -1055,20 +1077,30 @@ const Player: React.FC = () => {
                   />
                 </>
               )}
-              {showWatchedOverlay && (
+              {(showWatchedOverlay || showCompleteOverlay) && (
                 <div className={styles.watchedOverlay}>
                   <Icon name="check-circle" size={48} style={{ color: 'var(--accent-lighter)' }} />
                   <p className={styles.watchedTitle}>
-                    {state.currentEpisode ? `Episode ${state.currentEpisode} watched` : 'Watched'}
+                    {showCompletedState
+                      ? 'Show Completed!'
+                      : state.currentEpisode
+                        ? `Episode ${state.currentEpisode} watched`
+                        : 'Watched'}
                   </p>
                   <p className={styles.watchedSubtext}>
-                    Resume where you left off, replay from the beginning, or continue with the next
-                    episode.
+                    {showCompletedState
+                      ? 'Congratulations! You finished all available episodes.'
+                      : 'Resume where you left off, replay from the beginning, or continue with the next episode.'}
                   </p>
-                  <div className={styles.watchedActions}>
+                  <div
+                    className={`${styles.watchedActions} ${showCompleteOverlay ? styles.watchedActionsCentered : ''}`}
+                  >
                     <div>
-                      {state.resumeTime > 5 && (
-                        <Button variant="secondary" onClick={handleResumeWatchedEpisode}>
+                      {state.resumeTime > 5 && !showCompleteOverlay && (
+                        <Button
+                          variant={resumeIsPrimary ? undefined : 'secondary'}
+                          onClick={handleResumeWatchedEpisode}
+                        >
                           {`Resume ${formatTime(state.resumeTime)}`}
                         </Button>
                       )}
@@ -1077,7 +1109,7 @@ const Player: React.FC = () => {
                       {nextEpisode && (
                         <Button onClick={handleNextEpisode}>{`Watch EP ${nextEpisode}`}</Button>
                       )}
-                      {!nextEpisode && (
+                      {showCompletedState && (
                         <Button
                           onClick={handleMoveToCompletedAndNavigate}
                           disabled={isUpdatingWatchlistStatus}
@@ -1087,7 +1119,13 @@ const Player: React.FC = () => {
                       )}
                     </div>
                     <div>
-                      <Button variant="secondary" onClick={handleReplayWatchedEpisode}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          closeCompleteModal()
+                          handleReplayWatchedEpisode()
+                        }}
+                      >
                         Replay
                       </Button>
                     </div>
