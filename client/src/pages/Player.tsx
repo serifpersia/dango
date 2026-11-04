@@ -1309,7 +1309,9 @@ const Player: React.FC = () => {
                     </button>
                     <button
                       className={`${styles.watchlistBtn} ${styles.modeToggleBtn}`}
-                      onClick={() => state.currentEpisode && resetEpisodeProgress(state.currentEpisode)}
+                      onClick={() =>
+                        state.currentEpisode && resetEpisodeProgress(state.currentEpisode)
+                      }
                       disabled={isResettingProgress || !state.currentEpisode}
                       type="button"
                     >

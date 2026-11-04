@@ -401,12 +401,14 @@ const Asmr: React.FC = () => {
                 })}
               </div>
 
-              <Pagination
-                page={page}
-                canGoNext={hasNext}
-                onChange={(next) => setPage(next)}
-                variant="labeled"
-              />
+              <div className={styles.pagination}>
+                <Pagination
+                  page={page}
+                  canGoNext={hasNext}
+                  onChange={(next) => setPage(next)}
+                  variant="labeled"
+                />
+              </div>
             </>
           )}
         </>

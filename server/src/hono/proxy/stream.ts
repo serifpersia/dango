@@ -15,6 +15,12 @@ import { placeholderSvg } from './embed.js'
 import { pinVariant } from '../playlist.js'
 import { proxyCache } from './cache.js'
 
+const BINARY_MEDIA_RE = /\.(?:mp3|m4a|aac|ogg|oga|opus|wav|flac|mp4|webm|mkv|m4v|ts|m4s)(?:$|\?)/i
+
+export function isBinaryMediaUrl(url: string): boolean {
+  return BINARY_MEDIA_RE.test(url)
+}
+
 export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRule[]) {
   const url = c.req.query('url')
   if (!url) return c.text('URL required', 400)
@@ -31,6 +37,7 @@ export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRu
   const uaStr = c.req.query('ua') || ''
   const cookieStr = c.req.query('cookie') || ''
   const useScrape = c.req.query('scrape') === '1' || rule?.scrape === true
+  const isBinaryMedia = isBinaryMediaUrl(urlStr)
   const useCf = c.req.query('cf') === '1' || rule?.cfCookie === true
   const variantRaw = c.req.query('variant')
   const variantIdx = variantRaw !== undefined ? parseInt(variantRaw, 10) : NaN
@@ -131,7 +138,7 @@ export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRu
       proxyCache.set(cacheKey, rewritten)
       return playlistResponse(rewritten)
     } else {
-      if (useScrape) {
+      if (useScrape && !isBinaryMedia) {
         const resp = await fetchWithMirrors(
           urlStr,
           rule?.mirrors,

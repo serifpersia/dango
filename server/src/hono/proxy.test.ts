@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { applyEmbedPatches } from './proxy/embed.js'
+import { isBinaryMediaUrl } from './proxy/stream.js'
 import { mirrorUrls } from './proxy/rules.js'
 
 test('mirrorUrls returns the url itself when there are no mirrors', () => {
@@ -21,6 +22,13 @@ test('mirrorUrls skips a mirror that is the same host', () => {
     'https://host/a.m3u8',
     'https://other.example/a.m3u8',
   ])
+})
+
+test('isBinaryMediaUrl flags direct media files but not pages or playlists', () => {
+  assert.equal(isBinaryMediaUrl('https://cdn.example/RJ300204.mp3'), true)
+  assert.equal(isBinaryMediaUrl('https://cdn.example/RJ300204%202.mp3?token=x'), true)
+  assert.equal(isBinaryMediaUrl('https://cdn.example/list.m3u8'), false)
+  assert.equal(isBinaryMediaUrl('https://site.example/watch/1'), false)
 })
 
 test('applyEmbedPatches rewrites relative urls to absolute ones', () => {
