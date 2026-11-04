@@ -29,6 +29,8 @@ class DiscordGatewayService {
   private isEnabled = false
   private readonly RECONNECT_DELAY = 15000
   private externalAssetCache = new Map<string, string>()
+  private logoAssetId: string | null = null
+  private logoAssetChecked = false
 
   public setEnabled(enabled: boolean) {
     this.isEnabled = enabled
@@ -50,6 +52,8 @@ class DiscordGatewayService {
 
   private loadToken() {
     this.token = process.env.DISCORD_GATEWAY_TOKEN || null
+    this.logoAssetId = null
+    this.logoAssetChecked = false
   }
 
   public reloadToken() {
@@ -90,6 +94,32 @@ class DiscordGatewayService {
       return mp
     } catch (err) {
       log.warn({ err }, 'external-assets proxy error')
+      return null
+    }
+  }
+
+  private async getLogoAssetId(): Promise<string | null> {
+    if (!CONFIG.DISCORD_CLIENT_ID || !this.token) return null
+    if (this.logoAssetChecked) return this.logoAssetId
+
+    try {
+      const res = await fetch(
+        `https://discord.com/api/v9/oauth2/applications/${CONFIG.DISCORD_CLIENT_ID}/assets`,
+        { headers: { Authorization: this.token } }
+      )
+      const text = await res.text()
+      if (!res.ok) {
+        log.warn(`application assets fetch failed ${res.status}: ${text.slice(0, 200)}`)
+        this.logoAssetChecked = true
+        return null
+      }
+      const assets = JSON.parse(text) as Array<{ id?: string; name?: string }>
+      this.logoAssetId = assets.find((asset) => asset.name === 'logo')?.id ?? null
+      this.logoAssetChecked = true
+      return this.logoAssetId
+    } catch (err) {
+      log.warn({ err }, 'application assets fetch error')
+      this.logoAssetChecked = true
       return null
     }
   }
@@ -149,20 +179,12 @@ class DiscordGatewayService {
     const imageUrl = this.resolveImageUrl(data)
     let assets: { large_image?: string; large_text?: string } | undefined
 
-    if (imageUrl) {
-      if (CONFIG.DISCORD_CLIENT_ID) {
-        const proxied = await this.getExternalAsset(imageUrl)
-        if (proxied) {
-          assets = {
-            large_image: proxied,
-            large_text: data.title.slice(0, 128),
-          }
-        } else {
-          assets = { large_image: 'logo', large_text: data.title.slice(0, 128) }
-        }
+    if (CONFIG.DISCORD_CLIENT_ID) {
+      const image = imageUrl ? await this.getExternalAsset(imageUrl) : null
+      const logo = image ?? (await this.getLogoAssetId())
+      if (logo) {
+        assets = { large_image: logo, large_text: data.title.slice(0, 128) }
       }
-    } else if (CONFIG.DISCORD_CLIENT_ID) {
-      assets = { large_image: 'logo', large_text: data.title.slice(0, 128) }
     }
 
     const presence: {
@@ -223,7 +245,7 @@ class DiscordGatewayService {
     }
   }
 
-  public setIdleStatus(page: string) {
+  public async setIdleStatus(page: string) {
     if (!this.isEnabled || !this.gateway || this.gateway.readyState !== WebSocket.OPEN) return
 
     const pageLabels: Record<string, { details: string; state: string }> = {
@@ -244,6 +266,8 @@ class DiscordGatewayService {
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }
 
+    const logo = await this.getLogoAssetId()
+
     try {
       this.gateway.send(
         JSON.stringify({
@@ -257,9 +281,7 @@ class DiscordGatewayService {
                 state: label.state,
                 details: label.details,
                 ...(CONFIG.DISCORD_CLIENT_ID ? { application_id: CONFIG.DISCORD_CLIENT_ID } : {}),
-                ...(CONFIG.DISCORD_CLIENT_ID
-                  ? { assets: { large_image: 'logo', large_text: 'dango' } }
-                  : {}),
+                ...(logo ? { assets: { large_image: logo, large_text: 'dango' } } : {}),
                 buttons: ['Learn More'],
                 metadata: { button_urls: ['https://github.com/serifpersia/dango'] },
                 status_display_type: 2,
@@ -391,6 +413,7 @@ class DiscordGatewayService {
         } else if (msg.op === 0) {
           if (msg.t === 'READY') {
             log.info(`Gateway READY as ${msg.d.user?.username || 'unknown'}`)
+            this.logoAssetChecked = false
             if (this.lastActivity) {
               void this.updatePresence(this.lastActivity).catch((err) =>
                 log.warn({ err }, 'failed to restore presence after READY')

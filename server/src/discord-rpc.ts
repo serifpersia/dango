@@ -406,7 +406,7 @@ class DiscordRPCService {
     if (!this.isEnabled) return
 
     if (discordGatewayService.serviceEnabled) {
-      discordGatewayService.setIdleStatus(page)
+      void discordGatewayService.setIdleStatus(page)
       return
     }
 
