@@ -12,6 +12,89 @@
   background:
     radial-gradient(circle at 50% 0%, var(--accent-subtle), transparent 55%), var(--bg-main);
   color: var(--text-primary);
+  animation: gateFadeIn 0.35s var(--ease-smooth);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
+}
+
+.gateExiting {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.appEntering {
+  animation: appEnter 0.4s var(--ease-smooth);
+}
+
+@keyframes gateFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes appEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dotPulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
 }
 
 .gateInner {
@@ -21,6 +104,46 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
+  animation: gateFadeIn 0.35s var(--ease-smooth);
+}
+
+.connecting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: clamp(2rem, 8vh, 4rem);
+}
+
+.connectingLogo {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(circle at 35% 30%, var(--accent-light, var(--accent)), transparent 60%),
+    var(--accent);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.connectingDots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.connectingDots span {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-secondary);
+  animation: dotPulse 1.1s ease-in-out infinite;
+}
+
+.connectingDots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.connectingDots span:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 .gateTitle {
@@ -53,6 +176,32 @@
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  animation: cardIn 0.35s var(--ease-smooth) backwards;
+}
+
+.profileCard:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.profileCard:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.profileCard:nth-child(3) {
+  animation-delay: 0.11s;
+}
+.profileCard:nth-child(4) {
+  animation-delay: 0.15s;
+}
+.profileCard:nth-child(5) {
+  animation-delay: 0.19s;
+}
+.profileCard:nth-child(6) {
+  animation-delay: 0.23s;
+}
+.profileCard:nth-child(7) {
+  animation-delay: 0.27s;
+}
+.profileCard:nth-child(8) {
+  animation-delay: 0.31s;
 }
 
 .profileCard:disabled {
@@ -147,6 +296,7 @@
   border-radius: var(--radius-lg);
   background: var(--bg-tertiary);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  animation: panelSlideIn 0.35s var(--ease-smooth);
 }
 
 .panelAvatar {
@@ -269,6 +419,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gate,
+  .gateInner,
+  .gatePanel,
+  .profileCard,
+  .appEntering,
+  .connectingLogo,
+  .connectingDots span {
+    animation: none;
+    transition: none;
+  }
+
   .profileCardAvatar {
     transition: none;
   }

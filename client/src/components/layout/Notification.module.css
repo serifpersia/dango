@@ -272,6 +272,15 @@
   flex-shrink: 0;
 }
 
+.thumbWrap {
+  width: 48px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
 .thumbnail {
   width: 48px;
   height: 64px;

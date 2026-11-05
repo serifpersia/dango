@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import { fixThumbnailUrl } from '../../lib/utils'
 import type { Notification } from '../../hooks/useAnimeData'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -54,13 +55,15 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
 
   return (
     <div className={styles.item}>
-      <img
-        src={fixThumbnailUrl(notification.thumbnail, 48, 64)}
-        alt={notification.name}
-        className={styles.thumbnail}
-        loading="lazy"
-        decoding="async"
-      />
+      <span className={styles.thumbWrap}>
+        <FadeImage
+          src={fixThumbnailUrl(notification.thumbnail, 48, 64)}
+          alt={notification.name}
+          className={styles.thumbnail}
+          loading="lazy"
+          decoding="async"
+        />
+      </span>
       <div className={styles.itemInfo}>
         <Link
           to={`/watch/${notification.showId}/${notification.episodeNumber}`}

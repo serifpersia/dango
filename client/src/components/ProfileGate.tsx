@@ -9,10 +9,32 @@ import Icon from './common/Icon'
 import ProfileAvatar from './common/ProfileAvatar'
 import styles from './settings/Profiles.module.css'
 
+const ENTERING_KEY = 'dango:entering-profile'
+
+function wasEntering(): boolean {
+  try {
+    return !!sessionStorage.getItem(ENTERING_KEY)
+  } catch {
+    return false
+  }
+}
+
+function markEntering() {
+  try {
+    sessionStorage.setItem(ENTERING_KEY, String(Date.now()))
+  } catch {
+    // ignore
+  }
+}
+
 type View = 'pick' | 'password' | 'create'
 
 export default function ProfileGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [entering, setEntering] = useState(() => wasEntering())
+  const [loading, setLoading] = useState(true)
+  const [slowLoad, setSlowLoad] = useState(false)
   const [lanLocked, setLanLocked] = useState(false)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selected, setSelected] = useState('')
@@ -27,12 +49,28 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
+    let leaveTimer: ReturnType<typeof setTimeout> | undefined
     setError('')
+    setLoading(true)
+    setSlowLoad(false)
+    let becameSlow = false
+    const slowTimer = setTimeout(() => {
+      if (!cancelled) {
+        becameSlow = true
+        setSlowLoad(true)
+      }
+    }, 500)
+    const finish = () => {
+      if (slowTimer) clearTimeout(slowTimer)
+      setSlowLoad(false)
+    }
     const check = async () => {
       const lan = await fetchApi('/api/auth/app-status')
       if (cancelled) return
       if (lan.hasPassword && !lan.isAuthenticated) {
         setLanLocked(true)
+        finish()
+        setLoading(false)
         return
       }
       const status: { profiles: Profile[]; current: Profile | null } =
@@ -40,26 +78,56 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
       if (cancelled) return
       if (status.current) {
         setActiveProfileId(status.current.id)
-        setReady(true)
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const showExit = becameSlow && !reduceMotion
+        if (showExit) setLeaving(true)
+        leaveTimer = setTimeout(
+          () => {
+            if (cancelled) return
+            finish()
+            setReady(true)
+            setLeaving(false)
+            setLoading(false)
+            try {
+              sessionStorage.removeItem(ENTERING_KEY)
+            } catch {
+              // ignore
+            }
+          },
+          showExit ? 280 : 0
+        )
       } else {
+        finish()
         setProfiles(status.profiles)
         setSelected(status.profiles[0]?.id ?? '')
+        setLoading(false)
       }
     }
     check().catch((error) => {
-      if (!cancelled) setError(error.message)
+      if (!cancelled) {
+        finish()
+        setError(error.message)
+        setLoading(false)
+      }
     })
     return () => {
       cancelled = true
+      if (leaveTimer) clearTimeout(leaveTimer)
+      if (slowTimer) clearTimeout(slowTimer)
     }
   }, [retry])
 
   useEffect(() => {
     const changed = (event: StorageEvent) => {
-      if (event.key === 'dango:profile-session-change') window.location.reload()
+      if (event.key === 'dango:profile-session-change') {
+        markEntering()
+        window.location.reload()
+      }
     }
     const expired = () => {
       setReady(false)
+      setLeaving(false)
+      setEntering(false)
       setRetry((value) => value + 1)
     }
     window.addEventListener('storage', changed)
@@ -78,6 +146,7 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
         method: 'POST',
         body: JSON.stringify({ id, password: value }),
       })
+      markEntering()
       reloadProfiles()
     } catch (error) {
       setError((error as Error).message)
@@ -99,11 +168,17 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
     setError('')
   }
 
-  if (ready) return children
+  if (ready) {
+    return entering ? <div className={styles.appEntering}>{children}</div> : children
+  }
   const profile = profiles.find((profile) => profile.id === selected)
 
+  if (loading && !slowLoad && !error && !lanLocked) {
+    return <div className={styles.gate} aria-hidden="true" />
+  }
+
   return (
-    <div className={styles.gate}>
+    <div className={`${styles.gate}${leaving ? ` ${styles.gateExiting}` : ''}`}>
       <Toaster />
       <LanAuthModal
         isOpen={lanLocked}
@@ -114,11 +189,23 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
         }}
       />
 
-      {view === 'pick' && (
+      {view === 'pick' && loading && slowLoad && !profiles.length && !error && !lanLocked && (
+        <section className={styles.gateInner} aria-busy="true" aria-label="Connecting to Dango">
+          <div className={styles.connecting}>
+            <span className={styles.connectingLogo} aria-hidden="true" />
+            <h1 className={styles.gateTitle}>Connecting to Dango</h1>
+            <span className={styles.connectingDots} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </div>
+        </section>
+      )}
+
+      {view === 'pick' && !loading && (
         <section className={styles.gateInner}>
-          <h1 className={styles.gateTitle}>
-            {profiles.length ? "Who's watching?" : 'Connecting to Dango…'}
-          </h1>
+          <h1 className={styles.gateTitle}>{profiles.length ? "Who's watching?" : 'Dango'}</h1>
           {profiles.length > 0 && (
             <div className={styles.profileGrid}>
               {profiles.map((profile) => (
@@ -180,7 +267,7 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
       )}
 
       {view === 'password' && profile && (
-        <section className={styles.gatePanel}>
+        <section key="password" className={styles.gatePanel}>
           <button type="button" className={styles.backButton} onClick={back}>
             <Icon name="chevron-left" />
             Back
@@ -225,7 +312,7 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
       )}
 
       {view === 'create' && (
-        <section className={styles.gatePanel}>
+        <section key="create" className={styles.gatePanel}>
           <button type="button" className={styles.backButton} onClick={back}>
             <Icon name="chevron-left" />
             Back
