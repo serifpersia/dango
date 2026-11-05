@@ -1,18 +1,283 @@
 .gate {
   min-height: 100dvh;
-  display: grid;
-  place-content: center;
-  padding: var(--space-5);
-  background: var(--bg-primary);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: max(env(safe-area-inset-top), var(--space-5))
+    max(env(safe-area-inset-right), var(--space-4)) max(env(safe-area-inset-bottom), var(--space-5))
+    max(env(safe-area-inset-left), var(--space-4));
+  background:
+    radial-gradient(circle at 50% 0%, var(--accent-subtle), transparent 55%), var(--bg-main);
   color: var(--text-primary);
 }
 
-.panel {
-  width: min(100%, 440px);
-  padding: var(--space-5);
+.gateInner {
+  width: min(100%, 880px);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.gateTitle {
+  margin: 0;
+  font-size: clamp(1.75rem, 5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 132px));
+  justify-content: center;
+  gap: var(--space-5) var(--space-4);
+  width: 100%;
+}
+
+.profileCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profileCard:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.profileCard:focus-visible {
+  outline: none;
+}
+
+.profileCardAvatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.profileCard:hover .profileCardAvatar,
+.profileCard:focus-visible .profileCardAvatar {
+  transform: translateY(-3px) scale(1.02);
+  border-color: var(--accent);
+  box-shadow: 0 12px 32px var(--accent-glow);
+}
+
+.profileCard:active .profileCardAvatar {
+  transform: scale(0.98);
+}
+
+.addAvatar {
+  border: 2px dashed var(--border-secondary);
+  background: var(--bg-tertiary);
+}
+
+.profileCard:hover .addAvatar {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.profileCardName {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ownerTag {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.lockBadge {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.gatePanel {
+  width: min(100%, 420px);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-lg);
   background: var(--bg-tertiary);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.panelAvatar {
+  align-self: center;
+  width: 96px;
+  height: 96px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  text-align: center;
+}
+
+.gateForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.gateField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.gateField input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.gateField input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-input-focus);
+}
+
+.gateHint {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.gateError {
+  margin: 0;
+  color: var(--danger-color);
+  text-align: center;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.backButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.backButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .gateInner {
+    gap: var(--space-5);
+  }
+
+  .profileGrid {
+    grid-template-columns: repeat(auto-fit, minmax(min(88px, 100%), 116px));
+    gap: var(--space-4) var(--space-3);
+  }
+
+  .profileCard {
+    min-height: 44px;
+  }
+
+  .gatePanel {
+    padding: var(--space-5);
+    gap: var(--space-3);
+  }
+
+  .panelAvatar {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 380px) {
+  .profileGrid {
+    grid-template-columns: repeat(auto-fit, minmax(min(78px, 100%), 98px));
+    gap: var(--space-4) var(--space-2);
+  }
+
+  .gatePanel {
+    padding: var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profileCardAvatar {
+    transition: none;
+  }
+
+  .profileCard:hover .profileCardAvatar,
+  .profileCard:focus-visible .profileCardAvatar,
+  .profileCard:active .profileCardAvatar {
+    transform: none;
+  }
 }
 
 .form {

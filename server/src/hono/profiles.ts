@@ -88,6 +88,38 @@ export function registerProfiles(app: Hono, getStore: () => ProfileStore | undef
     return c.json({ success: true })
   })
 
+  app.post('/api/profiles/create', async (c) => {
+    const store = getStore()
+    if (!store) return c.json({ error: 'Profiles initializing' }, 503)
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ error: 'Invalid profile' }, 400)
+    if (!store.resolve(profileToken(c))?.owner) {
+      const owner = store.list().find((profile) => profile.owner)
+      if (!owner) return c.json({ error: 'Owner profile not found' }, 403)
+      for (const [key, value] of failures) if (value.until < Date.now()) failures.delete(key)
+      const failure = failures.get(owner.id)
+      if (failure && failure.attempts >= 10)
+        return c.json({ error: 'Too many attempts. Try again in 5 minutes.' }, 429)
+      if (typeof body.ownerPassword !== 'string' || body.ownerPassword.length > 256)
+        return c.json({ error: 'Owner password required' }, 403)
+      try {
+        store.logout(store.login(owner.id, body.ownerPassword))
+        failures.delete(owner.id)
+      } catch {
+        failures.set(owner.id, {
+          attempts: (failure?.attempts ?? 0) + 1,
+          until: failure?.until ?? Date.now() + 300000,
+        })
+        return c.json({ error: 'Incorrect owner password' }, 401)
+      }
+    }
+    try {
+      return c.json(store.create(body.name, body.password))
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400)
+    }
+  })
+
   app.use('/api/*', async (c, next) => {
     const store = getStore()
     if (!store || c.req.path.startsWith('/api/internal/')) return next()
@@ -130,16 +162,6 @@ export function registerProfiles(app: Hono, getStore: () => ProfileStore | undef
     return c.json({ ...profile, image: profile.avatar ?? cloudAvatar })
   })
 
-  app.post('/api/profiles/create', async (c) => {
-    if (!profileScope.getStore()?.owner) return c.json({ error: 'Owner access required' }, 403)
-    try {
-      const body = await c.req.json()
-      return c.json(getStore()!.create(body.name, body.password))
-    } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400)
-    }
-  })
-
   app.post('/api/profiles/update', async (c) => {
     try {
       const body = await c.req.json()
@@ -161,6 +183,26 @@ export function registerProfiles(app: Hono, getStore: () => ProfileStore | undef
       return c.json({ success: true })
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400)
+    }
+  })
+
+  app.post('/api/profiles/reset-password', async (c) => {
+    if (!profileScope.getStore()?.owner) return c.json({ error: 'Owner access required' }, 403)
+    const body = await c.req.json().catch(() => null)
+    if (typeof body?.id !== 'string') return c.json({ error: 'Profile ID is required' }, 400)
+    try {
+      const store = getStore()!
+      const target = store.get(body.id)
+      if (!target) return c.json({ error: 'Profile not found' }, 400)
+      if (target.owner)
+        return c.json({ error: 'Use your own profile settings to change the owner password' }, 400)
+      store.resetPassword(body.id, body.password)
+      return c.json({ success: true })
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : 'Could not reset password' },
+        400
+      )
     }
   })
 

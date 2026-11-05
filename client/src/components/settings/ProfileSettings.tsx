@@ -27,6 +27,8 @@ export default function ProfileSettings() {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [deleting, setDeleting] = useState<Profile | null>(null)
+  const [resetting, setResetting] = useState<Profile | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
 
   const update = async (body: Record<string, unknown>) => {
     setBusy(true)
@@ -226,6 +228,18 @@ export default function ProfileSettings() {
                   </span>
                   <span className={styles.profileName}>{other.name}</span>
                   <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setMessage('')
+                      setResetPassword('')
+                      setResetting(other)
+                    }}
+                  >
+                    Reset password
+                  </Button>
+                  <Button
                     variant="danger"
                     size="sm"
                     disabled={busy}
@@ -241,6 +255,60 @@ export default function ProfileSettings() {
           </ul>
         </>
       )}
+      <Modal
+        isOpen={!!resetting}
+        onClose={busy ? undefined : () => setResetting(null)}
+        title="Reset password"
+        width="sm"
+        footer={
+          <>
+            <Button variant="secondary" disabled={busy} onClick={() => setResetting(null)}>
+              Cancel
+            </Button>
+            <Button
+              loading={busy}
+              onClick={async () => {
+                if (!resetting) return
+                setBusy(true)
+                setMessage('')
+                try {
+                  await fetchApi('/api/profiles/reset-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ id: resetting.id, password: resetPassword }),
+                  })
+                  await queryClient.invalidateQueries({ queryKey: ['profiles'] })
+                  setResetting(null)
+                  setResetPassword('')
+                  setMessage('Password updated. The profile has been signed out.')
+                } catch (error) {
+                  setMessage((error as Error).message)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              Save password
+            </Button>
+          </>
+        }
+      >
+        <p>
+          Set a new password for <strong>{resetting?.name}</strong>. They will be signed out and
+          must use the new password next time.
+        </p>
+        <label className={styles.field}>
+          New password
+          <input
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            maxLength={256}
+            placeholder="Leave empty to remove their password"
+            value={resetPassword}
+            onChange={(event) => setResetPassword(event.currentTarget.value)}
+          />
+        </label>
+      </Modal>
       <Modal
         isOpen={!!deleting}
         onClose={busy ? undefined : () => setDeleting(null)}

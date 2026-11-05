@@ -201,6 +201,69 @@ test('profile HTTP routes enforce ownership, session identity, LAN protection an
       403
     )
     assert.equal(
+      (
+        await request('/api/profiles/create', undefined, {
+          name: 'Wrong owner',
+          password: '',
+          ownerPassword: 'wrong-password',
+        })
+      ).status,
+      401
+    )
+    const gateCreated = await request('/api/profiles/create', undefined, {
+      name: 'Gate profile',
+      password: '',
+      ownerPassword: 'owner-password',
+    })
+    assert.equal(gateCreated.status, 200)
+    const gateCreatedProfile = (await gateCreated.json()) as { id: string; name: string }
+    assert.equal(gateCreatedProfile.name, 'Gate profile')
+    assert.equal(
+      (
+        await request('/api/profiles/reset-password', memberToken, {
+          id: gateCreatedProfile.id,
+          password: 'reset-password',
+        })
+      ).status,
+      403
+    )
+    assert.equal(
+      (
+        await request('/api/profiles/reset-password', ownerToken, {
+          id: 'default',
+          password: 'reset-password',
+        })
+      ).status,
+      400
+    )
+    assert.equal(
+      (
+        await request('/api/profiles/reset-password', ownerToken, {
+          id: gateCreatedProfile.id,
+          password: 'reset-password',
+        })
+      ).status,
+      200
+    )
+    assert.equal(
+      (
+        await request('/api/profiles/login', undefined, {
+          id: gateCreatedProfile.id,
+          password: 'reset-password',
+        })
+      ).status,
+      200
+    )
+    assert.equal(
+      (
+        await request('/api/profiles/delete', ownerToken, {
+          id: gateCreatedProfile.id,
+          confirm: true,
+        })
+      ).status,
+      200
+    )
+    assert.equal(
       (await request('/api/trpc/auth.setServerPort', memberToken, { port: 4444 })).status,
       403
     )

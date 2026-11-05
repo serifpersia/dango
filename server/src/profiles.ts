@@ -170,6 +170,17 @@ export class ProfileStore {
     return this.get(id)!
   }
 
+  resetPassword(id: string, password: unknown) {
+    const row = this.registry
+      .prepare('SELECT * FROM profiles WHERE id = ? AND deleted = 0')
+      .get(id) as ProfileRow | undefined
+    if (!row) throw new Error('Profile not found')
+    this.registry
+      .prepare('UPDATE profiles SET password = ? WHERE id = ?')
+      .run(validPassword(password), id)
+    this.registry.prepare('DELETE FROM sessions WHERE profileId = ?').run(id)
+  }
+
   update(
     id: string,
     input: { name?: unknown; password?: unknown; currentPassword?: unknown; avatar?: unknown }
