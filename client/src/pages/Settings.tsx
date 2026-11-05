@@ -81,6 +81,9 @@ const Settings: React.FC = () => {
   const { data: discordSetting } = useSetting('discordRPCEnabled')
   const updateSetting = useUpdateSetting()
 
+  const [frozenMode, setFrozenMode] = useState(false)
+  const { data: frozenSetting } = useSetting('frozenMode')
+
   const [dangoGaze, setDangoGaze] = useState(true)
   const { data: dangoGazeSetting } = useSetting('dangoGaze')
 
@@ -128,6 +131,17 @@ const Settings: React.FC = () => {
   const toggleDiscord = (enabled: boolean) => {
     setDiscordEnabled(enabled)
     updateSetting.mutate({ key: 'discordRPCEnabled', value: String(enabled) })
+  }
+
+  useEffect(() => {
+    if (frozenSetting !== undefined) {
+      setFrozenMode(frozenSetting === 'true' || frozenSetting === true)
+    }
+  }, [frozenSetting])
+
+  const toggleFrozen = (enabled: boolean) => {
+    setFrozenMode(enabled)
+    updateSetting.mutate({ key: 'frozenMode', value: String(enabled) })
   }
 
   useEffect(() => {
@@ -380,6 +394,30 @@ const Settings: React.FC = () => {
                     isChecked={virtualKeyboardEnabled}
                     onChange={(e) => toggleVirtualKeyboard(e.currentTarget.checked)}
                     id="virtual-keyboard-enabled"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Frozen Mode</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      When on, nothing is saved or synced: no watchlist, progress, resume, or
+                      settings changes, and no cloud sync (GitHub/Google/rclone) or tracker push.
+                      Useful for experimentation and private sessions.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={frozenMode}
+                    onChange={(e) => toggleFrozen(e.currentTarget.checked)}
+                    id="frozen-mode"
                   />
                 </div>
               </div>

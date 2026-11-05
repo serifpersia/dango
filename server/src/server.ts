@@ -37,6 +37,7 @@ import { offlineDb } from './lib/offline-db/index.js'
 import { requestMalImportCancel } from './lib/mal-import.js'
 import { ProfileStore } from './profiles.js'
 import { profileScope, profileService } from './profile-scope.js'
+import { initFrozen } from './frozen.js'
 
 const app = createHonoApp(
   () => ({ shuttingDown: isShuttingDown, dbReady: !!db }),
@@ -205,6 +206,7 @@ async function main() {
   profiles = new ProfileStore()
   profiles.attachDefault({ db, mangaDb, tvDb, asmrDb })
   profiles.onOpen = async (dbs) => {
+    await initFrozen(dbs.db)
     await runFullSyncSequence(dbs, { remoteFolder }).catch((err) =>
       logger.error({ err }, 'Profile boot sync failed')
     )
@@ -225,6 +227,7 @@ async function main() {
     })
   }
 
+  await initFrozen(db)
   const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
   const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
   await discordRPCService.setEnabled(isRpcEnabled)

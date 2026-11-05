@@ -8,6 +8,7 @@ import { performWriteTransactionAsync } from '../../db/transaction.js'
 import { getMigratedId } from '../../lib/migration.js'
 import { episodeProgressInput, progressUpdateInput, showIdInput } from '../validation.js'
 import { pushCompletedEpisode } from '../../lib/tracker/episode-push.js'
+import { isFrozen } from '../../frozen.js'
 
 async function showsMetaChanged(
   db: DatabaseWrapper,
@@ -164,7 +165,7 @@ export const progressRouter = router({
         await NotificationsRepository.deleteDiscovered(tx, showId, episodeNumber)
       })
 
-      if (duration > 0 && currentTime >= duration * 0.8) {
+      if (!isFrozen() && duration > 0 && currentTime >= duration * 0.8) {
         void pushCompletedEpisode(ctx.db, showId, episodeNumber).catch(() => {})
       }
 

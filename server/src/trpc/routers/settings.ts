@@ -11,6 +11,7 @@ import { defineSchema, reqObj } from '../validation.js'
 import { badRequest, conflict } from '../errors.js'
 import { keyInput, setSettingInput } from '../validation.js'
 import { isPrivateTrackerSetting } from '../../lib/tracker/local-settings.js'
+import { FROZEN_MODE_KEY, isFrozen, setFrozen } from '../../frozen.js'
 
 export const SETTING_DEFAULTS: Record<string, string> = {
   discordRPCEnabled: 'true',
@@ -20,6 +21,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   mangaIgnoreAdultContent: 'true',
   tvIgnoreAdultContent: 'true',
   asmrIgnoreAdultContent: 'true',
+  frozenMode: 'false',
 }
 
 const autoUpdateInput = () =>
@@ -39,6 +41,7 @@ const translateInput = () =>
   })
 
 export const settingsRouter = router({
+  frozenStatus: protectedProcedure.query(() => ({ frozen: isFrozen() })),
   watchAlong: protectedProcedure.query(() => ({ workerUrl: CONFIG.WATCH_ALONG_WORKER_URL })),
   getByKey: protectedProcedure.input(keyInput()).query(async ({ ctx, input }) => {
     if (isPrivateTrackerSetting(input.key))
@@ -50,6 +53,20 @@ export const settingsRouter = router({
 
   set: protectedProcedure.input(setSettingInput()).mutation(async ({ ctx, input }) => {
     const key = input.key
+    if (key === FROZEN_MODE_KEY) {
+      const enabled = input.value === 'true' || input.value === true
+      await performWriteTransactionAsync(
+        ctx.db,
+        async (tx) => {
+          await SettingsRepository.upsert(tx, key, String(enabled))
+        },
+        undefined,
+        { allowWhenFrozen: true }
+      )
+      setFrozen(enabled)
+      return { success: true }
+    }
+    if (isFrozen()) return { success: true, frozen: true }
     if (key.startsWith('discord') && profileScope.getStore()?.owner === false)
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Owner access required' })
     if (isPrivateTrackerSetting(key))

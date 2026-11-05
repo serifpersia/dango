@@ -19,6 +19,7 @@ import {
   type SyncPayload,
 } from './sync-payload.js'
 import { SYNC_KINDS, withLabel, type SyncBackend, type SyncKind } from './sync-backend.js'
+import { isFrozen } from './frozen.js'
 
 const log = logger.child({ module: 'Sync' })
 
@@ -290,6 +291,7 @@ export async function syncDownOnBoot(
   kind: MediaKind,
   remoteFolderName: string
 ): Promise<number> {
+  if (isFrozen()) return -1
   const label = SYNC_KINDS[kind].label
   let localVersion = await getKindManifestVersion(kind)
 
@@ -354,6 +356,7 @@ export async function syncUp(
   remoteFolderName: string,
   knownRemoteVersion?: number
 ): Promise<void> {
+  if (isFrozen()) return
   const label = SYNC_KINDS[kind].label
   const backend = activeBackend()
   if (!backend) return
@@ -405,6 +408,7 @@ export async function runFullSyncSequence(
     preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
   }
 ): Promise<void> {
+  if (isFrozen()) return
   await initSyncProvider(opts.preferredProvider)
 
   if (getActiveProvider() === 'github' && getGitHubSyncService().isAuthenticated()) {

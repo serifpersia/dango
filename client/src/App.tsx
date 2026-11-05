@@ -42,6 +42,7 @@ import { LanAuthProvider } from './contexts/LanAuthProvider'
 import { useLanAuth } from './contexts/LanAuthContext'
 import LanAuthModal from './components/modals/LanAuthModal'
 import TrackerSyncNotice from './components/common/TrackerSyncNotice'
+import { useSetting } from './hooks/useSettings'
 
 function App() {
   useDangoAnimation()
@@ -61,6 +62,8 @@ function App() {
   const [navigationPending, setNavigationPending] = useState(false)
   const virtualKeyboard = useVirtualKeyboard()
   useDiscordPageStatus()
+  const { data: frozenSetting } = useSetting('frozenMode')
+  const frozen = frozenSetting === 'true' || frozenSetting === true
 
   const [lanLocked, setLanLocked] = useState(false)
 
@@ -252,6 +255,19 @@ function App() {
         }}
       />
       {navigationPending && <TopProgressBar />}
+      {frozen && (
+        <div
+          style={{
+            padding: '0.5rem 1rem',
+            background: 'var(--bg-tertiary)',
+            borderBottom: '1px solid var(--border-color)',
+            fontSize: '0.85rem',
+            textAlign: 'center',
+          }}
+        >
+          <strong>Frozen Mode:</strong> nothing is being saved or synced.
+        </div>
+      )}
       <TrackerSyncNotice enabled={!lanLocked && !lanAuthOpen} />
       <Header />
       <Sidebar />

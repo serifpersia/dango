@@ -12,6 +12,7 @@ import { clearRewatching, isRewatching, readRewatchMarkers, setRewatching } from
 import { withTrackerWrite } from './tracker-activity.js'
 import { withTrackerLock } from './sync-lock.js'
 import logger from '../../logger.js'
+import { isFrozen } from '../../frozen.js'
 
 export async function activeTracker(db: DatabaseWrapper) {
   const token = (await SettingsRepository.getByKey(db, 'tracker_anilist_token'))?.value
@@ -38,6 +39,7 @@ export async function pushCompletedEpisode(
   showId: string,
   episodeNumber?: string
 ): Promise<void> {
+  if (isFrozen()) return
   if (episodeNumber !== undefined && !/^[1-9]\d*$/.test(episodeNumber)) return
   let keys = pending.get(db)
   if (!keys) pending.set(db, (keys = new Set()))

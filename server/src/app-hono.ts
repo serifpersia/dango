@@ -66,6 +66,7 @@ import { registerTrackerActivity } from './hono/tracker-activity.js'
 import { registerProfiles, profileToken } from './hono/profiles.js'
 import type { ProfileStore } from './profiles.js'
 import { profileScope } from './profile-scope.js'
+import { isFrozen } from './frozen.js'
 
 export type HonoHealthState = {
   shuttingDown: boolean
@@ -529,6 +530,7 @@ export function createHonoApp(
   )
 
   app.post('/api/import/mal-xml', async (c) => {
+    if (isFrozen()) return c.json({ error: 'Frozen mode is on' }, 403)
     const dbs = getDbs()
     const fields = (await c.req.parseBody().catch(() => ({}))) as Record<
       string,
@@ -651,6 +653,7 @@ export function createHonoApp(
   })
 
   app.post('/api/import/mal-xml-manga', async (c) => {
+    if (isFrozen()) return c.json({ error: 'Frozen mode is on' }, 403)
     const fields = (await c.req.parseBody().catch(() => ({}))) as Record<
       string,
       string | File | undefined
@@ -717,6 +720,7 @@ export function createHonoApp(
   })
 
   app.post('/api/database/clear', async (c) => {
+    if (isFrozen()) return c.json({ error: 'Frozen mode is on' }, 403)
     const body = (await c.req.json().catch(() => undefined)) as { confirm?: unknown } | undefined
     if (body?.confirm !== true) {
       return c.json({ error: 'Confirmation required' }, 400)
@@ -759,6 +763,7 @@ export function createHonoApp(
   })
 
   app.post('/api/restore-db', async (c) => {
+    if (isFrozen()) return c.json({ error: 'Frozen mode is on' }, 403)
     const dbs = getDbs()
     let buffer: Buffer | undefined
     let originalName = ''

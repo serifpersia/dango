@@ -27,6 +27,7 @@ import {
   unauthorized,
   unavailable,
 } from '../errors.js'
+import { isFrozen } from '../../frozen.js'
 
 const TRACKER_TOKEN_KEY = 'tracker_anilist_token'
 const TRACKER_USER_KEY = 'tracker_anilist_user'
@@ -158,6 +159,11 @@ export const trackerRouter = router({
   }),
 
   sync: protectedProcedure.input(trackerSyncInput()).mutation(async ({ ctx, input }) => {
+    if (isFrozen())
+      return {
+        success: true,
+        summary: { errors: [], unchanged: 0, pushed: 0, pulled: 0, merged: 0 },
+      }
     const { provider = 'anilist' } = input
     if (provider !== 'anilist' && provider !== 'mal') {
       throw badRequest(`Provider "${provider}" is not supported yet`)

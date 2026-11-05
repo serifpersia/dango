@@ -4,6 +4,7 @@ import type { DatabaseWrapper } from '../db.js'
 import { runTx } from './drizzle.js'
 import { dbGet } from '../utils/db-utils.js'
 import { CONFIG } from '../config.js'
+import { isFrozen } from '../frozen.js'
 
 export async function getLocalManifestVersion(
   manifestPath: string = CONFIG.LOCAL_MANIFEST_PATH
@@ -29,8 +30,10 @@ export async function setLocalManifestVersion(
 export async function performWriteTransactionAsync(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => Promise<void>,
-  setVersion: (version: number) => Promise<void> = (v) => setLocalManifestVersion(v)
+  setVersion: (version: number) => Promise<void> = (v) => setLocalManifestVersion(v),
+  opts?: { allowWhenFrozen?: boolean }
 ): Promise<void> {
+  if (isFrozen() && !opts?.allowWhenFrozen) return
   await runTx(db, async (tx) => {
     await runnable(tx)
     tx.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
@@ -47,27 +50,39 @@ export async function performWriteTransactionAsync(
 
 export async function performMangaWriteTransactionAsync(
   db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => Promise<void>
+  runnable: (tx: DatabaseWrapper) => Promise<void>,
+  opts?: { allowWhenFrozen?: boolean }
 ): Promise<void> {
-  await performWriteTransactionAsync(db, runnable, (v) =>
-    setLocalManifestVersion(v, CONFIG.MANGA_LOCAL_MANIFEST_PATH)
+  await performWriteTransactionAsync(
+    db,
+    runnable,
+    (v) => setLocalManifestVersion(v, CONFIG.MANGA_LOCAL_MANIFEST_PATH),
+    opts
   )
 }
 
 export async function performTvWriteTransactionAsync(
   db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => Promise<void>
+  runnable: (tx: DatabaseWrapper) => Promise<void>,
+  opts?: { allowWhenFrozen?: boolean }
 ): Promise<void> {
-  await performWriteTransactionAsync(db, runnable, (v) =>
-    setLocalManifestVersion(v, CONFIG.TV_LOCAL_MANIFEST_PATH)
+  await performWriteTransactionAsync(
+    db,
+    runnable,
+    (v) => setLocalManifestVersion(v, CONFIG.TV_LOCAL_MANIFEST_PATH),
+    opts
   )
 }
 
 export async function performAsmrWriteTransactionAsync(
   db: DatabaseWrapper,
-  runnable: (tx: DatabaseWrapper) => Promise<void>
+  runnable: (tx: DatabaseWrapper) => Promise<void>,
+  opts?: { allowWhenFrozen?: boolean }
 ): Promise<void> {
-  await performWriteTransactionAsync(db, runnable, (v) =>
-    setLocalManifestVersion(v, CONFIG.ASMR_LOCAL_MANIFEST_PATH)
+  await performWriteTransactionAsync(
+    db,
+    runnable,
+    (v) => setLocalManifestVersion(v, CONFIG.ASMR_LOCAL_MANIFEST_PATH),
+    opts
   )
 }

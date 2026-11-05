@@ -16,6 +16,7 @@ import { searchAnilistMangaByTitle } from '../anilist/index.js'
 import { readTrackerSyncState } from './sync-state.js'
 import { clearRewatching } from './rewatch.js'
 import logger from '../../logger.js'
+import { isFrozen } from '../../frozen.js'
 import {
   performMangaWriteTransactionAsync,
   performWriteTransactionAsync,
@@ -26,6 +27,7 @@ export async function pushMangaEntry(
   mangaDb: DatabaseWrapper,
   id: string
 ): Promise<void> {
+  if (isFrozen()) return
   try {
     const { provider, token } = await activeTracker(db)
     if (!provider) return

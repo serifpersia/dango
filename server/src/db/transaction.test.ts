@@ -6,6 +6,7 @@ import { afterEach, beforeEach, test } from 'node:test'
 import type { DatabaseWrapper } from '../db.js'
 import { performAsmrWriteTransactionAsync, performWriteTransactionAsync } from './transaction.js'
 import { createTestDb } from '../test-helpers.js'
+import { setFrozen } from '../frozen.js'
 
 let db: DatabaseWrapper
 let cleanup: () => void
@@ -19,6 +20,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  setFrozen(false)
   cleanup()
   fs.rmSync(manifestDir, { recursive: true, force: true })
 })
@@ -76,6 +78,30 @@ test('performWriteTransactionAsync writes the version through the callback', asy
   )?.value
   assert.equal(written, expected)
   assert.equal(JSON.parse(fs.readFileSync(manifest, 'utf-8')).version, expected)
+})
+
+test('frozen mode skips writes and version bump', async () => {
+  const before = db.get<{ value: number }>(
+    `SELECT value FROM sync_metadata WHERE key='db_version'`
+  )?.value
+  setFrozen(true)
+  await performWriteTransactionAsync(db, async (tx) => {
+    tx.run(`INSERT INTO settings (key,value) VALUES ('k','v')`)
+  })
+  assert.equal(db.get(`SELECT value FROM settings WHERE key='k'`), undefined)
+  assert.equal(
+    db.get<{ value: number }>(`SELECT value FROM sync_metadata WHERE key='db_version'`)?.value,
+    before
+  )
+  await performWriteTransactionAsync(
+    db,
+    async (tx) => {
+      tx.run(`INSERT INTO settings (key,value) VALUES ('k','v')`)
+    },
+    undefined,
+    { allowWhenFrozen: true }
+  )
+  assert.equal(db.get<{ value: string }>(`SELECT value FROM settings WHERE key='k'`)?.value, 'v')
 })
 
 test('the per-kind wrapper bumps db_version like the generic one', async () => {
