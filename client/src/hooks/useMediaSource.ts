@@ -109,16 +109,21 @@ export function useMediaSource({
       } catch {
         // ignore
       }
-      const pickedIdx = pickSubtitleIndex(selectedSource.subtitles, {
+      const subtitles = selectedSource.subtitles.map((sub) => ({
+        ...sub,
+        lang: sub.lang || sub.language || sub.label || 'en',
+        label: sub.label || sub.lang || sub.language || 'en',
+      }))
+      const pickedIdx = pickSubtitleIndex(subtitles, {
         lastKey,
         enabled: subtitlesEnabled,
       })
-      const pickedTrack = pickedIdx >= 0 ? selectedSource.subtitles[pickedIdx] : null
-      selectedSource.subtitles.forEach((sub) => {
+      const pickedTrack = pickedIdx >= 0 ? subtitles[pickedIdx] : null
+      subtitles.forEach((sub) => {
         const track = document.createElement('track')
         track.kind = 'subtitles'
         track.label = sub.label
-        track.srclang = sub.lang
+        track.srclang = sub.lang || 'en'
 
         const subSrc = sub.src ?? sub.url
         if (subSrc) {
@@ -138,7 +143,7 @@ export function useMediaSource({
       if (!subtitlesEnabled) {
         setActiveSubtitleTrack('off')
       }
-      setAvailableSubtitles(selectedSource.subtitles)
+      setAvailableSubtitles(subtitles)
     }
 
     const targetTime = seekToTimeRef.current ?? 0

@@ -26,7 +26,7 @@ export function useSubtitleTracks({
     const handleTracksChange = () => {
       const tracks: SubtitleTrack[] = Array.from(videoElement.textTracks).map((t) => ({
         label: t.label,
-        lang: t.language,
+        lang: t.language === 'undefined' ? '' : t.language,
         src: undefined,
         mode: t.mode as 'showing' | 'hidden' | 'disabled',
       }))
@@ -62,7 +62,7 @@ export function useSubtitleTracks({
         return
       }
       const trackToActivate = availableSubtitles[idx]
-      setActiveSubtitleTrack(trackToActivate.lang || trackToActivate.label)
+      setActiveSubtitleTrack(trackToActivate.label || trackToActivate.lang)
     }
   }, [activeSubtitleTrack, availableSubtitles, setActiveSubtitleTrack])
 

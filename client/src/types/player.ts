@@ -33,6 +33,7 @@ export interface SubtitleTrack {
   src?: string
   url?: string
   lang: string
+  language?: string
   label: string
   mode?: 'showing' | 'hidden' | 'disabled'
 }

@@ -99,6 +99,7 @@ const Player: React.FC = () => {
     toggleWatchlist,
     moveToCompleted,
     setPreferredSource,
+    setPreferredLink,
     handleToggleDetails,
     resetEpisodeProgress,
     prefetchEpisodeSources,
@@ -866,6 +867,7 @@ const Player: React.FC = () => {
               }
 
               setPreferredSource(source.sourceName)
+              void setPreferredLink(link.resolutionStr)
               dispatch({
                 type: 'SET_STATE',
                 payload: {
@@ -1230,6 +1232,7 @@ const Player: React.FC = () => {
                   onLinkChange={(link) => {
                     if (!state.selectedSource) return
                     setPreferredSource(state.selectedSource.sourceName)
+                    void setPreferredLink(link.resolutionStr)
                     dispatch({
                       type: 'SET_STATE',
                       payload: { selectedLink: link },

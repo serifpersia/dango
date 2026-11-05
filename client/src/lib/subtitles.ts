@@ -23,6 +23,25 @@ export function pickSubtitleIndex<T extends SubtitleLike>(
   if (lastKey) {
     const idx = subs.findIndex((s) => subtitleKey(s) === lastKey)
     if (idx >= 0) return idx
+    const sep = lastKey.indexOf('|||')
+    if (sep >= 0) {
+      const lastLang = lastKey.slice(0, sep)
+      const lastLabel = lastKey.slice(sep + 3)
+      const fuzzy = subs.findIndex((s) => {
+        const lang = s.language ?? s.lang ?? ''
+        const label = s.label ?? ''
+        return (
+          (lastLabel !== '' && label === lastLabel) ||
+          (lastLang !== '' && lastLang !== 'undefined' && (lang === lastLang || label === lastLang))
+        )
+      })
+      if (fuzzy >= 0) return fuzzy
+    } else {
+      const byId = subs.findIndex(
+        (s) => s.label === lastKey || s.language === lastKey || s.lang === lastKey
+      )
+      if (byId >= 0) return byId
+    }
   }
   const eng = subs.findIndex(isEnglishSubtitle)
   return eng >= 0 ? eng : 0

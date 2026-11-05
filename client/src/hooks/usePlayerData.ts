@@ -28,6 +28,7 @@ interface UsePlayerDataReturn {
   toggleWatchlist: () => Promise<void>
   moveToCompleted: () => Promise<void>
   setPreferredSource: (sourceName: string) => Promise<void>
+  setPreferredLink: (resolutionStr: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
   markEpisodeWatched: (episodeNumber: string, duration: number) => Promise<void>
   resetEpisodeProgress: (episodeNumber: string) => Promise<void>
@@ -74,33 +75,35 @@ async function fetchVideoSources(
   if (!showId || !episodeNumber) throw new Error('Missing params')
 
   try {
-    const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
-      trpcClient.data.video
-        .query({
-          showId,
-          episodeNumber,
-          mode: ui.currentMode,
-          provider: ui.selectedProvider,
-        })
-        .catch(
-          (error: {
-            message?: string
-            data?: { cause?: { code?: string; provider?: string } }
-          }) => {
-            const cause = error.data?.cause
-            if (error.message === 'AUTH_REQUIRED' && cause?.provider === 'mkissa') {
-              dispatch({
-                type: 'SET_STATE',
-                payload: { showCookieModal: true, cookieProvider: 'mkissa' },
-              })
+    const [sources, progress, preferredSourceData, preferredLinkData, skipTimesData] =
+      await Promise.all([
+        trpcClient.data.video
+          .query({
+            showId,
+            episodeNumber,
+            mode: ui.currentMode,
+            provider: ui.selectedProvider,
+          })
+          .catch(
+            (error: {
+              message?: string
+              data?: { cause?: { code?: string; provider?: string } }
+            }) => {
+              const cause = error.data?.cause
+              if (error.message === 'AUTH_REQUIRED' && cause?.provider === 'mkissa') {
+                dispatch({
+                  type: 'SET_STATE',
+                  payload: { showCookieModal: true, cookieProvider: 'mkissa' },
+                })
+              }
+              return null
             }
-            return null
-          }
-        ),
-      trpcClient.progress.getEpisode.query({ showId, episodeNumber }).catch(() => null),
-      trpcClient.settings.getByKey.query({ key: 'preferredSource' }).catch(() => null),
-      trpcClient.data.skipTimes.query({ showId, episodeNumber }).catch(() => []),
-    ])
+          ),
+        trpcClient.progress.getEpisode.query({ showId, episodeNumber }).catch(() => null),
+        trpcClient.settings.getByKey.query({ key: 'preferredSource' }).catch(() => null),
+        trpcClient.settings.getByKey.query({ key: 'preferredLink' }).catch(() => null),
+        trpcClient.data.skipTimes.query({ showId, episodeNumber }).catch(() => []),
+      ])
 
     const preferredSourceName = preferredSourceData?.value
 
@@ -127,12 +130,35 @@ async function fetchVideoSources(
       if (found) sourceToSelect = found
     }
 
+    const preferredLinkStr = preferredLinkData?.value
+    const pickHeight = (label?: string): number => {
+      const match = /(\d{3,4})/.exec(label || '')
+      return match ? parseInt(match[1], 10) : 0
+    }
     const selectedLink =
       sourceToSelect && sourceToSelect.links.length > 0
-        ? [...sourceToSelect.links].sort(
+        ? ((preferredLinkStr
+            ? sourceToSelect.links.find((l) => l.resolutionStr === preferredLinkStr)
+            : null) ??
+          (() => {
+            const wanted = pickHeight(preferredLinkStr)
+            if (!wanted) return null
+            let best: VideoLink | null = null
+            let bestDiff = Infinity
+            for (const link of sourceToSelect.links) {
+              const height = pickHeight(link.resolutionStr)
+              const diff = Math.abs(height - wanted)
+              if (height > 0 && diff < bestDiff) {
+                bestDiff = diff
+                best = link
+              }
+            }
+            return best
+          })() ??
+          [...sourceToSelect.links].sort(
             (a: VideoLink, b: VideoLink) =>
               (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-          )[0]
+          )[0])
         : null
 
     const savedResumeTime = progress?.currentTime || 0
@@ -419,6 +445,14 @@ export const usePlayerData = (
     }
   }, [])
 
+  const setPreferredLink = useCallback(async (resolutionStr: string) => {
+    try {
+      await trpcClient.settings.set.mutate({ key: 'preferredLink', value: resolutionStr })
+    } catch (e) {
+      console.error(e)
+    }
+  }, [])
+
   const { mutateAsync: updateWatchlistStatusMutation, isPending: isUpdatingWatchlistStatus } =
     useMutation({
       mutationFn: async ({ status }: { status: string }) => {
@@ -651,6 +685,7 @@ export const usePlayerData = (
     toggleWatchlist,
     moveToCompleted,
     setPreferredSource,
+    setPreferredLink,
     handleToggleDetails,
     markEpisodeWatched,
     resetEpisodeProgress,
