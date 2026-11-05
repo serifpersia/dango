@@ -16,7 +16,7 @@
 
 .gateInner {
   width: min(100%, 880px);
-  margin: auto;
+  margin: clamp(2rem, 12vh, 7rem) auto auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -33,7 +33,7 @@
 
 .profileGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 132px));
+  grid-template-columns: repeat(auto-fit, minmax(min(104px, 100%), 148px));
   justify-content: center;
   gap: var(--space-5) var(--space-4);
   width: 100%;
@@ -73,7 +73,7 @@
   aspect-ratio: 1;
   overflow: hidden;
   border: 2px solid transparent;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
   transition:
@@ -238,7 +238,7 @@
   }
 
   .profileGrid {
-    grid-template-columns: repeat(auto-fit, minmax(min(88px, 100%), 116px));
+    grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 128px));
     gap: var(--space-4) var(--space-3);
   }
 
@@ -259,7 +259,7 @@
 
 @media (max-width: 380px) {
   .profileGrid {
-    grid-template-columns: repeat(auto-fit, minmax(min(78px, 100%), 98px));
+    grid-template-columns: repeat(auto-fit, minmax(min(86px, 100%), 108px));
     gap: var(--space-4) var(--space-2);
   }
 

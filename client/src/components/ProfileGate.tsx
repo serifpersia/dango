@@ -134,7 +134,7 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
                       image={profile.avatar ?? profile.cloudAvatar}
                       name={profile.name}
                       size="100%"
-                      radius="18%"
+                      radius="var(--radius-sm)"
                     />
                     {profile.protected && (
                       <span className={styles.lockBadge} aria-hidden="true">
