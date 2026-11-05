@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { applyEmbedPatches } from './proxy/embed.js'
-import { isBinaryMediaUrl } from './proxy/stream.js'
+import { isBinaryMediaUrl, makeMpdProxier, rewriteMpdBody } from './proxy/stream.js'
 import { mirrorUrls } from './proxy/rules.js'
 
 test('mirrorUrls returns the url itself when there are no mirrors', () => {
@@ -61,4 +61,31 @@ test('applyEmbedPatches keeps a page that has nothing to patch', () => {
 test('applyEmbedPatches rejects a body that is not html at all', () => {
   assert.equal(applyEmbedPatches('not html', new URL('https://embed.example/')), null)
   assert.equal(applyEmbedPatches('', new URL('https://embed.example/')), null)
+})
+
+test('rewriteMpdBody proxies segment templates and keeps dash tokens literal', () => {
+  const mpd =
+    '<SegmentTemplate initialization="chunks/init-stream$RepresentationID$.webp" media="chunks/chunk-stream$RepresentationID$-$Number%05d$.webp" startNumber="1">'
+  const proxier = makeMpdProxier('https://site.example/', '', '')
+  const rewritten = rewriteMpdBody(mpd, 'https://cdn.example/ep/720/manifest.mpd', proxier)
+
+  assert.match(rewritten, /\$Number%05d\$/)
+  assert.match(rewritten, /\$RepresentationID\$/)
+  assert.match(rewritten, /\/api\/proxy\?url=https:\/\/cdn\.example\/ep\/720\/chunks\//)
+  assert.doesNotMatch(rewritten, /%24Number/)
+  assert.doesNotMatch(rewritten, /%2505d/)
+  assert.match(rewritten, /&amp;referer=/)
+  assert.doesNotMatch(rewritten, /&referer=/)
+})
+
+test('rewriteMpdBody leaves data urls, proxied urls and base urls intact', () => {
+  const mpd =
+    '<BaseURL>https://cdn.example/</BaseURL>' +
+    '<SegmentTemplate initialization="data:;base64,AA" media="/api/proxy?url=x.webp" startNumber="1">'
+  const proxier = makeMpdProxier('', '', '')
+  const rewritten = rewriteMpdBody(mpd, 'https://cdn.example/ep/manifest.mpd', proxier)
+
+  assert.match(rewritten, /<BaseURL>\/api\/proxy\?url=https:\/\/cdn\.example\/<\/BaseURL>/)
+  assert.match(rewritten, /initialization="data:;base64,AA"/)
+  assert.match(rewritten, /media="\/api\/proxy\?url=x\.webp"/)
 })

@@ -1,11 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPlayerEngine } from './engine'
 import { loadHls } from '../hls'
+import { loadDash, type DashHost, type DashModule } from '../dash'
 
 vi.mock('../hls', () => ({
   loadHls: vi.fn(),
   canPlayHlsNatively: (media: HTMLMediaElement) =>
     media.canPlayType('application/vnd.apple.mpegurl') !== '',
+}))
+
+vi.mock('../dash', () => ({
+  loadDash: vi.fn(),
+  resolveDashModule: (mod: unknown) => {
+    const candidate = mod as { default?: { MediaPlayer?: unknown }; MediaPlayer?: unknown }
+    const MediaPlayer =
+      candidate?.default?.MediaPlayer ?? candidate?.MediaPlayer ?? candidate?.default
+    return typeof MediaPlayer === 'function' ? { MediaPlayer } : null
+  },
 }))
 
 class Media extends EventTarget {
@@ -79,6 +90,23 @@ class HlsMock {
   }
 }
 
+class DashMock {
+  static instances: DashMock[] = []
+  handlers = new Map<string, ((...args: unknown[]) => void)[]>()
+  initialize = vi.fn()
+  addRequestInterceptor = vi.fn()
+  destroy = vi.fn()
+  constructor() {
+    DashMock.instances.push(this)
+  }
+  on(name: string, callback: (...args: unknown[]) => void) {
+    this.handlers.set(name, [...(this.handlers.get(name) ?? []), callback])
+  }
+  emit(name: string, data?: unknown) {
+    this.handlers.get(name)?.forEach((callback) => callback(data))
+  }
+}
+
 describe('player engine', () => {
   const engines: ReturnType<typeof createPlayerEngine>[] = []
   function setup(tagName = 'VIDEO') {
@@ -97,6 +125,12 @@ describe('player engine', () => {
       .mockReset()
       .mockResolvedValue(HlsMock as unknown as NonNullable<Awaited<ReturnType<typeof loadHls>>>)
     HlsMock.instances = []
+    vi.mocked(loadDash)
+      .mockReset()
+      .mockResolvedValue({
+        MediaPlayer: () => ({ create: () => new DashMock() }),
+      } as unknown as DashModule)
+    DashMock.instances = []
   })
   afterEach(() => {
     engines.forEach((engine) => engine.destroy())
@@ -269,6 +303,45 @@ describe('player engine', () => {
     await Promise.resolve()
     expect(media.src).toBe('/native.m3u8')
     expect(engine.getState().error).toBe(null)
+  })
+
+  it('attaches dash sources, reports ready and errors, and destroys on dispose', async () => {
+    const { engine, media } = setup()
+    const ready = vi.fn()
+    const failed = vi.fn()
+    const dispose = engine.loadSource(
+      { url: '/test.mpd', dash: true },
+      { onReady: ready, onError: failed }
+    )
+    await Promise.resolve()
+    const player = DashMock.instances[0]
+    expect(player.initialize).toHaveBeenCalledWith(media, '/test.mpd')
+    player.emit('streamActivated')
+    expect(ready).toHaveBeenCalledOnce()
+    player.emit('error', { error: { message: 'manifest load failed' } })
+    expect(failed).toHaveBeenCalledOnce()
+    expect(engine.getState().error).toContain('manifest load failed')
+    dispose()
+    expect(player.destroy).toHaveBeenCalledOnce()
+  })
+
+  it('calls onDash before attaching so the interceptor can proxy segment URLs', async () => {
+    const { engine } = setup()
+    const onDash = vi.fn((player: DashHost) => {
+      player.addRequestInterceptor((request) => ({
+        ...request,
+        url: `/api/proxy?url=${encodeURIComponent(request.url)}`,
+      }))
+    })
+    engine.loadSource({ url: '/test.mpd', dash: true }, { onDash })
+    await Promise.resolve()
+    const player = DashMock.instances[0]
+    expect(onDash).toHaveBeenCalledOnce()
+    expect(player.initialize).toHaveBeenCalledTimes(1)
+    expect(player.addRequestInterceptor).toHaveBeenCalledOnce()
+    expect(
+      player.addRequestInterceptor.mock.calls[0][0]({ url: 'https://cdn.example/chunk.webp' }).url
+    ).toBe('/api/proxy?url=https%3A%2F%2Fcdn.example%2Fchunk.webp')
   })
 
   it('removes stale resume listeners and releases handlers on teardown', () => {

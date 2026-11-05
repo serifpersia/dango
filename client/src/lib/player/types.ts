@@ -1,5 +1,6 @@
 import type Hls from 'hls.js'
 import type { HlsConfig } from 'hls.js'
+import type { DashHost } from '../dash'
 
 export interface PlayerTrack {
   id: number
@@ -37,6 +38,7 @@ export interface PlayerTimeline {
 export interface PlayerSource {
   url: string
   hls?: boolean
+  dash?: boolean
 }
 
 export interface PlayerSourceOptions {
@@ -44,6 +46,7 @@ export interface PlayerSourceOptions {
   initialTime?: number
   hlsConfig?: Partial<HlsConfig>
   onHls?: (hls: Hls, constructor: typeof Hls) => void
+  onDash?: (player: DashHost) => void
   onReady?: () => void
   onError?: (error: Error) => void
 }

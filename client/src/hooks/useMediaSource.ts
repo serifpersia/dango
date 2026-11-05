@@ -146,7 +146,7 @@ export function useMediaSource({
 
     const isLowEnd = document.body.classList.contains('low-end')
     return engine.loadSource(
-      { url: proxiedUrl, hls: selectedLink.hls },
+      { url: proxiedUrl, hls: selectedLink.hls, dash: selectedLink.dash },
       {
         initialTime: targetTime,
         autoPlay:
@@ -167,6 +167,30 @@ export function useMediaSource({
           }
           hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, disableEmbeddedSubs)
           disableEmbeddedSubs()
+        },
+        onDash: (player) => {
+          const referer = selectedLink.headers?.Referer
+          if (!referer) return
+          player.addRequestInterceptor((request) => {
+            const url = request?.url ?? ''
+            if (
+              !url ||
+              url.includes('/api/proxy?') ||
+              url.includes('/api/subtitle-proxy?') ||
+              url.includes('/api/tv/stream-proxy?')
+            )
+              return request
+            try {
+              const absolute = new URL(url)
+              if (absolute.protocol !== 'http:' && absolute.protocol !== 'https:') return request
+            } catch {
+              return request
+            }
+            const proxied =
+              `/api/proxy?url=${encodeURIComponent(url)}` +
+              `&referer=${encodeURIComponent(referer)}`
+            return { ...request, url: proxied }
+          })
         },
         onError: () => onFatalErrorRef.current(),
       }

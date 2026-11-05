@@ -25,6 +25,7 @@ export interface VideoLink {
   resolutionStr: string
   link: string
   hls: boolean
+  dash?: boolean
   headers?: { Referer?: string }
 }
 

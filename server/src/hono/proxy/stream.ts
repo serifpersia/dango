@@ -22,6 +22,45 @@ export function isBinaryMediaUrl(url: string): boolean {
   return BINARY_MEDIA_RE.test(url)
 }
 
+function encMpdParam(value: string): string {
+  return value
+    .replace(/&/g, '%26')
+    .replace(/#/g, '%23')
+    .replace(/\?/g, '%3F')
+    .replace(/\+/g, '%2B')
+    .replace(/ /g, '%20')
+}
+
+export function makeMpdProxier(refererStr: string, originStr: string, uaStr: string) {
+  return (absolute: string) => {
+    let proxied = `/api/proxy?url=${encMpdParam(absolute)}`
+    if (refererStr) proxied += `&referer=${encMpdParam(refererStr)}`
+    if (originStr) proxied += `&origin=${encMpdParam(originStr)}`
+    if (uaStr) proxied += `&ua=${encMpdParam(uaStr)}`
+    return proxied.replace(/&/g, '&amp;')
+  }
+}
+
+export function rewriteMpdBody(
+  body: string,
+  finalUrl: string,
+  buildProxied: (absolute: string) => string
+): string {
+  const baseUrl = new URL(finalUrl)
+  const proxyAttr = (value: string) => {
+    if (value.includes('/api/proxy')) return value
+    return buildProxied(new URL(value, baseUrl).href)
+  }
+  return body
+    .replace(/(initialization|media|sourceURL)="([^"]+)"/g, (_, attr, value) =>
+      value.startsWith('data:') ? _ : `${attr}="${proxyAttr(value)}"`
+    )
+    .replace(/<BaseURL>([^<]+)<\/BaseURL>/g, (_, value) => {
+      const trimmed = String(value).trim()
+      return `<BaseURL>${proxyAttr(trimmed)}</BaseURL>`
+    })
+}
+
 export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRule[]) {
   const url = c.req.query('url')
   if (!url) return c.text('URL required', 400)
@@ -67,18 +106,18 @@ export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRu
       outHeaders.set('Access-Control-Allow-Origin', '*')
       return new Response(body, { headers: outHeaders })
     }
+    const proxiedMediaUrl = (targetUrl: string) => {
+      const params = new URLSearchParams({ url: targetUrl })
+      if (refererStr) params.set('referer', refererStr)
+      if (originStr) params.set('origin', originStr)
+      if (uaStr) params.set('ua', uaStr)
+      if (cookieStr) params.set('cookie', sanitizeCfClearance(cookieStr))
+      if (useScrape) params.set('scrape', '1')
+      if (useCf) params.set('cf', '1')
+      return `/api/proxy?${params}`
+    }
     const rewritePlaylist = (playlistBody: string, finalUrl: string) => {
       const baseUrl = new URL(finalUrl)
-      const proxiedMediaUrl = (targetUrl: string) => {
-        const params = new URLSearchParams({ url: targetUrl })
-        if (refererStr) params.set('referer', refererStr)
-        if (originStr) params.set('origin', originStr)
-        if (uaStr) params.set('ua', uaStr)
-        if (cookieStr) params.set('cookie', sanitizeCfClearance(cookieStr))
-        if (useScrape) params.set('scrape', '1')
-        if (useCf) params.set('cf', '1')
-        return `/api/proxy?${params}`
-      }
       const needsProxy = Boolean(refererStr || originStr || uaStr || useScrape)
       const isProxied = (value: string) => value.includes('/api/proxy')
       const pinned = pinVar ? pinVariant(playlistBody, variantIdx as number) : null
@@ -102,6 +141,48 @@ export async function proxyStream(c: Context, getProxyRules: () => RemoteProxyRu
           return proxiedMediaUrl(absolute)
         })
         .join('\n')
+    }
+
+    const rewriteMpd = (mpdBody: string, finalUrl: string) =>
+      rewriteMpdBody(mpdBody, finalUrl, makeMpdProxier(refererStr, originStr, uaStr))
+
+    if (urlStr.includes('.mpd')) {
+      const cached = proxyCache.get<string>(cacheKey)
+      if (cached) {
+        const headers = new Headers()
+        headers.set('Content-Type', 'application/dash+xml')
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(cached, { headers })
+      }
+
+      const resp = await fetchWithMirrors(
+        urlStr,
+        rule?.mirrors,
+        abort.signal,
+        (candidate) =>
+          gotScraping({
+            url: candidate,
+            method: 'GET',
+            headers,
+            responseType: 'text',
+            timeout: { request: 30000 },
+            followRedirect: true,
+            throwHttpErrors: false,
+            retry: UPSTREAM_RETRY,
+          }),
+        (attempt) => attempt.statusCode === 200 || attempt.statusCode === 206
+      )
+
+      if (!resp || (resp.statusCode !== 200 && resp.statusCode !== 206)) {
+        return c.text('Upstream error', (resp?.statusCode || 502) as 502)
+      }
+
+      const rewritten = rewriteMpd(resp.body as string, resp.url || urlStr)
+      proxyCache.set(cacheKey, rewritten)
+      const outHeaders = new Headers()
+      outHeaders.set('Content-Type', 'application/dash+xml')
+      outHeaders.set('Access-Control-Allow-Origin', '*')
+      return new Response(rewritten, { headers: outHeaders })
     }
 
     if (urlStr.includes('.m3u8')) {

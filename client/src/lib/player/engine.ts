@@ -1,5 +1,6 @@
 import { profileStorage } from '../profileStorage'
 import { canPlayHlsNatively, loadHls } from '../hls'
+import { loadDash, type DashHost } from '../dash'
 import type Hls from 'hls.js'
 import type {
   PlayerPreferences,
@@ -64,6 +65,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   let basePlaybackRate = 1
   let destroyed = false
   let hls: Hls | null = null
+  let dash: DashHost | null = null
   let applyingRemote = false
 
   function update(patch: Partial<PlayerState>) {
@@ -370,6 +372,8 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
       instance?.destroy()
       if (hls === instance) hls = null
       instance = null
+      dash?.destroy()
+      dash = null
       if (sourceGeneration === generation) sourceGeneration++
     }
     const sourceError = () => {
@@ -379,6 +383,24 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     media.addEventListener('error', sourceError)
     disposeSource = dispose
     void (async () => {
+      if (source.dash) {
+        const DashModule = await loadDash()
+        if (!current()) return
+        if (!DashModule) throw new Error('DASH playback is unavailable in this browser.')
+        const player = DashModule.MediaPlayer().create()
+        dash = player
+        player.on('streamActivated', ready)
+        player.on('error', (event) => {
+          const detail = event as { error?: { message?: string }; message?: string } | undefined
+          const message = detail?.error?.message || detail?.message || 'DASH stream failed.'
+          fail(new Error(message))
+          dispose()
+        })
+        if (!current()) return
+        options.onDash?.(player)
+        player.initialize(media, source.url)
+        return
+      }
       if (source.hls) {
         const HlsClass = await loadHls()
         if (!current()) return
