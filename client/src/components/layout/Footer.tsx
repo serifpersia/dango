@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import Icon from '../common/Icon'
 import Logo from '../common/Logo'
 import styles from './Footer.module.css'
@@ -7,9 +7,17 @@ import packageJson from '../../../package.json'
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear()
+  const location = useLocation()
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (location.pathname === '/') {
+      e.preventDefault()
+      scrollToTop()
+    }
   }
 
   return (
@@ -17,7 +25,9 @@ const Footer: React.FC = () => {
       <div className={styles.footerInner}>
         <div className={styles.brandSection}>
           <div className={styles.logoRow}>
-            <Logo className={styles.logoText} />
+            <Link to="/" onClick={handleLogoClick} aria-label="Home">
+              <Logo className={styles.logoText} />
+            </Link>
           </div>
           <div className={styles.brandMeta}>
             <div className={styles.statusPill}>

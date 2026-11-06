@@ -23,9 +23,3 @@ export const THEMES: { id: ThemeId; label: string; blurb: string; swatch: string
   { id: 'sakura', label: 'Sakura', blurb: 'Soft pink', swatch: '#e0b0e0' },
   { id: 'mochi', label: 'Mochi', blurb: 'Monochrome pearl', swatch: '#f0f0f0' },
 ]
-
-export const THEME_LOGOS: Record<ThemeId, { fill: string; stroke: string }> = {
-  iris: { fill: '#897cff', stroke: '#5646db' },
-  mochi: { fill: '#e3e1ee', stroke: '#b3b1c6' },
-  sakura: { fill: '#e1afef', stroke: '#a978a9' },
-}

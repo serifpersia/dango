@@ -50,6 +50,10 @@
   transform: translateY(-1px);
 }
 
+.logoCollapsed {
+  display: none;
+}
+
 .headerInner {
   width: 100%;
   max-width: var(--max-width);
@@ -693,6 +697,14 @@ input.searchInput:focus-visible {
 }
 
 @media (max-width: 480px) {
+  .logoFull {
+    display: none;
+  }
+
+  .logoCollapsed {
+    display: block;
+  }
+
   .searchButton,
   .profileBtn {
     width: 42px;

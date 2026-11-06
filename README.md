@@ -1,16 +1,14 @@
 <div align="center">
 
-<img src="client/public/repo_logo.svg" alt="dango logo" width="420" height="145"/>
+<img src="client/public/logo.svg" alt="dango logo" width="420" height="141"/>
 
 _A local-first anime web app focused on performance, privacy, and personal library tracking._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-897cff?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/dango.svg?style=for-the-badge&color=897cff)
-[![App version](https://img.shields.io/badge/dango-3.9.7-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
+[![App version](https://img.shields.io/badge/dango-3.9.8-897cff?style=for-the-badge)](https://github.com/serifpersia/dango)
 
 [![Provider Status](https://dango-users-badge.ramiserifpersia.workers.dev/?provider=all)](https://dango-users-badge.ramiserifpersia.workers.dev/?view=status)
-
-![Animation](docs/showcase.webp)
 
 </div>
 

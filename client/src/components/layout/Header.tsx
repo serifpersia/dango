@@ -332,7 +332,8 @@ const Header: React.FC = () => {
               <Icon name="bars" />
             </button>
             <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
-              <Logo />
+              <Logo className={styles.logoFull} />
+              <Logo collapsed className={styles.logoCollapsed} />
             </Link>
             <nav className={styles.desktopNav} ref={navContainerRef}>
               <span className={styles.navPill} style={pillStyle} aria-hidden="true" />

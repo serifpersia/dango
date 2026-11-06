@@ -4,8 +4,8 @@ plugins {
 }
 
 // Standalone app version, independent from the dango node project version.
-val dangoVersionName = "1.1.2"
-val dangoVersionCode = 13
+val dangoVersionName = "1.1.3"
+val dangoVersionCode = 14
 
 val abiFlavors = mapOf(
     "arm64" to "arm64-v8a",
