@@ -327,6 +327,13 @@ export function createHonoApp(
   const getDbs = () => profileScope.getStore()?.dbs ?? getDefaultDbs()
   const requestUrlForOrigin = (c: Context) =>
     requestOrigin(c.req.url, c.req.header('x-forwarded-proto'), c.req.header('x-forwarded-host'))
+  const isAllowedOriginsRequest = (c: Context) => {
+    if (!c.req.path.startsWith('/api/trpc/')) return false
+    const procedures = c.req.path.slice('/api/trpc/'.length).split(',')
+    return (
+      procedures.includes('auth.setAllowedOrigins') || procedures.includes('auth.allowedOrigins')
+    )
+  }
 
   app.use(honoRequestLogger)
   app.use(honoRequestContextMiddleware)
@@ -382,7 +389,10 @@ export function createHonoApp(
   app.use(async (c, next) => {
     const origin = c.req.header('origin')
     if (c.req.method === 'OPTIONS') {
-      if (!origin || !isAllowedOrigin(origin, requestUrlForOrigin(c))) {
+      if (
+        !origin ||
+        (!isAllowedOrigin(origin, requestUrlForOrigin(c)) && !isAllowedOriginsRequest(c))
+      ) {
         await next()
         return
       }
@@ -398,7 +408,7 @@ export function createHonoApp(
         },
       })
     }
-    if (!origin || isAllowedOrigin(origin, requestUrlForOrigin(c))) {
+    if (!origin || isAllowedOrigin(origin, requestUrlForOrigin(c)) || isAllowedOriginsRequest(c)) {
       if (origin) c.header('Access-Control-Allow-Origin', origin)
       c.header('Access-Control-Allow-Credentials', 'true')
       c.header('Vary', 'Origin')
@@ -420,7 +430,7 @@ export function createHonoApp(
       }
     }
     const origin = c.req.header('origin')
-    if (origin && !isAllowedOrigin(origin, requestUrlForOrigin(c))) {
+    if (origin && !isAllowedOrigin(origin, requestUrlForOrigin(c)) && !isAllowedOriginsRequest(c)) {
       return c.json({ error: 'Forbidden: cross-origin request rejected' }, 403)
     }
     await next()

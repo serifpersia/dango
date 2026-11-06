@@ -496,6 +496,13 @@ test('avatars reject executable and oversized input, and origins must match the 
   assert.throws(() => validateAvatar('a'.repeat(2_800_001)), /smaller/)
   assert.equal(isAllowedOrigin('http://192.168.1.4:3000', 'http://192.168.1.4:3000/api'), true)
   assert.equal(isAllowedOrigin('https://untrusted.example', 'http://192.168.1.4:3000/api'), false)
+  assert.equal(isAllowedOrigin('https://dango.example.com', 'http://dango.example.com/api'), true)
+  assert.equal(
+    isAllowedOrigin('https://dango.example.com', 'http://dango.example.com:3000/api'),
+    true
+  )
+  assert.equal(isAllowedOrigin('https://evil.example.com', 'http://dango.example.com/api'), false)
+  assert.equal(isAllowedOrigin('http://localhost:9999', 'http://localhost:3000/api'), false)
 })
 
 test('allowed origins are queryable and mutable by the owner, and cross-origin requests are blocked', async (t) => {
@@ -609,6 +616,39 @@ test('allowed origins are queryable and mutable by the owner, and cross-origin r
             origin: 'https://untrusted.example',
             'sec-fetch-site': 'cross-site',
           }
+        )
+      ).status,
+      403
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/trpc/auth.setAllowedOrigins',
+          memberToken,
+          { origins: 'https://evil.example' },
+          { origin: 'https://untrusted.example' }
+        )
+      ).status,
+      403
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/trpc/auth.setAllowedOrigins',
+          ownerToken,
+          { origins: 'https://dango.example, https://other.example' },
+          { origin: 'https://untrusted.example' }
+        )
+      ).status,
+      200
+    )
+    assert.equal(
+      (
+        await request(
+          '/api/trpc/auth.setAllowedOrigins',
+          ownerToken,
+          { origins: 'https://evil.example' },
+          { origin: 'https://untrusted.example', 'sec-fetch-site': 'cross-site' }
         )
       ).status,
       403

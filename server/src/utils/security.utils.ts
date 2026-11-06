@@ -101,6 +101,7 @@ export function isAllowedOrigin(origin: string | undefined, requestUrl?: string)
     const request = new URL(requestUrl)
     if (parsed.origin === request.origin) return true
     const loopback = (host: string) => ['localhost', '127.0.0.1', '[::1]'].includes(host)
+    if (parsed.hostname === request.hostname && !loopback(parsed.hostname)) return true
     return (
       CONFIG.IS_DEV &&
       loopback(parsed.hostname) &&
