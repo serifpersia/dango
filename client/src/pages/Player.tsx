@@ -110,6 +110,15 @@ const Player: React.FC = () => {
     watchSelection: followingHost ? watchAlong.room?.selection : null,
   })
 
+  const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
+  const nextAiringAt = state.showMeta.nextAiring?.airingAt
+  const nextAiringTarget = typeof nextAiringAt === 'number' ? nextAiringAt * 1000 : null
+  useEffect(() => {
+    if (nextAiringTarget == null || nextAiringTarget <= Date.now()) return
+    const timer = setInterval(() => setCountdownNowMs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [nextAiringTarget])
+
   useEffect(() => {
     if (showId && state.showMeta?.id && state.showMeta.id !== showId) {
       const url = episodeNumber
@@ -1267,11 +1276,31 @@ const Player: React.FC = () => {
                       {state.showMeta.status && (
                         <span className={styles.status}>{state.showMeta.status}</span>
                       )}
-                      {state.showMeta.nextEpisodeAirDate && (
-                        <span className={styles.nextEpisode}>
-                          Next episode: {state.showMeta.nextEpisodeAirDate}
-                        </span>
-                      )}
+                      {state.showMeta.nextEpisodeAirDate &&
+                        (() => {
+                          const nextAiring = state.showMeta.nextAiring
+                          const target = nextAiringAt != null ? nextAiringAt * 1000 : null
+                          let tick = ''
+                          if (target != null) {
+                            let diff = Math.floor((target - countdownNowMs) / 1000)
+                            if (diff <= 0) return null
+                            const days = Math.floor(diff / 86400)
+                            diff %= 86400
+                            const hours = Math.floor(diff / 3600)
+                            diff %= 3600
+                            const minutes = Math.floor(diff / 60)
+                            const seconds = diff % 60
+                            tick = `in ${days}d ${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
+                          }
+                          const ep = nextAiring?.episode != null ? `E${nextAiring.episode} · ` : ''
+                          return (
+                            <span className={styles.nextEpisode}>
+                              Next episode: {ep}
+                              {state.showMeta.nextEpisodeAirDate}
+                              {tick ? ` · ${tick}` : ''}
+                            </span>
+                          )
+                        })()}
                     </div>
                   </div>
                   <div className={styles.controls}>

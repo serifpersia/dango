@@ -340,6 +340,7 @@ async function getScheduleFromAnilist(date: Date, format?: string, adult = false
     show.nextAiring = {
       episode: entry.episode,
       timeUntilAiring: entry.airingAt - now,
+      airingAt: entry.airingAt,
     }
     show.nextEpisodeAirDate = new Date(entry.airingAt * 1000).toLocaleDateString('en-US', {
       month: 'short',

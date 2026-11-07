@@ -47,6 +47,7 @@ export function fromAnilistMedia(m: AnilistMedia): Show {
       ? {
           episode: m.nextAiringEpisode.episode,
           timeUntilAiring: m.nextAiringEpisode.timeUntilAiring,
+          airingAt: m.nextAiringEpisode.airingAt,
         }
       : undefined,
     nextEpisodeAirDate,

@@ -75,6 +75,14 @@ import type { WatchSelection } from '../lib/watchAlong'
 
 type MediaType = 'movie' | 'tv' | 'tvSeries' | 'tvMiniSeries'
 
+interface TvAiringEpisode {
+  episode_number: number
+  season_number: number
+  air_date?: string | null
+  name?: string
+  air_timestamp?: number | null
+}
+
 interface TvDetails {
   id: number
   title: string
@@ -88,11 +96,14 @@ interface TvDetails {
   adult?: boolean
   status?: string
   genres?: { id: number; name: string }[]
+  in_production?: boolean
   seasons?: { season_number: number; episode_count: number; name?: string }[]
   number_of_seasons?: number
   number_of_episodes?: number
   first_air_date?: string
   last_air_date?: string
+  next_episode_to_air?: TvAiringEpisode | null
+  last_episode_to_air?: TvAiringEpisode | null
   networks?: { name: string }[]
   created_by?: { name: string }[]
   episode_run_time?: number[]
@@ -183,6 +194,14 @@ const Tv: React.FC = () => {
       : null
 
   const [details, setDetails] = useState<TvDetails | null>(null)
+  const [nextAiring, setNextAiring] = useState<TvAiringEpisode | null>(null)
+  const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
+  const nextAiringTarget = (nextAiring ?? details?.next_episode_to_air ?? null)?.air_timestamp
+  useEffect(() => {
+    if (typeof nextAiringTarget !== 'number' || nextAiringTarget <= Date.now()) return
+    const timer = setInterval(() => setCountdownNowMs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [nextAiringTarget])
   const [localSeason, setSeason] = useState(() => parseInt(searchParams.get('s') || '1', 10) || 1)
   const season = sharedSelection?.season ?? localSeason
   const [episodes, setEpisodes] = useState<Episode[]>([])
@@ -1093,6 +1112,30 @@ const Tv: React.FC = () => {
     () => (details?.genres ?? []).map((g) => g.name).slice(0, 5),
     [details]
   )
+  const nextAiringText = useMemo(() => {
+    const next = nextAiring ?? details?.next_episode_to_air ?? null
+    if (!next || !next.air_date) return null
+    const date = new Date(`${next.air_date}T00:00:00`)
+    if (isNaN(date.getTime())) return null
+    const label = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    const base = `Next episode: S${next.season_number} E${next.episode_number} · ${label}`
+    const target = next.air_timestamp
+    if (typeof target !== 'number' || target <= 0) return base
+    let diff = Math.floor((target - countdownNowMs) / 1000)
+    if (diff <= 0) return null
+    const days = Math.floor(diff / 86400)
+    diff %= 86400
+    const hours = Math.floor(diff / 3600)
+    diff %= 3600
+    const minutes = Math.floor(diff / 60)
+    const seconds = diff % 60
+    const tick = `${days}d ${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
+    return `${base} · in ${tick}`
+  }, [nextAiring, details, countdownNowMs])
   const metaRow = useMemo(
     () =>
       [
@@ -1102,8 +1145,9 @@ const Tv: React.FC = () => {
           ? `${details.number_of_seasons} Season${details.number_of_seasons > 1 ? 's' : ''}`
           : null,
         details?.number_of_episodes ? `${details.number_of_episodes} Episodes` : null,
+        nextAiringText,
       ].filter(Boolean) as string[],
-    [details]
+    [details, nextAiringText]
   )
 
   useEffect(() => {
@@ -1177,12 +1221,22 @@ const Tv: React.FC = () => {
           imdb_id: d.imdb_id || undefined,
           adult: d.adult,
           status: d.status,
+          in_production: d.in_production,
           seasons: d.seasons,
           number_of_seasons: d.number_of_seasons,
+          number_of_episodes: d.number_of_episodes,
+          first_air_date: d.first_air_date,
+          last_air_date: d.last_air_date,
+          next_episode_to_air: d.next_episode_to_air,
+          last_episode_to_air: d.last_episode_to_air,
         }
         setDetails(mapped)
+        setNextAiring(null)
         if (mapped.seasons && mapped.seasons.length > 0 && isNaN(sParam)) {
-          setSeason(mapped.seasons[0].season_number)
+          const firstStorySeason =
+            mapped.seasons.find((s) => s.season_number === 1)?.season_number ??
+            mapped.seasons[0].season_number
+          setSeason(firstStorySeason)
         }
       })
       .catch(() => {
@@ -1198,6 +1252,7 @@ const Tv: React.FC = () => {
       return
     }
     const eParam = parseInt(searchParams.get('e') || '', 10)
+    setNextAiring(null)
     trpcClient.tv.episodes
       .query({ id: String(id), season: String(season) })
       .then((d) => {
@@ -1209,6 +1264,7 @@ const Tv: React.FC = () => {
           still_path: ep.still_path || '',
         }))
         setEpisodes(eps)
+        setNextAiring(d.nextAiring ?? null)
         if (eps.length === 0) return
         setEpisode((prev) => {
           if (!isNaN(eParam) && eps.some((ep) => ep.episode_number === eParam)) return eParam
@@ -1993,7 +2049,8 @@ const Tv: React.FC = () => {
         >
           {details.seasons.map((s) => (
             <option key={s.season_number} value={s.season_number}>
-              Season {s.season_number} ({s.episode_count} ep)
+              {s.season_number === 0 ? 'Specials' : `Season ${s.season_number}`} ({s.episode_count}{' '}
+              ep)
             </option>
           ))}
         </select>

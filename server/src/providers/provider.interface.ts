@@ -46,6 +46,7 @@ export interface Show {
   nextAiring?: {
     episode: number
     timeUntilAiring: number
+    airingAt?: number
   }
   nextEpisodeAirDate?: string
   airTime?: string

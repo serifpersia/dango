@@ -101,6 +101,20 @@ export interface TmdbEpisode {
   vote_average?: number
   overview?: string
   still_path?: string | null
+  air_date?: string | null
+  episode_type?: string
+}
+
+export interface TmdbAirEpisode {
+  episode_number: number
+  season_number: number
+  air_date?: string | null
+  name?: string
+  air_timestamp?: number | null
+}
+
+export function tmdbToday(): string {
+  return new Date().toISOString().slice(0, 10)
 }
 
 export interface TmdbMetaBody {
@@ -108,9 +122,14 @@ export interface TmdbMetaBody {
   name?: string
   release_date?: string
   first_air_date?: string
+  last_air_date?: string
   imdb_id?: string | null
   external_ids?: { imdb_id?: string | null }
   number_of_seasons?: number
+  number_of_episodes?: number
+  in_production?: boolean
+  next_episode_to_air?: TmdbAirEpisode | null
+  last_episode_to_air?: TmdbAirEpisode | null
 }
 
 export interface TmdbDetailsBody extends TmdbMetaBody {

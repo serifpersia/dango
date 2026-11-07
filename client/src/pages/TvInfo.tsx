@@ -76,6 +76,10 @@ export default function TvInfo() {
           adult: data.adult,
           seasons: data.seasons?.map((s) => ({ ...s, name: '' })),
           number_of_seasons: data.number_of_seasons,
+          number_of_episodes: data.number_of_episodes,
+          status: data.status,
+          first_air_date: data.first_air_date,
+          last_air_date: data.last_air_date,
         }
         setDetails(mapped)
         setLoading(false)
@@ -125,7 +129,7 @@ export default function TvInfo() {
 
   const seasonOptions = useMemo(() => {
     if (!details?.seasons) return []
-    return details.seasons.filter((s) => s.season_number > 0)
+    return [...details.seasons].sort((a, b) => a.season_number - b.season_number)
   }, [details?.seasons])
 
   const meta = [
@@ -276,7 +280,8 @@ export default function TvInfo() {
                 >
                   {seasonOptions.map((s) => (
                     <option key={s.season_number} value={s.season_number}>
-                      Season {s.season_number} ({s.episode_count} Episodes)
+                      {s.season_number === 0 ? 'Specials' : `Season ${s.season_number}`} (
+                      {s.episode_count} Episodes)
                     </option>
                   ))}
                 </select>

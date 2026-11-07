@@ -7,12 +7,20 @@ import {
   tmdbMediaMeta,
   tmdbSearchMedia,
   tmdbSeasonEpisodes,
+  tmdbToday,
   tmdbTrendingMedia,
   TMDB_IMAGE,
+  type TmdbAirEpisode,
   type TmdbEpisode,
   type TmdbSearchItem,
   type TmdbSeason,
 } from '../../lib/tmdb.js'
+import {
+  pickNextAiring,
+  resolveEpisodesWithTvMaze,
+  tvmazeShowByImdb,
+  type TvMazeData,
+} from '../../lib/tvmaze.js'
 import { fetchWithRetry, parseJsonBody } from '../../utils/http.utils.js'
 import { buildTvMediaRequest } from '../../lib/tv-media.js'
 import { rankByTitleMatch } from '../../providers/title-matching.js'
@@ -33,6 +41,17 @@ async function resolveTvMeta(
     if (mediaType === 'tv' && d.number_of_seasons) meta.totalSeasons = String(d.number_of_seasons)
   }
   return meta
+}
+
+async function getTvMazeByTmdbId(numericTmdbId: number): Promise<TvMazeData | null> {
+  try {
+    const meta = await tmdbMediaMeta('tv', numericTmdbId)
+    const imdbId = meta?.external_ids?.imdb_id || meta?.imdb_id
+    if (!imdbId) return null
+    return await tvmazeShowByImdb(imdbId)
+  } catch {
+    return null
+  }
 }
 
 type SearchResultItem = {
@@ -293,6 +312,12 @@ export const tvRouter = router({
         backdrop: string
         adult: boolean
         status?: string
+        first_air_date?: string
+        last_air_date?: string
+        number_of_episodes?: number
+        in_production?: boolean
+        next_episode_to_air?: TmdbAirEpisode | null
+        last_episode_to_air?: TmdbAirEpisode | null
         seasons?: TmdbSeason[]
         number_of_seasons?: number
       } = {
@@ -306,15 +331,22 @@ export const tvRouter = router({
         backdrop: d.backdrop_path ? `${TMDB_IMAGE}/original${d.backdrop_path}` : '',
         adult: d.adult === true,
         status: d.status,
+        first_air_date: d.first_air_date,
+        last_air_date: d.last_air_date,
+        number_of_episodes: d.number_of_episodes,
+        in_production: d.in_production,
+        next_episode_to_air: d.next_episode_to_air ?? null,
+        last_episode_to_air: d.last_episode_to_air ?? null,
       }
       if (type === 'tv') {
-        result.seasons = (d.seasons || [])
-          .filter((s: TmdbSeason) => s.season_number > 0)
-          .map((s: TmdbSeason) => ({
-            season_number: s.season_number,
-            episode_count: s.episode_count,
-          }))
+        result.seasons = (d.seasons || []).map((s: TmdbSeason) => ({
+          season_number: s.season_number,
+          episode_count: s.episode_count,
+        }))
         result.number_of_seasons = d.number_of_seasons
+        const tvmaze = await getTvMazeByTmdbId(Number(id))
+        const next = tvmaze ? pickNextAiring(tvmaze.episodes, tvmaze.show, tmdbToday()) : null
+        if (next) result.next_episode_to_air = next
       }
       return result
     } catch (e) {
@@ -327,14 +359,23 @@ export const tvRouter = router({
     const id = input.id
     const season = input.season
     try {
-      const episodes = (await tmdbSeasonEpisodes(id, season)).map((ep: TmdbEpisode) => ({
+      const raw = await tmdbSeasonEpisodes(id, season)
+      const tvmaze = await getTvMazeByTmdbId(Number(id))
+      const { aired, nextAiring } = resolveEpisodesWithTvMaze(
+        raw,
+        tvmaze,
+        Number(season) || 0,
+        tmdbToday()
+      )
+      const episodes = aired.map((ep: TmdbEpisode) => ({
         episode_number: ep.episode_number,
         name: ep.name,
         vote_average: ep.vote_average,
         overview: ep.overview,
         still_path: ep.still_path,
+        air_date: ep.air_date ?? null,
       }))
-      return { episodes }
+      return { episodes, nextAiring }
     } catch (e) {
       if (e instanceof TRPCError) throw e
       throw failed((e as Error).message)
