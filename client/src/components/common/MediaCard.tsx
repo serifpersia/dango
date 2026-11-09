@@ -332,32 +332,37 @@ const MediaCard: React.FC<MediaCardProps> = memo(
               <div className={styles.hoverOverlay}>{hoverOverlayIcon}</div>
             )}
           </div>
+        </Link>
 
-          {showProgressSection && showProgress && showBar && progress && (
-            <div className={styles.progressSection}>
-              <div className={styles.progressContainer}>
-                <div className={styles.progressBar} style={{ width: `${progress.percent}%` }} />
-              </div>
-              <div className={styles.timestamp}>{progress.label}</div>
+        {showProgressSection && showProgress && showBar && progress && (
+          <div className={styles.progressSection}>
+            <div className={styles.progressContainer}>
+              <div className={styles.progressBar} style={{ width: `${progress.percent}%` }} />
+            </div>
+            <div className={styles.timestamp}>{progress.label}</div>
+          </div>
+        )}
+
+        <Link
+          to={linkTo}
+          className={styles.titleSection}
+          onClick={handleCardClick}
+          aria-label={displayTitle}
+        >
+          {isMobile && showMobileBadges && (
+            <div className={styles.mobileBadges}>
+              {!!item.typeBadge && <span className={styles.mobileType}>{item.typeBadge}</span>}
+              {item.chapterBadge && <span className={styles.mobileEp}>{item.chapterBadge}</span>}
             </div>
           )}
 
-          <div className={styles.titleSection}>
-            {isMobile && showMobileBadges && (
-              <div className={styles.mobileBadges}>
-                {!!item.typeBadge && <span className={styles.mobileType}>{item.typeBadge}</span>}
-                {item.chapterBadge && <span className={styles.mobileEp}>{item.chapterBadge}</span>}
-              </div>
-            )}
+          {infoEls?.title !== false && (
+            <div className={styles.title} title={displayTitle}>
+              <span className={styles.titleText}>{displayTitle}</span>
+            </div>
+          )}
 
-            {infoEls?.title !== false && (
-              <div className={styles.title} title={displayTitle}>
-                <span className={styles.titleText}>{displayTitle}</span>
-              </div>
-            )}
-
-            {showMeta && metaRow && <div className={styles.metaRow}>{metaRow}</div>}
-          </div>
+          {showMeta && metaRow && <div className={styles.metaRow}>{metaRow}</div>}
         </Link>
 
         {showModal && (

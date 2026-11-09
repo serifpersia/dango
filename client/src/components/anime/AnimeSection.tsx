@@ -10,6 +10,7 @@ interface AnimeSectionProps {
   eyebrow?: string
   animeList: Anime[]
   continueWatching?: boolean
+  episodeBadge?: boolean
   titleLink?: string
   onRemove?: (id: string) => void
   loading?: boolean
@@ -29,6 +30,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   eyebrow,
   animeList,
   continueWatching,
+  episodeBadge,
   titleLink,
   onRemove,
   loading,
@@ -69,6 +71,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
           key={anime._id}
           anime={anime}
           continueWatching={continueWatching}
+          episodeBadge={episodeBadge}
           onRemove={onRemove}
           config={cardConfig}
           layout={currentLayout}

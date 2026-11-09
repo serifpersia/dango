@@ -184,7 +184,7 @@ const Home: React.FC = () => {
         return <LatestReleasesList eyebrow="Fresh episodes" />
       case 'season':
         return (
-          <section style={{ marginBottom: '2.5rem' }}>
+          <section className={styles.seasonSection}>
             <div className={styles['section-header']} ref={seasonalRef}>
               <div className={styles['title-wrapper']}>
                 <div className="title-stack">
@@ -253,6 +253,7 @@ const Home: React.FC = () => {
             eyebrow="Aired this week"
             animeList={(thisWeekList || []) as AnimeShow[]}
             continueWatching={false}
+            episodeBadge
             carousel
             loading={loadingThisWeek}
           />

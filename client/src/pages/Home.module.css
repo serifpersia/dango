@@ -31,6 +31,10 @@
   border: 1px solid var(--border-primary);
 }
 
+.seasonSection {
+  margin-bottom: 2.5rem;
+}
+
 .seasonGrid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -50,6 +54,10 @@
 }
 
 @media (max-width: 768px) {
+  .seasonSection {
+    margin-bottom: 1.25rem;
+  }
+
   .seasonGrid {
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-2);

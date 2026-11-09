@@ -1137,35 +1137,6 @@ const Player: React.FC = () => {
 
         {!isTheaterMode && (
           <>
-            {isQueueLoading && queue.length === 0 ? (
-              <QueueRailSkeleton count={3} />
-            ) : (
-              <QueueRail
-                title="Queue"
-                items={queue}
-                currentShowId={showId}
-                currentEpisode={state.currentEpisode ?? undefined}
-                onNextQueue={followingHost ? () => {} : handleQueueTransition}
-                onRemove={(item) =>
-                  removeQueue.mutate({
-                    showId: item.showId,
-                    episodeNumber: item.episodeNumber,
-                  })
-                }
-                onClear={() => clearQueue.mutate()}
-                showClearAll
-                onReorder={(items) =>
-                  reorderQueue.mutate(
-                    items.map((item) => ({
-                      id: item.id,
-                      showId: item.showId,
-                      episodeNumber: item.episodeNumber,
-                    }))
-                  )
-                }
-              />
-            )}
-
             <div className={styles.streamPanel}>
               {!followingHost && (
                 <ProviderSelector
@@ -1255,6 +1226,35 @@ const Player: React.FC = () => {
                 </p>
               )}
             </div>
+
+            {isQueueLoading && queue.length === 0 ? (
+              <QueueRailSkeleton count={3} />
+            ) : (
+              <QueueRail
+                title="Queue"
+                items={queue}
+                currentShowId={showId}
+                currentEpisode={state.currentEpisode ?? undefined}
+                onNextQueue={followingHost ? () => {} : handleQueueTransition}
+                onRemove={(item) =>
+                  removeQueue.mutate({
+                    showId: item.showId,
+                    episodeNumber: item.episodeNumber,
+                  })
+                }
+                onClear={() => clearQueue.mutate()}
+                showClearAll
+                onReorder={(items) =>
+                  reorderQueue.mutate(
+                    items.map((item) => ({
+                      id: item.id,
+                      showId: item.showId,
+                      episodeNumber: item.episodeNumber,
+                    }))
+                  )
+                }
+              />
+            )}
 
             <div className={layoutStyles.playerInfoContainer}>
               <div className={layoutStyles.playerInfoHeader}>

@@ -5,8 +5,6 @@
   min-width: 0;
   z-index: 1;
   transition: z-index var(--transition-fast);
-  content-visibility: auto;
-  contain-intrinsic-size: 200px 300px;
   border-radius: var(--radius-md);
 }
 
@@ -18,9 +16,9 @@
   display: flex;
   flex-direction: column;
   background-color: var(--bg-secondary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  height: 100%;
+  height: auto;
   min-width: 0;
   box-shadow: none;
   border: 1px solid var(--border-secondary);
@@ -76,7 +74,7 @@
     transform 0.25s var(--ease-smooth);
   pointer-events: none;
   z-index: 8;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-sm);
 }
 
 .hoverOverlay svg {
@@ -111,7 +109,7 @@
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background: var(--bg-tertiary);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-sm);
 }
 
 .card.horizontal .posterContainer {
@@ -127,7 +125,7 @@
     opacity 0.4s ease,
     transform var(--transition-base),
     filter var(--transition-base);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-sm);
 }
 
 .posterImg.blurred {
@@ -167,17 +165,20 @@
 }
 
 .progressSection {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-1) 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .titleSection {
-  padding: var(--space-3) var(--space-3) 0;
+  padding: var(--space-2) var(--space-1) 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
 }
 
 .title {
@@ -185,7 +186,7 @@
   font-size: var(--font-size-sm);
   line-height: 1.3;
   color: #e2e8f0;
-  height: 2.6em;
+  height: 1.3em;
   margin-bottom: 0;
   transition: color var(--transition-base);
   word-break: break-word;
@@ -194,10 +195,10 @@
 
 .titleText {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  max-height: 2.6em;
+  max-height: 1.3em;
 }
 
 .cardWrapper:hover .title {
@@ -418,8 +419,8 @@
   }
 
   .cardWrapper .title {
-    height: 2.5em;
-    max-height: 2.5em;
+    height: 1.25em;
+    max-height: 1.25em;
     overflow: hidden;
     font-size: 0.82rem;
     line-height: 1.25;
@@ -428,10 +429,10 @@
 
   .titleText {
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    max-height: 2.5em;
+    max-height: 1.25em;
     word-break: break-word;
     color: #e2e8f0;
   }

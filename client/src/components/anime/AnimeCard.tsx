@@ -10,13 +10,21 @@ import type { AnimeShow as Anime } from '../../types/player'
 interface AnimeCardProps {
   anime: Anime
   continueWatching?: boolean
+  episodeBadge?: boolean
   onRemove?: (id: string) => void
   config?: MediaCardDisplay
   layout?: 'vertical' | 'horizontal'
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({ anime, continueWatching = false, onRemove, config, layout = 'vertical' }) => {
+  ({
+    anime,
+    continueWatching = false,
+    episodeBadge = false,
+    onRemove,
+    config,
+    layout = 'vertical',
+  }) => {
     const ct = anime.currentTime || 0
     const dur = anime.duration || 0
     const hasProgress = ct > 5 && dur > 5 && ct < dur * COMPLETION_THRESHOLD
@@ -46,7 +54,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     })()
 
     const progressString = (() => {
-      if (continueWatching && episodeToPlay) {
+      if ((continueWatching || episodeBadge) && episodeToPlay) {
         return `EP ${episodeToPlay}`
       }
 
@@ -58,7 +66,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     })()
 
     const airMeta = [
-      anime.airTime,
+      anime.aired === true ? '' : anime.airTime,
       anime.aired === false && anime.nextEpisodeAirDate
         ? `· ${anime.nextEpisodeAirDate.split(',')[0]}`
         : '',

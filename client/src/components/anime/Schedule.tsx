@@ -209,6 +209,7 @@ const Schedule: React.FC<{ eyebrow?: string }> = ({ eyebrow }) => {
                     key={anime._id}
                     anime={anime}
                     continueWatching={false}
+                    episodeBadge
                     layout="vertical"
                   />
                 </div>
