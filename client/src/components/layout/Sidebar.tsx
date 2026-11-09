@@ -54,17 +54,18 @@ const Sidebar: React.FC = () => {
     <>
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''} sidebar`}>
         <div className={styles.sidebarHeader}>
-          <button
-            className={styles.closeBtn}
-            onClick={() => setIsOpen(false)}
-            aria-label="Close menu"
-          >
-            &times;
-          </button>
           <Link to="/" className={styles.logo} onClick={handleNavLinkClick}>
             <Logo />
           </Link>
         </div>
+
+        <button
+          className={styles.closeBtn}
+          onClick={() => setIsOpen(false)}
+          aria-label="Close menu"
+        >
+          <Icon name="chevron-left" size={18} />
+        </button>
 
         <nav className={styles.navSection}>
           {navItems.map((item) => (

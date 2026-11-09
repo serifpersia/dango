@@ -26,32 +26,39 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-10);
+  margin: 0 calc(var(--space-6) * -1) var(--space-10);
+  padding: 0 var(--space-6) 16.9px;
+  border-bottom: 1px solid var(--border-primary);
   position: relative;
 }
 
 .closeBtn {
   position: absolute;
-  top: 0;
   right: 0;
-  background: none;
-  border: none;
-  font-size: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 76px;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-right: none;
   line-height: 1;
   cursor: pointer;
-  color: var(--text-tertiary);
-  transition: color var(--transition-base);
+  color: var(--text-secondary);
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-1);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  z-index: 2;
+  padding: 0;
 }
 
 .closeBtn:hover {
   color: var(--text-primary);
+  background-color: var(--bg-elevated);
 }
 
 .logo {
@@ -72,6 +79,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  margin-right: 18px;
 }
 
 .navLink {
@@ -85,8 +93,6 @@
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
-  border-left: 2px solid transparent;
-  margin-left: var(--space-2);
 }
 
 .navLink svg {
@@ -100,7 +106,6 @@
 .navLink:hover {
   background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
-  border-left-color: rgba(255, 255, 255, 0.15);
 }
 
 .navLink:hover svg {
@@ -110,7 +115,6 @@
 .navLink.active {
   background-color: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-light);
-  border-left-color: var(--accent);
 }
 
 .navLink.active svg {
@@ -132,6 +136,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -165,10 +170,23 @@
 
   .sidebarHeader {
     margin-bottom: var(--space-8);
+    margin-left: calc(var(--space-4) * -1);
+    margin-right: calc(var(--space-4) * -1);
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
   }
 
   .logo {
     --logo-height: 48px;
+  }
+
+  .closeBtn {
+    width: 18px;
+    height: 56px;
+  }
+
+  .navSection {
+    margin-right: 18px;
   }
 
   .navLink {
