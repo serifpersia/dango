@@ -59,6 +59,8 @@
   align-items: center;
   text-decoration: none;
   --logo-height: 50px;
+  --logo-scale: 1.7;
+  --logo-drop: -0.5;
   transition: opacity var(--transition-base);
 }
 

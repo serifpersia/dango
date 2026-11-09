@@ -26,7 +26,7 @@ const Footer: React.FC = () => {
         <div className={styles.brandSection}>
           <div className={styles.logoRow}>
             <Link to="/" onClick={handleLogoClick} aria-label="Home">
-              <Logo className={styles.logoText} />
+              <Logo collapsed className={styles.logoText} />
             </Link>
           </div>
           <div className={styles.brandMeta}>

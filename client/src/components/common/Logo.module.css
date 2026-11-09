@@ -1,37 +1,35 @@
 .logo {
   height: var(--logo-height, 75px);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--logo-height, 75px) * 0.18);
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.img {
+  height: calc(var(--logo-height, 75px) * var(--logo-scale, 1.9));
   width: auto;
   display: block;
-  overflow: visible;
-}
-
-.ball {
-  fill: var(--accent-light);
-  stroke: var(--accent-dark);
-  stroke-width: 2.5;
-  transition: fill var(--transition-fast);
-}
-
-.eyes {
-  fill: none;
-  stroke: var(--logo-ink);
-  stroke-width: 4.5;
-  stroke-linecap: round;
+  object-fit: contain;
+  user-select: none;
+  align-self: flex-end;
+  margin-bottom: calc(var(--logo-height, 75px) * var(--logo-drop, -0.7));
+  flex-shrink: 0;
 }
 
 .word {
-  fill: var(--text-primary);
   font-family: var(--font-family);
-  font-size: 60px;
+  font-size: calc(var(--logo-height, 75px) * 0.68);
   font-weight: 700;
-  letter-spacing: -2px;
-  transition: fill var(--transition-fast);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text-primary);
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .logo:hover .word {
-  fill: var(--accent);
-}
-
-.logo:hover .ball {
-  fill: var(--accent);
+  color: var(--accent);
 }

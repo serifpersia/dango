@@ -38,8 +38,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  background: var(--header-btn-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--header-control-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition:
     opacity var(--transition-base),
     transform var(--transition-fast);
@@ -47,11 +51,17 @@
 
 .logo:hover {
   opacity: 0.9;
-  transform: translateY(-1px);
+  transform: translateX(2px);
 }
 
 .logoCollapsed {
   display: none;
+}
+
+.logoFull,
+.logoCollapsed {
+  --logo-scale: 1.7;
+  --logo-drop: -0.29;
 }
 
 .headerInner {
@@ -505,7 +515,7 @@ input.searchInput:focus-visible {
 @media (max-width: 1200px) {
   .searchWrapper {
     background: transparent;
-    border: none;
+    border: 1px solid transparent;
     padding: 0;
     height: auto;
     cursor: default;
@@ -607,6 +617,7 @@ input.searchInput:focus-visible {
       opacity: 0;
       transform: translateY(-8px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -689,11 +700,6 @@ input.searchInput:focus-visible {
     width: 38px;
     font-size: 1rem;
   }
-
-  .logo {
-    padding: 2px;
-    min-width: 0;
-  }
 }
 
 @media (max-width: 480px) {
@@ -702,7 +708,12 @@ input.searchInput:focus-visible {
   }
 
   .logoCollapsed {
-    display: block;
+    display: inline-flex;
+  }
+
+  .logo {
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
   }
 
   .searchButton,

@@ -1,6 +1,7 @@
 .footer {
   width: 100%;
   position: relative;
+  z-index: 2;
   padding: 0 var(--space-8) var(--space-8);
   overflow: visible;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -40,12 +41,21 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  --logo-height: 60px;
+}
+
+.logoRow a {
+  display: flex;
+  align-items: flex-end;
+  height: calc(var(--logo-height) * 1.9);
+  margin-top: calc(var(--logo-height) * -0.9);
 }
 
 .logoText {
   --logo-height: 60px;
+  --logo-scale: 1.5;
+  --logo-drop: -0.075;
   width: auto;
-  display: block;
 }
 
 .brandMeta {
@@ -203,6 +213,7 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    --logo-height: 52px;
   }
 
   .logoText {
@@ -214,7 +225,7 @@
     align-items: center;
     gap: var(--space-1);
     justify-content: center;
-    margin-top: 6px;
+    margin-top: 8px;
   }
 
   .linksGrid {
