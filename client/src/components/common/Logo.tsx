@@ -12,7 +12,13 @@ const Logo: React.FC<LogoProps> = ({ className, collapsed }) => (
     role="img"
     aria-label="dango"
   >
-    <img src="/logo-mascot.png" alt="" aria-hidden="true" draggable={false} className={styles.img} />
+    <img
+      src="/logo-mascot.png"
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      className={styles.img}
+    />
     {!collapsed && <span className={styles.word}>dango</span>}
   </span>
 )

@@ -32,36 +32,33 @@ import {
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 import { loadWatchedOverlayEnabled, storeWatchedOverlayEnabled } from '../lib/playbackCompletion'
 import { Alert } from '../components/common/Alert'
-import { useContentType } from '../contexts/ContentTypeContext'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import sharedStyles from '../components/settings/Settings.module.css'
 import MatureConsentModal from '../components/common/MatureConsentModal'
 
-const LIST_TAB_LABELS = {
-  anime: 'Watchlist',
-  manga: 'Reading List',
-  tv: 'TV Watchlist',
-  asmr: 'Listening List',
-} as const
-
-type SettingsTab = 'general' | 'presence' | 'server' | 'sync' | 'watchlist' | 'database'
+type SettingsTab = 'profile' | 'appearance' | 'presence' | 'server' | 'sync' | 'watchlist'
 const SETTINGS_TABS: SettingsTab[] = [
-  'general',
+  'profile',
+  'appearance',
   'presence',
   'server',
   'sync',
   'watchlist',
-  'database',
 ]
+
+const TAB_ALIASES: Record<string, SettingsTab> = { general: 'profile', database: 'sync' }
+
+const resolveTab = (value: string | null): SettingsTab | null => {
+  if (!value) return null
+  if (SETTINGS_TABS.includes(value as SettingsTab)) return value as SettingsTab
+  return TAB_ALIASES[value] ?? null
+}
 
 const Settings: React.FC = () => {
   const { data: profile } = useQuery(profileQuery)
   const [searchParams, setSearchParams] = useSearchParams()
-  const { contentType } = useContentType()
-  const initialTab = searchParams.get('tab') as SettingsTab | null
-  const [activeTab, setActiveTab] = useState<SettingsTab>(
-    initialTab && SETTINGS_TABS.includes(initialTab) ? initialTab : 'general'
-  )
+  const initialTab = resolveTab(searchParams.get('tab'))
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'profile')
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -162,15 +159,15 @@ const Settings: React.FC = () => {
   }, [])
 
   React.useEffect(() => {
-    const tab = searchParams.get('tab') as SettingsTab | null
-    if (tab && SETTINGS_TABS.includes(tab)) {
+    const tab = resolveTab(searchParams.get('tab'))
+    if (tab) {
       setActiveTab(tab)
     }
   }, [searchParams])
 
   const selectTab = (tab: SettingsTab) => {
     setActiveTab(tab)
-    setSearchParams(tab === 'general' ? {} : { tab })
+    setSearchParams(tab === 'profile' ? {} : { tab })
   }
 
   const updateIndicator = useCallback(() => {
@@ -280,10 +277,50 @@ const Settings: React.FC = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'general':
+      case 'profile':
         return (
           <div className={styles.tabContent}>
             <ProfileSettings />
+            <div className={sharedStyles.sectionCard}>
+              <h3>Mature Content</h3>
+              <p>
+                Allow mature content intended for adults 18 and older. Turning this off restores
+                filtering and blur gates.
+              </p>
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Allow mature content intended for adults 18 and older. Turning this off
+                      restores filtering and blur gates.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={hasMatureConsent}
+                    onChange={(e) => {
+                      if (e.currentTarget.checked) setShowMatureConsentModal(true)
+                      else {
+                        revokeMatureConsent()
+                        window.location.reload()
+                      }
+                    }}
+                    id="mature-content-enabled"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      case 'appearance':
+        return (
+          <div className={styles.tabContent}>
             <div className={sharedStyles.sectionCard}>
               <h3>Appearance & Preferences</h3>
               <p>Configure how titles are displayed and other general preferences.</p>
@@ -360,30 +397,6 @@ const Settings: React.FC = () => {
                   />
                 </div>
               </div>
-
-              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div className={sharedStyles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Frozen Mode</h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      When on, nothing is saved or synced: no watchlist, progress, resume, or
-                      settings changes, and no cloud sync (GitHub/Google/rclone) or tracker push.
-                      Useful for experimentation and private sessions.
-                    </p>
-                  </div>
-                  <ToggleSwitch
-                    isChecked={frozenMode}
-                    onChange={(e) => toggleFrozen(e.currentTarget.checked)}
-                    id="frozen-mode"
-                  />
-                </div>
-              </div>
             </div>
             <section className={sharedStyles.sectionCard}>
               <h3>Keyboard Shortcuts</h3>
@@ -440,8 +453,8 @@ const Settings: React.FC = () => {
         return (
           <div className={styles.tabContent}>
             <div className={sharedStyles.sectionCard}>
-              <h3>Presence & Content</h3>
-              <p>Control what Dango shares on Discord and your mature-content preference.</p>
+              <h3>Discord Presence</h3>
+              <p>Control what Dango shares on Discord.</p>
               {profile?.owner && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                   <div className={sharedStyles.settingRow}>
@@ -605,35 +618,6 @@ const Settings: React.FC = () => {
                   {profile?.owner && <DiscordTokenBookmarklet />}
                 </div>
               )}
-
-              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div className={sharedStyles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Allow mature content intended for adults 18 and older. Turning this off
-                      restores filtering and blur gates.
-                    </p>
-                  </div>
-                  <ToggleSwitch
-                    isChecked={hasMatureConsent}
-                    onChange={(e) => {
-                      if (e.currentTarget.checked) setShowMatureConsentModal(true)
-                      else {
-                        revokeMatureConsent()
-                        window.location.reload()
-                      }
-                    }}
-                    id="mature-content-enabled"
-                  />
-                </div>
-              </div>
             </div>
           </div>
         )
@@ -643,6 +627,7 @@ const Settings: React.FC = () => {
             {profile?.owner && <LanAuthSettings />}
             {profile?.owner && <ServerPortSettings />}
             {profile?.owner && <AllowedOriginsSettings />}
+            <ClearDatabaseSettings />
           </div>
         )
       case 'sync':
@@ -652,17 +637,33 @@ const Settings: React.FC = () => {
             <GitHubSyncSettings />
             <GoogleAuthSettings />
             {profile?.owner && <RcloneSettings />}
-          </div>
-        )
-      case 'watchlist':
-        return (
-          <div className={styles.tabContent}>
-            <WatchlistSettings />
-          </div>
-        )
-      case 'database':
-        return (
-          <div className={styles.tabContent}>
+            <div className={sharedStyles.sectionCard}>
+              <h3>Frozen Mode</h3>
+              <p>When on, nothing is saved or synced.</p>
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Frozen Mode</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      When on, nothing is saved or synced: no watchlist, progress, resume, or
+                      settings changes, and no cloud sync (GitHub/Google/rclone) or tracker push.
+                      Useful for experimentation and private sessions.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={frozenMode}
+                    onChange={(e) => toggleFrozen(e.currentTarget.checked)}
+                    id="frozen-mode"
+                  />
+                </div>
+              </div>
+            </div>
             <div className={sharedStyles.sectionCard}>
               <h3>Database Management</h3>
               <p>
@@ -691,7 +692,12 @@ const Settings: React.FC = () => {
               {statusMessage && <p className={styles.status}>{statusMessage}</p>}
             </div>
             {profile?.owner && <OfflineDbSettings />}
-            <ClearDatabaseSettings />
+          </div>
+        )
+      case 'watchlist':
+        return (
+          <div className={styles.tabContent}>
+            <WatchlistSettings />
           </div>
         )
       default:
@@ -719,12 +725,21 @@ const Settings: React.FC = () => {
           />
           <button
             ref={(el) => {
-              if (el) tabBtnRefs.current.set('general', el)
+              if (el) tabBtnRefs.current.set('profile', el)
             }}
-            className={`${styles.sidebarItem} ${activeTab === 'general' ? styles.active : ''}`}
-            onClick={() => selectTab('general')}
+            className={`${styles.sidebarItem} ${activeTab === 'profile' ? styles.active : ''}`}
+            onClick={() => selectTab('profile')}
           >
-            <Icon name="cog" /> <span>General</span>
+            <Icon name="user-astronaut" /> <span>Profile</span>
+          </button>
+          <button
+            ref={(el) => {
+              if (el) tabBtnRefs.current.set('appearance', el)
+            }}
+            className={`${styles.sidebarItem} ${activeTab === 'appearance' ? styles.active : ''}`}
+            onClick={() => selectTab('appearance')}
+          >
+            <Icon name="image" /> <span>Appearance</span>
           </button>
           <button
             ref={(el) => {
@@ -751,7 +766,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
             onClick={() => selectTab('sync')}
           >
-            <Icon name="cloud" /> <span>Synchronization</span>
+            <Icon name="cloud" /> <span>Sync & Data</span>
           </button>
           <button
             ref={(el) => {
@@ -760,16 +775,7 @@ const Settings: React.FC = () => {
             className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
             onClick={() => selectTab('watchlist')}
           >
-            <Icon name="list" /> <span>{LIST_TAB_LABELS[contentType]}</span>
-          </button>
-          <button
-            ref={(el) => {
-              if (el) tabBtnRefs.current.set('database', el)
-            }}
-            className={`${styles.sidebarItem} ${activeTab === 'database' ? styles.active : ''}`}
-            onClick={() => selectTab('database')}
-          >
-            <Icon name="database" /> <span>Database</span>
+            <Icon name="list" /> <span>Lists</span>
           </button>
         </aside>
 
