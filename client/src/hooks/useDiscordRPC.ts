@@ -54,6 +54,6 @@ export function useDiscordPageStatus() {
     else if (path.startsWith('/manga')) page = 'manga'
     else if (path.startsWith('/tv')) page = 'tv'
 
-    trpcClient.discord.pageStatus.mutate({ page }).catch(() => {})
+    trpcClient.discord.pageStatus.mutate({ page, sessionId: sessionIdRef.current }).catch(() => {})
   }, [location.pathname, discordEnabled])
 }

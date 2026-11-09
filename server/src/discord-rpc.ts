@@ -81,6 +81,12 @@ class DiscordRPCService {
     void this.checkHeartbeats()
   }
 
+  private isLocked(sessionId?: string): boolean {
+    if (!sessionId || !this.currentSessionId || sessionId === this.currentSessionId) return false
+    const lastSeen = this.heartbeats.get(this.currentSessionId)
+    return lastSeen !== undefined && Date.now() - lastSeen <= this.HEARTBEAT_TIMEOUT
+  }
+
   private async checkHeartbeats() {
     if (!this.isEnabled) {
       if (this.heartbeatTimer) {
@@ -95,6 +101,12 @@ class DiscordRPCService {
       if (now - lastSeen > this.HEARTBEAT_TIMEOUT) {
         this.heartbeats.delete(sessionId)
       }
+    }
+
+    if (this.currentSessionId && !this.heartbeats.has(this.currentSessionId)) {
+      this.lastActivity = null
+      this.currentSessionId = null
+      this.hasPagePresence = false
     }
 
     if (this.heartbeats.size === 0) {
@@ -258,6 +270,7 @@ class DiscordRPCService {
   }
 
   public async updatePresence(data: DiscordActivityData) {
+    if (this.isLocked(data.sessionId)) return
     this.lastActivity = data
     if (data.sessionId) {
       this.currentSessionId = data.sessionId
@@ -402,7 +415,9 @@ class DiscordRPCService {
     }
   }
 
-  public async setIdleStatus(page: string) {
+  public async setIdleStatus(page: string, sessionId?: string) {
+    if (this.isLocked(sessionId)) return
+    if (sessionId && !this.currentSessionId) this.currentSessionId = sessionId
     if (!this.isEnabled) return
 
     if (discordGatewayService.serviceEnabled) {

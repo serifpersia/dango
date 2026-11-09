@@ -1,4 +1,4 @@
-import { ownerProcedure, router } from '../index.js'
+import { ownerProcedure, protectedProcedure, router } from '../index.js'
 import { defineSchema, optNum, optStr, reqObj } from '../validation.js'
 import { badRequest, failed } from '../errors.js'
 import type { TrpcContext } from '../context.js'
@@ -76,11 +76,18 @@ export const presenceInput = () =>
   })
 
 const pageStatusInput = () =>
-  defineSchema<{ page?: string }, { page?: string }>((value) => {
-    if (value === undefined || value === null) return {}
-    const page = optStr(reqObj(value), 'page')
-    return page === undefined ? {} : { page }
-  })
+  defineSchema<{ page?: string; sessionId?: string }, { page?: string; sessionId?: string }>(
+    (value) => {
+      if (value === undefined || value === null) return {}
+      const obj = reqObj(value)
+      const out: { page?: string; sessionId?: string } = {}
+      const page = optStr(obj, 'page')
+      if (page !== undefined) out.page = page
+      const sessionId = optStr(obj, 'sessionId')
+      if (sessionId !== undefined) out.sessionId = sessionId
+      return out
+    }
+  )
 
 const heartbeatInput = () =>
   defineSchema<{ sessionId?: string; bye?: boolean }, { sessionId?: string; bye?: boolean }>(
@@ -186,15 +193,15 @@ async function sendPresence(
 }
 
 export const discordRouter = router({
-  pageStatus: ownerProcedure.input(pageStatusInput()).mutation(async ({ ctx, input }) => {
+  pageStatus: protectedProcedure.input(pageStatusInput()).mutation(async ({ ctx, input }) => {
     if (!input.page || !ctx.discordRPC.isServiceEnabled) {
       return { success: true }
     }
-    ctx.discordRPC.setIdleStatus(input.page)
+    ctx.discordRPC.setIdleStatus(input.page, input.sessionId)
     return { success: true }
   }),
 
-  heartbeat: ownerProcedure.input(heartbeatInput()).mutation(async ({ ctx, input }) => {
+  heartbeat: protectedProcedure.input(heartbeatInput()).mutation(async ({ ctx, input }) => {
     if (!input.sessionId || !ctx.discordRPC.isServiceEnabled) {
       return { success: true }
     }
@@ -206,7 +213,7 @@ export const discordRouter = router({
     return { success: true }
   }),
 
-  clear: ownerProcedure.input(heartbeatInput()).mutation(async ({ ctx, input }) => {
+  clear: protectedProcedure.input(heartbeatInput()).mutation(async ({ ctx, input }) => {
     if (!ctx.discordRPC.isServiceEnabled) {
       return { success: true }
     }
@@ -214,17 +221,17 @@ export const discordRouter = router({
     return { success: true }
   }),
 
-  asmrPresence: ownerProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
+  asmrPresence: protectedProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
     await sendPresence(ctx.discordRPC, input, 'asmr')
     return { success: true }
   }),
 
-  mangaPresence: ownerProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
+  mangaPresence: protectedProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
     await sendPresence(ctx.discordRPC, input, 'manga')
     return { success: true }
   }),
 
-  tvPresence: ownerProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
+  tvPresence: protectedProcedure.input(presenceInput()).mutation(async ({ ctx, input }) => {
     await sendPresence(ctx.discordRPC, input, 'tv')
     return { success: true }
   }),
