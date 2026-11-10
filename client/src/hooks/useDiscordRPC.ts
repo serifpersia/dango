@@ -3,9 +3,11 @@ import { useLocation } from 'react-router'
 import { useSetting } from './useSettings'
 import { trpcClient } from '../lib/trpc'
 import { trpcBeacon } from '../lib/trpcBeacon'
+import { useContentType } from '../contexts/ContentTypeContext'
 
 export function useDiscordPageStatus() {
   const location = useLocation()
+  const { contentType } = useContentType()
   const { data: discordEnabled } = useSetting('discordRPCEnabled')
   const sessionIdRef = useRef<string>('')
   if (!sessionIdRef.current) {
@@ -43,17 +45,21 @@ export function useDiscordPageStatus() {
     if (path.startsWith('/watch/') || path.startsWith('/player/')) return
 
     let page = 'home'
-    if (path.startsWith('/search')) page = 'search'
-    else if (path.startsWith('/mature')) page = 'search'
+    if (path === '/search' || path === '/mature') page = 'search-anime'
+    else if (path === '/tv' || path === '/tv-search') page = 'search-tv'
+    else if (path === '/manga') page = 'search-manga'
+    else if (path === '/asmr') page = 'search-asmr'
     else if (path.startsWith('/watchlist')) page = 'watchlist'
     else if (path.startsWith('/anime/')) page = 'anime'
     else if (path.startsWith('/insights')) page = 'insights'
     else if (path.startsWith('/settings')) page = 'settings'
     else if (path.startsWith('/trackers')) page = 'trackers'
-    else if (path.startsWith('/asmr')) page = 'asmr'
-    else if (path.startsWith('/manga')) page = 'manga'
-    else if (path.startsWith('/tv')) page = 'tv'
+    else if (path.startsWith('/tv/')) page = 'tv'
+    else if (path.startsWith('/manga/')) page = 'manga'
+    else if (path.startsWith('/asmr/')) page = 'asmr'
+
+    if (path === '/') page = `home-${contentType}`
 
     trpcClient.discord.pageStatus.mutate({ page, sessionId: sessionIdRef.current }).catch(() => {})
-  }, [location.pathname, discordEnabled])
+  }, [location.pathname, contentType, discordEnabled])
 }

@@ -171,10 +171,7 @@ class DiscordGatewayService {
     const state = data.stateLine
       ? data.stateLine
       : `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`
-    const type =
-      data.providerName === 'ASMR' || data.providerName === 'Radio' || data.providerName === 'Music'
-        ? 2
-        : 3
+    const type = data.providerName === 'ASMR' ? 2 : 3
 
     const imageUrl = this.resolveImageUrl(data)
     let assets: { large_image?: string; large_text?: string } | undefined
@@ -250,21 +247,28 @@ class DiscordGatewayService {
 
     const pageLabels: Record<string, { details: string; state: string }> = {
       home: { details: 'Home', state: 'Browsing anime' },
+      'home-anime': { details: 'Home', state: 'Browsing anime' },
+      'home-manga': { details: 'Home', state: 'Browsing manga' },
+      'home-tv': { details: 'Home', state: 'Browsing movies & shows' },
+      'home-asmr': { details: 'Home', state: 'Browsing ASMR works' },
       search: { details: 'Search', state: 'Exploring titles...' },
+      'search-anime': { details: 'Anime Search', state: 'Browsing titles' },
+      'search-manga': { details: 'Manga Search', state: 'Browsing titles' },
+      'search-tv': { details: 'TV Search', state: 'Browsing titles' },
+      'search-asmr': { details: 'ASMR Search', state: 'Browsing titles' },
       watchlist: { details: 'Watchlist', state: 'Reviewing the watchlist' },
       anime: { details: 'Anime Info', state: 'Reading show details' },
       insights: { details: 'Insights', state: 'Reviewing stats' },
       settings: { details: 'Settings', state: 'Tweaking preferences' },
       trackers: { details: 'Trackers', state: 'Syncing watchlists' },
       map: { details: 'Map', state: 'Exploring the global user map' },
-      asmr: { details: 'ASMR', state: 'Browsing ASMR works' },
-      radio: { details: 'Radio', state: 'Browsing radio stations' },
-      music: { details: 'Music', state: 'Browsing music' },
-      tv: { details: 'TV', state: 'Browsing movies & shows' },
-      manga: { details: 'Manga', state: 'Browsing manga' },
+      asmr: { details: 'ASMR Info', state: 'Reading details' },
+      tv: { details: 'TV Info', state: 'Reading show details' },
+      manga: { details: 'Manga Info', state: 'Reading manga details' },
     }
 
     const label = pageLabels[page] ?? { details: 'dango', state: 'Idle' }
+    const isListening = page === 'asmr' || page === 'home-asmr' || page === 'search-asmr'
 
     const logo = await this.getLogoAssetId()
 
@@ -277,11 +281,18 @@ class DiscordGatewayService {
             activities: [
               {
                 name: 'dango',
-                type: page === 'asmr' || page === 'radio' || page === 'music' ? 2 : 3,
+                type: isListening ? 2 : 3,
                 state: label.state,
                 details: label.details,
                 ...(CONFIG.DISCORD_CLIENT_ID ? { application_id: CONFIG.DISCORD_CLIENT_ID } : {}),
-                ...(logo ? { assets: { large_image: logo, large_text: 'dango' } } : {}),
+                ...(logo
+                  ? {
+                      assets: {
+                        large_image: logo,
+                        ...(isListening ? {} : { large_text: 'dango' }),
+                      },
+                    }
+                  : {}),
                 buttons: ['Learn More'],
                 metadata: { button_urls: ['https://github.com/serifpersia/dango'] },
                 status_display_type: 2,
