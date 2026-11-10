@@ -210,6 +210,86 @@ const tvSourcesInput = () =>
     return out
   })
 
+export type TvOpenSubtitleLanguagesInput = {
+  provider?: string
+  type: string
+  tmdbId: string
+  season?: number
+  episode?: number
+  title?: string
+  year?: string
+  imdbId?: string
+  totalSeasons?: string
+}
+
+const tvOpenSubtitleLanguagesInput = () =>
+  defineSchema<TvOpenSubtitleLanguagesInput, TvOpenSubtitleLanguagesInput>((value) => {
+    const obj = reqObj(value)
+    const out: TvOpenSubtitleLanguagesInput = {
+      type: reqStr(obj, 'type'),
+      tmdbId: reqId(obj, 'tmdbId'),
+    }
+    const provider = optStr(obj, 'provider')
+    if (provider !== undefined) out.provider = provider
+    if (obj.season !== undefined) out.season = readCount(obj, 'season', 1)
+    if (obj.episode !== undefined) out.episode = readCount(obj, 'episode', 1)
+    const title = optStr(obj, 'title')
+    if (title !== undefined) out.title = title
+    const year = optStr(obj, 'year')
+    if (year !== undefined) out.year = year
+    const imdbId = optStr(obj, 'imdbId')
+    if (imdbId !== undefined) out.imdbId = imdbId
+    const totalSeasons = optStr(obj, 'totalSeasons')
+    if (totalSeasons !== undefined) out.totalSeasons = totalSeasons
+    return out
+  })
+
+export type TvOpenSubtitleFilesInput = TvOpenSubtitleLanguagesInput & { lang: string }
+
+const tvOpenSubtitleFilesInput = () =>
+  defineSchema<TvOpenSubtitleFilesInput, TvOpenSubtitleFilesInput>((value) => {
+    const obj = reqObj(value)
+    const out: TvOpenSubtitleFilesInput = {
+      type: reqStr(obj, 'type'),
+      tmdbId: reqId(obj, 'tmdbId'),
+      lang: reqStr(obj, 'lang'),
+    }
+    const provider = optStr(obj, 'provider')
+    if (provider !== undefined) out.provider = provider
+    if (obj.season !== undefined) out.season = readCount(obj, 'season', 1)
+    if (obj.episode !== undefined) out.episode = readCount(obj, 'episode', 1)
+    const title = optStr(obj, 'title')
+    if (title !== undefined) out.title = title
+    const year = optStr(obj, 'year')
+    if (year !== undefined) out.year = year
+    const imdbId = optStr(obj, 'imdbId')
+    if (imdbId !== undefined) out.imdbId = imdbId
+    const totalSeasons = optStr(obj, 'totalSeasons')
+    if (totalSeasons !== undefined) out.totalSeasons = totalSeasons
+    return out
+  })
+
+async function withOpenSubProvider<T>(
+  ctx: {
+    getTvProvider: (name: string) => import('../../providers/tv.types.js').TvProvider | undefined
+  },
+  provider: string | undefined,
+  fn: (mod: import('../../providers/tv.types.js').TvProvider) => Promise<T | null>
+): Promise<T | null> {
+  const names = provider ? [provider, 'embedmaster'] : ['embedmaster']
+  for (const name of names) {
+    const mod = ctx.getTvProvider(String(name).toLowerCase())
+    if (!mod) continue
+    try {
+      const res = await fn(mod)
+      if (res !== null) return res
+    } catch {
+      // ignore
+    }
+  }
+  return null
+}
+
 export const tvRouter = router({
   search: protectedProcedure.input(tvSearchInput()).query(async ({ ctx, input }) => {
     const query = input.q || ''
@@ -503,4 +583,62 @@ export const tvRouter = router({
       throw failed((e as Error).message)
     }
   }),
+
+  openSubtitleLanguages: protectedProcedure
+    .input(tvOpenSubtitleLanguagesInput())
+    .query(async ({ ctx, input }) => {
+      const mediaType = input.type === 'movie' ? 'movie' : 'tv'
+      const numericTmdbId = parseInt(input.tmdbId, 10)
+      if (!numericTmdbId) return { languages: [] }
+      const meta = await resolveTvMeta(mediaType, numericTmdbId, {
+        title: input.title || '',
+        year: input.year || '',
+        imdbId: input.imdbId || '',
+        totalSeasons: input.totalSeasons || '1',
+      })
+      const media = buildTvMediaRequest({
+        tmdbId: numericTmdbId,
+        type: mediaType,
+        season: input.season || 1,
+        episode: input.episode || 1,
+        title: meta.title,
+        year: meta.year,
+        imdbId: meta.imdbId,
+        totalSeasons: parseInt(meta.totalSeasons, 10) || 1,
+      })
+      const languages = await withOpenSubProvider(ctx, input.provider, async (mod) => {
+        if (typeof mod.getSubtitleLanguages !== 'function') return null
+        return (await mod.getSubtitleLanguages(media)) || []
+      })
+      return { languages: languages || [] }
+    }),
+
+  openSubtitleFiles: protectedProcedure
+    .input(tvOpenSubtitleFilesInput())
+    .query(async ({ ctx, input }) => {
+      const mediaType = input.type === 'movie' ? 'movie' : 'tv'
+      const numericTmdbId = parseInt(input.tmdbId, 10)
+      if (!numericTmdbId) return { files: [] }
+      const meta = await resolveTvMeta(mediaType, numericTmdbId, {
+        title: input.title || '',
+        year: input.year || '',
+        imdbId: input.imdbId || '',
+        totalSeasons: input.totalSeasons || '1',
+      })
+      const media = buildTvMediaRequest({
+        tmdbId: numericTmdbId,
+        type: mediaType,
+        season: input.season || 1,
+        episode: input.episode || 1,
+        title: meta.title,
+        year: meta.year,
+        imdbId: meta.imdbId,
+        totalSeasons: parseInt(meta.totalSeasons, 10) || 1,
+      })
+      const files = await withOpenSubProvider(ctx, input.provider, async (mod) => {
+        if (typeof mod.getSubtitleFiles !== 'function') return null
+        return (await mod.getSubtitleFiles(media, input.lang)) || []
+      })
+      return { files: files || [] }
+    }),
 })

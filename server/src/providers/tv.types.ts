@@ -26,6 +26,26 @@ export interface TvSubtitle {
   url: string
 }
 
+export interface OpenSubtitleLanguage {
+  id: string
+  language: string
+  label: string
+  count: number
+}
+
+export interface OpenSubtitleFile {
+  id: string
+  language: string
+  label: string
+  url: string
+  format?: string
+  encoding?: string
+  downloads?: number
+  rating?: string
+  fileName?: string
+  hearingImpaired?: boolean
+}
+
 export interface TvSourcesResult {
   sources: TvStreamSource[]
   audioTracks?: TvAudioTrack[]
@@ -41,5 +61,7 @@ export interface TvProvider {
   servers?: string[]
   getSources?: (media: TvMediaRequest, server?: string) => Promise<TvSourcesResult | null>
   getEmbedUrl?: (media: TvMediaRequest) => Promise<string | null>
+  getSubtitleLanguages?: (media: TvMediaRequest) => Promise<OpenSubtitleLanguage[] | null>
+  getSubtitleFiles?: (media: TvMediaRequest, lang: string) => Promise<OpenSubtitleFile[] | null>
   rewritePlaylist?: (body: string, playlistUrl: string) => string
 }

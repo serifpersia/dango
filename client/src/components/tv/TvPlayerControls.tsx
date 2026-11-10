@@ -42,6 +42,13 @@ interface TvPlayerControlsProps {
   ambientSettings?: AmbientLightSettings
   onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
   hideChrome?: boolean
+  onOpenSubtitles?: () => void
+  openSubLanguages?: { id: string; language?: string; label?: string; count?: number }[]
+  openSubFiles?: { id: string; language?: string; label: string; url: string }[]
+  openSubLoading?: boolean
+  openSubError?: string | null
+  onOpenSubLangSelect?: (langId: string) => void
+  onOpenSubFileSelect?: (file: { id: string; language: string; label: string; url: string }) => void
 }
 
 const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
@@ -75,6 +82,13 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   ambientSettings,
   onAmbientChange,
   hideChrome = false,
+  onOpenSubtitles,
+  openSubLanguages,
+  openSubFiles,
+  openSubLoading,
+  openSubError,
+  onOpenSubLangSelect,
+  onOpenSubFileSelect,
 }) => {
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
@@ -217,7 +231,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     videoBoxH,
   ])
 
-  const hasSubtitles = subtitles.length > 0
+  const hasSubtitles = subtitles.length > 0 || !!onOpenSubtitles
   const isSubtitleActive = selectedSubtitle >= 0
 
   const openSettings = () => {
@@ -312,6 +326,22 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       onSubtitleDelayChange={onSubtitleDelayChange}
       ambientSettings={ambientSettings}
       onAmbientChange={onAmbientChange}
+      onOpenSubtitles={() => {
+        onOpenSubtitles?.()
+        setSettingsView('opensub-langs')
+      }}
+      openSubLanguages={openSubLanguages}
+      openSubFiles={openSubFiles}
+      openSubLoading={openSubLoading}
+      openSubError={openSubError}
+      onOpenSubLangSelect={(langId) => {
+        onOpenSubLangSelect?.(langId)
+        setSettingsView('opensub-files')
+      }}
+      onOpenSubFileSelect={(file) => {
+        onOpenSubFileSelect?.(file)
+        closeSettings()
+      }}
     />
   ) : null
 

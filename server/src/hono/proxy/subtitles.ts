@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { gotScraping } from 'got-scraping'
+import { gunzipSync } from 'node:zlib'
 import { buildCfClearanceCookie } from '../../utils/cookie.utils.js'
 import { isSafeExternalUrl } from '../../utils/security.utils.js'
 import { fetchWithRetry, linkAbort, UPSTREAM_RETRY } from '../../utils/http.utils.js'
@@ -148,6 +149,42 @@ export async function proxySubtitles(c: Context, getProxyRules: () => RemoteProx
     return headers
   }
 
+  const normEnc = (enc: string): string => {
+    const e = enc
+      .trim()
+      .toLowerCase()
+      .replace(/^windows-/, 'windows-')
+      .replace(/^win-/, 'windows-')
+    if (!e) return 'utf-8'
+    if (e === 'cp1251' || e === 'win1251') return 'windows-1251'
+    if (e === 'cp1252' || e === 'win1252') return 'windows-1252'
+    if (e === 'cp1250' || e === 'win1250') return 'windows-1250'
+    if (e === 'cp1253' || e === 'win1253') return 'windows-1253'
+    if (e === 'cp1254' || e === 'win1254') return 'windows-1254'
+    if (e === 'cp1255' || e === 'win1255') return 'windows-1255'
+    if (e === 'cp1256' || e === 'win1256') return 'windows-1256'
+    if (e === 'iso-8859-1' || e === 'iso8859-1' || e === 'latin1') return 'windows-1252'
+    if (e === 'koi8-r' || e === 'koi8r') return 'koi8-r'
+    return e
+  }
+
+  const decodeSubText = (buf: Buffer): string => {
+    let b = buf
+    if (b.length > 2 && b[0] === 0x1f && b[1] === 0x8b) {
+      try {
+        b = gunzipSync(b)
+      } catch {
+        // keep original
+      }
+    }
+    const wanted = normEnc(c.req.query('enc') || c.req.query('encoding') || '')
+    try {
+      return new TextDecoder(wanted).decode(b).replace(/^\uFEFF/, '')
+    } catch {
+      return b.toString('utf8').replace(/^\uFEFF/, '')
+    }
+  }
+
   const fetchText = async (
     target: string,
     retries = 1
@@ -159,7 +196,7 @@ export async function proxySubtitles(c: Context, getProxyRules: () => RemoteProx
           url: target,
           method: 'GET',
           headers,
-          responseType: 'text',
+          responseType: 'buffer',
           timeout: { request: 15000 },
           followRedirect: true,
           throwHttpErrors: false,
@@ -172,7 +209,7 @@ export async function proxySubtitles(c: Context, getProxyRules: () => RemoteProx
           )
           return { status: upstream.statusCode, body: '' }
         }
-        const body = String(upstream.body ?? '').replace(/^\uFEFF/, '')
+        const body = decodeSubText(Buffer.from(upstream.body as Buffer))
         if (/^\s*\{[\s\S]*"error"[\s\S]*\}\s*$/.test(body.slice(0, 500))) {
           logger.warn({ target, body: body.slice(0, 200) }, '[subtitle-proxy] upstream JSON error')
           return { status: 502, body: '' }
@@ -205,7 +242,7 @@ export async function proxySubtitles(c: Context, getProxyRules: () => RemoteProx
         }
         return { status: upstream.status, body: '' }
       }
-      const body = (await upstream.text()).replace(/^\uFEFF/, '')
+      const body = decodeSubText(Buffer.from(await upstream.arrayBuffer()))
       if (/^\s*\{[\s\S]*"error"[\s\S]*\}\s*$/.test(body.slice(0, 500))) {
         logger.warn({ target, body: body.slice(0, 200) }, '[subtitle-proxy] upstream JSON error')
         return { status: 502, body: '' }
@@ -269,7 +306,7 @@ export async function proxySubtitles(c: Context, getProxyRules: () => RemoteProx
             { retries: 1, timeoutMs: 15000, signal: abort.signal }
           )
           if (!segRes.ok) continue
-          let segBody = (await segRes.text()).replace(/^\uFEFF/, '')
+          let segBody = decodeSubText(Buffer.from(await segRes.arrayBuffer()))
           if (/#EXTM3U/i.test(segBody.slice(0, 200))) continue
           segBody = segBody.replace(/\r\n/g, '\n').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
           if (/^\s*WEBVTT/i.test(segBody)) {

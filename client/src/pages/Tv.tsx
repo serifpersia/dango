@@ -148,6 +148,25 @@ interface SubtitleTrack {
   language: string
   label: string
   url: string
+  source?: 'provider' | 'opensub'
+  encoding?: string
+}
+
+interface OpenSubtitleLanguage {
+  id: string
+  language: string
+  label: string
+  count: number
+}
+
+interface OpenSubtitleFile {
+  id: string
+  language: string
+  label: string
+  url: string
+  format?: string
+  downloads?: number
+  encoding?: string
 }
 
 interface TvProviderOption {
@@ -245,6 +264,10 @@ const Tv: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number>(0)
   const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([])
   const [selectedSubtitle, setSelectedSubtitle] = useState<number>(-1)
+  const [openSubLanguages, setOpenSubLanguages] = useState<OpenSubtitleLanguage[]>([])
+  const [openSubFiles, setOpenSubFiles] = useState<OpenSubtitleFile[]>([])
+  const [openSubLoading, setOpenSubLoading] = useState(false)
+  const [openSubError, setOpenSubError] = useState<string | null>(null)
   const [qualityIdx, setQualityIdx] = useState(0)
   const [referer, setReferer] = useState('')
   const [iframeUrl, setIframeUrl] = useState('')
@@ -1026,11 +1049,13 @@ const Tv: React.FC = () => {
     return pickSubtitleIndex(subs, { lastKey, enabled })
   }, [])
 
-  const persistSubtitlePick = useCallback((pick: number) => {
+  const persistSubtitlePick = useCallback((pick: number, subs?: SubtitleTrack[]) => {
     if (pick < 0) return
     try {
       profileStorage.setItem('tvSubtitlesEnabled', 'true')
       profileStorage.setItem('tvSelectedSubtitle', String(pick))
+      const chosen = subs?.[pick]
+      if (chosen) profileStorage.setItem('tvLastSubtitle', subtitleKey(chosen))
     } catch {
       // ignore
     }
@@ -1353,12 +1378,12 @@ const Tv: React.FC = () => {
       const tracks = data.audioTracks || []
       setAudioTracks(tracks)
       setSelectedAudioTrack(tracks.length > 0 ? pickDefaultAudio(tracks) : 0)
-      const subs = data.subtitles || []
+      const subs = (data.subtitles || []).map((s) => ({ ...s, source: 'provider' as const }))
       setSubtitles(subs)
       if (subs.length > 0) {
         const pick = pickDefaultSubtitle(subs)
         setSelectedSubtitle(pick)
-        persistSubtitlePick(pick)
+        if (pick >= 0) persistSubtitlePick(pick, subs)
       } else {
         setSelectedSubtitle(-1)
       }
@@ -1368,14 +1393,22 @@ const Tv: React.FC = () => {
         .query({ type, tmdbId: String(subId), season: String(season), episode: String(episode) })
         .then((sd) => {
           if (streamKeyRef.current !== episodeKey) return
-          const osSubs = Array.isArray(sd.subtitles) ? sd.subtitles : []
+          const osSubs = (Array.isArray(sd.subtitles) ? sd.subtitles : []).map((s) => ({
+            ...s,
+            source: 'provider' as const,
+          }))
           if (osSubs.length === 0) return
           setSubtitles((prev) => {
             const merged = [...prev, ...osSubs.filter((s) => !prev.some((p) => p.url === s.url))]
-            if (prev.length === 0) {
-              const pick = pickDefaultSubtitle(merged)
-              setSelectedSubtitle(pick)
-              persistSubtitlePick(pick)
+            if (prev.length === 0 && merged.length > 0) {
+              Promise.resolve().then(() => {
+                if (streamKeyRef.current !== episodeKey) return
+                const pick = pickDefaultSubtitle(merged)
+                if (pick >= 0) {
+                  setSelectedSubtitle(pick)
+                  persistSubtitlePick(pick, merged)
+                }
+              })
             }
             return merged
           })
@@ -1713,7 +1746,11 @@ const Tv: React.FC = () => {
       track.kind = 'subtitles'
       track.label = sub.label || sub.language || 'Unknown'
       track.srclang = sub.language || sub.label || 'en'
-      const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(referer)}`
+      const isOpenSub = sub.source === 'opensub'
+      const ref = isOpenSub ? '' : referer
+      const scrape = isOpenSub ? '&scrape=1' : ''
+      const enc = sub.encoding ? `&enc=${encodeURIComponent(sub.encoding)}` : ''
+      const subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(sub.url)}&referer=${encodeURIComponent(ref)}${scrape}${enc}`
       track.src = subUrl
       track.addEventListener('load', () => {
         const idx = manualTrackElsRef.current.indexOf(track)
@@ -2113,6 +2150,98 @@ const Tv: React.FC = () => {
     }
   }
 
+  const openSubLabel = (label: string) =>
+    label.startsWith('[Open Subs]') ? label : `[Open Subs] ${label}`
+  const setOpenSubTrack = useCallback(
+    (
+      file: { id: string; language: string; label: string; url: string; encoding?: string },
+      episodeKey: string
+    ) => {
+      const track: SubtitleTrack = {
+        language: file.language || 'en',
+        label: openSubLabel(file.label || file.language || 'Subtitles'),
+        url: file.url,
+        source: 'opensub',
+        encoding: file.encoding,
+      }
+      setSubtitles((prev) => {
+        const base = prev.filter((s) => s.source !== 'opensub')
+        const next = [...base, track]
+        const idx = next.length - 1
+        if (streamKeyRef.current === episodeKey) {
+          setSelectedSubtitle(idx)
+          persistSubtitlePick(idx, next)
+        }
+        return next
+      })
+    },
+    [persistSubtitlePick]
+  )
+
+  const handleOpenSubtitles = useCallback(async () => {
+    setOpenSubError(null)
+    setOpenSubLanguages([])
+    setOpenSubFiles([])
+    setOpenSubLoading(true)
+    const payload = {
+      provider: source,
+      type: isMovie ? 'movie' : 'tv',
+      tmdbId: String(id),
+      season,
+      episode,
+      title: details?.title || '',
+      year: details?.year || '',
+      imdbId: details?.imdb_id || '',
+      totalSeasons: String(details?.number_of_seasons || 1),
+    }
+    try {
+      const res = await trpcClient.tv.openSubtitleLanguages.query(payload)
+      setOpenSubLanguages(res.languages || [])
+      if (!(res.languages || []).length) setOpenSubError('No languages found')
+    } catch (e) {
+      setOpenSubError(e instanceof Error ? e.message : 'Failed to load languages')
+    } finally {
+      setOpenSubLoading(false)
+    }
+  }, [id, isMovie, source, season, episode, details])
+
+  const handleOpenSubLangSelect = useCallback(
+    async (langId: string) => {
+      setOpenSubError(null)
+      setOpenSubFiles([])
+      setOpenSubLoading(true)
+      const payload = {
+        provider: source,
+        type: isMovie ? 'movie' : 'tv',
+        tmdbId: String(id),
+        season,
+        episode,
+        lang: langId,
+        title: details?.title || '',
+        year: details?.year || '',
+        imdbId: details?.imdb_id || '',
+        totalSeasons: String(details?.number_of_seasons || 1),
+      }
+      try {
+        const res = await trpcClient.tv.openSubtitleFiles.query(payload)
+        setOpenSubFiles(res.files || [])
+        if (!(res.files || []).length) setOpenSubError('No files found')
+      } catch (e) {
+        setOpenSubError(e instanceof Error ? e.message : 'Failed to load files')
+      } finally {
+        setOpenSubLoading(false)
+      }
+    },
+    [id, isMovie, source, season, episode, details]
+  )
+
+  const handleOpenSubFileSelect = useCallback(
+    (file: { id: string; language: string; label: string; url: string; encoding?: string }) => {
+      setOpenSubTrack(file, streamKeyRef.current)
+    },
+    [setOpenSubTrack]
+  )
+
   const handleSubtitleChange = (index: number) => {
     setSelectedSubtitle(index)
     try {
@@ -2271,19 +2400,24 @@ const Tv: React.FC = () => {
                   onCalibrateAvSync={inRoom ? undefined : openAvSyncCalibrator}
                   subtitleDelayMs={subtitleDelayMs}
                   onSubtitleDelayChange={handleSubtitleDelayChange}
-                  showNextEpisodeButton={
-                    !followingHost &&
-                    showNextEpisodePrompt &&
-                    !showResumeModal &&
-                    !showCompleteModal
+                  showNextEpisodeButton={!followingHost && showNextEpisodePrompt}
+                  onNextEpisode={
+                    nextEpisodeNumber != null
+                      ? () => handleTvEpisodeClick(String(nextEpisodeNumber))
+                      : undefined
                   }
-                  onNextEpisode={handleWatchNextEpisode}
-                  isLoading={streamLoading}
                   isTheaterMode={isTheaterMode}
                   onTheaterModeToggle={toggleTheaterMode}
                   ambientSettings={ambientSettings}
                   onAmbientChange={updateAmbient}
                   hideChrome={showWatchedOverlay || showCompleteOverlay}
+                  onOpenSubtitles={handleOpenSubtitles}
+                  openSubLanguages={openSubLanguages}
+                  openSubFiles={openSubFiles}
+                  openSubLoading={openSubLoading}
+                  openSubError={openSubError}
+                  onOpenSubLangSelect={handleOpenSubLangSelect}
+                  onOpenSubFileSelect={handleOpenSubFileSelect}
                 >
                   <>
                     <PlayerVideo

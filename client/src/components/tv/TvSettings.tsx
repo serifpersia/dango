@@ -19,6 +19,8 @@ export type TvSettingsView =
   | 'audio'
   | 'av-sync'
   | 'ambient'
+  | 'opensub-langs'
+  | 'opensub-files'
   | null
 
 interface TvSettingsProps {
@@ -47,6 +49,13 @@ interface TvSettingsProps {
   onSubtitleDelayChange?: (ms: number) => void
   ambientSettings?: AmbientLightSettings
   onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
+  onOpenSubtitles?: () => void
+  openSubLanguages?: { id: string; language?: string; label?: string; count?: number }[]
+  openSubFiles?: { id: string; language?: string; label: string; url: string }[]
+  openSubLoading?: boolean
+  openSubError?: string | null
+  onOpenSubLangSelect?: (langId: string) => void
+  onOpenSubFileSelect?: (file: { id: string; language: string; label: string; url: string }) => void
 }
 
 const TvSettings: React.FC<TvSettingsProps> = ({
@@ -75,6 +84,13 @@ const TvSettings: React.FC<TvSettingsProps> = ({
   onSubtitleDelayChange,
   ambientSettings,
   onAmbientChange,
+  onOpenSubtitles,
+  openSubLanguages,
+  openSubFiles,
+  openSubLoading,
+  openSubError,
+  onOpenSubLangSelect,
+  onOpenSubFileSelect,
 }) => {
   const { state } = player
 
@@ -86,7 +102,7 @@ const TvSettings: React.FC<TvSettingsProps> = ({
           <span className={styles.currentValue}>{streams[resolutionIdx]?.quality || 'Auto'}</span>
         </button>
       )}
-      {hasSubtitles && (
+      {(hasSubtitles || onOpenSubtitles) && (
         <button className={styles.menuItem} onClick={() => onSelectView('subtitles')}>
           <span>Subtitles</span>
           <span className={styles.currentValue}>
@@ -146,18 +162,75 @@ const TvSettings: React.FC<TvSettingsProps> = ({
   )
 
   const renderSubtitleSettings = () => (
-    <OptionListMenu
-      classes={{ item: styles.menuItem, active: styles.active }}
-      options={[
-        { key: 'off', label: 'Off', selected: !isSubtitleActive },
-        ...subtitles.map((track, i) => ({
-          key: String(i),
-          label: track.label || track.language,
-          selected: i === selectedSubtitle,
-        })),
-      ]}
-      onSelect={(key) => onSubtitleChange(key === 'off' ? -1 : Number(key))}
-    />
+    <>
+      <button
+        type="button"
+        className={`${styles.menuItem} ${!isSubtitleActive ? styles.active : ''}`}
+        onClick={() => onSubtitleChange(-1)}
+      >
+        <span>Off</span>
+      </button>
+      {onOpenSubtitles && (
+        <button type="button" className={styles.menuItem} onClick={onOpenSubtitles}>
+          <span>Open Subtitles...</span>
+        </button>
+      )}
+      {subtitles.map((track, i) => (
+        <button
+          key={i}
+          type="button"
+          className={`${styles.menuItem} ${i === selectedSubtitle ? styles.active : ''}`}
+          onClick={() => onSubtitleChange(i)}
+        >
+          <span>{track.label || track.language}</span>
+        </button>
+      ))}
+    </>
+  )
+
+  const renderOpenSubLangs = () => (
+    <>
+      {openSubLoading && <div className={styles.menuNote}>Loading languages...</div>}
+      {!openSubLoading && openSubError && <div className={styles.menuNote}>{openSubError}</div>}
+      {!openSubLoading && !openSubError && (openSubLanguages?.length ?? 0) === 0 && (
+        <div className={styles.menuNote}>No languages found</div>
+      )}
+      {!openSubLoading && (openSubLanguages?.length ?? 0) > 0 && (
+        <OptionListMenu
+          classes={{ item: styles.menuItem, active: styles.active }}
+          options={(openSubLanguages || []).map((l, i) => ({
+            key: String(l.id || l.language || i),
+            label: `${l.label || l.language || l.id}${l.count ? ` (${l.count})` : ''}`,
+            selected: false,
+          }))}
+          onSelect={(key) => onOpenSubLangSelect?.(key)}
+        />
+      )}
+    </>
+  )
+
+  const renderOpenSubFiles = () => (
+    <>
+      {openSubLoading && <div className={styles.menuNote}>Loading files...</div>}
+      {!openSubLoading && openSubError && <div className={styles.menuNote}>{openSubError}</div>}
+      {!openSubLoading && !openSubError && (openSubFiles?.length ?? 0) === 0 && (
+        <div className={styles.menuNote}>No files found</div>
+      )}
+      {!openSubLoading && (openSubFiles?.length ?? 0) > 0 && (
+        <OptionListMenu
+          classes={{ item: styles.menuItem, active: styles.active }}
+          options={(openSubFiles || []).map((f) => ({
+            key: f.id,
+            label: f.label,
+            selected: false,
+          }))}
+          onSelect={(key) => {
+            const f = (openSubFiles || []).find((x) => String(x.id) === key)
+            if (f) onOpenSubFileSelect?.({ ...f, language: f.language || 'en' })
+          }}
+        />
+      )}
+    </>
   )
 
   const renderSubtitleStyleSettings = () => (
@@ -241,9 +314,17 @@ const TvSettings: React.FC<TvSettingsProps> = ({
                       ? 'A/V Sync'
                       : view === 'ambient'
                         ? 'Ambient Light'
-                        : view.charAt(0).toUpperCase() + view.slice(1)
+                        : view === 'opensub-langs'
+                          ? 'Open Subtitles'
+                          : view === 'opensub-files'
+                            ? 'Select File'
+                            : view.charAt(0).toUpperCase() + view.slice(1)
         }
-        onBack={() => (view === 'main' ? onClose() : onSelectView('main'))}
+        onBack={() => {
+          if (view === 'main') return onClose()
+          if (view === 'opensub-files') return onSelectView('opensub-langs')
+          onSelectView('main')
+        }}
       >
         {view === 'main' && renderMainSettings()}
         {view === 'resolution' && renderResolutionSettings()}
@@ -253,6 +334,8 @@ const TvSettings: React.FC<TvSettingsProps> = ({
         {view === 'audio' && renderAudioSettings()}
         {view === 'av-sync' && renderAvSyncSettings()}
         {view === 'ambient' && renderAmbientSettings()}
+        {view === 'opensub-langs' && renderOpenSubLangs()}
+        {view === 'opensub-files' && renderOpenSubFiles()}
       </SettingsShell>
     </div>
   )
