@@ -12,17 +12,11 @@
         android:padding="32dp"
         android:gravity="center_horizontal">
 
-        <View
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginTop="48dp"
-            android:layout_marginBottom="16dp"
-            android:background="@drawable/ic_launcher_foreground" />
-
         <TextView
             android:id="@+id/statusTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
             android:text="dango"
             android:textColor="#FFFFFF"
             android:textSize="28sp"
