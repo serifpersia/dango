@@ -144,6 +144,23 @@ export const InsightsRepository = {
       FROM watchlist w
       LEFT JOIN shows_meta sm ON sm.id = w.id`),
 
+  getDayEpisodes: (db: DatabaseWrapper, day: string) =>
+    getDrizzle(db).all<{
+      showId: string
+      episodeNumber: string
+      name: string
+      thumbnail: string | null
+      isAdult: number | null
+    }>(sql`
+      SELECT we.showId, we.episodeNumber,
+        COALESCE(NULLIF(sm.englishName, ''), sm.name, w.name, we.showId) as name,
+        sm.thumbnail, sm.isAdult
+      FROM watched_episodes we
+      LEFT JOIN shows_meta sm ON sm.id = we.showId
+      LEFT JOIN watchlist w ON w.id = we.showId
+      WHERE date(we.watchedAt) = ${day} AND NOT (we.currentTime = 0 AND we.duration = 0)
+      ORDER BY we.watchedAt ASC`),
+
   getAllAnilistIds: (db: DatabaseWrapper) =>
     getDrizzle(db).all<{ anilistId: number }>(
       sql`SELECT anilistId FROM shows_meta WHERE anilistId IS NOT NULL`

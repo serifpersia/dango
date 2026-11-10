@@ -36,6 +36,7 @@ export const qk = {
   notifications: 'notifications',
   settings: 'settings',
   insights: 'insights',
+  insightsDay: 'insights-day',
   insightsRecommendations: 'insights-recommendations',
   providers: 'providers',
   syncProfile: 'sync-profile',

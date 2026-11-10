@@ -1,8 +1,8 @@
 import { protectedProcedure, router } from '../index.js'
-import { getWatchInsights, getGenreCards } from '../../lib/insights.js'
+import { getWatchInsights, getGenreCards, getDayActivity } from '../../lib/insights.js'
 import { getCachedRecommendations } from '../../lib/recommendations.service.js'
 import { badRequest } from '../errors.js'
-import { defineSchema, reqObj } from '../validation.js'
+import { defineSchema, reqObj, reqStr } from '../validation.js'
 
 type RecommendationsInput = { refresh?: boolean } | undefined
 
@@ -16,9 +16,19 @@ const recommendationsInput = () =>
     return { refresh: obj.refresh as boolean | undefined }
   })
 
+const dayInput = () =>
+  defineSchema<{ day: string }, { day: string }>((value) => {
+    const obj = reqObj(value)
+    return { day: reqStr(obj, 'day') }
+  })
+
 export const insightsRouter = router({
   summary: protectedProcedure.query(async ({ ctx }) => {
     return getWatchInsights(ctx.db)
+  }),
+
+  dayEpisodes: protectedProcedure.input(dayInput()).query(async ({ ctx, input }) => {
+    return getDayActivity(ctx.db, input.day)
   }),
 
   genreCards: protectedProcedure.query(async ({ ctx }) => {

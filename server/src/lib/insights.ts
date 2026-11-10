@@ -208,6 +208,36 @@ export async function getWatchInsights(db: DatabaseWrapper) {
   }
 }
 
+export interface DayActivityShow {
+  id: string
+  name: string
+  thumbnail: string
+  isAdult: boolean
+  episodes: string[]
+}
+
+export async function getDayActivity(db: DatabaseWrapper, day: string) {
+  const rows = await InsightsRepository.getDayEpisodes(db, day)
+  const shows: DayActivityShow[] = []
+  const byId = new Map<string, DayActivityShow>()
+  for (const row of rows) {
+    let show = byId.get(row.showId)
+    if (!show) {
+      show = {
+        id: row.showId,
+        name: row.name,
+        thumbnail: row.thumbnail || '',
+        isAdult: !!row.isAdult,
+        episodes: [],
+      }
+      byId.set(row.showId, show)
+      shows.push(show)
+    }
+    show.episodes.push(row.episodeNumber)
+  }
+  return { day, shows }
+}
+
 export async function getGenreCards(db: DatabaseWrapper): Promise<GenreCard[]> {
   const rows: WatchedEpisodeWithMeta[] = await InsightsRepository.getWatchedEpisodesWithMeta(db)
 

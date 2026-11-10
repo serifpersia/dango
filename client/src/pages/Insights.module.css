@@ -102,11 +102,9 @@
 }
 
 .wideSection {
-  background: var(--glass-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  padding: var(--space-6) 0;
   margin-bottom: var(--space-10);
+  border-top: 1px solid var(--border-primary);
   animation: slideUpIn 0.45s var(--ease-smooth) 0.05s both;
 }
 
@@ -174,9 +172,14 @@
 }
 
 .heatmapWrapper {
-  overflow-x: auto;
-  padding: var(--space-2) var(--space-3);
+  min-width: 0;
   max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+}
+
+.heatmapScroll {
+  overflow-x: auto;
+  padding-bottom: 8px;
 }
 
 .heatmapMonthLabels {
@@ -203,7 +206,7 @@
   height: 14px;
   border-radius: 3px;
   background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
+  border: none;
   transition: all 0.15s ease;
 }
 
@@ -213,29 +216,24 @@
 }
 
 .heatBox:hover {
-  transform: scale(1.6);
-  z-index: 10;
-  border-color: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent);
 }
 
 .level0 {
-  background: var(--bg-tertiary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  pointer-events: none;
 }
 .level1 {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .level2 {
   background: color-mix(in srgb, var(--accent) 50%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .level3 {
   background: color-mix(in srgb, var(--accent) 75%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
 .level4 {
   background: var(--accent);
-  border-color: var(--accent-light);
 }
 
 .heatmapFooter {
@@ -556,7 +554,15 @@
     padding: var(--space-5) 0;
   }
   .heatmapLayout {
-    flex-direction: column-reverse;
+    gap: var(--space-2);
+  }
+  .dayLabels {
+    font-size: 0.65rem;
+    padding-right: 2px;
+  }
+  .heatmapWrapper {
+    flex: 1;
+    min-width: 0;
   }
   .genreGrid {
     grid-template-columns: 1fr;
@@ -907,4 +913,119 @@
   padding: var(--space-16) var(--space-4);
   text-align: center;
   color: var(--color-danger);
+}
+
+.dayPopup {
+  width: 300px;
+}
+
+.dayPopupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #223);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.dayPopupCount {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.dayPopupMatureBtn {
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #223);
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+  transition:
+    color 0.15s var(--ease-smooth),
+    border-color 0.15s var(--ease-smooth);
+}
+
+.dayPopupMatureBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.dayPopupList {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dayPopupRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  transition: background 0.15s var(--ease-smooth);
+}
+
+.dayPopupRow:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+}
+
+.dayPopupPoster {
+  width: 44px;
+  height: 62px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+}
+
+.dayPopupSkeleton {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.dayPopupLine {
+  height: 12px;
+  flex: 1;
+  border-radius: 4px;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.dayPopupMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dayPopupTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dayPopupEps {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.dayPopupEmpty {
+  padding: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }

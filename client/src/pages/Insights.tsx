@@ -1,16 +1,19 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
 import FadeImage from '../components/common/FadeImage'
+import MediaPopupShell from '../components/common/MediaPopupShell'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
 import { trpcClient } from '../lib/trpc'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { useMatureConsent } from '../hooks/useMatureConsent'
+import MatureConsentModal from '../components/common/MatureConsentModal'
 import styles from './Insights.module.css'
 import { qk } from '../lib/queryKeys'
+import type { RouterOutputs } from '../lib/trpc'
 
 interface GenreStat {
   name: string
@@ -87,7 +90,8 @@ const Insights: React.FC = () => {
   })
 
   const { data: genreCardsData, isLoading: isLoadingGenreCards } = useGenreCards()
-  const { hasConsent: hasMatureConsent } = useMatureConsent()
+  const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
+  const [showMatureModal, setShowMatureModal] = useState(false)
   const { titlePreference } = useTitlePreference()
   const queryClient = useQueryClient()
 
@@ -159,6 +163,47 @@ const Insights: React.FC = () => {
   }
 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [dayPopup, setDayPopup] = useState<{ date: string; rect: DOMRect } | null>(null)
+  const dayPopupCloseTimer = useRef<number | null>(null)
+  const dayEpisodesQuery = useQuery<RouterOutputs['insights']['dayEpisodes']>({
+    queryKey: [qk.insightsDay, dayPopup?.date],
+    queryFn: async () => {
+      const res = await trpcClient.insights.dayEpisodes.query({ day: dayPopup?.date ?? '' })
+      return res
+    },
+    enabled: !!dayPopup?.date,
+    staleTime: 60 * 1000,
+  })
+
+  const openDayPopup = (date: string, rect: DOMRect) => {
+    if (dayPopupCloseTimer.current !== null) {
+      window.clearTimeout(dayPopupCloseTimer.current)
+      dayPopupCloseTimer.current = null
+    }
+    setDayPopup({ date, rect })
+  }
+  const scheduleDayPopupClose = () => {
+    dayPopupCloseTimer.current = window.setTimeout(() => {
+      dayPopupCloseTimer.current = null
+      setDayPopup(null)
+    }, 120)
+  }
+  const cancelDayPopupClose = () => {
+    if (dayPopupCloseTimer.current !== null) {
+      window.clearTimeout(dayPopupCloseTimer.current)
+      dayPopupCloseTimer.current = null
+    }
+  }
+  useEffect(
+    () => () => {
+      if (dayPopupCloseTimer.current !== null) window.clearTimeout(dayPopupCloseTimer.current)
+    },
+    []
+  )
+
+  const dayShows = (dayEpisodesQuery.data?.shows ?? []).filter(
+    (show) => hasMatureConsent || !show.isAdult
+  )
 
   const availableYears = useMemo(() => {
     if (!data?.activityGrid) return [new Date().getFullYear()]
@@ -360,54 +405,72 @@ const Insights: React.FC = () => {
             <span style={{ gridRow: 6 }}>Fri</span>
           </div>
           <div className={styles.heatmapWrapper}>
-            <div className={styles.heatmapMonthLabels}>
-              {(() => {
-                const labels: React.ReactElement[] = []
-                let lastMonth = -1
-                heatmapData.forEach((d, i) => {
-                  if (d.month !== lastMonth && !d.isOutOfRange) {
-                    const weekIdx = Math.floor(i / 7) + 1
-                    if (
-                      weekIdx >
-                      (labels.length > 0
-                        ? ((labels[labels.length - 1].props as { style?: { gridColumn?: number } })
-                            .style?.gridColumn as number) + 2
-                        : -1)
-                    ) {
-                      labels.push(
-                        <span
-                          key={i}
-                          style={{
-                            gridColumn: weekIdx,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {new Date(0, d.month).toLocaleString('default', { month: 'short' })}
-                        </span>
-                      )
-                      lastMonth = d.month
+            <div className={styles.heatmapScroll}>
+              <div className={styles.heatmapMonthLabels}>
+                {(() => {
+                  const labels: React.ReactElement[] = []
+                  let lastMonth = -1
+                  heatmapData.forEach((d, i) => {
+                    if (d.month !== lastMonth && !d.isOutOfRange) {
+                      const weekIdx = Math.floor(i / 7) + 1
+                      if (
+                        weekIdx >
+                        (labels.length > 0
+                          ? ((
+                              labels[labels.length - 1].props as { style?: { gridColumn?: number } }
+                            ).style?.gridColumn as number) + 2
+                          : -1)
+                      ) {
+                        labels.push(
+                          <span
+                            key={i}
+                            style={{
+                              gridColumn: weekIdx,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {new Date(0, d.month).toLocaleString('default', { month: 'short' })}
+                          </span>
+                        )
+                        lastMonth = d.month
+                      }
                     }
-                  }
-                })
-                return labels
-              })()}
-            </div>
-            <div className={styles.heatmapGrid}>
-              {heatmapData.map((d, i) => {
-                let level = 0
-                if (d.count > 0 && !d.isOutOfRange) level = 1
-                if (d.count > 2 && !d.isOutOfRange) level = 2
-                if (d.count > 5 && !d.isOutOfRange) level = 3
-                if (d.count > 10 && !d.isOutOfRange) level = 4
+                  })
+                  return labels
+                })()}
+              </div>
+              <div className={styles.heatmapGrid}>
+                {heatmapData.map((d, i) => {
+                  let level = 0
+                  if (d.count > 0 && !d.isOutOfRange) level = 1
+                  if (d.count > 2 && !d.isOutOfRange) level = 2
+                  if (d.count > 5 && !d.isOutOfRange) level = 3
+                  if (d.count > 10 && !d.isOutOfRange) level = 4
 
-                return (
-                  <div
-                    key={i}
-                    className={`${styles.heatBox} ${styles[`level${level}`]} ${d.isOutOfRange ? styles.hiddenBox : ''}`}
-                    title={d.isOutOfRange ? '' : `${d.count} episodes on ${d.date}`}
-                  />
-                )
-              })}
+                  return (
+                    <div
+                      key={i}
+                      className={`${styles.heatBox} ${styles[`level${level}`]} ${d.isOutOfRange ? styles.hiddenBox : ''}`}
+                      onMouseEnter={
+                        d.isOutOfRange || d.count === 0
+                          ? undefined
+                          : (e) => openDayPopup(d.date, e.currentTarget.getBoundingClientRect())
+                      }
+                      onMouseLeave={
+                        d.isOutOfRange || d.count === 0 ? undefined : scheduleDayPopupClose
+                      }
+                      onClick={
+                        d.isOutOfRange || d.count === 0
+                          ? undefined
+                          : (e) => {
+                              if (dayPopup?.date === d.date) setDayPopup(null)
+                              else openDayPopup(d.date, e.currentTarget.getBoundingClientRect())
+                            }
+                      }
+                    />
+                  )
+                })}
+              </div>
             </div>
             <div className={styles.heatmapFooter}>
               <div className={styles.heatLegend}>
@@ -657,6 +720,87 @@ const Insights: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {dayPopup && !showMatureModal && (
+        <MediaPopupShell
+          anchorRect={dayPopup.rect}
+          onMouseEnter={cancelDayPopupClose}
+          onMouseLeave={scheduleDayPopupClose}
+          onRequestClose={() => setDayPopup(null)}
+        >
+          <div className={styles.dayPopup}>
+            <div className={styles.dayPopupHeader}>
+              <span>
+                {new Date(`${dayPopup.date}T00:00:00`).toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
+              {!hasMatureConsent && (dayEpisodesQuery.data?.shows ?? []).some((s) => s.isAdult) && (
+                <button
+                  className={styles.dayPopupMatureBtn}
+                  onClick={() => setShowMatureModal(true)}
+                >
+                  18+
+                </button>
+              )}
+              <span className={styles.dayPopupCount}>
+                {dayEpisodesQuery.data ? dayShows.reduce((n, s) => n + s.episodes.length, 0) : ''}
+              </span>
+            </div>
+            {dayEpisodesQuery.isLoading ? (
+              <div className={styles.dayPopupRow}>
+                <div className={`${styles.dayPopupPoster} ${styles.dayPopupSkeleton}`} />
+                <div className={styles.dayPopupLine} />
+              </div>
+            ) : dayShows.length === 0 ? (
+              <div className={styles.dayPopupEmpty}>Nothing recorded.</div>
+            ) : (
+              <div className={styles.dayPopupList}>
+                {dayShows.map((show) => (
+                  <Link
+                    key={show.id}
+                    to={`/anime/${show.id}`}
+                    className={styles.dayPopupRow}
+                    onClick={() => setDayPopup(null)}
+                  >
+                    <FadeImage
+                      src={fixThumbnailUrl(show.thumbnail)}
+                      alt={show.name}
+                      className={styles.dayPopupPoster}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div className={styles.dayPopupMeta}>
+                      <span className={styles.dayPopupTitle}>{show.name}</span>
+                      <span className={styles.dayPopupEps}>
+                        {show.episodes
+                          .slice(0, 12)
+                          .map((e) => `Ep ${e}`)
+                          .join(' · ')}
+                        {show.episodes.length > 12 && ` · +${show.episodes.length - 12} more`}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </MediaPopupShell>
+      )}
+      {showMatureModal && (
+        <MatureConsentModal
+          isOpen
+          showResetHint
+          onClose={() => setShowMatureModal(false)}
+          onGrant={() => {
+            grantMatureConsent()
+            setShowMatureModal(false)
+          }}
+        />
       )}
     </div>
   )
