@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router'
 import Icon, { type IconName } from './Icon'
+import FadeImage from './FadeImage'
 import styles from './SpotlightBanner.module.css'
 
 export interface SpotlightSlide {
@@ -310,7 +311,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
                 aria-hidden={index !== safeIndex}
               >
                 <div className={styles.slideInner}>
-                  <img
+                  <FadeImage
                     src={slide.posterSrc}
                     alt={slide.posterAlt}
                     className={

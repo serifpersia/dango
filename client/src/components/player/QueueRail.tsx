@@ -1,6 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router'
 import Icon from '../common/Icon'
+import FadeImage from '../common/FadeImage'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import type { QueueItem } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -74,7 +75,7 @@ const QueueRailItem = ({
       <button className={styles.dragHandle} type="button" aria-label="Drag queue item">
         <Icon name="bars" />
       </button>
-      <img
+      <FadeImage
         className={styles.thumbnail}
         src={fixThumbnailUrl(item.thumbnail || '', 72, 96)}
         alt={displayTitle}

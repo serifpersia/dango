@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
+import FadeImage from '../common/FadeImage'
 import styles from './EpisodeList.module.css'
 
 export interface EpisodeListItem {
@@ -116,7 +117,7 @@ const EpisodeList = ({
               onClick={() => onEpisodeClick(item.id)}
             >
               {item.thumbnail && (
-                <img
+                <FadeImage
                   src={item.thumbnail}
                   alt=""
                   loading="lazy"

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import toast from 'react-hot-toast'
 import Icon from '../components/common/Icon'
+import FadeImage from '../components/common/FadeImage'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
 import { trpcClient } from '../lib/trpc'
@@ -534,7 +535,7 @@ const Insights: React.FC = () => {
                   </div>
                   <div className={styles.posterRow}>
                     {card.topShows.map((show: TopShow) => (
-                      <img
+                      <FadeImage
                         key={show.id}
                         src={fixThumbnailUrl(show.thumbnail)}
                         alt={getShowTitle(show)}
@@ -591,7 +592,7 @@ const Insights: React.FC = () => {
                       className={styles.recPosterButton}
                       aria-label={`View ${c.title}`}
                     >
-                      <img
+                      <FadeImage
                         src={fixThumbnailUrl(c.cover)}
                         alt=""
                         className={styles.recCover}
