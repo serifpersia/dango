@@ -180,15 +180,11 @@ const MediaCard: React.FC<MediaCardProps> = memo(
     }
 
     const handleContextMenu = (e: React.MouseEvent<HTMLElement>) => {
-      if (!showInfoButton) return
+      if (!(onOpenDetails || renderPopup)) return
       if (onOpenDetails) {
         e.preventDefault()
         e.stopPropagation()
         onOpenDetails((e.currentTarget as HTMLElement).getBoundingClientRect())
-        return
-      }
-      if (renderPopup) {
-        interaction.handleContextMenu(e, shouldBlur)
         return
       }
       interaction.handleContextMenu(e, shouldBlur)

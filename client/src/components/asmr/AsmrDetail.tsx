@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
+import { createPortal } from 'preact/compat'
 import Icon from '../common/Icon'
 import FadeImage from '../common/FadeImage'
 import { useAsmrWork } from '../../hooks/useAsmr'
@@ -27,6 +28,21 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
   const { data: progressData } = useAsmrProgress(workId || undefined)
   const bookmarked = workId ? bookmarkedIds.has(workId) : !!libraryCheck?.inLibrary
 
+  useEffect(() => {
+    const prevBody = document.body.style.overflow
+    const prevHtml = document.documentElement.style.overflow
+    const main = document.querySelector('main') as HTMLElement | null
+    const prevMain = main?.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    if (main) main.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevBody
+      document.documentElement.style.overflow = prevHtml
+      if (main) main.style.overflow = prevMain ?? ''
+    }
+  }, [])
+
   const metaRows = useMemo(() => {
     return (data?.description || work.description || '')
       .split('\n')
@@ -47,8 +63,13 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
   const resumeIndex =
     latestProgress && latestProgress.trackIndex < tracks.length ? latestProgress.trackIndex : null
 
-  return (
-    <div className={styles.detailOverlay} onClick={onClose}>
+  return createPortal(
+    <div
+      className={styles.detailOverlay}
+      onClick={onClose}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+    >
       <div className={styles.detailModal} onClick={(e) => e.stopPropagation()}>
         <button className={styles.detailClose} onClick={onClose} aria-label="Close">
           <Icon name="times" />
@@ -146,7 +167,8 @@ const AsmrDetail: React.FC<AsmrDetailProps> = ({ work, onClose, onPlay, t }) => 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
