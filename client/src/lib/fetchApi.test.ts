@@ -11,6 +11,23 @@ const notReady = () =>
     headers: { 'x-dango-not-ready': '1' },
   })
 
+function storageStub(initial: Map<string, string> | Record<string, string>) {
+  const values = initial instanceof Map ? initial : new Map(Object.entries(initial))
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, String(value))
+    },
+    removeItem: (key: string) => {
+      values.delete(key)
+    },
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size
+    },
+  }
+}
+
 describe('fetchWithLocalHeaders', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -78,30 +95,33 @@ describe('fetchWithLocalHeaders', () => {
 
   it('preserves Headers overrides and does not send local credentials to another origin', async () => {
     vi.stubGlobal('window', { location: { origin: 'https://dango.example' } })
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => (key === 'animepahe_ua' ? navigator.userAgent : 'secret'),
-    })
+    vi.stubGlobal(
+      'localStorage',
+      storageStub({
+        'auth:provider-ids': JSON.stringify(['animepahe']),
+        'auth:animepahe:ua': navigator.userAgent,
+        'auth:animepahe:cookie': 'secret',
+      })
+    )
     const fetch = vi.fn().mockImplementation(async () => new Response('ok'))
     vi.stubGlobal('fetch', fetch)
     await fetchWithLocalHeaders('/api/health', {
-      headers: new Headers({ 'x-animepahe-ua': 'override' }),
+      headers: new Headers({ 'x-provider-animepahe-ua': 'override' }),
     })
-    expect(fetch.mock.calls[0][1].headers.get('x-animepahe-ua')).toBe('override')
+    expect(fetch.mock.calls[0][1].headers.get('x-provider-animepahe-ua')).toBe('override')
     await fetchWithLocalHeaders('https://dango.example.evil/api/health')
-    expect(fetch.mock.calls[1][1].headers.has('x-animepahe-cookie')).toBe(false)
+    expect(fetch.mock.calls[1][1].headers.has('x-provider-animepahe-cookie')).toBe(false)
     await fetchWithLocalHeaders('//external.example/api/health')
-    expect(fetch.mock.calls[2][1].headers.has('x-animepahe-cookie')).toBe(false)
+    expect(fetch.mock.calls[2][1].headers.has('x-provider-animepahe-cookie')).toBe(false)
   })
 
   it('invalidates stale browser credentials once and requests verification', async () => {
     const values = new Map([
-      ['animepahe_ua', 'old-browser'],
-      ['animepahe_cookie', 'old-cookie'],
+      ['auth:provider-ids', JSON.stringify(['animepahe'])],
+      ['auth:animepahe:ua', 'old-browser'],
+      ['auth:animepahe:cookie', 'old-cookie'],
     ])
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => values.get(key) ?? null,
-      removeItem: (key: string) => values.delete(key),
-    })
+    vi.stubGlobal('localStorage', storageStub(values))
     const fetch = vi.fn().mockImplementation(async () => new Response('ok'))
     vi.stubGlobal('fetch', fetch)
     const onAuth = vi.fn()
@@ -110,11 +130,13 @@ describe('fetchWithLocalHeaders', () => {
     try {
       await fetchWithLocalHeaders('/api/providers')
       await fetchWithLocalHeaders('/api/providers')
-      expect(values.size).toBe(0)
+      expect(values.get('auth:provider-ids')).toBe('[]')
+      expect(values.has('auth:animepahe:cookie')).toBe(false)
+      expect(values.has('auth:animepahe:ua')).toBe(false)
       expect(onAuth).toHaveBeenCalledOnce()
       expect(toast.error).toHaveBeenCalledOnce()
-      expect(fetch.mock.calls[0][1].headers.has('x-animepahe-cookie')).toBe(false)
-      expect(fetch.mock.calls[0][1].headers.has('x-animepahe-ua')).toBe(false)
+      expect(fetch.mock.calls[0][1].headers.has('x-provider-animepahe-cookie')).toBe(false)
+      expect(fetch.mock.calls[0][1].headers.has('x-provider-animepahe-ua')).toBe(false)
     } finally {
       unsubscribe()
     }

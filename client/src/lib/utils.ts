@@ -1,6 +1,10 @@
-import { profileStorage } from './profileStorage'
+import { getProviderCreds } from './providerAuthStorage'
 const thumbnailCache = new Map<string, string>()
 const MAX_CACHE_SIZE = 500
+
+export function clearThumbnailCache(): void {
+  thumbnailCache.clear()
+}
 
 export const fixThumbnailUrl = (
   url: string | undefined,
@@ -9,7 +13,7 @@ export const fixThumbnailUrl = (
 ): string => {
   if (!url || url.trim() === '') return '/placeholder.svg'
 
-  if (url.includes('/api/image-proxy')) {
+  if (url.includes('/api/image-proxy') || url.includes('/api/proxy')) {
     let finalUrl = url
     if (width && !finalUrl.includes('w=')) {
       const separator = finalUrl.includes('?') ? '&' : '?'
@@ -68,8 +72,7 @@ export const fixThumbnailUrl = (
     }
   } else if (finalUrl.includes('animepahe')) {
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
-    const cookie = profileStorage.getItem('animepahe_cookie')
-    const ua = profileStorage.getItem('animepahe_ua')
+    const { cookie, ua } = getProviderCreds('animepahe')
     if (cookie) proxiedUrl += `&cookie=${encodeURIComponent(cookie)}`
     if (ua) proxiedUrl += `&ua=${encodeURIComponent(ua)}`
   } else if (finalUrl.startsWith('http')) {

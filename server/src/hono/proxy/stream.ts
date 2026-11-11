@@ -16,7 +16,7 @@ import { pinVariant } from '../playlist.js'
 import { proxyCache } from './cache.js'
 
 const BINARY_MEDIA_RE = /\.(?:mp3|m4a|aac|ogg|oga|opus|wav|flac|mp4|webm|mkv|m4v|ts|m4s)(?:$|\?)/i
-const HLS_CHUNK_RE = /\.(?:ts|m4s)(?:$|\?)/i
+const HLS_CHUNK_RE = /\.(?:ts|m4s|jpe?g)(?:$|\?)/i
 
 export function isBinaryMediaUrl(url: string): boolean {
   return BINARY_MEDIA_RE.test(url)

@@ -14,6 +14,7 @@ interface AnimeCardProps {
   onRemove?: (id: string) => void
   config?: MediaCardDisplay
   layout?: 'vertical' | 'horizontal'
+  wide?: boolean
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
@@ -24,6 +25,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     onRemove,
     config,
     layout = 'vertical',
+    wide = false,
   }) => {
     const ct = anime.currentTime || 0
     const dur = anime.duration || 0
@@ -105,7 +107,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           nativeName: anime.nativeName,
           englishName: anime.englishName,
           thumbnail: anime.thumbnail,
-          typeBadge: anime.type || 'TV',
+          preview: anime.preview,
+          wide,
+          typeBadge: wide ? undefined : anime.type || 'TV',
           chapterBadge: progressString,
           airMeta: airMeta || undefined,
           isAdult: adultContent,
@@ -128,7 +132,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
         showRemoveButton={
           config?.elements?.poster?.removeButton ?? (continueWatching && !!onRemove)
         }
-        showInfoButton={!continueWatching}
+        showInfoButton={!continueWatching && !wide}
         enrichedId={anime._id}
         renderPopup={(anchorRect, helpers) => (
           <AnimePopup

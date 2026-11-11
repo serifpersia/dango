@@ -12,6 +12,16 @@ export interface BrowseCaps {
 export interface BrowseFacets {
   genres?: string[]
   orders?: string[]
+  sorts?: string[]
+}
+
+export interface RemoteAuthSpec {
+  type: 'cookie' | 'browser_verify'
+  label?: string
+  siteUrl?: string
+  cookieName?: string
+  needsUa?: boolean
+  instructions?: string
 }
 
 export interface RemoteProxyRule {
@@ -35,13 +45,13 @@ export interface RemoteProviderEntry {
   sha256?: string
   minDango?: string
   mature: boolean
-  kind?: 'anime' | 'asmr' | 'manga' | 'tv'
+  kind?: 'anime' | 'asmr' | 'manga' | 'tv' | 'adult'
   sub?: RemoteSubType
   tier?: RemoteTier
   modes?: ('sub' | 'dub')[]
   browse?: BrowseCaps
   proxy?: RemoteProxyRule
-  auth?: 'cookie' | 'none'
+  auth?: 'cookie' | 'none' | RemoteAuthSpec
   enabledByDefault?: boolean
 }
 
@@ -56,13 +66,14 @@ export interface ProviderCatalogItem {
   label: string
   version: string
   mature: boolean
-  kind: 'anime' | 'asmr' | 'manga' | 'tv'
+  kind: 'anime' | 'asmr' | 'manga' | 'tv' | 'adult'
   sub?: RemoteSubType
   tier?: RemoteTier
   modes: ('sub' | 'dub')[]
   browse?: BrowseCaps
   facets?: BrowseFacets
   servers?: string[]
+  auth?: RemoteAuthSpec
   enabledByDefault: boolean
   loaded: boolean
   remote: boolean
@@ -145,9 +156,10 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     p.kind !== 'anime' &&
     p.kind !== 'asmr' &&
     p.kind !== 'manga' &&
-    p.kind !== 'tv'
+    p.kind !== 'tv' &&
+    p.kind !== 'adult'
   ) {
-    throw new Error(`registry.providers[${index}].kind must be anime|asmr|manga|tv`)
+    throw new Error(`registry.providers[${index}].kind must be anime|asmr|manga|tv|adult`)
   }
   if (p.sub !== undefined && p.sub !== 'soft' && p.sub !== 'hard' && p.sub !== 'mixed') {
     throw new Error(`registry.providers[${index}].sub must be soft|hard|mixed`)
@@ -179,7 +191,7 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     kind:
       embedBase !== undefined
         ? 'tv'
-        : p.kind === 'asmr' || p.kind === 'manga' || p.kind === 'tv'
+        : p.kind === 'asmr' || p.kind === 'manga' || p.kind === 'tv' || p.kind === 'adult'
           ? p.kind
           : 'anime',
     sub: p.sub as RemoteSubType | undefined,
@@ -187,7 +199,7 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     modes,
     browse: parseBrowseCaps(p.browse, index),
     proxy: parseProxyRule(p.proxy, index),
-    auth: p.auth === 'cookie' ? 'cookie' : undefined,
+    auth: parseAuthSpec(p.auth, index),
     enabledByDefault: p.enabledByDefault === false ? false : true,
   }
 }
@@ -221,6 +233,62 @@ function parseProxyRule(raw: unknown, index: number): RemoteProxyRule | undefine
     rule[key] = p[key]
   }
   return rule
+}
+
+function parseAuthSpec(raw: unknown, index: number): RemoteAuthSpec | undefined {
+  if (raw === undefined || raw === 'none') return undefined
+  if (raw === 'cookie') return { type: 'cookie' }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`registry.providers[${index}].auth must be an object`)
+  }
+  const a = raw as Record<string, unknown>
+  if (a.type !== 'cookie' && a.type !== 'browser_verify') {
+    throw new Error(`registry.providers[${index}].auth.type must be cookie|browser_verify`)
+  }
+  for (const key of ['label', 'siteUrl', 'cookieName', 'instructions'] as const) {
+    if (a[key] === undefined) continue
+    if (typeof a[key] !== 'string' || !a[key].trim()) {
+      throw new Error(`registry.providers[${index}].auth.${key} must be a non-empty string`)
+    }
+  }
+  if (a.siteUrl !== undefined && !/^https:\/\//i.test((a.siteUrl as string).trim())) {
+    throw new Error(`registry.providers[${index}].auth.siteUrl must be an https URL`)
+  }
+  if (a.cookieName !== undefined && !/^[a-z0-9_.-]+$/i.test((a.cookieName as string).trim())) {
+    throw new Error(`registry.providers[${index}].auth.cookieName must be a cookie name`)
+  }
+  if (a.needsUa !== undefined && typeof a.needsUa !== 'boolean') {
+    throw new Error(`registry.providers[${index}].auth.needsUa must be boolean`)
+  }
+  return {
+    type: a.type,
+    label: typeof a.label === 'string' ? a.label.trim() : undefined,
+    siteUrl: typeof a.siteUrl === 'string' ? a.siteUrl.trim() : undefined,
+    cookieName: typeof a.cookieName === 'string' ? a.cookieName.trim() : undefined,
+    needsUa: typeof a.needsUa === 'boolean' ? a.needsUa : undefined,
+    instructions: typeof a.instructions === 'string' ? a.instructions.trim() : undefined,
+  }
+}
+
+export function resolveAuthSpec(item: RemoteProviderEntry): RemoteAuthSpec | undefined {
+  if (item.auth && typeof item.auth === 'object') {
+    return {
+      ...item.auth,
+      siteUrl:
+        item.auth.siteUrl ?? item.proxy?.referer ?? item.proxy?.origin,
+      cookieName: item.auth.cookieName ?? 'cf_clearance',
+      needsUa: item.auth.needsUa ?? true,
+    }
+  }
+  if (item.auth === 'cookie' || item.proxy?.cfCookie || item.tier === 'cookie') {
+    return {
+      type: 'cookie',
+      siteUrl: item.proxy?.referer ?? item.proxy?.origin,
+      cookieName: 'cf_clearance',
+      needsUa: true,
+    }
+  }
+  return undefined
 }
 
 function parseBrowseCaps(raw: unknown, index: number): BrowseCaps | undefined {

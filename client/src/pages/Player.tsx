@@ -59,8 +59,6 @@ import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '..
 import type { VideoLink } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
-import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
-import MkissaVerificationModal from '../components/anime/MkissaVerificationModal'
 import QueueOptionsButton from '../components/anime/QueueOptionsButton'
 
 import { useProviders } from '../hooks/useProviders'
@@ -784,38 +782,6 @@ const Player: React.FC = () => {
           </Button>
         </Modal.Actions>
       </Modal>
-
-      <AnimePaheCookieModal
-        isOpen={!!state.showCookieModal && state.cookieProvider !== 'mkissa'}
-        onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
-        onSuccess={() => {
-          queryClient.invalidateQueries({
-            queryKey: [
-              qk.videoSources,
-              showId,
-              state.currentEpisode,
-              state.selectedProvider,
-              state.currentMode,
-            ],
-          })
-        }}
-      />
-
-      <MkissaVerificationModal
-        isOpen={!!state.showCookieModal && state.cookieProvider === 'mkissa'}
-        onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
-        onSuccess={() => {
-          queryClient.invalidateQueries({
-            queryKey: [
-              qk.videoSources,
-              showId,
-              state.currentEpisode,
-              state.selectedProvider,
-              state.currentMode,
-            ],
-          })
-        }}
-      />
 
       {!isTheaterMode && (
         <aside ref={episodeSidebarRef} className={layoutStyles.episodeSidebar}>

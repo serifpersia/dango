@@ -22,7 +22,9 @@ export function matureStreamingIds(ctx: TrpcContext): Set<string> | null {
   if (!catalog || catalog.length === 0) return null
   return new Set(
     catalog
-      .filter((c) => c.mature && (c.kind ?? 'anime') === 'anime' && c.loaded)
+      .filter(
+        (c) => c.mature && ((c.kind ?? 'anime') === 'anime' || c.kind === 'adult') && c.loaded
+      )
       .map((c) => c.id.toLowerCase())
   )
 }

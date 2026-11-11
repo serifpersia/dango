@@ -14,6 +14,7 @@ export interface Show {
   englishName?: string
   thumbnail?: string
   thumbnails?: string[]
+  preview?: string
   bannerImage?: string
   description?: string
   type?: string

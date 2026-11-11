@@ -167,14 +167,17 @@ export async function honoRequestLogger(c: Context, next: Next) {
 
 export async function honoRequestContextMiddleware(c: Context, next: Next) {
   const store = new Map<string, string>()
-  const ua = c.req.header('x-animepahe-ua')
-  if (ua) store.set('ua', ua)
-  const cookie = c.req.header('x-animepahe-cookie')
-  if (cookie) store.set('cookie', cookie)
-  const jasmrUa = c.req.header('x-jasmr-ua')
-  if (jasmrUa) store.set('jasmr_ua', jasmrUa)
-  const jasmrCookie = c.req.header('x-jasmr-cookie')
-  if (jasmrCookie) store.set('jasmr_cookie', jasmrCookie)
+  for (const [name, value] of c.req.raw.headers) {
+    const scoped = /^x-provider-([a-z0-9-]+)-(cookie|ua)$/i.exec(name)
+    if (scoped) {
+      store.set(`${scoped[1].toLowerCase()}_${scoped[2].toLowerCase()}`, value)
+      continue
+    }
+    const legacy = /^x-([a-z0-9-]+)-(cookie|ua)$/i.exec(name)
+    if (legacy && legacy[1].toLowerCase() !== 'provider') {
+      store.set(`${legacy[1].toLowerCase()}_${legacy[2].toLowerCase()}`, value)
+    }
+  }
   return requestContext.run(store, () => next())
 }
 

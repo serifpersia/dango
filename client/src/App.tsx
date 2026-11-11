@@ -8,8 +8,7 @@ import { useDiscordPageStatus } from './hooks/useDiscordRPC'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { fetchApi } from './lib/fetchApi'
-import { useAnimePaheCookie } from './contexts/AnimePaheCookieContext'
-import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
+import ProviderAuthModal from './components/modals/ProviderAuthModal'
 const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -44,7 +43,6 @@ import TrackerSyncNotice from './components/common/TrackerSyncNotice'
 import { useSetting } from './hooks/useSettings'
 
 function App() {
-  const { isOpen: animePaheOpen, closeModal: closeAnimePaheModal, onSuccess } = useAnimePaheCookie()
   const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
   const {
     isOpen: lanAuthOpen,
@@ -213,11 +211,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <AnimePaheCookieModal
-        isOpen={animePaheOpen}
-        onClose={closeAnimePaheModal}
-        onSuccess={onSuccess}
-      />
+      <ProviderAuthModal />
       <LanAuthModal
         isOpen={lanAuthOpen}
         onClose={lanLocked ? () => {} : closeLanAuthModal}

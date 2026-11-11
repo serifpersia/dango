@@ -69,7 +69,7 @@ async function fetchVideoSources(
   showId: string | undefined,
   episodeNumber: string | undefined,
   ui: VideoFetchUiState,
-  dispatch: React.Dispatch<Action>,
+  _dispatch: React.Dispatch<Action>,
   silentToast: boolean = false
 ): Promise<FetchedVideoData> {
   if (!showId || !episodeNumber) throw new Error('Missing params')
@@ -84,21 +84,7 @@ async function fetchVideoSources(
             mode: ui.currentMode,
             provider: ui.selectedProvider,
           })
-          .catch(
-            (error: {
-              message?: string
-              data?: { cause?: { code?: string; provider?: string } }
-            }) => {
-              const cause = error.data?.cause
-              if (error.message === 'AUTH_REQUIRED' && cause?.provider === 'mkissa') {
-                dispatch({
-                  type: 'SET_STATE',
-                  payload: { showCookieModal: true, cookieProvider: 'mkissa' },
-                })
-              }
-              return null
-            }
-          ),
+          .catch(() => null),
         trpcClient.progress.getEpisode.query({ showId, episodeNumber }).catch(() => null),
         trpcClient.settings.getByKey.query({ key: 'preferredSource' }).catch(() => null),
         trpcClient.settings.getByKey.query({ key: 'preferredLink' }).catch(() => null),
@@ -199,13 +185,6 @@ async function fetchVideoSources(
   } catch (e) {
     const error = e as Error & { provider?: string }
     if (error.message === 'AUTH_REQUIRED') {
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          showCookieModal: true,
-          cookieProvider: error.provider as 'animepahe' | 'mkissa' | undefined,
-        },
-      })
       return {
         videoSources: [],
         selectedSource: null,

@@ -1,7 +1,11 @@
-import { profileStorage } from './profileStorage'
 import { emitAuthRequired } from './auth-bus'
 import toast from 'react-hot-toast'
 import { getActiveProfileId } from './profileStorage'
+import {
+  clearProviderCreds,
+  getProviderCreds,
+  listAuthProviderIds,
+} from './providerAuthStorage'
 
 const sleep = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {
@@ -39,23 +43,18 @@ export const fetchWithLocalHeaders = async (
       !target.includes('/api/auth/app-')
     )
       headers.set('x-dango-profile-id', getActiveProfileId())
-    let animepaheUa = profileStorage.getItem('animepahe_ua')
-    let animepaheCookie = profileStorage.getItem('animepahe_cookie')
-    if (animepaheCookie && animepaheUa && animepaheUa !== navigator.userAgent) {
-      profileStorage.removeItem('animepahe_cookie')
-      profileStorage.removeItem('animepahe_ua')
-      animepaheCookie = null
-      animepaheUa = null
-      toast.error('Your browser changed. Verify AnimePahe again to refresh its cookie.')
-      emitAuthRequired('animepahe')
+    const browserUa = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+    for (const id of listAuthProviderIds()) {
+      const { cookie, ua } = getProviderCreds(id)
+      if (cookie && ua && browserUa && ua !== browserUa) {
+        clearProviderCreds(id)
+        toast.error('Your browser changed. Verify provider access again.')
+        emitAuthRequired(id)
+        continue
+      }
+      if (ua) headers.set(`x-provider-${id}-ua`, ua)
+      if (cookie) headers.set(`x-provider-${id}-cookie`, cookie)
     }
-    const jasmrUa = profileStorage.getItem('jasmr_ua')
-    const jasmrCookie = profileStorage.getItem('jasmr_cookie')
-
-    if (animepaheUa) headers.set('x-animepahe-ua', animepaheUa)
-    if (animepaheCookie) headers.set('x-animepahe-cookie', animepaheCookie)
-    if (jasmrUa) headers.set('x-jasmr-ua', jasmrUa)
-    if (jasmrCookie) headers.set('x-jasmr-cookie', jasmrCookie)
   }
   new Headers(init?.headers).forEach((value, name) => headers.set(name, value))
   const options = { ...init, headers }
@@ -110,11 +109,8 @@ export const fetchApi = async (url: string, init?: RequestInit) => {
 
     const errorMsg = typeof data.error === 'string' ? data.error : ''
 
-    if (response.status === 403 && errorMsg === 'AUTH_REQUIRED' && data.provider === 'animepahe') {
-      emitAuthRequired('animepahe')
-    }
-    if (response.status === 403 && errorMsg === 'AUTH_REQUIRED' && data.provider === 'jasmr') {
-      emitAuthRequired('jasmr')
+    if (errorMsg === 'AUTH_REQUIRED' && typeof data.provider === 'string') {
+      emitAuthRequired(data.provider)
     }
     if (response.status === 401 && errorMsg === 'LAN_AUTH_REQUIRED') {
       emitAuthRequired('lan')

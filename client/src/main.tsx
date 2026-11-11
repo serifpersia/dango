@@ -7,7 +7,6 @@ import { ContentTypeProvider } from './contexts/ContentTypeProvider'
 import { TitlePreferenceProvider } from './contexts/TitlePreferenceProvider'
 import { LowEndModeProvider } from './contexts/LowEndModeProvider'
 import { ThemeProvider } from './contexts/ThemeProvider'
-import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TRPCProvider, trpcClient } from './lib/trpc'
 import ProfileGate from './components/ProfileGate'
@@ -38,21 +37,19 @@ if (root) {
       <BrowserRouter>
         <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
           <QueryClientProvider client={queryClient}>
-            <AnimePaheCookieProvider>
-              <SidebarProvider>
-                <ContentTypeProvider>
-                  <TitlePreferenceProvider>
-                    <LowEndModeProvider>
-                      <ThemeProvider>
-                        <WatchAlongProvider>
-                          <App />
-                        </WatchAlongProvider>
-                      </ThemeProvider>
-                    </LowEndModeProvider>
-                  </TitlePreferenceProvider>
-                </ContentTypeProvider>
-              </SidebarProvider>
-            </AnimePaheCookieProvider>
+            <SidebarProvider>
+              <ContentTypeProvider>
+                <TitlePreferenceProvider>
+                  <LowEndModeProvider>
+                    <ThemeProvider>
+                      <WatchAlongProvider>
+                        <App />
+                      </WatchAlongProvider>
+                    </ThemeProvider>
+                  </LowEndModeProvider>
+                </TitlePreferenceProvider>
+              </ContentTypeProvider>
+            </SidebarProvider>
           </QueryClientProvider>
         </TRPCProvider>
       </BrowserRouter>

@@ -169,7 +169,7 @@ export function getMigratedId(db: DatabaseWrapper, legacyId: string): Promise<st
     inFlightMigrations = new Map()
     migrationsByDb.set(db, inFlightMigrations)
   }
-  if (isTempShowId(legacyId)) return Promise.resolve(legacyId)
+  if (isTempShowId(legacyId) || legacyId.startsWith('/')) return Promise.resolve(legacyId)
 
   if (/^(mal-\d+|-\d+)$/i.test(legacyId)) {
     const mapping = LegacyIdMappingRepository.getNumericId(db, legacyId)

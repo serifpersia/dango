@@ -116,6 +116,10 @@
   aspect-ratio: 16 / 9;
 }
 
+.posterContainer.widePoster {
+  aspect-ratio: 16 / 9;
+}
+
 .posterImg {
   width: 100%;
   height: 100%;
@@ -130,6 +134,15 @@
 
 .posterImg.blurred {
   filter: blur(15px);
+}
+
+.previewVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 
 .matureOverlay {

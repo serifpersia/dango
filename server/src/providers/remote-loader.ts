@@ -23,6 +23,7 @@ import { getTmdbKey, TMDB_BASE, TMDB_IMAGE } from '../lib/tmdb.js'
 import {
   parseRegistry,
   meetsMinDango,
+  resolveAuthSpec,
   type BrowseFacets,
   type ProviderCatalogItem,
   type RemoteProviderEntry,
@@ -368,6 +369,37 @@ function validateProviderShape(kind: RemoteProviderEntry['kind'], p: unknown): b
   return isValidVideoProvider(p)
 }
 
+const wrappedProviders = new WeakMap<object, Map<string, object>>()
+
+function withProviderAuth<T extends object>(id: string, provider: T): T {
+  let byId = wrappedProviders.get(provider)
+  if (!byId) {
+    byId = new Map()
+    wrappedProviders.set(provider, byId)
+  }
+  const existing = byId.get(id)
+  if (existing) return existing as T
+  const proxy = new Proxy(provider, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop)
+      if (typeof value !== 'function') return value
+      return (...args: unknown[]) => {
+        const parent = requestContext.getStore()
+        if (!parent) return value.apply(target, args)
+        const cookie = parent.get(`${id}_cookie`)
+        const ua = parent.get(`${id}_ua`)
+        if (!cookie && !ua) return value.apply(target, args)
+        const store = new Map(parent)
+        if (cookie) store.set('cookie', cookie)
+        if (ua) store.set('ua', ua)
+        return requestContext.run(store, () => value.apply(target, args))
+      }
+    },
+  })
+  byId.set(id, proxy)
+  return proxy as T
+}
+
 function assignProvider(
   out: RemoteLoadResult,
   item: RemoteProviderEntry,
@@ -376,21 +408,21 @@ function assignProvider(
 ): boolean {
   if (item.kind === 'manga') {
     if (!isValidMangaProvider(provider)) return false
-    out.mangaProviders[key] = provider
+    out.mangaProviders[key] = withProviderAuth(key, provider)
     return true
   }
   if (item.kind === 'tv') {
     if (!isValidTvProvider(provider)) return false
-    out.tvProviders[key] = provider
+    out.tvProviders[key] = withProviderAuth(key, provider)
     return true
   }
   if (item.kind === 'asmr') {
     if (!isJasmrApi(provider)) return false
-    out.asmrProviders[key] = provider
+    out.asmrProviders[key] = withProviderAuth(key, provider)
     return true
   }
   if (!isValidVideoProvider(provider)) return false
-  out.providers[key] = provider
+  out.providers[key] = withProviderAuth(key, provider)
   return true
 }
 
@@ -481,6 +513,7 @@ function moduleFileName(item: RemoteProviderEntry): string {
 function extractBrowseFacets(mod: Record<string, unknown>): BrowseFacets | undefined {
   let genres: string[] | undefined
   let orders: string[] | undefined
+  let sorts: string[] | undefined
   for (const [key, value] of Object.entries(mod)) {
     if (key === 'default' || !Array.isArray(value) || value.length === 0) continue
     if (!value.every((v): v is string => typeof v === 'string' && v.length > 0)) continue
@@ -489,12 +522,18 @@ function extractBrowseFacets(mod: Record<string, unknown>): BrowseFacets | undef
     const name = key.toUpperCase()
     if (name.includes('GENRE') || name.includes('TAG')) {
       genres ??= list
-    } else if (name.includes('ORDER') || name.includes('SORT')) {
+    } else if (name.includes('ORDER')) {
       orders ??= list
+    } else if (name.includes('SORT')) {
+      sorts ??= list
     }
   }
-  if (!genres && !orders) return undefined
-  return { ...(genres ? { genres } : {}), ...(orders ? { orders } : {}) }
+  if (!genres && !orders && !sorts) return undefined
+  return {
+    ...(genres ? { genres } : {}),
+    ...(orders ? { orders } : {}),
+    ...(sorts ? { sorts } : {}),
+  }
 }
 
 async function instantiateModule(
@@ -736,8 +775,16 @@ function withFacets(
 ): ProviderCatalogItem {
   const genres = (facets?.genres ?? []).length > 0 ? facets?.genres : undefined
   const orders = (facets?.orders ?? []).length > 0 ? facets?.orders : undefined
-  if (!genres && !orders) return cat
-  return { ...cat, facets: { ...(genres ? { genres } : {}), ...(orders ? { orders } : {}) } }
+  const sorts = (facets?.sorts ?? []).length > 0 ? facets?.sorts : undefined
+  if (!genres && !orders && !sorts) return cat
+  return {
+    ...cat,
+    facets: {
+      ...(genres ? { genres } : {}),
+      ...(orders ? { orders } : {}),
+      ...(sorts ? { sorts } : {}),
+    },
+  }
 }
 
 function toCatalog(
@@ -755,6 +802,7 @@ function toCatalog(
     tier: item.tier,
     modes: item.modes ?? (item.kind === 'tv' ? [] : ['sub', 'dub']),
     browse: item.browse,
+    auth: resolveAuthSpec(item),
     enabledByDefault: item.enabledByDefault !== false,
     loaded,
     remote: true,
