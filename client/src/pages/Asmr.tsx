@@ -2,7 +2,6 @@ import { profileStorage } from '../lib/profileStorage'
 import React, { useCallback, useEffect, useState } from 'react'
 import Icon from '../components/common/Icon'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
-import { useQueryClient } from '@tanstack/react-query'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import MatureConsentModal from '../components/common/MatureConsentModal'
 import MediaCard from '../components/common/MediaCard'
@@ -12,8 +11,6 @@ import AsmrPopup from '../components/asmr/AsmrPopup'
 import { useAsmrPopup } from '../hooks/useAsmrPopup'
 import { useMatureConsent } from '../hooks/useMatureConsent'
 import AsmrPlayer from '../components/asmr/AsmrPlayer'
-import JasmrCookieModal from '../components/asmr/JasmrCookieModal'
-import { subscribeAuthRequired } from '../lib/auth-bus'
 import { useAsmrBrowse, useAsmrWork } from '../hooks/useAsmr'
 import { useToggleAsmrBookmark, asmrLibraryId } from '../hooks/useAsmrLibrary'
 import { asmrWorkId, isAsmrAdult } from '../lib/asmr'
@@ -21,7 +18,6 @@ import { useTranslate } from '../hooks/useTranslate'
 import type { AsmrTrack, AsmrWork } from '../hooks/useAsmr'
 import styles from '../components/asmr/Asmr.module.css'
 import pageStyles from '../components/common/page.module.css'
-import { qk } from '../lib/queryKeys'
 
 const SORT_GROUPS = [
   {
@@ -98,14 +94,8 @@ const Asmr: React.FC = () => {
   const [translateEN, setTranslateEN] = useState(
     () => profileStorage.getItem('asmrTranslateEN') === 'true'
   )
-  const [showJasmrModal, setShowJasmrModal] = useState(false)
-  const queryClient = useQueryClient()
   const { toggle: toggleBookmark, bookmarkedIds } = useToggleAsmrBookmark()
   const { popup, openPopup, scheduleClose, cancelClose, closePopup } = useAsmrPopup()
-
-  useEffect(() => {
-    return subscribeAuthRequired('jasmr', () => setShowJasmrModal(true))
-  }, [])
 
   useEffect(() => {
     profileStorage.setItem('asmrTranslateEN', String(translateEN))
@@ -434,17 +424,6 @@ const Asmr: React.FC = () => {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           onRequestClose={closePopup}
-        />
-      )}
-
-      {showJasmrModal && (
-        <JasmrCookieModal
-          isOpen={showJasmrModal}
-          onClose={() => setShowJasmrModal(false)}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: [qk.asmrBrowse] })
-            queryClient.invalidateQueries({ queryKey: [qk.asmrWork] })
-          }}
         />
       )}
 

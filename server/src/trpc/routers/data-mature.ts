@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { protectedProcedure, router } from '../index.js'
-import { badRequest, failed, notFound } from '../errors.js'
+import { authRequiredError, badRequest, failed, notFound } from '../errors.js'
 import { cached } from '../cache.js'
 import { TempShowIdsRepository } from '../../repositories/temp-show-ids.repository.js'
 import { malSearchMedia, malSearchTitle } from '../../lib/mal/index.js'
@@ -12,6 +12,7 @@ import {
   dataMatureResolveInput,
   dataMatureSearchInput,
   dataMatureAllocateInput,
+  dataMatureStreamInput,
 } from '../schemas/data.js'
 import { isMatureStreamingProvider, parseListParam } from '../../lib/resolve-show.js'
 import { rankByTitleMatch } from '../../providers/title-matching.js'
@@ -95,40 +96,51 @@ export const dataMatureRouter = router({
               genre: input.genres,
               genre_not_in: parseListParam(input.excludeGenres),
               isAdult: true,
-              sort: input.sortBy,
+              sort: /^[A-Z_]+$/.test(input.sortBy || '') ? input.sortBy : undefined,
             })
             return { data: rankMatureResults(result, query), hasMore: result.length >= limit }
           }
           if (isMatureStreamingProvider(ctx, provider)) {
             const streaming = ctx.getProviders()[provider]
-            if (streaming?.browse) {
-              const genre = input.genre || input.genres || undefined
-              const result = await streaming.browse({
-                query,
-                page,
-                limit,
-                pageSize: limit,
-                genre,
-                genres: input.genres || genre,
-                order: input.order || input.sortBy || undefined,
-                sort: input.sortBy || input.order || undefined,
-                studio: input.studio || undefined,
-                blacklist: input.blacklist || undefined,
-              })
-              return {
-                data: rankMatureResults(result.shows, query),
-                hasMore: result.hasMore,
-                ...(result.total !== undefined ? { total: result.total } : {}),
-                ...(result.genres ? { genres: result.genres } : {}),
+            try {
+              if (streaming?.browse) {
+                const genre = input.genre || input.genres || undefined
+                const result = await streaming.browse({
+                  query,
+                  page,
+                  limit,
+                  pageSize: limit,
+                  genre,
+                  genres: input.genres || genre,
+                  order: input.order || input.sortBy || undefined,
+                  sort: input.sortBy || input.order || undefined,
+                  studio: input.studio || undefined,
+                  blacklist: input.blacklist || undefined,
+                })
+                return {
+                  data: rankMatureResults(result.shows, query),
+                  hasMore: result.hasMore,
+                  ...(result.total !== undefined ? { total: result.total } : {}),
+                  ...(result.genres ? { genres: result.genres } : {}),
+                }
               }
-            }
-            const shows = await streaming.search({ query })
-            return {
-              data: rankMatureResults(
-                shows.map((s) => ({ ...s, isAdult: true })),
-                query
-              ),
-              hasMore: false,
+              const shows = await streaming.search({ query })
+              return {
+                data: rankMatureResults(
+                  shows.map((s) => ({ ...s, isAdult: true })),
+                  query
+                ),
+                hasMore: false,
+              }
+            } catch (e) {
+              if ((e as Error).message === 'AUTH_REQUIRED') {
+                throw new TRPCError({
+                  code: 'FORBIDDEN',
+                  message: 'AUTH_REQUIRED',
+                  cause: { code: 'AUTH_REQUIRED', provider },
+                })
+              }
+              throw e
             }
           }
           if (provider === 'mal') {
@@ -167,20 +179,54 @@ export const dataMatureRouter = router({
     )
   }),
 
+  matureStream: protectedProcedure.input(dataMatureStreamInput()).query(async ({ ctx, input }) => {
+    const provider = String(input.provider || '').toLowerCase()
+    const nativeId = String(input.nativeId || '').trim()
+    if (!provider || !isMatureStreamingProvider(ctx, provider)) {
+      throw badRequest('Unknown provider')
+    }
+    if (!nativeId) throw badRequest('nativeId is required')
+    const streaming = ctx.getProviders()[provider]
+    if (!streaming) throw badRequest('Unknown provider')
+    try {
+      return (await streaming.getStreamUrls(nativeId, input.episode || '1', 'sub')) || []
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') throw authRequiredError(provider)
+      logger.error({ err: e, provider, nativeId }, 'mature stream failed')
+      throw failed('Failed to load stream')
+    }
+  }),
+
   matureFilters: protectedProcedure.query(async ({ ctx }) => {
     try {
       const catalog = ctx.getCatalog() ?? []
       const providers: Record<
         string,
-        { label: string; browse?: BrowseCaps; genres?: string[]; orders?: string[] }
+        {
+          label: string
+          browse?: BrowseCaps
+          genres?: string[]
+          orders?: string[]
+          sorts?: string[]
+          studios?: string[]
+        }
       > = {}
       for (const item of catalog) {
-        if (!item.mature || (item.kind ?? 'anime') !== 'anime' || !item.loaded) continue
+        const kind = item.kind ?? 'anime'
+        if (!item.loaded || !(kind === 'hentai' || kind === 'adult' || item.mature)) continue
         providers[item.id] = {
           label: item.label,
           ...(item.browse ? { browse: item.browse } : {}),
           ...(item.facets?.genres?.length ? { genres: item.facets.genres } : {}),
           ...(item.facets?.orders?.length ? { orders: item.facets.orders } : {}),
+          ...(item.facets?.sorts?.length ? { sorts: item.facets.sorts } : {}),
+        }
+        const p = ctx.getProviders()[item.id] as
+          { getFilters?: () => Promise<{ makers?: string[]; studios?: string[] }> } | undefined
+        if (p?.getFilters) {
+          const f = await p.getFilters().catch(() => null)
+          const studios = f?.makers ?? f?.studios
+          if (studios?.length) providers[item.id].studios = studios
         }
       }
       return { providers }

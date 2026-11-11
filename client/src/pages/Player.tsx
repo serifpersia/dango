@@ -55,12 +55,11 @@ import { useSubtitleTracks } from '../hooks/useSubtitleTracks'
 import { useSubtitleCueLayout } from '../hooks/useSubtitleCueLayout'
 import { useSubtitleOverlay } from '../hooks/useSubtitleOverlay'
 import { savePreferredProvider } from '../reducers/playerReducer'
+
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { VideoLink } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
-import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
-import MkissaVerificationModal from '../components/anime/MkissaVerificationModal'
 import QueueOptionsButton from '../components/anime/QueueOptionsButton'
 
 import { useProviders } from '../hooks/useProviders'
@@ -81,7 +80,10 @@ const Player: React.FC = () => {
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const { options: providerOptions } = useProviders()
   const animeOptions = useMemo(
-    () => providerOptions.filter((option) => (option.kind ?? 'anime') === 'anime'),
+    () =>
+      providerOptions.filter(
+        (option) => (option.kind ?? 'anime') === 'anime' || option.kind === 'hentai'
+      ),
     [providerOptions]
   )
   const DIRECT_PROVIDER_ORDER: string[] = useMemo(
@@ -89,9 +91,23 @@ const Player: React.FC = () => {
     [animeOptions]
   )
   const MATURE_PROVIDERS = useMemo(
-    () => new Set(animeOptions.filter((option) => option.mature).map((option) => option.id)),
+    () =>
+      new Set(
+        animeOptions
+          .filter((option) => option.mature || option.kind === 'hentai')
+          .map((option) => option.id)
+      ),
     [animeOptions]
   )
+
+  const requestedProvider =
+    ((location.state as Record<string, unknown> | null)?.requestedProvider as string | undefined) ||
+    new URLSearchParams(location.search).get('requestedProvider') ||
+    undefined
+  const playerInitialMeta = {
+    ...((location.state as Record<string, unknown>) || {}),
+    ...(requestedProvider ? { requestedProvider } : {}),
+  }
 
   const {
     state,
@@ -105,7 +121,7 @@ const Player: React.FC = () => {
     prefetchEpisodeSources,
     isResettingProgress,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
+  } = usePlayerData(showId, episodeNumber, playerInitialMeta, {
     hasMatureConsent,
     watchSelection: followingHost ? watchAlong.room?.selection : null,
   })
@@ -784,38 +800,6 @@ const Player: React.FC = () => {
           </Button>
         </Modal.Actions>
       </Modal>
-
-      <AnimePaheCookieModal
-        isOpen={!!state.showCookieModal && state.cookieProvider !== 'mkissa'}
-        onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
-        onSuccess={() => {
-          queryClient.invalidateQueries({
-            queryKey: [
-              qk.videoSources,
-              showId,
-              state.currentEpisode,
-              state.selectedProvider,
-              state.currentMode,
-            ],
-          })
-        }}
-      />
-
-      <MkissaVerificationModal
-        isOpen={!!state.showCookieModal && state.cookieProvider === 'mkissa'}
-        onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
-        onSuccess={() => {
-          queryClient.invalidateQueries({
-            queryKey: [
-              qk.videoSources,
-              showId,
-              state.currentEpisode,
-              state.selectedProvider,
-              state.currentMode,
-            ],
-          })
-        }}
-      />
 
       {!isTheaterMode && (
         <aside ref={episodeSidebarRef} className={layoutStyles.episodeSidebar}>

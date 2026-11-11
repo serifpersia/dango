@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import type { Profile } from '../../../server/src/profile.types'
 import { fetchApi } from '../lib/fetchApi'
 import { setActiveProfileId, reloadProfiles } from '../lib/profileStorage'
+import { migrateLegacyProviderAuth } from '../lib/providerAuthStorage'
 import LanAuthModal from './modals/LanAuthModal'
 import { Button } from './common/Button'
 import Icon from './common/Icon'
@@ -78,6 +79,7 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
       if (cancelled) return
       if (status.current) {
         setActiveProfileId(status.current.id)
+        migrateLegacyProviderAuth()
         const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
         const showExit = becameSlow && !reduceMotion
         if (showExit) setLeaving(true)

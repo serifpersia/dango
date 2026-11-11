@@ -33,7 +33,7 @@ export function PlayerVideo({
   ...props
 }: Omit<ComponentProps<'video'>, 'ref' | 'src'> & SourceProps) {
   const bind = useMediaElement(source, sourceOptions)
-  return <video playsInline {...props} ref={bind} />
+  return <video playsInline disablePictureInPicture {...props} ref={bind} />
 }
 
 export function PlayerAudio({

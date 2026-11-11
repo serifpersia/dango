@@ -40,10 +40,11 @@ export async function emitAuthFromTrpcBody(response: Response): Promise<void> {
       const err = (item as TrpcErrorEnvelope)?.error
       if (!err || typeof err !== 'object') continue
       const cause = err.data?.cause
-      if (err.message === 'AUTH_REQUIRED' || cause?.code === 'AUTH_REQUIRED') {
-        if (cause?.provider === 'animepahe' || cause?.provider === 'jasmr') {
-          emitAuthRequired(cause.provider)
-        }
+      if (
+        (err.message === 'AUTH_REQUIRED' || cause?.code === 'AUTH_REQUIRED') &&
+        typeof cause?.provider === 'string'
+      ) {
+        emitAuthRequired(cause.provider)
       }
       if (err.message === 'LAN_AUTH_REQUIRED' || cause?.code === 'LAN_AUTH_REQUIRED') {
         emitAuthRequired('lan')

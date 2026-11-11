@@ -1,29 +1,42 @@
-export type AuthModalKind = 'lan' | 'animepahe' | 'jasmr'
+export type AuthModalKind = string
 
-type AuthModalListener = () => void
+type AuthModalListener = (kind: AuthModalKind) => void
 
-const listeners: Record<AuthModalKind, Set<AuthModalListener>> = {
-  lan: new Set(),
-  animepahe: new Set(),
-  jasmr: new Set(),
+const listeners = new Map<AuthModalKind, Set<AuthModalListener>>()
+const anyListeners = new Set<AuthModalListener>()
+
+function safeCall(listener: AuthModalListener, kind: AuthModalKind): void {
+  try {
+    listener(kind)
+  } catch (err) {
+    console.error(`auth-bus listener failed (${kind}):`, err)
+  }
 }
 
 export function emitAuthRequired(kind: AuthModalKind): void {
-  for (const listener of [...listeners[kind]]) {
-    try {
-      listener()
-    } catch (err) {
-      console.error(`auth-bus listener failed (${kind}):`, err)
-    }
-  }
+  for (const listener of [...(listeners.get(kind) ?? [])]) safeCall(listener, kind)
+  for (const listener of [...anyListeners]) safeCall(listener, kind)
 }
 
 export function subscribeAuthRequired(
   kind: AuthModalKind,
   listener: AuthModalListener
 ): () => void {
-  listeners[kind].add(listener)
+  let set = listeners.get(kind)
+  if (!set) {
+    set = new Set()
+    listeners.set(kind, set)
+  }
+  set.add(listener)
   return () => {
-    listeners[kind].delete(listener)
+    set.delete(listener)
+    if (set.size === 0) listeners.delete(kind)
+  }
+}
+
+export function subscribeAnyAuthRequired(listener: AuthModalListener): () => void {
+  anyListeners.add(listener)
+  return () => {
+    anyListeners.delete(listener)
   }
 }

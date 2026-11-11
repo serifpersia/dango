@@ -17,6 +17,8 @@ export interface MediaCardItem {
   nativeName?: string
   englishName?: string
   thumbnail?: string
+  preview?: string
+  wide?: boolean
   typeBadge?: string
   chapterBadge?: string | null
   airMeta?: string
@@ -142,7 +144,7 @@ const MediaCard: React.FC<MediaCardProps> = memo(
     const clearPopupTimeout = interaction.clearPopupTimeout
 
     const handleInfoMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
-      if (isMobile) return
+      if (isMobile || !showInfoButton) return
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       if (onOpenDetails) {
         onOpenDetails(rect)
@@ -178,6 +180,7 @@ const MediaCard: React.FC<MediaCardProps> = memo(
     }
 
     const handleContextMenu = (e: React.MouseEvent<HTMLElement>) => {
+      if (!showInfoButton) return
       if (onOpenDetails) {
         e.preventDefault()
         e.stopPropagation()
@@ -295,7 +298,7 @@ const MediaCard: React.FC<MediaCardProps> = memo(
           onPointerUp={handlePointerUpOrCancel}
           onPointerCancel={handlePointerUpOrCancel}
         >
-          <div className={styles.posterContainer}>
+          <div className={`${styles.posterContainer} ${item.wide ? styles.widePoster : ''}`}>
             {shouldBlur && (
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
             )}
@@ -309,6 +312,18 @@ const MediaCard: React.FC<MediaCardProps> = memo(
               decoding="async"
               onLoad={() => setIsLoaded(true)}
             />
+
+            {!isMobile && isHovered && item.preview && !lowEndMode && (
+              <video
+                className={styles.previewVideo}
+                src={item.preview}
+                muted
+                loop
+                autoPlay
+                playsInline
+                preload="none"
+              />
+            )}
 
             {!isMobile && (
               <>
@@ -328,7 +343,7 @@ const MediaCard: React.FC<MediaCardProps> = memo(
 
             {item.notAired && <div className={styles.notAiredBadge}>NOT AIRED</div>}
 
-            {!isMobile && isHovered && (
+            {!isMobile && isHovered && !item.preview && (
               <div className={styles.hoverOverlay}>{hoverOverlayIcon}</div>
             )}
           </div>
