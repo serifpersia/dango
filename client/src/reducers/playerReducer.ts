@@ -52,8 +52,6 @@ export const createInitialState = (): PlayerState => ({
   loadingShowData: true,
   loadingVideo: false,
   error: null,
-  showCookieModal: false,
-  cookieProvider: null,
 })
 
 export function playerReducer(state: PlayerState, action: Action): PlayerState {

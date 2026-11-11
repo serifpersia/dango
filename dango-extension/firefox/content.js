@@ -2,16 +2,16 @@ const ext = typeof browser !== 'undefined' ? browser : chrome
 
 const bridge = (getEvent, replyEvent, type) => {
   window.addEventListener(getEvent, async (e) => {
-    let requestId = null
+    let detail = {}
     try {
       const raw = e && e.detail
-      requestId =
-        typeof raw === 'string' ? (JSON.parse(raw)?.requestId ?? null) : (raw?.requestId ?? null)
+      detail = typeof raw === 'string' ? JSON.parse(raw) || {} : raw || {}
     } catch {
-      requestId = null
+      detail = {}
     }
+    const requestId = detail.requestId ?? null
     try {
-      const reply = await ext.runtime.sendMessage({ type })
+      const reply = await ext.runtime.sendMessage({ type, ...detail })
       window.dispatchEvent(
         new CustomEvent(replyEvent, { detail: JSON.stringify({ ...reply, requestId }) })
       )
@@ -32,3 +32,4 @@ const bridge = (getEvent, replyEvent, type) => {
 bridge('dango:get-pahe-cookie', 'dango:pahe-cookie', 'GET_PAHE_COOKIE')
 bridge('dango:get-jasmr-cookie', 'dango:jasmr-cookie', 'GET_JASMR_COOKIE')
 bridge('dango:get-ytmusic-cookie', 'dango:ytmusic-cookie', 'GET_YTMUSIC_COOKIE')
+bridge('dango:get-provider-cookie', 'dango:provider-cookie', 'GET_PROVIDER_COOKIE')

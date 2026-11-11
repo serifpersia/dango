@@ -86,23 +86,31 @@ try {
   // ignore
 }
 
-const findCfClearance = async (needles) => {
+const findCookie = async (needles, cookieName = 'cf_clearance', partitionKey) => {
   const ids = await storeIds()
   const checked = []
   const names = []
   for (const storeId of ids) {
     const opts = {}
     if (storeId) opts.storeId = storeId
-    const all = await ext.cookies.getAll(opts)
+    if (partitionKey) opts.partitionKey = partitionKey
+    let all
+    try {
+      all = await ext.cookies.getAll(opts)
+    } catch {
+      continue
+    }
     checked.push(storeId || 'default')
     for (const c of all) {
       if (matchesAny(c, needles)) names.push(tag(c))
     }
-    const cf = all.find((c) => c.name === 'cf_clearance' && matchesAny(c, needles))
-    if (cf) return { ok: true, cookie: clean(cf.value), storeId: storeId || 'default' }
+    const match = all.find((c) => c.name === cookieName && matchesAny(c, needles))
+    if (match) return { ok: true, cookie: clean(match.value), storeId: storeId || 'default' }
   }
   return { ok: false, checked, names }
 }
+
+const findCfClearance = (needles) => findCookie(needles, 'cf_clearance')
 
 const getFullCookieHeader = async (needles) => {
   const ids = await storeIds()
@@ -142,6 +150,37 @@ ext.runtime.onMessage.addListener((msg) => {
       const cap = isJasmr ? captured.jasmr : captured.pahe
       if (cap) return { ok: true, cookie: cap.value, storeId: cap.source, at: cap.at }
       return { ok: false, error: 'NO_COOKIE', debug: { stores: found.checked, names: found.names } }
+    })()
+  }
+  if (msg.type === 'GET_PROVIDER_COOKIE') {
+    const raw = [msg.origin, msg.domain].find(
+      (v) => typeof v === 'string' && /^https?:\/\/[^/]+/i.test(v.trim())
+    )
+    if (!raw) return Promise.resolve({ ok: false, error: 'NO_DOMAIN' })
+    const origin = new URL(raw.trim()).origin
+    const host = new URL(origin).host
+    const base = host.split('.').slice(-2)[0] || host
+    const cookieName =
+      typeof msg.cookieName === 'string' && msg.cookieName.trim()
+        ? msg.cookieName.trim()
+        : 'cf_clearance'
+    return (async () => {
+      const attempts = []
+      for (const partitionKey of [undefined, { topLevelSite: origin }]) {
+        for (const needles of [[host], [base]]) {
+          const found = await findCookie(needles, cookieName, partitionKey)
+          if (found.ok) return found
+          attempts.push(found)
+        }
+      }
+      return {
+        ok: false,
+        error: 'NO_COOKIE',
+        debug: {
+          stores: [...new Set(attempts.flatMap((a) => a.checked))],
+          names: [...new Set(attempts.flatMap((a) => a.names))],
+        },
+      }
     })()
   }
   if (msg.type === 'GET_YTMUSIC_COOKIE') {

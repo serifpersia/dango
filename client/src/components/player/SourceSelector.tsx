@@ -17,7 +17,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   options,
 }) => {
   const list = options && options.length > 0 ? options : []
-  const visibleProviders = list.filter((option) => option.mature === (isAdult === true))
+  const isMatureProvider = (option: ProviderOption) =>
+    option.mature || option.kind === 'hentai' || option.kind === 'adult'
+  const visibleProviders = list.filter((option) => isMatureProvider(option) === (isAdult === true))
 
   return (
     <div className={styles.providerSelectContainer}>

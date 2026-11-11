@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+﻿import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -7,6 +7,7 @@ import Pagination from '../components/common/Pagination'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import MatureConsentModal from '../components/common/MatureConsentModal'
+import AdultPlayerModal from '../components/anime/AdultPlayerModal'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useMatureConsent } from '../hooks/useMatureConsent'
@@ -14,8 +15,8 @@ import { useProviders } from '../hooks/useProviders'
 import { trpcClient, useTRPC } from '../lib/trpc'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import type { AnimeShow } from '../types/player'
-import styles from './Search.module.css'
-import matureStyles from './Mature.module.css'
+import searchStyles from './Search.module.css'
+import styles from './Mature.module.css'
 
 type MatureShow = AnimeShow
 
@@ -44,6 +45,16 @@ const remoteSortOptions = [
   { value: 'visits:desc', label: 'Most Visited' },
   { value: 'title:asc', label: 'Title A-Z' },
 ]
+
+const sortLabels: Record<string, string> = {
+  released_at: 'Release date',
+  published_at: 'Recent update',
+  saved: 'Saved',
+  today_views: 'Today views',
+  weekly_views: 'Weekly views',
+  monthly_views: 'Monthly views',
+  views: 'Total views',
+}
 
 const orderLabels: Record<string, string> = {
   recent: 'Latest',
@@ -135,6 +146,9 @@ export default function Mature() {
     document.title = 'Mature - dango'
   }, [])
 
+  const [category, setCategory] = useState<'hentai' | 'adult'>(
+    searchParams.get('category') === 'adult' ? 'adult' : 'hentai'
+  )
   const [provider, setProvider] = useState(searchParams.get('provider') || 'anilist')
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [submittedQuery, setSubmittedQuery] = useState(searchParams.get('query') || '')
@@ -155,18 +169,32 @@ export default function Mature() {
   const [dynamicGenres, setDynamicGenres] = useState<{ slug: string; name: string }[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [resolvingId, setResolvingId] = useState<string | null>(null)
-
+  const [adultPlayback, setAdultPlayback] = useState<{
+    id: string
+    name: string
+    provider: string
+  } | null>(null)
   const { options: allProviderOptions } = useProviders()
-  const matureStreamingOptions = useMemo(
-    () => allProviderOptions.filter((o) => o.mature && (o.kind ?? 'anime') === 'anime'),
+  const hentaiStreamingOptions = useMemo(
+    () =>
+      allProviderOptions.filter(
+        (o) => o.kind === 'hentai' || (o.mature && (o.kind ?? 'anime') === 'anime')
+      ),
+    [allProviderOptions]
+  )
+  const adultStreamingOptions = useMemo(
+    () => allProviderOptions.filter((o) => o.kind === 'adult'),
     [allProviderOptions]
   )
   const providerOptions = useMemo(
-    () => [
-      ...META_PROVIDER_OPTIONS,
-      ...matureStreamingOptions.map((o) => ({ value: o.id, label: o.label })),
-    ],
-    [matureStreamingOptions]
+    () =>
+      category === 'adult'
+        ? adultStreamingOptions.map((o) => ({ value: o.id, label: o.label }))
+        : [
+            ...META_PROVIDER_OPTIONS,
+            ...hentaiStreamingOptions.map((o) => ({ value: o.id, label: o.label })),
+          ],
+    [category, adultStreamingOptions, hentaiStreamingOptions]
   )
 
   const { data: filters } = useQuery({
@@ -175,7 +203,14 @@ export default function Mature() {
     staleTime: Infinity,
   })
 
-  const isMetaProvider = provider === 'anilist' || provider === 'mal'
+  useEffect(() => {
+    if (providerOptions.length === 0) return
+    if (providerOptions.some((o) => o.value === provider)) return
+    setProvider(providerOptions[0].value)
+    setPage(1)
+  }, [providerOptions, provider])
+
+  const isMetaProvider = category === 'hentai' && (provider === 'anilist' || provider === 'mal')
   const streamingFilters = isMetaProvider ? undefined : filters?.providers?.[provider]
   const caps = streamingFilters?.browse
   const staticGenres = streamingFilters?.genres ?? []
@@ -187,10 +222,27 @@ export default function Mature() {
   const orderSupported = !isMetaProvider && (caps?.order === true || staticOrders.length > 0)
   const studioSupported = !isMetaProvider && caps?.studio === true
   const remoteSortSupported = !isMetaProvider && caps?.sort === true
+  const sortChoices = remoteSortSupported
+    ? (streamingFilters?.sorts ?? []).length > 0
+      ? (streamingFilters?.sorts ?? []).map((value) => ({
+          value,
+          label: sortLabels[value] || value.replace(/_/g, ' '),
+        }))
+      : remoteSortOptions
+    : []
+
+  useEffect(() => {
+    if (!remoteSortSupported) return
+    const sorts = streamingFilters?.sorts ?? []
+    if (sorts.length === 0) return
+    if (sorts.includes(remoteSort)) return
+    setRemoteSort(sorts[0])
+  }, [remoteSortSupported, streamingFilters, remoteSort])
 
   const limit = isMetaProvider ? 14 : (caps?.pageSize ?? 14)
 
   interface UrlSnapshot {
+    category: 'hentai' | 'adult'
     provider: string
     query: string
     page: number
@@ -206,6 +258,7 @@ export default function Mature() {
 
   const writeParams = (s: UrlSnapshot) => {
     const p = new URLSearchParams()
+    if (s.category === 'adult') p.set('category', 'adult')
     if (s.provider !== 'anilist') p.set('provider', s.provider)
     if (s.query.trim()) p.set('query', s.query.trim())
     if (s.page > 1) p.set('page', String(s.page))
@@ -230,6 +283,7 @@ export default function Mature() {
   }
 
   const snapshot = (over: Partial<UrlSnapshot> = {}): UrlSnapshot => ({
+    category,
     provider,
     query: submittedQuery,
     page,
@@ -277,7 +331,7 @@ export default function Mature() {
     error,
   } = useQuery({
     ...trpc.data.matureSearch.queryOptions(parseMatureSearchInput(paramString)),
-    enabled: hasConsent,
+    enabled: hasConsent && providerOptions.some((o) => o.value === provider),
   })
 
   useEffect(() => {
@@ -351,7 +405,43 @@ export default function Mature() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleCategoryChange = (next: 'hentai' | 'adult') => {
+    const nextOptions =
+      next === 'adult'
+        ? adultStreamingOptions.map((o) => ({ value: o.id, label: o.label }))
+        : [
+            ...META_PROVIDER_OPTIONS,
+            ...hentaiStreamingOptions.map((o) => ({ value: o.id, label: o.label })),
+          ]
+    const nextProvider = next === 'adult' ? (nextOptions[0]?.value ?? '') : 'anilist'
+    setCategory(next)
+    setProvider(nextProvider)
+    setPage(1)
+    setGenre('')
+    setRemoteSort('')
+    setQuery('')
+    setSubmittedQuery('')
+    setStudio('')
+    setSubmittedStudio('')
+    writeParams(
+      snapshot({
+        category: next,
+        provider: nextProvider,
+        page: 1,
+        genre: '',
+        remoteSort: '',
+        query: '',
+      })
+    )
+  }
+
   const handleCardClick = async (e: React.MouseEvent<HTMLElement>, show: MatureShow) => {
+    if (category === 'adult') {
+      e.preventDefault()
+      e.stopPropagation()
+      setAdultPlayback({ id: show.id || show._id, name: show.name, provider })
+      return
+    }
     const id = show.id || show._id
     if (provider === 'mal') return
     if (/^\d+$/.test(id)) return
@@ -370,7 +460,9 @@ export default function Mature() {
         }
         if (anilistUp) {
           const data = await trpcClient.data.matureResolve.query({ title: show.name })
-          navigate(`/anime/${(data as { id: number }).id}`)
+          navigate(`/anime/${(data as { id: number }).id}`, {
+            state: { requestedProvider: provider },
+          })
           return
         }
         const data = await trpcClient.data.matureAllocate.mutate({
@@ -380,7 +472,7 @@ export default function Mature() {
           thumbnail: show.thumbnail,
         })
         if (!data?.id) throw new Error('Allocate failed')
-        navigate(`/anime/${data.id}`)
+        navigate(`/anime/${data.id}`, { state: { requestedProvider: provider } })
         return
       }
       const data = await trpcClient.data.matureResolve.query({ title: show.name })
@@ -412,17 +504,17 @@ export default function Mature() {
 
   return (
     <div className="page-container">
-      <div className={styles.header}>
-        <h1 className={styles.pageTitle}>Mature</h1>
-        <p className={styles.pageSubtitle}>
+      <div className={searchStyles.header}>
+        <h1 className={searchStyles.pageTitle}>Mature</h1>
+        <p className={searchStyles.pageSubtitle}>
           Browse 18+ titles across AniList and streaming providers
         </p>
       </div>
 
-      <div className={styles.filterContainer}>
-        <div className={styles.searchBarWrapper}>
-          <div className={styles.inputIconWrapper}>
-            <Icon name="search" className={styles.searchIcon} />
+      <div className={searchStyles.filterContainer}>
+        <div className={searchStyles.searchBarWrapper}>
+          <div className={searchStyles.inputIconWrapper}>
+            <Icon name="search" className={searchStyles.searchIcon} />
             <input
               type="text"
               placeholder={`Search ${providerOptions.find((p) => p.value === provider)?.label}...`}
@@ -431,14 +523,23 @@ export default function Mature() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSearch()
               }}
-              className={styles.searchInput}
+              className={searchStyles.searchInput}
             />
           </div>
-          <div className={styles.searchActions}>
+          <div className={searchStyles.searchActions}>
+            <select
+              value={category}
+              onChange={(e) => handleCategoryChange(e.currentTarget.value as 'hentai' | 'adult')}
+              className={searchStyles.providerSelect}
+              aria-label="Category"
+            >
+              <option value="hentai">Hentai</option>
+              <option value="adult">Adult</option>
+            </select>
             <select
               value={provider}
               onChange={(e) => handleProviderChange(e.currentTarget.value)}
-              className={styles.providerSelect}
+              className={searchStyles.providerSelect}
               aria-label="Provider"
             >
               {providerOptions.map((opt) => (
@@ -447,13 +548,13 @@ export default function Mature() {
                 </option>
               ))}
             </select>
-            <Button onClick={handleSearch} className={styles.searchBtn}>
+            <Button onClick={handleSearch} className={searchStyles.searchBtn}>
               Search
             </Button>
             {isMetaProvider && (
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
+                className={`${searchStyles.filterToggleBtn} ${showFilters ? searchStyles.active : ''}`}
               >
                 <Icon name="filter" /> Filters
               </button>
@@ -466,10 +567,10 @@ export default function Mature() {
                   setPage(1)
                   writeParams(snapshot({ remoteSort: e.currentTarget.value, page: 1 }))
                 }}
-                className={styles.providerSelect}
+                className={searchStyles.providerSelect}
                 aria-label="Sort"
               >
-                {remoteSortOptions.map((opt) => (
+                {sortChoices.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -480,10 +581,12 @@ export default function Mature() {
         </div>
 
         {(provider === 'anilist' || provider === 'mal') && (
-          <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
-            <div className={styles.filterDivider} />
-            <div className={styles.filterGrid}>
-              <div className={styles.filterItem}>
+          <div
+            className={`${searchStyles.advancedFilters} ${showFilters ? searchStyles.show : ''}`}
+          >
+            <div className={searchStyles.filterDivider} />
+            <div className={searchStyles.filterGrid}>
+              <div className={searchStyles.filterItem}>
                 <label>Sort By</label>
                 <select value={sort} onChange={(e) => setSort(e.currentTarget.value)}>
                   {sortOptions.map((opt) => (
@@ -493,7 +596,7 @@ export default function Mature() {
                   ))}
                 </select>
               </div>
-              <div className={styles.filterItem}>
+              <div className={searchStyles.filterItem}>
                 <label>Status</label>
                 <select value={status} onChange={(e) => setStatus(e.currentTarget.value)}>
                   {statusOptions.map((opt) => (
@@ -505,7 +608,7 @@ export default function Mature() {
               </div>
               {provider === 'anilist' && (
                 <>
-                  <div className={styles.filterItem}>
+                  <div className={searchStyles.filterItem}>
                     <label>Season</label>
                     <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
                       {seasonOptions.map((opt) => (
@@ -515,7 +618,7 @@ export default function Mature() {
                       ))}
                     </select>
                   </div>
-                  <div className={styles.filterItem}>
+                  <div className={searchStyles.filterItem}>
                     <label>Year</label>
                     <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
                       {yearOptions.map((opt) => (
@@ -528,8 +631,8 @@ export default function Mature() {
                 </>
               )}
             </div>
-            <div className={styles.filterActions}>
-              <Button onClick={handleSearch} className={styles.searchBtn}>
+            <div className={searchStyles.filterActions}>
+              <Button onClick={handleSearch} className={searchStyles.searchBtn}>
                 Apply Filters
               </Button>
             </div>
@@ -537,11 +640,11 @@ export default function Mature() {
         )}
 
         {!isMetaProvider && !!filters && (genreSupported || orderSupported || studioSupported) && (
-          <div className={`${styles.advancedFilters} ${styles.show}`}>
-            <div className={styles.filterDivider} />
-            <div className={`${styles.filterGrid} ${matureStyles.tightGrid}`}>
+          <div className={`${searchStyles.advancedFilters} ${searchStyles.show}`}>
+            <div className={searchStyles.filterDivider} />
+            <div className={`${searchStyles.filterGrid} ${styles.tightGrid}`}>
               {orderSupported && (
-                <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
+                <div className={`${searchStyles.filterItem} ${styles.shrinkSelect}`}>
                   <label>Order</label>
                   <select
                     value={effectiveOrder}
@@ -560,7 +663,7 @@ export default function Mature() {
                 </div>
               )}
               {genreSupported && (
-                <div className={`${styles.filterItem} ${matureStyles.shrinkSelect}`}>
+                <div className={`${searchStyles.filterItem} ${styles.shrinkSelect}`}>
                   <label>Genre</label>
                   <select
                     value={genre}
@@ -584,30 +687,44 @@ export default function Mature() {
                 </div>
               )}
               {studioSupported && (
-                <div className={styles.filterItem}>
+                <div className={searchStyles.filterItem}>
                   <label>Studio</label>
                   <input
                     type="text"
+                    list="mature-studio-list"
                     placeholder="Studio name..."
                     value={studio}
                     onChange={(e) => setStudio(e.currentTarget.value)}
+                    onFocus={(e) => {
+                      try {
+                        ;(
+                          e.currentTarget as HTMLInputElement & { showPicker?: () => void }
+                        ).showPicker?.()
+                      } catch {
+                        // ignore
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSearch()
                     }}
-                    className={styles.searchInput}
                   />
+                  <datalist id="mature-studio-list">
+                    {(streamingFilters?.studios ?? []).map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
                 </div>
               )}
             </div>
             {genre && genreSupported && !orderSupported && (
-              <p className={styles.pageSubtitle}>
+              <p className={searchStyles.pageSubtitle}>
                 Browsing the {prettyLabel(genre)} genre - search text is ignored while a genre is
                 selected.
               </p>
             )}
             {(orderSupported || studioSupported) && (
-              <div className={styles.filterActions}>
-                <Button onClick={handleSearch} className={styles.searchBtn}>
+              <div className={searchStyles.filterActions}>
+                <Button onClick={handleSearch} className={searchStyles.searchBtn}>
                   Apply Filters
                 </Button>
               </div>
@@ -623,18 +740,18 @@ export default function Mature() {
       {isLoading ? (
         <SkeletonGrid count={limit} />
       ) : results.length === 0 ? (
-        <div className={styles.noResults}>
+        <div className={searchStyles.noResults}>
           <h3>No results found</h3>
           <p>Try a different query, genre or provider</p>
         </div>
       ) : (
         <>
-          <div className={styles.resultsHeader}>
-            <h2 className={styles.resultsTitle}>
+          <div className={searchStyles.resultsHeader}>
+            <h2 className={searchStyles.resultsTitle}>
               {response?.total ?? results.length} result
               {(response?.total ?? results.length) === 1 ? '' : 's'}
             </h2>
-            <div className={styles.pagination}>
+            <div className={searchStyles.pagination}>
               <Pagination
                 page={page}
                 totalPages={totalPages}
@@ -644,15 +761,15 @@ export default function Mature() {
               />
             </div>
           </div>
-          <div className={styles.resultsGrid}>
+          <div className={category === 'adult' ? styles.resultsGrid : searchStyles.resultsGrid}>
             {results.map((show) => (
               <div key={`${provider}-${show._id}`} onClickCapture={(e) => handleCardClick(e, show)}>
-                <AnimeCard anime={show} />
+                <AnimeCard anime={show} wide={category === 'adult'} />
               </div>
             ))}
           </div>
-          <div className={styles.bottomPagination}>
-            <div className={styles.pagination}>
+          <div className={searchStyles.bottomPagination}>
+            <div className={searchStyles.pagination}>
               <Pagination
                 page={page}
                 totalPages={totalPages}
@@ -664,6 +781,7 @@ export default function Mature() {
           </div>
         </>
       )}
+      <AdultPlayerModal item={adultPlayback} onClose={() => setAdultPlayback(null)} />
     </div>
   )
 }

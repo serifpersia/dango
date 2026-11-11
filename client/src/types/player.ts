@@ -77,7 +77,5 @@ export interface PlayerState {
   resumeProgressPending: boolean
   error: string | null
   fetchedEpisodeNumber?: string
-  showCookieModal?: boolean
-  cookieProvider?: 'animepahe' | 'mkissa' | null
   initialEpisode?: string
 }

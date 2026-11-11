@@ -1,4 +1,4 @@
-export type ProviderKind = 'anime' | 'manga' | 'asmr' | 'tv'
+export type ProviderKind = 'anime' | 'manga' | 'asmr' | 'tv' | 'hentai' | 'adult'
 
 export type SubType = 'soft' | 'hard' | 'mixed'
 
@@ -15,6 +15,16 @@ export interface BrowseCaps {
 export interface BrowseFacets {
   genres?: string[]
   orders?: string[]
+  sorts?: string[]
+}
+
+export interface ProviderAuthSpec {
+  type: 'cookie' | 'browser_verify'
+  label?: string
+  siteUrl?: string
+  cookieName?: string
+  needsUa?: boolean
+  instructions?: string
 }
 
 export interface ProviderOption {
@@ -29,6 +39,7 @@ export interface ProviderOption {
   facets?: BrowseFacets
   modes?: ('sub' | 'dub')[]
   servers?: string[]
+  auth?: ProviderAuthSpec
   enabledByDefault?: boolean
   loaded: boolean
   remote: boolean

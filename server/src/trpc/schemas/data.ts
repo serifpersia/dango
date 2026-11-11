@@ -266,3 +266,18 @@ export const dataMatureAllocateInput = () =>
     if (thumbnail !== undefined) out.thumbnail = thumbnail
     return out
   })
+
+export type DataMatureStreamInput = { provider?: string; nativeId?: string; episode?: string }
+
+export const dataMatureStreamInput = () =>
+  defineSchema<DataMatureStreamInput, DataMatureStreamInput>((value) => {
+    const obj = reqObj(value)
+    const out: DataMatureStreamInput = {}
+    const provider = optStr(obj, 'provider')
+    if (provider !== undefined) out.provider = provider
+    const nativeId = optStr(obj, 'nativeId')
+    if (nativeId !== undefined) out.nativeId = nativeId
+    const episode = optStr(obj, 'episode')
+    if (episode !== undefined) out.episode = episode
+    return out
+  })

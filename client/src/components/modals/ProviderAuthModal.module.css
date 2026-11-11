@@ -110,10 +110,6 @@
   line-height: 1.5;
 }
 
-.hint .actions {
-  margin-top: 0.6rem;
-}
-
 .link {
   color: var(--accent);
   text-decoration: underline;
