@@ -153,8 +153,9 @@ ext.runtime.onMessage.addListener((msg) => {
     })()
   }
   if (msg.type === 'GET_PROVIDER_COOKIE') {
-    const raw = [msg.origin, msg.domain]
-      .find((v) => typeof v === 'string' && /^https?:\/\/[^/]+/i.test(v.trim()))
+    const raw = [msg.origin, msg.domain].find(
+      (v) => typeof v === 'string' && /^https?:\/\/[^/]+/i.test(v.trim())
+    )
     if (!raw) return Promise.resolve({ ok: false, error: 'NO_DOMAIN' })
     const origin = new URL(raw.trim()).origin
     const host = new URL(origin).host

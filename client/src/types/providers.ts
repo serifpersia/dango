@@ -1,4 +1,4 @@
-export type ProviderKind = 'anime' | 'manga' | 'asmr' | 'tv' | 'adult'
+export type ProviderKind = 'anime' | 'manga' | 'asmr' | 'tv' | 'hentai' | 'adult'
 
 export type SubType = 'soft' | 'hard' | 'mixed'
 

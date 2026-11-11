@@ -55,6 +55,7 @@ import { useSubtitleTracks } from '../hooks/useSubtitleTracks'
 import { useSubtitleCueLayout } from '../hooks/useSubtitleCueLayout'
 import { useSubtitleOverlay } from '../hooks/useSubtitleOverlay'
 import { savePreferredProvider } from '../reducers/playerReducer'
+
 import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { VideoLink } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
@@ -79,7 +80,10 @@ const Player: React.FC = () => {
   const { hasConsent: hasMatureConsent, grant: grantMatureConsent } = useMatureConsent()
   const { options: providerOptions } = useProviders()
   const animeOptions = useMemo(
-    () => providerOptions.filter((option) => (option.kind ?? 'anime') === 'anime'),
+    () =>
+      providerOptions.filter(
+        (option) => (option.kind ?? 'anime') === 'anime' || option.kind === 'hentai'
+      ),
     [providerOptions]
   )
   const DIRECT_PROVIDER_ORDER: string[] = useMemo(
@@ -87,9 +91,23 @@ const Player: React.FC = () => {
     [animeOptions]
   )
   const MATURE_PROVIDERS = useMemo(
-    () => new Set(animeOptions.filter((option) => option.mature).map((option) => option.id)),
+    () =>
+      new Set(
+        animeOptions
+          .filter((option) => option.mature || option.kind === 'hentai')
+          .map((option) => option.id)
+      ),
     [animeOptions]
   )
+
+  const requestedProvider =
+    ((location.state as Record<string, unknown> | null)?.requestedProvider as string | undefined) ||
+    new URLSearchParams(location.search).get('requestedProvider') ||
+    undefined
+  const playerInitialMeta = {
+    ...((location.state as Record<string, unknown>) || {}),
+    ...(requestedProvider ? { requestedProvider } : {}),
+  }
 
   const {
     state,
@@ -103,7 +121,7 @@ const Player: React.FC = () => {
     prefetchEpisodeSources,
     isResettingProgress,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null, {
+  } = usePlayerData(showId, episodeNumber, playerInitialMeta, {
     hasMatureConsent,
     watchSelection: followingHost ? watchAlong.room?.selection : null,
   })

@@ -1,11 +1,7 @@
 import { emitAuthRequired } from './auth-bus'
 import toast from 'react-hot-toast'
 import { getActiveProfileId } from './profileStorage'
-import {
-  clearProviderCreds,
-  getProviderCreds,
-  listAuthProviderIds,
-} from './providerAuthStorage'
+import { clearProviderCreds, getProviderCreds, listAuthProviderIds } from './providerAuthStorage'
 
 const sleep = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {

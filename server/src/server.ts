@@ -125,9 +125,11 @@ async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
     logger.info(
       {
         count: result.catalog.filter((c) => c.kind === 'anime' && c.loaded).length,
+        hentaiCount: result.catalog.filter((c) => c.kind === 'hentai' && c.loaded).length,
         mangaCount: Object.keys(result.mangaProviders).length,
         tvCount: Object.keys(result.tvProviders).length,
         asmrCount: Object.keys(result.asmrProviders).length,
+        adultCount: result.catalog.filter((c) => c.kind === 'adult' && c.loaded).length,
       },
       'remote providers refreshed'
     )

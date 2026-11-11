@@ -45,7 +45,7 @@ export interface RemoteProviderEntry {
   sha256?: string
   minDango?: string
   mature: boolean
-  kind?: 'anime' | 'asmr' | 'manga' | 'tv' | 'adult'
+  kind?: 'anime' | 'asmr' | 'manga' | 'tv' | 'hentai' | 'adult'
   sub?: RemoteSubType
   tier?: RemoteTier
   modes?: ('sub' | 'dub')[]
@@ -66,7 +66,7 @@ export interface ProviderCatalogItem {
   label: string
   version: string
   mature: boolean
-  kind: 'anime' | 'asmr' | 'manga' | 'tv' | 'adult'
+  kind: 'anime' | 'asmr' | 'manga' | 'tv' | 'hentai' | 'adult'
   sub?: RemoteSubType
   tier?: RemoteTier
   modes: ('sub' | 'dub')[]
@@ -157,9 +157,10 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     p.kind !== 'asmr' &&
     p.kind !== 'manga' &&
     p.kind !== 'tv' &&
+    p.kind !== 'hentai' &&
     p.kind !== 'adult'
   ) {
-    throw new Error(`registry.providers[${index}].kind must be anime|asmr|manga|tv|adult`)
+    throw new Error(`registry.providers[${index}].kind must be anime|asmr|manga|tv|hentai|adult`)
   }
   if (p.sub !== undefined && p.sub !== 'soft' && p.sub !== 'hard' && p.sub !== 'mixed') {
     throw new Error(`registry.providers[${index}].sub must be soft|hard|mixed`)
@@ -191,7 +192,11 @@ function parseEntry(raw: unknown, index: number): RemoteProviderEntry {
     kind:
       embedBase !== undefined
         ? 'tv'
-        : p.kind === 'asmr' || p.kind === 'manga' || p.kind === 'tv' || p.kind === 'adult'
+        : p.kind === 'asmr' ||
+            p.kind === 'manga' ||
+            p.kind === 'tv' ||
+            p.kind === 'hentai' ||
+            p.kind === 'adult'
           ? p.kind
           : 'anime',
     sub: p.sub as RemoteSubType | undefined,
@@ -274,8 +279,7 @@ export function resolveAuthSpec(item: RemoteProviderEntry): RemoteAuthSpec | und
   if (item.auth && typeof item.auth === 'object') {
     return {
       ...item.auth,
-      siteUrl:
-        item.auth.siteUrl ?? item.proxy?.referer ?? item.proxy?.origin,
+      siteUrl: item.auth.siteUrl ?? item.proxy?.referer ?? item.proxy?.origin,
       cookieName: item.auth.cookieName ?? 'cf_clearance',
       needsUa: item.auth.needsUa ?? true,
     }

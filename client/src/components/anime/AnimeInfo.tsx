@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate, useLocation } from 'react-router'
 import Icon from '../common/Icon'
 import FadeImage from '../common/FadeImage'
 import { useState, useMemo, useEffect } from 'react'
@@ -16,6 +16,7 @@ import QueueOptionsButton from './QueueOptionsButton'
 export default function AnimeInfo() {
   const { id: showId } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { titlePreference } = useTitlePreference()
   const [showDetails, setShowDetails] = useState(false)
 
@@ -24,9 +25,9 @@ export default function AnimeInfo() {
 
   useEffect(() => {
     if (showId && showMeta?.id && showMeta.id !== showId) {
-      navigate(`/anime/${showMeta.id}`, { replace: true })
+      navigate(`/anime/${showMeta.id}`, { replace: true, state: location.state })
     }
-  }, [showId, showMeta, navigate])
+  }, [showId, showMeta, navigate, location.state])
 
   useEffect(() => {
     document.title = showMeta?.name ? `${showMeta.name} - dango` : 'Anime - dango'
@@ -41,7 +42,14 @@ export default function AnimeInfo() {
   }
 
   const handleStartWatching = () => {
-    if (showId) navigate(`/watch/${showId}`)
+    if (!showId) return
+    const rp = (location.state as { requestedProvider?: string } | null)?.requestedProvider
+    navigate(
+      rp ? `/watch/${showId}?requestedProvider=${encodeURIComponent(rp)}` : `/watch/${showId}`,
+      {
+        state: location.state,
+      }
+    )
   }
 
   const bannerUrl = useMemo(() => {

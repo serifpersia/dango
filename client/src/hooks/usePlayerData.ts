@@ -206,8 +206,11 @@ export const usePlayerData = (
   initialMeta?: Record<string, unknown> | null,
   options?: { hasMatureConsent?: boolean; watchSelection?: WatchSelection | null }
 ): UsePlayerDataReturn => {
+  const requestedProviderInit =
+    typeof initialMeta?.requestedProvider === 'string' ? initialMeta.requestedProvider : null
   const [localUiState, dispatch] = useReducer(playerReducer, initialMeta, (meta) => ({
     ...createInitialState(),
+    ...(requestedProviderInit ? { selectedProvider: requestedProviderInit } : {}),
     showMeta: meta?.name
       ? {
           name: meta.name as string,
@@ -223,6 +226,8 @@ export const usePlayerData = (
       : {},
   }))
   const watchSelection = options?.watchSelection
+  const requestedProvider =
+    typeof initialMeta?.requestedProvider === 'string' ? initialMeta.requestedProvider : null
   const uiState = useMemo(
     () =>
       watchSelection
@@ -238,9 +243,10 @@ export const usePlayerData = (
   const trpc = useTRPC()
   const hasForcedProvider = useRef<string | null>(null)
   const hasForcedAdultProvider = useRef<string | null>(null)
+  const hasAppliedRequestedProvider = useRef<string | null>(null)
   const { options: providerOptions } = useProviders()
   const animeOptions = useMemo(
-    () => providerOptions.filter((o) => (o.kind ?? 'anime') === 'anime'),
+    () => providerOptions.filter((o) => (o.kind ?? 'anime') === 'anime' || o.kind === 'hentai'),
     [providerOptions]
   )
 
@@ -331,13 +337,25 @@ export const usePlayerData = (
   }, [playerData, episodeNumber])
 
   useEffect(() => {
+    if (watchSelection || !showId || !requestedProvider) return
+    if (hasAppliedRequestedProvider.current === showId) return
+    hasAppliedRequestedProvider.current = showId
+    hasForcedAdultProvider.current = showId
+    if (uiState.selectedProvider !== requestedProvider) {
+      dispatch({ type: 'SET_PROVIDER', payload: requestedProvider })
+    }
+  }, [watchSelection, showId, requestedProvider, uiState.selectedProvider])
+
+  useEffect(() => {
     if (watchSelection) return
     if (showMeta?.isAdult === undefined) return
     if (hasForcedAdultProvider.current === showId) return
     const isMatureShow = showMeta.isAdult === true
-    const candidates = animeOptions.filter((o) => o.mature === isMatureShow)
+    const isMatureProvider = (o: (typeof animeOptions)[number]) => o.mature || o.kind === 'hentai'
+    const candidates = animeOptions.filter((o) => isMatureProvider(o) === isMatureShow)
     if (candidates.length === 0) return
-    if (animeOptions.find((o) => o.id === uiState.selectedProvider)?.mature === isMatureShow) return
+    const selected = animeOptions.find((o) => o.id === uiState.selectedProvider)
+    if (selected && isMatureProvider(selected) === isMatureShow) return
     const stored = loadPreferredProvider(isMatureShow)
     hasForcedAdultProvider.current = showId ?? null
     dispatch({

@@ -215,12 +215,7 @@ export default function ProviderAuthModal() {
               </p>
               {spec.siteUrl && (
                 <div className={styles.actions}>
-                  <a
-                    className={styles.link}
-                    href={spec.siteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  <a className={styles.link} href={spec.siteUrl} target="_blank" rel="noreferrer">
                     Open {spec.label}
                   </a>
                 </div>
@@ -279,9 +274,7 @@ export default function ProviderAuthModal() {
                 <br />
                 3. Paste only the value below (no <code>{spec.cookieName}=</code> prefix).
               </p>
-              {spec.instructions && (
-                <div className={styles.hint}>{spec.instructions}</div>
-              )}
+              {spec.instructions && <div className={styles.hint}>{spec.instructions}</div>}
               {showHelper && host && (
                 <div className={styles.hint}>
                   <strong>Dango helper (one-time setup):</strong>{' '}
@@ -302,12 +295,7 @@ export default function ProviderAuthModal() {
                     </>
                   )}{' '}
                   Use this link to download the extension and extract it:{' '}
-                  <a
-                    className={styles.link}
-                    href={HELPER_ZIP_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  <a className={styles.link} href={HELPER_ZIP_URL} target="_blank" rel="noreferrer">
                     dango-extension.zip
                   </a>
                   . Then click Extract below and the field fills itself.
@@ -342,11 +330,7 @@ export default function ProviderAuthModal() {
                     Back
                   </button>
                 )}
-                <button
-                  className={styles.button}
-                  onClick={submitCookie}
-                  disabled={submitting}
-                >
+                <button className={styles.button} onClick={submitCookie} disabled={submitting}>
                   {submitting ? 'Saving...' : 'Submit'}
                 </button>
               </div>

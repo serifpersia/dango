@@ -176,11 +176,14 @@ export default function Mature() {
   } | null>(null)
   const { options: allProviderOptions } = useProviders()
   const hentaiStreamingOptions = useMemo(
-    () => allProviderOptions.filter((o) => o.mature && (o.kind ?? 'anime') === 'anime'),
+    () =>
+      allProviderOptions.filter(
+        (o) => o.kind === 'hentai' || (o.mature && (o.kind ?? 'anime') === 'anime')
+      ),
     [allProviderOptions]
   )
   const adultStreamingOptions = useMemo(
-    () => allProviderOptions.filter((o) => o.mature && o.kind === 'adult'),
+    () => allProviderOptions.filter((o) => o.kind === 'adult'),
     [allProviderOptions]
   )
   const providerOptions = useMemo(
@@ -457,7 +460,9 @@ export default function Mature() {
         }
         if (anilistUp) {
           const data = await trpcClient.data.matureResolve.query({ title: show.name })
-          navigate(`/anime/${(data as { id: number }).id}`)
+          navigate(`/anime/${(data as { id: number }).id}`, {
+            state: { requestedProvider: provider },
+          })
           return
         }
         const data = await trpcClient.data.matureAllocate.mutate({
@@ -467,7 +472,7 @@ export default function Mature() {
           thumbnail: show.thumbnail,
         })
         if (!data?.id) throw new Error('Allocate failed')
-        navigate(`/anime/${data.id}`)
+        navigate(`/anime/${data.id}`, { state: { requestedProvider: provider } })
         return
       }
       const data = await trpcClient.data.matureResolve.query({ title: show.name })

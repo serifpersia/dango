@@ -213,7 +213,7 @@ export const dataMatureRouter = router({
       > = {}
       for (const item of catalog) {
         const kind = item.kind ?? 'anime'
-        if (!item.mature || (kind !== 'anime' && kind !== 'adult') || !item.loaded) continue
+        if (!item.loaded || !(kind === 'hentai' || kind === 'adult' || item.mature)) continue
         providers[item.id] = {
           label: item.label,
           ...(item.browse ? { browse: item.browse } : {}),
