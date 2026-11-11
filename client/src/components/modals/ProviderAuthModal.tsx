@@ -224,7 +224,13 @@ export default function ProviderAuthModal() {
                 <button className={styles.secondaryButton} onClick={close}>
                   Cancel
                 </button>
-                <button className={styles.button} onClick={finish}>
+                <button
+                  className={styles.button}
+                  onClick={() => {
+                    clearThumbnailCache()
+                    window.location.reload()
+                  }}
+                >
                   Refresh Dango
                 </button>
               </div>
