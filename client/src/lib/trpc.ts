@@ -1,4 +1,4 @@
-import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import { createTRPCClient, httpBatchStreamLink } from '@trpc/client'
 import { createTRPCContext } from '@trpc/tanstack-react-query'
 import type { AppRouter } from '../../../server/src/trpc/router.js'
 export type { RouterOutputs } from '../../../server/src/trpc/router.js'
@@ -17,7 +17,7 @@ async function trpcFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Re
     }
   }
 
-  await emitAuthFromTrpcBody(response)
+  void emitAuthFromTrpcBody(response)
 
   return response
 }
@@ -58,9 +58,10 @@ export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRou
 
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
-    httpBatchLink({
+    httpBatchStreamLink({
       url: '/api/trpc',
       fetch: trpcFetch,
+      headers: { 'x-no-compression': '1' },
     }),
   ],
 })
