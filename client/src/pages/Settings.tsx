@@ -81,6 +81,9 @@ const Settings: React.FC = () => {
   const [frozenMode, setFrozenMode] = useState(false)
   const { data: frozenSetting } = useSetting('frozenMode')
 
+  const [dangoGaze, setDangoGaze] = useState(true)
+  const { data: dangoGazeSetting } = useSetting('dangoGaze')
+
   const [discordHideMature, setDiscordHideMature] = useState(true)
   const { data: discordHideMatureSetting } = useSetting('discordRPCHideMature')
 
@@ -132,6 +135,17 @@ const Settings: React.FC = () => {
       setFrozenMode(frozenSetting === 'true' || frozenSetting === true)
     }
   }, [frozenSetting])
+
+  useEffect(() => {
+    if (dangoGazeSetting !== undefined) {
+      setDangoGaze(dangoGazeSetting !== 'false' && dangoGazeSetting !== false)
+    }
+  }, [dangoGazeSetting])
+
+  const toggleDangoGaze = (enabled: boolean) => {
+    setDangoGaze(enabled)
+    updateSetting.mutate({ key: 'dangoGaze', value: String(enabled) })
+  }
 
   const toggleFrozen = (enabled: boolean) => {
     setFrozenMode(enabled)
@@ -349,6 +363,29 @@ const Settings: React.FC = () => {
                     isChecked={lowEndMode}
                     onChange={(e) => setLowEndMode(e.currentTarget.checked)}
                     id="low-end-mode"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={sharedStyles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Dango Animations</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Lets dango buttons look around and react when you pet them. Always off in Low
+                      End Mode.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={dangoGaze}
+                    onChange={(e) => toggleDangoGaze(e.currentTarget.checked)}
+                    id="dango-gaze"
                   />
                 </div>
               </div>

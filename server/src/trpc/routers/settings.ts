@@ -16,6 +16,7 @@ import { FROZEN_MODE_KEY, isFrozen, setFrozen } from '../../frozen.js'
 export const SETTING_DEFAULTS: Record<string, string> = {
   discordRPCEnabled: 'true',
   discordRPCHideMature: 'true',
+  dangoGaze: 'true',
   ignoreAdultContent: 'true',
   mangaIgnoreAdultContent: 'true',
   tvIgnoreAdultContent: 'true',

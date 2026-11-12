@@ -70,7 +70,345 @@
   transform: none !important;
 }
 
+.underlineBar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: min(100%, 640px);
+}
+
+.underlineIndicator {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent-light);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  transition:
+    left 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.underlineButton {
+  flex: 1;
+  min-width: 0;
+  min-height: 64px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.underlineButton svg {
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: opacity var(--transition-fast);
+}
+
+.underlineButton:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.underlineButton.underlineActive {
+  color: var(--accent-light);
+  background: linear-gradient(0deg, var(--accent-subtle), transparent);
+}
+
+.underlineActive svg {
+  opacity: 1;
+}
+
+.underlineButton:focus-visible {
+  outline-offset: -4px;
+}
+
+.dangoBar {
+  --dango-size: clamp(44px, 7vw, 54px);
+  --dango-pad: 16px;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--dango-pad) 10px 6px;
+  margin: 0 0 2.5rem;
+  isolation: isolate;
+}
+
+.dangoStick {
+  position: absolute;
+  top: calc(var(--dango-pad) + var(--dango-size) * 0.375 - 1px);
+  left: 4px;
+  right: 4px;
+  height: 10px;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #e3c49f 72%, var(--bg-primary)),
+    color-mix(in srgb, #a9764a 66%, var(--bg-primary))
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent),
+    0 4px 8px rgba(0, 0, 0, 0.22);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dangoButton {
+  appearance: none;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dangoButton:nth-of-type(2),
+.dangoButton:nth-of-type(5) {
+  transform: translateY(-2px);
+}
+
+.dangoButton:nth-of-type(3),
+.dangoButton:nth-of-type(4) {
+  transform: translateY(-4px);
+}
+
+.dangoBall {
+  --dango-bg: #b9a9f5;
+  --dango-edge: #8b7ce0;
+  --dango-ink: #1a1820;
+  width: var(--dango-size);
+  height: calc(var(--dango-size) * 0.75);
+  display: block;
+  transition: transform 0.25s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+.dangoSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: filter 0.25s ease;
+}
+
+.dangoBody {
+  fill: var(--dango-bg);
+  stroke: var(--dango-edge);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.dangoEye {
+  fill: var(--dango-ink);
+}
+
+.dangoLine {
+  fill: none;
+  stroke: var(--dango-ink);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dangoGaze {
+  transform: translate(calc(var(--dango-gaze-x, 0) * 1.1px), calc(var(--dango-gaze-y, 0) * 0.8px));
+  transition: transform 0.15s ease-out;
+}
+
+.face {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+[data-dango-face='normal'] .faceNormal,
+[data-dango-face='pet'] .facePet,
+[data-dango-face='squint'] .faceSquint,
+[data-dango-face='sleep'] .faceSleep {
+  opacity: 1;
+}
+
+.hearts {
+  pointer-events: none;
+}
+
+.heart {
+  opacity: 0;
+  font-size: 4.6px;
+  text-anchor: middle;
+  fill: var(--color-danger);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+[data-dango-cheer] .heart {
+  animation: dangoHeart 1.2s ease-out infinite;
+}
+
+@keyframes dangoHeart {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.35);
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 0), -6.5px) scale(1.05);
+  }
+}
+
+.dangoButton:nth-of-type(1) .dangoBall {
+  --dango-bg: color-mix(in srgb, #b9a9f5 88%, var(--bg-primary));
+  --dango-edge: #8b7ce0;
+}
+
+.dangoButton:nth-of-type(2) .dangoBall {
+  --dango-bg: color-mix(in srgb, #f5a9cf 88%, var(--bg-primary));
+  --dango-edge: #d97fb0;
+}
+
+.dangoButton:nth-of-type(3) .dangoBall {
+  --dango-bg: color-mix(in srgb, #f1ead7 90%, var(--bg-primary));
+  --dango-edge: #d6ccb0;
+}
+
+.dangoButton:nth-of-type(4) .dangoBall {
+  --dango-bg: color-mix(in srgb, #a8ddb5 88%, var(--bg-primary));
+  --dango-edge: #7bbd8e;
+}
+
+.dangoButton:hover .dangoBall {
+  transform: translateY(-3px);
+}
+
+.dangoButton:hover .dangoSvg {
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
+}
+
+.dangoButton:hover .dangoLabel {
+  color: var(--text-primary);
+}
+
+.dangoLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.dangoActive .dangoLabel {
+  color: var(--accent-light);
+  font-weight: 700;
+}
+
+.dangoActive .dangoBall {
+  transform: translateY(-4px) scale(1.06);
+  animation: dangoPop 0.4s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+.dangoActive .dangoSvg {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 55%, transparent))
+    drop-shadow(0 10px 20px var(--accent-glow));
+}
+
+.dangoButton:focus-visible {
+  outline: none;
+}
+
+.dangoButton:focus-visible .dangoBall {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+@keyframes dangoPop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  55% {
+    transform: translateY(-7px) scale(1.1);
+  }
+
+  100% {
+    transform: translateY(-4px) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .underlineIndicator,
+  .underlineButton,
+  .underlineButton svg,
+  .dangoBall,
+  .dangoSvg,
+  .dangoLabel,
+  .heart {
+    transition: none;
+  }
+
+  .dangoActive .dangoBall,
+  [data-dango-cheer] .heart {
+    animation: none;
+  }
+}
+
 @media (max-width: 600px) {
+  .dangoBar {
+    --dango-size: 40px;
+    --dango-pad: 14px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .dangoStick {
+    left: 1px;
+    right: 1px;
+  }
+
+  .dangoButton {
+    gap: 6px;
+    padding: 0 8px;
+    margin: 0;
+  }
+
+  .dangoLabel {
+    font-size: 0.68rem;
+  }
+
+  .underlineBar {
+    gap: var(--space-1);
+  }
+
+  .underlineButton {
+    flex-direction: column;
+    gap: var(--space-2);
+    min-height: 72px;
+    padding: var(--space-3) 2px;
+    font-size: clamp(0.68rem, 2.8vw, 0.8rem);
+  }
+
   .tabBar {
     width: 100%;
     justify-content: flex-start;

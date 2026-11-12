@@ -1,6 +1,7 @@
 import { profileStorage } from '../lib/profileStorage'
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { useDangoAnimation } from '../hooks/useDangoAnimation'
 import Pagination from '../components/common/Pagination'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
@@ -28,7 +29,7 @@ import {
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import type { AnimeShow } from '../types/player'
 import { useContentType, type ContentType } from '../contexts/ContentTypeContext'
-import OptionTabs from '../components/common/OptionTabs'
+import OptionTabs, { type TabOption } from '../components/common/OptionTabs'
 import MangaHome from '../components/manga/MangaHome'
 import TvHome from '../components/tv/TvHome'
 import AsmrHome from '../components/asmr/AsmrHome'
@@ -44,14 +45,15 @@ import { qk } from '../lib/queryKeys'
 
 type ActiveTab = 'latest' | 'season' | 'popular' | 'week'
 
-const CONTENT_OPTIONS: { value: ContentType; label: string }[] = [
-  { value: 'anime', label: 'Anime' },
-  { value: 'manga', label: 'Manga' },
-  { value: 'tv', label: 'TV & Movies' },
-  { value: 'asmr', label: 'ASMR' },
+const CONTENT_OPTIONS: TabOption<ContentType>[] = [
+  { value: 'anime', label: 'Anime', icon: 'play' },
+  { value: 'manga', label: 'Manga', icon: 'book' },
+  { value: 'tv', label: 'TV & Movies', icon: 'tv' },
+  { value: 'asmr', label: 'ASMR', icon: 'headphones' },
 ]
 
 const Home: React.FC = () => {
+  useDangoAnimation()
   const queryClient = useQueryClient()
   const trpc = useTRPC()
   const [page, setPage] = React.useState(1)
@@ -296,14 +298,15 @@ const Home: React.FC = () => {
           asmrSpotlight && asmrSpotlight.length > 0 && <AsmrSpotlightBanner works={asmrSpotlight} />
         ))}
 
-      <div className={styles['content-type-nav']}>
+      <nav className={styles['content-type-nav']} aria-label="Browse content">
         <OptionTabs
           ariaLabel="Content type"
+          variant="underline"
           options={CONTENT_OPTIONS}
           value={contentType}
           onChange={setContentType}
         />
-      </div>
+      </nav>
 
       {contentType === 'manga' ? (
         <MangaHome />
@@ -359,6 +362,7 @@ const Home: React.FC = () => {
 
           <OptionTabs
             ariaLabel="Browse anime"
+            variant="dango"
             options={tabsWithWeek.map((tab) => ({ value: tab.key, label: tab.label }))}
             value={displayTab}
             onChange={setActiveTab}

@@ -8,11 +8,9 @@
 .content-type-nav {
   display: flex;
   justify-content: center;
+  margin-top: calc(-1 * var(--space-4));
   margin-bottom: 2.5rem;
-}
-
-.content-type-nav :global(.tabBar) {
-  margin-bottom: 0;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .title-wrapper {
