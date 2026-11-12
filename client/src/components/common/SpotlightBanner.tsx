@@ -30,22 +30,11 @@ interface SpotlightBannerProps {
 
 const AUTOPLAY_MS = 8000
 
+const hasScore = (score: SpotlightSlide['score']) =>
+  score !== undefined && score !== null && score !== ''
+
 export const SpotlightSkeleton: React.FC = () => (
-  <div
-    className="skeleton"
-    style={{
-      width: '100vw',
-      maxWidth: '100vw',
-      position: 'relative',
-      left: '50%',
-      right: '50%',
-      marginLeft: '-50vw',
-      marginRight: '-50vw',
-      height: 'clamp(480px, 72vh, 660px)',
-      marginTop: 'calc(-1 * var(--header-height))',
-      marginBottom: '2.5rem',
-    }}
-  />
+  <div className={`${styles.bannerContainer} ${styles.skeleton} skeleton`} />
 )
 
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
@@ -56,6 +45,10 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [autoplayResetKey, setAutoplayResetKey] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  const [hasFocus, setHasFocus] = useState(false)
+  const [autoplayEnabled, setAutoplayEnabled] = useState(
+    () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
   const [pendingIndex, setPendingIndex] = useState<number | null>(null)
   const [loadedTick, setLoadedTick] = useState(0)
   const [ambient, setAmbient] = useState({ front: '', back: '', flip: false })
@@ -195,10 +188,18 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
   }, [slides.length, nextSlide, prevSlide, resetAutoplay])
 
   useEffect(() => {
-    if (slides.length === 0 || isPaused) return
+    if (slides.length < 2 || isPaused || hasFocus || !autoplayEnabled) return
     const timer = setTimeout(nextSlide, AUTOPLAY_MS)
     return () => clearTimeout(timer)
-  }, [currentIndex, nextSlide, slides.length, autoplayResetKey, isPaused])
+  }, [
+    currentIndex,
+    nextSlide,
+    slides.length,
+    autoplayResetKey,
+    isPaused,
+    hasFocus,
+    autoplayEnabled,
+  ])
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -254,9 +255,16 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
       className={styles.bannerContainer}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setHasFocus(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHasFocus(false)
+      }}
+      role="region"
+      aria-label={eyebrow}
+      aria-roledescription="carousel"
     >
       <div
-        className={`${styles.hero} ${isPaused ? styles.paused : ''}`}
+        className={`${styles.hero} ${isPaused || hasFocus || !autoplayEnabled ? styles.paused : ''}`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -278,30 +286,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
         )}
         <div className={styles.scrim} aria-hidden="true" />
 
-        {slides.length > 1 && (
-          <div
-            className={styles.progressLine}
-            aria-hidden="true"
-            key={`progress-${autoplayResetKey}-${safeIndex}`}
-          />
-        )}
-
-        {slides.length > 1 && (
-          <div className={styles.dots} ref={dotsRef} role="tablist" aria-label="Spotlight slides">
-            {slides.map((slide, index) => (
-              <button
-                key={slide.key}
-                role="tab"
-                aria-selected={index === safeIndex}
-                aria-label={`Go to slide ${index + 1}: ${slide.title}`}
-                className={`${styles.dot} ${index === safeIndex ? styles.dotActive : ''}`}
-                onClick={() => selectSlide(index)}
-                tabIndex={index === safeIndex ? 0 : -1}
-              />
-            ))}
-          </div>
-        )}
-
         <div className={styles.viewport}>
           <div className={styles.track} style={{ transform: `translateX(-${safeIndex * 100}%)` }}>
             {slides.map((slide, index) => (
@@ -310,33 +294,43 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
                 className={`${styles.slide} ${index === safeIndex ? styles.active : ''}`}
                 aria-hidden={index !== safeIndex}
               >
-                <div className={styles.slideInner}>
-                  <FadeImage
-                    src={slide.posterSrc}
-                    alt={slide.posterAlt}
-                    className={
-                      posterAspect === 'landscape' ? styles.posterLandscape : styles.poster
-                    }
-                    decoding="async"
-                  />
+                <div
+                  className={`${styles.slideInner} ${
+                    posterAspect === 'landscape' ? styles.slideInnerLandscape : ''
+                  }`}
+                >
+                  <Link
+                    to={slide.detailTo}
+                    className={`${styles.posterStage} ${posterAspect === 'landscape' ? styles.landscapeStage : ''}`}
+                    aria-label={`View details for ${slide.title}`}
+                    tabIndex={index === safeIndex ? 0 : -1}
+                  >
+                    <FadeImage
+                      src={slide.posterSrc}
+                      alt={slide.posterAlt}
+                      className={
+                        posterAspect === 'landscape' ? styles.posterLandscape : styles.poster
+                      }
+                      decoding="async"
+                    />
+                    <span className={styles.posterCaption} aria-hidden="true">
+                      <span>{slide.metaItems[0] || eyebrow}</span>
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                    </span>
+                  </Link>
                   <div className={styles.info}>
-                    <div className={`${styles.kicker} ${styles.rise}`}>
-                      <span className={styles.featureLabel}>{eyebrow}</span>
-                      {slide.score !== undefined && slide.score !== null && slide.score !== '' && (
-                        <span className={styles.scoreChip}>
-                          <Icon name="star" size={12} />
-                          <span>{slide.score}</span>
-                        </span>
-                      )}
-                    </div>
-                    <Link
-                      to={slide.detailTo}
-                      className={`${styles.title} ${styles.rise}`}
-                      aria-label={`View details for ${slide.title}`}
-                      tabIndex={index === safeIndex ? 0 : -1}
+                    <h1
+                      className={`${styles.title} ${slide.title.length > 40 ? styles.titleLong : ''} ${styles.rise}`}
                     >
-                      {slide.title}
-                    </Link>
+                      <Link
+                        to={slide.detailTo}
+                        className={styles.titleLink}
+                        aria-label={`View details for ${slide.title}`}
+                        tabIndex={index === safeIndex ? 0 : -1}
+                      >
+                        {slide.title}
+                      </Link>
+                    </h1>
                     {slide.metaItems.length > 0 && (
                       <div className={`${styles.metaRow} ${styles.rise}`}>
                         {slide.metaItems.map((item, idx) => (
@@ -349,13 +343,19 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
                         ))}
                       </div>
                     )}
-                    {slide.tags.length > 0 && (
+                    {(slide.tags.length > 0 || hasScore(slide.score)) && (
                       <div className={`${styles.genres} ${styles.rise}`}>
                         {slide.tags.slice(0, 3).map((tag) => (
                           <span key={tag} className={styles.genreTag}>
                             {tag}
                           </span>
                         ))}
+                        {hasScore(slide.score) && (
+                          <span className={styles.scoreChip}>
+                            <Icon name="star" size={12} />
+                            <span>{slide.score}</span>
+                          </span>
+                        )}
                       </div>
                     )}
                     {slide.synopsis && (
@@ -399,28 +399,61 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
         </div>
 
         {slides.length > 1 && (
-          <>
-            <button
-              className={`${styles.navArrow} ${styles.prevArrow}`}
-              onClick={() => {
-                resetAutoplay()
-                prevSlide()
-              }}
-              aria-label="Previous slide"
-            >
-              <Icon name="chevron-left" size={20} />
-            </button>
-            <button
-              className={`${styles.navArrow} ${styles.nextArrow}`}
-              onClick={() => {
-                resetAutoplay()
-                nextSlide()
-              }}
-              aria-label="Next slide"
-            >
-              <Icon name="chevron-right" size={20} />
-            </button>
-          </>
+          <div className={styles.carouselFooter}>
+            <div className={styles.slideSelector}>
+              <span className={styles.slideCount} aria-hidden="true">
+                <span>{String(safeIndex + 1).padStart(2, '0')}</span>
+                <span>/ {String(slides.length).padStart(2, '0')}</span>
+              </span>
+              <div className={styles.dots} ref={dotsRef} aria-label="Spotlight slides">
+                {slides.map((slide, index) => (
+                  <button
+                    key={slide.key}
+                    type="button"
+                    aria-pressed={index === safeIndex}
+                    aria-label={`Go to slide ${index + 1}: ${slide.title}`}
+                    className={`${styles.dot} ${index === safeIndex ? styles.dotActive : ''}`}
+                    onClick={() => selectSlide(index)}
+                  >
+                    <span
+                      className={styles.dotProgress}
+                      aria-hidden="true"
+                      key={`progress-${autoplayResetKey}-${safeIndex}`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.slideControls}>
+              <button
+                type="button"
+                className={styles.autoplayBtn}
+                onClick={() => {
+                  setAutoplayEnabled((enabled) => !enabled)
+                  resetAutoplay()
+                }}
+                aria-label={autoplayEnabled ? 'Pause slideshow' : 'Play slideshow'}
+              >
+                <Icon name={autoplayEnabled ? 'pause' : 'play'} size={12} />
+              </button>
+              <button
+                type="button"
+                className={styles.navArrow}
+                onClick={prevSlide}
+                aria-label="Previous slide"
+              >
+                <Icon name="chevron-left" size={15} />
+              </button>
+              <button
+                type="button"
+                className={styles.navArrow}
+                onClick={nextSlide}
+                aria-label="Next slide"
+              >
+                <Icon name="chevron-right" size={15} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
