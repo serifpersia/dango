@@ -7,6 +7,7 @@ import { formatTime } from '../lib/utils'
 import { trpcClient, useTRPC } from '../lib/trpc'
 import { clearDiscordPresence, trpcKeepalive } from '../lib/trpcBeacon'
 import {
+  isSubtitleFont,
   loadSubtitleStyle,
   SUBTITLE_STYLE_STORAGE_KEYS,
   type SubtitleEdge,
@@ -70,17 +71,28 @@ const useVideoPlayer = ({
   )
   const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null)
   const [initialSubtitleStyle] = useState(loadSubtitleStyle)
+  const [subtitleFont, setSubtitleFont] = useState(initialSubtitleStyle.font)
   const [subtitleFontSize, setSubtitleFontSize] = useState(initialSubtitleStyle.fontSize)
   const [subtitlePosition, setSubtitlePosition] = useState(initialSubtitleStyle.position)
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(initialSubtitleStyle.bgOpacity)
   const [subtitleBgColor, setSubtitleBgColor] = useState(initialSubtitleStyle.bgColor)
   const [subtitleTextColor, setSubtitleTextColor] = useState(initialSubtitleStyle.textColor)
   const [subtitleEdge, setSubtitleEdge] = useState<SubtitleEdge>(initialSubtitleStyle.edge)
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState(
+    initialSubtitleStyle.outlineWidth
+  )
+  const [subtitleOutlineColor, setSubtitleOutlineColor] = useState(
+    initialSubtitleStyle.outlineColor
+  )
   const [subtitleBold, setSubtitleBold] = useState(initialSubtitleStyle.bold)
-  // one action for the 7 style fields, the persistence lives here too
   const setSubtitleStyle = useCallback(
     (key: SubtitleStyleKey, value: number | string | boolean) => {
       const setters: Record<SubtitleStyleKey, (v: number | string | boolean) => boolean> = {
+        font: (v) => {
+          if (!isSubtitleFont(v)) return false
+          setSubtitleFont(v)
+          return true
+        },
         fontSize: (v) => {
           if (typeof v !== 'number') return false
           setSubtitleFontSize(v)
@@ -109,6 +121,16 @@ const useVideoPlayer = ({
         edge: (v) => {
           if (v !== 'shadow' && v !== 'outline' && v !== 'none') return false
           setSubtitleEdge(v)
+          return true
+        },
+        outlineWidth: (v) => {
+          if (typeof v !== 'number') return false
+          setSubtitleOutlineWidth(v)
+          return true
+        },
+        outlineColor: (v) => {
+          if (typeof v !== 'string') return false
+          setSubtitleOutlineColor(v)
           return true
         },
         bold: (v) => {
@@ -374,12 +396,15 @@ const useVideoPlayer = ({
       setShowControls,
       setIsAutoSkipEnabled,
       setCurrentSkipInterval,
+      setSubtitleFont,
       setSubtitleFontSize,
       setSubtitlePosition,
       setSubtitleBgOpacity,
       setSubtitleBgColor,
       setSubtitleTextColor,
       setSubtitleEdge,
+      setSubtitleOutlineWidth,
+      setSubtitleOutlineColor,
       setSubtitleBold,
       setSubtitleStyle,
       setAvailableSubtitles,
@@ -423,12 +448,15 @@ const useVideoPlayer = ({
       isScrubbing,
       isAutoSkipEnabled,
       currentSkipInterval,
+      subtitleFont,
       subtitleFontSize,
       subtitlePosition,
       subtitleBgOpacity,
       subtitleBgColor,
       subtitleTextColor,
       subtitleEdge,
+      subtitleOutlineWidth,
+      subtitleOutlineColor,
       subtitleBold,
       availableSubtitles,
       activeSubtitleTrack,

@@ -1944,12 +1944,15 @@ const Tv: React.FC = () => {
       if (cues.length === 0) return
 
       const subtitleStyle: SubtitleStyleSettings = {
+        font: player.state.subtitleFont,
         fontSize: fitSubtitleSize(player.state.subtitleFontSize, height),
         position: player.state.subtitlePosition,
         bgOpacity: player.state.subtitleBgOpacity,
         bgColor: player.state.subtitleBgColor,
         textColor: player.state.subtitleTextColor,
         edge: player.state.subtitleEdge,
+        outlineWidth: player.state.subtitleOutlineWidth,
+        outlineColor: player.state.subtitleOutlineColor,
         bold: player.state.subtitleBold,
       }
       const baseCss = buildOverlayCss(subtitleStyle)
@@ -2048,12 +2051,15 @@ const Tv: React.FC = () => {
     subtitles,
     effectiveVideoDelayMs,
     videoRef,
+    player.state.subtitleFont,
     player.state.subtitleFontSize,
     player.state.subtitlePosition,
     player.state.subtitleBgOpacity,
     player.state.subtitleBgColor,
     player.state.subtitleTextColor,
     player.state.subtitleEdge,
+    player.state.subtitleOutlineWidth,
+    player.state.subtitleOutlineColor,
     player.state.subtitleBold,
   ])
 

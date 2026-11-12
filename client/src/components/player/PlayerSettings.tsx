@@ -4,9 +4,10 @@ import Icon from '../common/Icon'
 import styles from './PlayerSettings.module.css'
 import type { VideoSource, VideoLink, SubtitleTrack } from '../../types/player'
 import type { Anime4KProfile } from '../../hooks/useAnime4K'
-import { type SubtitleEdge } from '../../lib/subtitleStyle'
+import { type SubtitleStyleKey, type SubtitleStyleSettings } from '../../lib/subtitleStyle'
 import SettingsShell from './SettingsShell'
 import SubtitleStyleMenu from './SubtitleStyleMenu'
+import SubtitleFontMenu from './SubtitleFontMenu'
 import AvSyncMenu from './AvSyncMenu'
 import AmbientLightMenu from './AmbientLightMenu'
 import OptionListMenu from './OptionListMenu'
@@ -24,19 +25,8 @@ interface PlayerSettingsProps {
   subtitles: SubtitleTrack[]
   activeSubtitleTrack: string | null
   onSubtitleChange: (trackLabel: string | null) => void
-  subtitleSettings: {
-    fontSize: number
-    position: number
-    bgOpacity: number
-    bgColor: string
-    textColor: string
-    edge: SubtitleEdge
-    bold: boolean
-  }
-  onSubtitleSettingsChange: (
-    key: 'fontSize' | 'position' | 'bgOpacity' | 'bgColor' | 'textColor' | 'edge' | 'bold',
-    value: number | string | boolean
-  ) => void
+  subtitleSettings: SubtitleStyleSettings
+  onSubtitleSettingsChange: (key: SubtitleStyleKey, value: number | string | boolean) => void
   useNativeControls: boolean
   onNativeControlsToggle: (value: boolean) => void
   anime4kEnabled: boolean
@@ -67,6 +57,7 @@ type SettingsView =
   | 'quality'
   | 'subtitles'
   | 'subtitle-style'
+  | 'subtitle-font'
   | 'upscaler'
   | 'av-sync'
   | 'playback'
@@ -229,6 +220,17 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
         classes={{ item: styles.menuItem, active: styles.selected }}
         values={subtitleSettings}
         onChange={onSubtitleSettingsChange}
+        onFontMenu={() => setView('subtitle-font')}
+      />
+    </div>
+  )
+
+  const renderSubtitleFont = () => (
+    <div className={styles.menuContent}>
+      <SubtitleFontMenu
+        classes={{ item: styles.menuItem, active: styles.selected }}
+        value={subtitleSettings.font}
+        onChange={(font) => onSubtitleSettingsChange('font', font)}
       />
     </div>
   )
@@ -410,13 +412,15 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       title={
         view === 'main'
           ? 'Settings'
-          : view === 'ambient'
-            ? 'Ambient Light'
-            : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')
+          : view === 'subtitle-font'
+            ? 'Subtitle Font'
+            : view === 'ambient'
+              ? 'Ambient Light'
+              : view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ')
       }
       titleTag="h3"
       showBack={view !== 'main'}
-      onBack={() => setView('main')}
+      onBack={() => setView(view === 'subtitle-font' ? 'subtitle-style' : 'main')}
       panelRef={ref}
       onPanelClick={(e) => e.stopPropagation()}
     >
@@ -424,6 +428,7 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       {view === 'quality' && renderQuality()}
       {view === 'subtitles' && renderSubtitles()}
       {view === 'subtitle-style' && renderSubtitleStyle()}
+      {view === 'subtitle-font' && renderSubtitleFont()}
       {view === 'upscaler' && renderUpscaler()}
       {view === 'av-sync' && renderAvSync()}
       {view === 'playback' && renderPlayback()}

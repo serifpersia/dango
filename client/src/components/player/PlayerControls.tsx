@@ -186,12 +186,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         activeSubtitleTrack={state.activeSubtitleTrack}
         onSubtitleChange={handlers.handleSubtitleSelection}
         subtitleSettings={{
+          font: state.subtitleFont,
           fontSize: state.subtitleFontSize,
           position: state.subtitlePosition,
           bgOpacity: state.subtitleBgOpacity,
           bgColor: state.subtitleBgColor,
           textColor: state.subtitleTextColor,
           edge: state.subtitleEdge,
+          outlineWidth: state.subtitleOutlineWidth,
+          outlineColor: state.subtitleOutlineColor,
           bold: state.subtitleBold,
         }}
         onSubtitleSettingsChange={actions.setSubtitleStyle}

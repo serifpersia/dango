@@ -2,6 +2,7 @@ import React from 'react'
 import styles from './TvPlayerControls.module.css'
 import SettingsShell from '../player/SettingsShell'
 import SubtitleStyleMenu, { type SubtitleStyleKey } from '../player/SubtitleStyleMenu'
+import SubtitleFontMenu from '../player/SubtitleFontMenu'
 import SubtitleDelayMenu from '../player/SubtitleDelayMenu'
 import AvSyncMenu from '../player/AvSyncMenu'
 import AmbientLightMenu from '../player/AmbientLightMenu'
@@ -15,6 +16,7 @@ export type TvSettingsView =
   | 'resolution'
   | 'subtitles'
   | 'subtitle-style'
+  | 'subtitle-font'
   | 'subtitle-timing'
   | 'audio'
   | 'av-sync'
@@ -237,15 +239,27 @@ const TvSettings: React.FC<TvSettingsProps> = ({
     <SubtitleStyleMenu
       classes={{ item: styles.menuItem, active: styles.active }}
       values={{
+        font: state.subtitleFont,
         fontSize: state.subtitleFontSize,
         position: state.subtitlePosition,
         bgOpacity: state.subtitleBgOpacity,
         bgColor: state.subtitleBgColor,
         textColor: state.subtitleTextColor,
         edge: state.subtitleEdge,
+        outlineWidth: state.subtitleOutlineWidth,
+        outlineColor: state.subtitleOutlineColor,
         bold: state.subtitleBold,
       }}
       onChange={onSubtitleStyleChange}
+      onFontMenu={() => onSelectView('subtitle-font')}
+    />
+  )
+
+  const renderSubtitleFontSettings = () => (
+    <SubtitleFontMenu
+      classes={{ item: styles.menuItem, active: styles.active }}
+      value={state.subtitleFont}
+      onChange={(font) => onSubtitleStyleChange('font', font)}
     />
   )
 
@@ -302,26 +316,29 @@ const TvSettings: React.FC<TvSettingsProps> = ({
         title={
           view === 'main'
             ? 'Settings'
-            : view === 'subtitle-style'
-              ? 'Subtitle Style'
-              : view === 'subtitle-timing'
-                ? 'Subtitle Timing'
-                : view === 'audio'
-                  ? 'Audio Track'
-                  : view === 'resolution'
-                    ? 'Resolution'
-                    : view === 'av-sync'
-                      ? 'A/V Sync'
-                      : view === 'ambient'
-                        ? 'Ambient Light'
-                        : view === 'opensub-langs'
-                          ? 'Open Subtitles'
-                          : view === 'opensub-files'
-                            ? 'Select File'
-                            : view.charAt(0).toUpperCase() + view.slice(1)
+            : view === 'subtitle-font'
+              ? 'Subtitle Font'
+              : view === 'subtitle-style'
+                ? 'Subtitle Style'
+                : view === 'subtitle-timing'
+                  ? 'Subtitle Timing'
+                  : view === 'audio'
+                    ? 'Audio Track'
+                    : view === 'resolution'
+                      ? 'Resolution'
+                      : view === 'av-sync'
+                        ? 'A/V Sync'
+                        : view === 'ambient'
+                          ? 'Ambient Light'
+                          : view === 'opensub-langs'
+                            ? 'Open Subtitles'
+                            : view === 'opensub-files'
+                              ? 'Select File'
+                              : view.charAt(0).toUpperCase() + view.slice(1)
         }
         onBack={() => {
           if (view === 'main') return onClose()
+          if (view === 'subtitle-font') return onSelectView('subtitle-style')
           if (view === 'opensub-files') return onSelectView('opensub-langs')
           onSelectView('main')
         }}
@@ -330,6 +347,7 @@ const TvSettings: React.FC<TvSettingsProps> = ({
         {view === 'resolution' && renderResolutionSettings()}
         {view === 'subtitles' && renderSubtitleSettings()}
         {view === 'subtitle-style' && renderSubtitleStyleSettings()}
+        {view === 'subtitle-font' && renderSubtitleFontSettings()}
         {view === 'subtitle-timing' && renderSubtitleTimingSettings()}
         {view === 'audio' && renderAudioSettings()}
         {view === 'av-sync' && renderAvSyncSettings()}

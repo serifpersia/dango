@@ -535,21 +535,27 @@ const Player: React.FC = () => {
 
   const subtitleStyle = useMemo<SubtitleStyleSettings>(
     () => ({
+      font: player.state.subtitleFont,
       fontSize: player.state.subtitleFontSize,
       position: player.state.subtitlePosition,
       bgOpacity: player.state.subtitleBgOpacity,
       bgColor: player.state.subtitleBgColor,
       textColor: player.state.subtitleTextColor,
       edge: player.state.subtitleEdge,
+      outlineWidth: player.state.subtitleOutlineWidth,
+      outlineColor: player.state.subtitleOutlineColor,
       bold: player.state.subtitleBold,
     }),
     [
+      player.state.subtitleFont,
       player.state.subtitleFontSize,
       player.state.subtitlePosition,
       player.state.subtitleBgOpacity,
       player.state.subtitleBgColor,
       player.state.subtitleTextColor,
       player.state.subtitleEdge,
+      player.state.subtitleOutlineWidth,
+      player.state.subtitleOutlineColor,
       player.state.subtitleBold,
     ]
   )

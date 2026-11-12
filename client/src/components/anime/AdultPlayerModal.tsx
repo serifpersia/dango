@@ -199,6 +199,7 @@ export default function AdultPlayerModal({ item, onClose }: Props) {
             bottomBar={!isLoading && source ? bottomBar : null}
             settingsPanel={settingsPanel}
             isInteracting={showSettings}
+            onStageClick={() => setShowSettings(false)}
             className={modalStyles.surface}
           >
             {source ? (

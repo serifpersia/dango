@@ -93,12 +93,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   const { state, refs, actions } = player
   const videoRef = refs.videoRef
   const {
+    subtitleFont,
     subtitleFontSize,
     subtitlePosition,
     subtitleBgOpacity,
     subtitleBgColor,
     subtitleTextColor,
     subtitleEdge,
+    subtitleOutlineWidth,
+    subtitleOutlineColor,
     subtitleBold,
   } = state
   const [settingsView, setSettingsView] = useState<TvSettingsView>(null)
@@ -126,12 +129,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
     }
 
     const subtitleStyle: SubtitleStyleSettings = {
+      font: subtitleFont,
       fontSize: subtitleFontSize,
       position: subtitlePosition,
       bgOpacity: subtitleBgOpacity,
       bgColor: subtitleBgColor,
       textColor: subtitleTextColor,
       edge: subtitleEdge,
+      outlineWidth: subtitleOutlineWidth,
+      outlineColor: subtitleOutlineColor,
       bold: subtitleBold,
     }
     const video = videoRef.current
@@ -218,12 +224,15 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       }
     }
   }, [
+    subtitleFont,
     subtitleFontSize,
     subtitlePosition,
     subtitleBgOpacity,
     subtitleBgColor,
     subtitleTextColor,
     subtitleEdge,
+    subtitleOutlineWidth,
+    subtitleOutlineColor,
     subtitleBold,
     selectedSubtitle,
     subtitles,
