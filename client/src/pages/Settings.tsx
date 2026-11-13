@@ -18,6 +18,7 @@ import DiscordTokenBookmarklet from '../components/settings/DiscordTokenBookmark
 import LanAuthSettings from '../components/settings/LanAuthSettings'
 import ServerPortSettings from '../components/settings/ServerPortSettings'
 import AllowedOriginsSettings from '../components/settings/AllowedOriginsSettings'
+import ProviderRegistrySettings from '../components/settings/ProviderRegistrySettings'
 import ThemeSettings from '../components/settings/ThemeSettings'
 import Icon from '../components/common/Icon'
 import { trpcClient } from '../lib/trpc'
@@ -296,38 +297,31 @@ const Settings: React.FC = () => {
           <div className={styles.tabContent}>
             <ProfileSettings />
             <div className={sharedStyles.sectionCard}>
-              <h3>Mature Content</h3>
-              <p>
-                Allow mature content intended for adults 18 and older. Turning this off restores
-                filtering and blur gates.
-              </p>
-              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div className={sharedStyles.settingRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
-                    <p
-                      style={{
-                        margin: '0.25rem 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Allow mature content intended for adults 18 and older. Turning this off
-                      restores filtering and blur gates.
-                    </p>
-                  </div>
-                  <ToggleSwitch
-                    isChecked={hasMatureConsent}
-                    onChange={(e) => {
-                      if (e.currentTarget.checked) setShowMatureConsentModal(true)
-                      else {
-                        revokeMatureConsent()
-                        window.location.reload()
-                      }
+              <div className={sharedStyles.settingRow}>
+                <div style={{ minWidth: 0 }}>
+                  <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
+                  <p
+                    style={{
+                      margin: '0.25rem 0 0',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
                     }}
-                    id="mature-content-enabled"
-                  />
+                  >
+                    Allow mature content intended for adults 18 and older. Turning this off restores
+                    filtering and blur gates.
+                  </p>
                 </div>
+                <ToggleSwitch
+                  isChecked={hasMatureConsent}
+                  onChange={(e) => {
+                    if (e.currentTarget.checked) setShowMatureConsentModal(true)
+                    else {
+                      revokeMatureConsent()
+                      window.location.reload()
+                    }
+                  }}
+                  id="mature-content-enabled"
+                />
               </div>
             </div>
           </div>
@@ -664,6 +658,7 @@ const Settings: React.FC = () => {
             {profile?.owner && <LanAuthSettings />}
             {profile?.owner && <ServerPortSettings />}
             {profile?.owner && <AllowedOriginsSettings />}
+            {profile?.owner && <ProviderRegistrySettings />}
             <ClearDatabaseSettings />
           </div>
         )

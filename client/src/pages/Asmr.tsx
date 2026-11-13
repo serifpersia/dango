@@ -270,7 +270,6 @@ const Asmr: React.FC = () => {
                 />
                 <span className={styles.filterLabel}>EN</span>
               </div>
-
             </div>
           </div>
 

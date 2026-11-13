@@ -126,4 +126,31 @@ export const settingsRouter = router({
   malImportCancel: protectedProcedure.mutation(() => {
     return requestMalImportCancel()
   }),
+
+  providerRegistry: protectedProcedure.query(async ({ ctx }) => {
+    const row = await SettingsRepository.getByKey(ctx.db, 'providerRegistryUrl')
+    return {
+      url: (row?.value as string | undefined) ?? '',
+      defaultUrl: CONFIG.PROVIDER_REPO_URL || '',
+    }
+  }),
+
+  setProviderRegistry: ownerProcedure
+    .input(
+      defineSchema<{ url?: unknown }, { url: string }>((value) => ({
+        url: String(reqObj(value).url ?? '').trim(),
+      }))
+    )
+    .mutation(async ({ ctx, input }) => {
+      await performWriteTransactionAsync(
+        ctx.db,
+        async (tx) => {
+          if (input.url) await SettingsRepository.upsert(tx, 'providerRegistryUrl', input.url)
+          else await SettingsRepository.deleteByKey(tx, 'providerRegistryUrl')
+        },
+        undefined,
+        { allowWhenFrozen: true }
+      )
+      return { success: true }
+    }),
 })

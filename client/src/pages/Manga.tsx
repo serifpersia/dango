@@ -368,7 +368,6 @@ export default function Manga() {
           onRequestClose={closePopup}
         />
       )}
-
     </div>
   )
 }

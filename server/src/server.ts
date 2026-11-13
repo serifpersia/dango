@@ -91,8 +91,12 @@ function getProviderCatalog(): ProviderCatalogItem[] {
   return remoteCatalog
 }
 
-async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
-  const url = CONFIG.PROVIDER_REPO_URL.trim()
+export async function refreshRemoteProviders(): Promise<ProviderCatalogItem[]> {
+  const row =
+    db && !db.isClosedCheck()
+      ? await SettingsRepository.getByKey(db, 'providerRegistryUrl').catch(() => null)
+      : null
+  const url = ((row?.value as string | undefined) || CONFIG.PROVIDER_REPO_URL || '').trim()
   if (!url) return getProviderCatalog()
   try {
     const result = await loadRemoteProviders({
@@ -237,13 +241,11 @@ async function main() {
 
   checkAnilistStatus().catch(() => {})
 
-  if (CONFIG.PROVIDER_REPO_URL.trim()) {
-    setInterval(() => {
-      refreshRemoteProviders().catch((err) =>
-        logger.error({ err }, 'periodic providers refresh failed')
-      )
-    }, CONFIG.PROVIDER_REPO_REFRESH_MS).unref()
-  }
+  setInterval(() => {
+    refreshRemoteProviders().catch((err) =>
+      logger.error({ err }, 'periodic providers refresh failed')
+    )
+  }, CONFIG.PROVIDER_REPO_REFRESH_MS).unref()
 
   const server = serve({ fetch: app.fetch, port: CONFIG.PORT }, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
