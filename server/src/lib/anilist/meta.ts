@@ -134,6 +134,56 @@ export async function batchGetShowStatuses(ids: number[]): Promise<Map<number, s
   return result
 }
 
+export async function batchGetShowsByIds(ids: string[]): Promise<Map<string, Show>> {
+  const result = new Map<string, Show>()
+  if (ids.length === 0) return result
+
+  const entries = ids
+    .map((id) => {
+      const malId = parseMalId(id)
+      const numericId = malId ?? parseInt(id, 10)
+      return { id, malId, numericId }
+    })
+    .filter((entry) => Number.isFinite(entry.numericId) && entry.numericId > 0)
+
+  const missing: typeof entries = []
+  for (const entry of entries) {
+    const cached = getCachedAnilist<Show>(`meta:v2:${entry.id}`)
+    if (cached) result.set(entry.id, cached)
+    else missing.push(entry)
+  }
+  if (missing.length === 0 || isAnilistRateLimited()) return result
+
+  const fields = mediaFields()
+  const BATCH = 6
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH)
+    const aliases = batch
+      .map((entry, idx) =>
+        entry.malId != null
+          ? `a${idx}: Media(idMal: ${entry.malId}, type: ANIME) { ${fields} }`
+          : `a${idx}: Media(id: ${entry.numericId}, type: ANIME) { ${fields} }`
+      )
+      .join('\n')
+
+    try {
+      const resp = await anilistRequest<Record<string, AnilistMedia | null>>(`query { ${aliases} }`)
+      batch.forEach((entry, idx) => {
+        const media = resp?.data?.[`a${idx}`]
+        if (media) {
+          const show = fromAnilistMedia(media)
+          result.set(entry.id, show)
+          setCachedAnilist(`meta:v2:${entry.id}`, show)
+        }
+      })
+    } catch {
+      break
+    }
+  }
+
+  return result
+}
+
 export async function getAnilistEpisodes(id: string): Promise<string[]> {
   const malId = parseMalId(id)
   if (malId) return getEpisodesByMalId(malId)

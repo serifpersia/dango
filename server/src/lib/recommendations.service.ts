@@ -17,6 +17,8 @@ export interface RecCandidate {
   title: string
   url: string
   cover: string | null
+  bannerImage: string | null
+  description: string | null
   year: number | null
   format: string
   episodes: number | null
@@ -110,7 +112,8 @@ export async function computeTasteProfile(db: DatabaseWrapper): Promise<TastePro
   return { genreComp, genreDrop, exemplars, knownIds: [...knownIds] }
 }
 
-const REC_FIELDS = `id title { romaji english } coverImage { large } averageScore popularity episodes seasonYear format genres isAdult status`
+const REC_FIELDS = `id title { romaji english } coverImage { large } bannerImage description averageScore popularity episodes seasonYear 
+format genres isAdult status`
 
 function tasteWeights(
   genreComp: Record<string, number>,
@@ -255,6 +258,8 @@ export async function computeRecCandidates(taste: TasteProfile): Promise<RecCand
       title,
       url: `https://anilist.co/anime/${t.m.id}`,
       cover: t.m.coverImage?.large || null,
+      bannerImage: t.m.bannerImage || null,
+      description: t.m.description || null,
       year: t.m.seasonYear ?? null,
       format: t.m.format || 'TV',
       episodes: t.m.episodes ?? null,

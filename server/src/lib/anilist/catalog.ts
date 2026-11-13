@@ -98,7 +98,8 @@ export async function getLatestReleases(
 export async function getSeasonal(
   page: number = 1,
   size: number = 14,
-  format?: string
+  format?: string,
+  full: boolean = false
 ): Promise<Show[]> {
   if (format === 'ADULT') {
     return getAdultLatest(page, size)
@@ -115,7 +116,7 @@ export async function getSeasonal(
       Page(page: $page, perPage: $perPage) {
         pageInfo { hasNextPage total }
         media(season: $season, seasonYear: $seasonYear, type: ANIME, format: $format, isAdult: false, sort: [POPULARITY_DESC, SCORE_DESC]) {
-          ${mediaFieldsLight()}
+          ${full ? mediaFields() : mediaFieldsLight()}
         }
       }
     }
@@ -181,27 +182,30 @@ export async function getTrending(
   return []
 }
 
+export function pickSpotlightShows(shows: Show[]): Show[] {
+  const withBanner: Show[] = []
+  const rest: Show[] = []
+  for (const show of shows) {
+    if (withBanner.length >= 6 && rest.length >= 6) break
+    if (show.bannerImage) {
+      if (withBanner.length < 6) withBanner.push(show)
+    } else if (rest.length < 6) {
+      rest.push(show)
+    }
+  }
+  const results = [...withBanner]
+  for (const show of rest) {
+    if (results.length >= 6) break
+    if (show.thumbnail) results.push({ ...show, bannerImage: show.thumbnail })
+  }
+  return results
+}
+
 export async function getSpotlightBanners(page: number = 1, perPage: number = 20): Promise<Show[]> {
   const media = await fetchAnilistMedia(page, perPage)
 
   if (media) {
-    const withBanner: Show[] = []
-    const rest: Show[] = []
-    for (const m of media) {
-      if (withBanner.length >= 6 && rest.length >= 6) break
-      const show = fromAnilistMedia(m)
-      if (show.bannerImage) {
-        if (withBanner.length < 6) withBanner.push(show)
-      } else if (rest.length < 6) {
-        rest.push(show)
-      }
-    }
-    const results = [...withBanner]
-    for (const show of rest) {
-      if (results.length >= 6) break
-      if (show.thumbnail) results.push({ ...show, bannerImage: show.thumbnail })
-    }
-    return results
+    return pickSpotlightShows(media.map(fromAnilistMedia))
   }
 
   const now = new Date()

@@ -1,4 +1,5 @@
 import { defineSchema, optNum, optStr, readLimit, readPage, reqObj, reqStr } from '../validation.js'
+import { badRequest } from '../errors.js'
 
 export type DataScheduleInput = { date: string; format?: string }
 
@@ -143,6 +144,32 @@ export const dataPopularListInput = () =>
     if (obj.page !== undefined) out.page = readPage(obj)
     if (obj.size !== undefined) out.size = readLimit(obj, 20, 50, 'size')
     return out
+  })
+
+const DATA_SPOTLIGHT_SOURCES = [
+  'trending',
+  'popular',
+  'top',
+  'season',
+  'thisWeek',
+  'forYou',
+  'upcoming',
+] as const
+
+export type DataSpotlightSource = (typeof DATA_SPOTLIGHT_SOURCES)[number]
+
+export type DataSpotlightInput = { source?: DataSpotlightSource } | undefined
+
+export const dataSpotlightInput = () =>
+  defineSchema<DataSpotlightInput, DataSpotlightInput>((value) => {
+    if (value === undefined || value === null) return undefined
+    const obj = reqObj(value)
+    const source = optStr(obj, 'source')
+    if (source === undefined) return {}
+    if (!(DATA_SPOTLIGHT_SOURCES as readonly string[]).includes(source)) {
+      throw badRequest(`Invalid spotlight source: ${source}`)
+    }
+    return { source: source as DataSpotlightSource }
   })
 
 export type DataEpisodesInput = { showId?: string; mode?: 'sub' | 'dub'; provider?: string }

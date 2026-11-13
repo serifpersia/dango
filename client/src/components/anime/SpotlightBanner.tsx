@@ -1,15 +1,27 @@
 import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import SpotlightBannerShell, { type SpotlightSlide } from '../common/SpotlightBanner'
-import type { Anime } from '../../hooks/useAnimeData'
+import type { Anime, SpotlightSource } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl, sanitizeText } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 
 interface SpotlightBannerProps {
   animeList: Anime[]
+  source?: SpotlightSource
+  onSourceChange?: (source: SpotlightSource) => void
 }
 
-const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
+const SOURCE_OPTIONS = [
+  { value: 'forYou', label: 'For You' },
+  { value: 'trending', label: 'Trending' },
+  { value: 'thisWeek', label: 'This Week' },
+  { value: 'season', label: 'This Season' },
+  { value: 'popular', label: 'Popular' },
+  { value: 'top', label: 'Top Rated' },
+  { value: 'upcoming', label: 'Upcoming' },
+]
+
+const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList, source, onSourceChange }) => {
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
 
@@ -52,7 +64,21 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     [animeList, titlePreference, navigate]
   )
 
-  return <SpotlightBannerShell slides={slides} />
+  return (
+    <SpotlightBannerShell
+      slides={slides}
+      selector={
+        source && onSourceChange
+          ? {
+              label: 'Spotlight source',
+              value: source,
+              options: SOURCE_OPTIONS,
+              onChange: (value) => onSourceChange(value as SpotlightSource),
+            }
+          : undefined
+      }
+    />
+  )
 }
 
 export default SpotlightBanner

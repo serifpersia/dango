@@ -94,6 +94,17 @@
   gap: var(--space-3);
 }
 
+.sourcePicker {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sourcePicker select {
+  height: 34px;
+  font-size: 0.78rem;
+}
+
 .slideSelector {
   min-width: 0;
 }

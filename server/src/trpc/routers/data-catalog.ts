@@ -9,21 +9,43 @@ import {
   getSchedule,
   searchAnilist,
   getSpotlightBanners,
+  pickSpotlightShows,
+  batchGetShowsByIds,
   getGenreTagLists,
   anilistUnavailable,
   wasAnilistDownAtBoot,
   checkAnilistStatus,
 } from '../../lib/anilist/index.js'
+import { getCachedRecommendations, type RecCandidate } from '../../lib/recommendations.service.js'
+import { NotificationsRepository } from '../../repositories/notifications.repository.js'
+import type { Show } from '../../providers/provider.interface.js'
 import {
   dataScheduleInput,
   dataLatestReleasesInput,
   dataSearchInput,
   dataSeasonalInput,
   dataPopularListInput,
+  dataSpotlightInput,
 } from '../schemas/data.js'
 import { parseListParam } from '../../lib/resolve-show.js'
 
 const defaultValidate = (d: unknown) => Array.isArray(d) && d.length > 0
+
+const recToShow = (c: RecCandidate): Show => ({
+  _id: String(c.id),
+  id: String(c.id),
+  name: c.title,
+  thumbnail: c.cover ?? undefined,
+  bannerImage: c.bannerImage ?? c.cover ?? undefined,
+  description: c.description ?? '',
+  type: c.format,
+  episodeCount: c.episodes ?? undefined,
+  score: c.averageScore ?? undefined,
+  year: c.year ?? undefined,
+  genres: c.genres.map((name) => ({ name })),
+})
+
+const SPOTLIGHT_ENRICH_LIMIT = 12
 
 export const dataCatalogRouter = router({
   schedule: protectedProcedure.input(dataScheduleInput()).query(async ({ ctx, input }) => {
@@ -158,16 +180,63 @@ export const dataCatalogRouter = router({
     )
   }),
 
-  spotlight: protectedProcedure.query(async ({ ctx }) => {
+  spotlight: protectedProcedure.input(dataSpotlightInput()).query(async ({ ctx, input }) => {
+    const source = input?.source || 'trending'
+    const ttl = source === 'thisWeek' ? 900 : source === 'forYou' ? 600 : 300
     return cached(
       ctx,
-      'spotlight',
-      300,
+      `spotlight-${source}`,
+      ttl,
       async () => {
         try {
-          return await getSpotlightBanners(1, 20)
+          const load = async (): Promise<Show[]> => {
+            switch (source) {
+              case 'popular':
+                return pickSpotlightShows(await getTrending(1, 20, 'POPULARITY_DESC'))
+              case 'top':
+                return pickSpotlightShows(await getTrending(1, 20, 'SCORE_DESC'))
+              case 'season':
+                return pickSpotlightShows(await getSeasonal(1, 20, undefined, true))
+              case 'upcoming':
+                return pickSpotlightShows(
+                  await getTrending(1, 20, 'POPULARITY_DESC', 'NOT_YET_RELEASED')
+                )
+              case 'thisWeek': {
+                const rows = (await NotificationsRepository.getThisWeekDiscovered(ctx.db)).slice(
+                  0,
+                  SPOTLIGHT_ENRICH_LIMIT
+                )
+                const meta = await batchGetShowsByIds(rows.map((row) => row.id))
+                return pickSpotlightShows(
+                  rows.map((row) => {
+                    const show = meta.get(row.id)
+                    const episodeNumber = parseInt(row.episodeNumber) || undefined
+                    if (show) return { ...show, episodeNumber }
+                    return {
+                      _id: row.id,
+                      id: row.id,
+                      name: row.name,
+                      thumbnail: row.thumbnail || undefined,
+                      nativeName: row.nativeName,
+                      englishName: row.englishName,
+                      type: row.type,
+                      episodeNumber,
+                    }
+                  })
+                )
+              }
+              case 'forYou':
+                return pickSpotlightShows((await getCachedRecommendations(ctx.db)).map(recToShow))
+              default:
+                return getSpotlightBanners(1, 20)
+            }
+          }
+
+          const shows = await load()
+          if (shows.length === 0 && source !== 'trending') return getSpotlightBanners(1, 20)
+          return shows
         } catch (e) {
-          logger.error({ err: e }, 'Spotlight fetch failed')
+          logger.error({ err: e, source }, 'Spotlight fetch failed')
           return []
         }
       },

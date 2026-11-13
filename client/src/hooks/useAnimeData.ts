@@ -21,10 +21,14 @@ export interface QueueItem {
   type?: string
 }
 
-export const useSpotlightBanners = () => {
+export type SpotlightSource =
+  'trending' | 'popular' | 'top' | 'season' | 'thisWeek' | 'forYou' | 'upcoming'
+
+export const useSpotlightBanners = (source: SpotlightSource = 'trending', enabled = true) => {
   const trpc = useTRPC()
   const query = useQuery({
-    ...trpc.data.spotlight.queryOptions(),
+    ...trpc.data.spotlight.queryOptions({ source }),
+    enabled,
     staleTime: 1000 * 60 * 5,
     retry: 1,
   })

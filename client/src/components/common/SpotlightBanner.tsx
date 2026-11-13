@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router'
 import Icon, { type IconName } from './Icon'
 import FadeImage from './FadeImage'
+import SectionSelect from './SectionSelect'
 import styles from './SpotlightBanner.module.css'
 
 export interface SpotlightSlide {
@@ -22,10 +23,18 @@ export interface SpotlightSlide {
   onWatchlist?: () => void
 }
 
+interface SpotlightSelector {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+}
+
 interface SpotlightBannerProps {
   slides: SpotlightSlide[]
   posterAspect?: 'portrait' | 'landscape'
   eyebrow?: string
+  selector?: SpotlightSelector
 }
 
 const AUTOPLAY_MS = 8000
@@ -41,6 +50,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
   slides,
   posterAspect = 'portrait',
   eyebrow = 'Spotlight',
+  selector,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [autoplayResetKey, setAutoplayResetKey] = useState(0)
@@ -398,61 +408,75 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({
           </div>
         </div>
 
-        {slides.length > 1 && (
+        {(slides.length > 1 || selector) && (
           <div className={styles.carouselFooter}>
-            <div className={styles.slideSelector}>
-              <span className={styles.slideCount} aria-hidden="true">
-                <span>{String(safeIndex + 1).padStart(2, '0')}</span>
-                <span>/ {String(slides.length).padStart(2, '0')}</span>
-              </span>
-              <div className={styles.dots} ref={dotsRef} aria-label="Spotlight slides">
-                {slides.map((slide, index) => (
-                  <button
-                    key={slide.key}
-                    type="button"
-                    aria-pressed={index === safeIndex}
-                    aria-label={`Go to slide ${index + 1}: ${slide.title}`}
-                    className={`${styles.dot} ${index === safeIndex ? styles.dotActive : ''}`}
-                    onClick={() => selectSlide(index)}
-                  >
-                    <span
-                      className={styles.dotProgress}
-                      aria-hidden="true"
-                      key={`progress-${autoplayResetKey}-${safeIndex}`}
-                    />
-                  </button>
-                ))}
+            {selector && (
+              <div className={styles.sourcePicker}>
+                <SectionSelect
+                  ariaLabel={selector.label}
+                  value={selector.value}
+                  options={selector.options}
+                  onChange={selector.onChange}
+                />
               </div>
-            </div>
-            <div className={styles.slideControls}>
-              <button
-                type="button"
-                className={styles.autoplayBtn}
-                onClick={() => {
-                  setAutoplayEnabled((enabled) => !enabled)
-                  resetAutoplay()
-                }}
-                aria-label={autoplayEnabled ? 'Pause slideshow' : 'Play slideshow'}
-              >
-                <Icon name={autoplayEnabled ? 'pause' : 'play'} size={12} />
-              </button>
-              <button
-                type="button"
-                className={styles.navArrow}
-                onClick={prevSlide}
-                aria-label="Previous slide"
-              >
-                <Icon name="chevron-left" size={15} />
-              </button>
-              <button
-                type="button"
-                className={styles.navArrow}
-                onClick={nextSlide}
-                aria-label="Next slide"
-              >
-                <Icon name="chevron-right" size={15} />
-              </button>
-            </div>
+            )}
+            {slides.length > 1 && (
+              <div className={styles.slideSelector}>
+                <span className={styles.slideCount} aria-hidden="true">
+                  <span>{String(safeIndex + 1).padStart(2, '0')}</span>
+                  <span>/ {String(slides.length).padStart(2, '0')}</span>
+                </span>
+                <div className={styles.dots} ref={dotsRef} aria-label="Spotlight slides">
+                  {slides.map((slide, index) => (
+                    <button
+                      key={slide.key}
+                      type="button"
+                      aria-pressed={index === safeIndex}
+                      aria-label={`Go to slide ${index + 1}: ${slide.title}`}
+                      className={`${styles.dot} ${index === safeIndex ? styles.dotActive : ''}`}
+                      onClick={() => selectSlide(index)}
+                    >
+                      <span
+                        className={styles.dotProgress}
+                        aria-hidden="true"
+                        key={`progress-${autoplayResetKey}-${safeIndex}`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {slides.length > 1 && (
+              <div className={styles.slideControls}>
+                <button
+                  type="button"
+                  className={styles.autoplayBtn}
+                  onClick={() => {
+                    setAutoplayEnabled((enabled) => !enabled)
+                    resetAutoplay()
+                  }}
+                  aria-label={autoplayEnabled ? 'Pause slideshow' : 'Play slideshow'}
+                >
+                  <Icon name={autoplayEnabled ? 'pause' : 'play'} size={12} />
+                </button>
+                <button
+                  type="button"
+                  className={styles.navArrow}
+                  onClick={prevSlide}
+                  aria-label="Previous slide"
+                >
+                  <Icon name="chevron-left" size={15} />
+                </button>
+                <button
+                  type="button"
+                  className={styles.navArrow}
+                  onClick={nextSlide}
+                  aria-label="Next slide"
+                >
+                  <Icon name="chevron-right" size={15} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

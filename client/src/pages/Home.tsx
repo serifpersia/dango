@@ -26,6 +26,7 @@ import {
   useReorderQueue,
   useThisWeekSchedule,
 } from '../hooks/useAnimeData'
+import type { SpotlightSource } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import type { AnimeShow } from '../types/player'
 import { useContentType, type ContentType } from '../contexts/ContentTypeContext'
@@ -63,6 +64,9 @@ const Home: React.FC = () => {
   const [seasonFormat, setSeasonFormat] = useState(() => {
     return profileStorage.getItem('season_format') || 'TV'
   })
+  const [spotlightSource, setSpotlightSource] = useState<SpotlightSource>(() => {
+    return (profileStorage.getItem('spotlight_source') as SpotlightSource) || 'trending'
+  })
   const seasonalRef = useRef<HTMLDivElement>(null)
 
   const { data: nextPageData } = usePaginatedCurrentSeason(
@@ -97,6 +101,10 @@ const Home: React.FC = () => {
   }, [seasonFormat])
 
   useEffect(() => {
+    profileStorage.setItem('spotlight_source', spotlightSource)
+  }, [spotlightSource])
+
+  useEffect(() => {
     if (thisWeekList !== undefined && thisWeekList.length === 0 && activeTab === 'week') {
       setActiveTab('latest')
     }
@@ -121,7 +129,10 @@ const Home: React.FC = () => {
     fetchMoreContinueWatching,
   ])
 
-  const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners()
+  const { data: spotlightAnime, isLoading: loadingSpotlight } = useSpotlightBanners(
+    spotlightSource,
+    contentType === 'anime'
+  )
   const { data: tvTrending, isLoading: loadingTvSpotlight } = useTvTrending(
     'all',
     'week',
@@ -272,7 +283,13 @@ const Home: React.FC = () => {
           <SpotlightSkeleton />
         ) : (
           spotlightAnime &&
-          spotlightAnime.length > 0 && <SpotlightBanner animeList={spotlightAnime} />
+          spotlightAnime.length > 0 && (
+            <SpotlightBanner
+              animeList={spotlightAnime}
+              source={spotlightSource}
+              onSourceChange={setSpotlightSource}
+            />
+          )
         ))}
 
       {contentType === 'tv' &&
