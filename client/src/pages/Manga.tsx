@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, Navigate } from 'react-router'
 import Icon from '../components/common/Icon'
-import ToggleSwitch from '../components/common/ToggleSwitch'
-import MatureConsentModal from '../components/common/MatureConsentModal'
 import ErrorMessage from '../components/common/ErrorMessage'
 import MediaCard from '../components/common/MediaCard'
 import Pagination from '../components/common/Pagination'
@@ -63,8 +61,7 @@ const FULL_RATINGS = [
 
 export default function Manga() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { hasConsent, grant: grantMatureConsent } = useMatureConsent()
-  const [showMatureModal, setShowMatureModal] = useState(false)
+  const { hasConsent } = useMatureConsent()
   const [queryInput, setQueryInput] = useState(searchParams.get('q') || '')
 
   const {
@@ -146,22 +143,6 @@ export default function Manga() {
     e.preventDefault()
     hideVirtualKeyboard()
     update({ q: queryInput }, true)
-  }
-
-  const handleMatureToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.currentTarget.checked && !hasConsent) {
-      setShowMatureModal(true)
-    }
-  }
-
-  const handleAcceptMature = () => {
-    grantMatureConsent()
-    setShowMatureModal(false)
-    update({}, true)
-  }
-
-  const handleDeclineMature = () => {
-    setShowMatureModal(false)
   }
 
   const handleSelect = (item: MangaCardType) => {
@@ -292,18 +273,6 @@ export default function Manga() {
             ))}
           </select>
         )}
-        {!hasConsent && (
-          <div className={styles.matureToggleWrap}>
-            <label className={styles.matureLabel} htmlFor="manga-mature-toggle">
-              Mature
-            </label>
-            <ToggleSwitch
-              id="manga-mature-toggle"
-              isChecked={false}
-              onChange={handleMatureToggle}
-            />
-          </div>
-        )}
       </div>
 
       {browse.isError ? (
@@ -400,15 +369,6 @@ export default function Manga() {
         />
       )}
 
-      {showMatureModal && (
-        <MatureConsentModal
-          isOpen
-          scope="section"
-          showResetHint
-          onClose={handleDeclineMature}
-          onGrant={handleAcceptMature}
-        />
-      )}
     </div>
   )
 }

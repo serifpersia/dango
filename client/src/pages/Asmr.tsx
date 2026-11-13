@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from 'react'
 import Icon from '../components/common/Icon'
 import { useParams, useNavigate, useSearchParams } from 'react-router'
 import ToggleSwitch from '../components/common/ToggleSwitch'
-import MatureConsentModal from '../components/common/MatureConsentModal'
 import MediaCard from '../components/common/MediaCard'
 import Pagination from '../components/common/Pagination'
 import AsmrDetail from '../components/asmr/AsmrDetail'
@@ -77,8 +76,7 @@ const Asmr: React.FC = () => {
   const { rj: rjParam } = useParams<{ rj: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { hasConsent, grant: grantMatureConsent } = useMatureConsent()
-  const [showMatureModal, setShowMatureModal] = useState(false)
+  const { hasConsent } = useMatureConsent()
   const [queryInput, setQueryInput] = useState(() => searchParams.get('q') || '')
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
   const [sort, setSort] = useState('latest')
@@ -189,22 +187,6 @@ const Asmr: React.FC = () => {
     setPage(1)
   }, [searchParams])
 
-  const handleMatureToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.currentTarget.checked && !hasConsent) {
-      setShowMatureModal(true)
-    }
-  }
-
-  const handleAcceptMature = () => {
-    grantMatureConsent()
-    setShowMatureModal(false)
-    setPage(1)
-  }
-
-  const handleDeclineMature = () => {
-    setShowMatureModal(false)
-  }
-
   const handlePlay = useCallback((work: AsmrWork, tracks: AsmrTrack[], index: number) => {
     setSelectedWork(null)
     setPlayerExpanded(true)
@@ -289,18 +271,6 @@ const Asmr: React.FC = () => {
                 <span className={styles.filterLabel}>EN</span>
               </div>
 
-              {!hasConsent && (
-                <div className={styles.matureToggleWrap}>
-                  <label className={styles.matureLabel} htmlFor="asmr-mature-toggle">
-                    Mature
-                  </label>
-                  <ToggleSwitch
-                    id="asmr-mature-toggle"
-                    isChecked={false}
-                    onChange={handleMatureToggle}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -424,16 +394,6 @@ const Asmr: React.FC = () => {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           onRequestClose={closePopup}
-        />
-      )}
-
-      {showMatureModal && (
-        <MatureConsentModal
-          isOpen
-          scope="section"
-          showResetHint
-          onClose={handleDeclineMature}
-          onGrant={handleAcceptMature}
         />
       )}
 
