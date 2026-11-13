@@ -286,9 +286,20 @@ const flushProviderSummary = (color, prefix) => {
   }
   if (!pendingProviderSummary) return
   pendingProviderSummary = false
+  const parts = [
+    [providerFields.count, 'anime'],
+    [providerFields.hentaiCount, 'hentai'],
+    [providerFields.mangaCount, 'manga'],
+    [providerFields.tvCount, 'tv'],
+    [providerFields.asmrCount, 'asmr'],
+    [providerFields.adultCount, 'adult'],
+  ]
+    .filter(([n]) => Number(n) > 0)
+    .map(([n, label]) => `${n} ${label}`)
+  if (parts.length === 0) return
   console.log(
     `${color}[${prefix}]${colors.reset} ${colors.system}Providers ready${colors.reset} ` +
-      `${colors.client}${providerFields.count} anime, ${providerFields.hentaiCount || 0} hentai, ${providerFields.mangaCount} manga, ${providerFields.tvCount} tv, ${providerFields.asmrCount} asmr, ${providerFields.adultCount || 0} adult${colors.reset}`
+      `${colors.client}${parts.join(', ')}${colors.reset}`
   )
 }
 

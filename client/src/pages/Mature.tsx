@@ -174,7 +174,7 @@ export default function Mature() {
     name: string
     provider: string
   } | null>(null)
-  const { options: allProviderOptions } = useProviders()
+  const { options: allProviderOptions, isLoading: providersLoading } = useProviders()
   const hentaiStreamingOptions = useMemo(
     () =>
       allProviderOptions.filter(
@@ -500,6 +500,27 @@ export default function Mature() {
 
   if (!hasConsent) {
     return <MatureConsentModal isOpen onClose={() => navigate('/')} onGrant={grant} />
+  }
+
+  const noConfiguredProviders =
+    !providersLoading &&
+    (providerOptions.length === 0 || (category === 'hentai' && hentaiStreamingOptions.length === 0))
+
+  if (noConfiguredProviders) {
+    return (
+      <div className="page-container">
+        <div className={searchStyles.header}>
+          <h1 className={searchStyles.pageTitle}>Mature</h1>
+        </div>
+        <div className={searchStyles.noResults}>
+          <h3>No providers configured</h3>
+          <p>
+            Bring your own provider registry: set the server <code>PROVIDER_REPO_URL</code> to a
+            custom registry that includes <code>{category}</code> providers.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -6,6 +6,8 @@ import { isSafeExternalUrl } from '../utils/security.utils.js'
 import { pinVariant } from './playlist.js'
 import { buildTvMediaRequest } from '../lib/tv-media.js'
 import type { TvProvider } from '../providers/tv.types.js'
+import type { RemoteProxyRule } from '../providers/remote-types.js'
+import { matchProxyRule, resolveOrigin } from './proxy/rules.js'
 
 function proxiedMediaUrl(targetUrl: string, refererStr: string, providerStr: string): string {
   const provider = providerStr ? `&provider=${encodeURIComponent(providerStr)}` : ''
@@ -47,7 +49,11 @@ function isPlaylistBody(body: Buffer): boolean {
   )
 }
 
-export function registerTv(app: Hono, getTvProvider: (name: string) => TvProvider | undefined) {
+export function registerTv(
+  app: Hono,
+  getTvProvider: (name: string) => TvProvider | undefined,
+  getProxyRules?: () => RemoteProxyRule[]
+) {
   app.get('/api/tv/embed/:provider/:type/:tmdbId', async (c) => {
     const provider = c.req.param('provider')
     const type = c.req.param('type')
@@ -79,7 +85,9 @@ export function registerTv(app: Hono, getTvProvider: (name: string) => TvProvide
     const variantMatch = requestedUrl.match(/#v=(\d+)$/)
     const variantIdx = variantMatch ? parseInt(variantMatch[1], 10) : NaN
     const urlStr = requestedUrl.replace(/#.*$/, '')
-    const refererStr = c.req.query('referer') || ''
+    const rule = getProxyRules ? matchProxyRule(urlStr, getProxyRules()) : undefined
+    const refererStr = c.req.query('referer') || rule?.referer || ''
+    const originStr = resolveOrigin(rule, refererStr, c.req.query('origin'))
     const providerStr = (c.req.query('provider') || '').toLowerCase()
     if (!urlStr) return c.text('URL required', 400)
     const providerMod = providerStr ? getTvProvider(providerStr) : undefined
@@ -106,6 +114,7 @@ export function registerTv(app: Hono, getTvProvider: (name: string) => TvProvide
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       }
       if (refererStr) headers['Referer'] = refererStr
+      if (originStr) headers['Origin'] = originStr
 
       const fetchResp = await fetchWithRetry(
         urlStr,

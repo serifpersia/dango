@@ -799,7 +799,7 @@ export function createHonoApp(
   })
 
   registerAuth(app, getDbs, runSync)
-  registerTv(app, media.getTvProvider)
+  registerTv(app, media.getTvProvider, media.getProxyRules)
   registerProxy(app, media.getProxyRules)
 
   app.onError((err: Error & { status?: number }, c) => {

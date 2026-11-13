@@ -171,6 +171,7 @@ export const dataMatureRouter = router({
           }
           return { data: [], hasMore: false }
         } catch (e) {
+          if (e instanceof TRPCError) throw e
           logger.error({ err: e }, 'mature search failed')
           return { data: [], hasMore: false }
         }
