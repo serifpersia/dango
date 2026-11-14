@@ -47,6 +47,10 @@ jobs:
           echo "3. No install needed — production dependencies are included, client is prebuilt" >> release_notes.md
           echo "4. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
           echo "" >> release_notes.md
+          echo "### Browser Extensions" >> release_notes.md
+          echo "- Firefox: open 'dango-firefox-extension-<version>.xpi' in Firefox to install the signed add-on." >> release_notes.md
+          echo "- Chrome: extract 'dango-extension.zip' and load the 'chrome' folder via chrome://extensions (Developer mode)." >> release_notes.md
+          echo "" >> release_notes.md
           echo "### Android APK" >> release_notes.md
           echo "APKs for arm64-v8a and armeabi-v7a are included in this release if available." >> release_notes.md
 
@@ -61,6 +65,15 @@ jobs:
         run: |
           mkdir -p apk-download
           gh release download "latest" --pattern "*.apk" --dir apk-download/ 2>/dev/null || echo "No existing APK found."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Existing Firefox XPI
+        # Signed XPI is uploaded manually after AMO signing. Carry it over so
+        # rebuilding the release never drops it.
+        run: |
+          mkdir -p xpi-download
+          gh release download "latest" --pattern "*.xpi" --dir xpi-download/ 2>/dev/null || echo "No existing XPI found."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -209,10 +222,15 @@ jobs:
           if ls apk-download/*.apk 1>/dev/null 2>&1; then
             APK_FILES=(apk-download/*.apk)
           fi
+          XPI_FILES=()
+          if ls xpi-download/*.xpi 1>/dev/null 2>&1; then
+            XPI_FILES=(xpi-download/*.xpi)
+          fi
           gh release create "latest" \
             "dango.zip" \
             "dango-extension.zip" \
             "${APK_FILES[@]}" \
+            "${XPI_FILES[@]}" \
             --title "latest (v$VERSION)" \
             --notes-file release_notes.md \
             --target ${{ github.sha }}

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dango</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>dango</h1>
+      <div class="server-row">
+        <input
+          id="server"
+          type="text"
+          placeholder="localhost:3000"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="connect" type="button">Go</button>
+      </div>
+      <select id="provider" aria-label="Provider">
+        <option value="">All cookies</option>
+      </select>
+      <div id="provider-note" class="provider-note" hidden></div>
+      <input id="search" type="search" placeholder="Search domain or cookie" autocomplete="off" />
+    </header>
+    <section id="discord" class="token" hidden>
+      <div class="token-head">
+        <span class="token-title">Discord token</span>
+        <button id="discord-grab" type="button" class="token-grab">Grab again</button>
+      </div>
+      <div class="token-row">
+        <span id="discord-value" class="token-value">Reading token…</span>
+        <button id="discord-copy" type="button" class="token-copy" disabled>Copy</button>
+      </div>
+    </section>
+    <section id="ytmusic" class="token">
+      <div class="token-head">
+        <span class="token-title">YouTube Music</span>
+        <span class="token-actions">
+          <a class="token-link" href="https://music.youtube.com/" target="_blank" rel="noreferrer"
+            >Open</a
+          >
+          <button id="ytmusic-grab" type="button" class="token-grab">Grab again</button>
+        </span>
+      </div>
+      <div class="token-row">
+        <span id="ytmusic-value" class="token-value">Reading cookies…</span>
+        <button id="ytmusic-copy" type="button" class="token-copy" disabled>Copy</button>
+      </div>
+    </section>
+    <main id="list"></main>
+    <div id="toast" class="toast" role="status" aria-live="polite">
+      <span class="toast-icon" aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      </span>
+      <span id="toast-text" class="toast-text"></span>
+      <span class="toast-bar" aria-hidden="true"></span>
+    </div>
+    <footer>
+      <span id="status">Loading…</span>
+      <button id="refresh" type="button">Refresh</button>
+    </footer>
+    <template id="icon-copy">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+        <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+      </svg>
+    </template>
+    <template id="icon-check">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    </template>
+    <script src="popup.js"></script>
+  </body>
+</html>

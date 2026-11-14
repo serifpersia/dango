@@ -10,39 +10,11 @@ const tag = (c) => `${c.name}@${c.domain}[${c.storeId}]`
 const matchesAny = (c, needles) =>
   needles.some((n) => (c.domain || '').includes(n) || (c.firstPartyDomain || '').includes(n))
 
+const matchesDomain = (c, needles) => needles.some((n) => (c.domain || '').includes(n))
+
 const PAHE_DOMAINS = ['animepahe']
 const JASMR_DOMAINS = ['japaneseasmr']
-const YTMUSIC_DOMAINS = ['music.youtube.com', 'youtube.com', 'google.com']
-
-const YTMUSIC_COOKIES = new Set([
-  'SID',
-  'HSID',
-  'SSID',
-  'APISID',
-  'SAPISID',
-  'LOGIN_INFO',
-  'PREF',
-  'SIDCC',
-  '__Secure-1PSID',
-  '__Secure-3PSID',
-  '__Secure-1PAPISID',
-  '__Secure-3PAPISID',
-  '__Secure-1PSIDTS',
-  '__Secure-3PSIDTS',
-  '__Secure-1PSIDCC',
-  '__Secure-3PSIDCC',
-  'VISITOR_INFO1_LIVE',
-  'VISITOR_PRIVACY_METADATA',
-  'YSC',
-  '__Secure-YNID',
-  '__Secure-YENID',
-  '__Secure-ROLLOUT_TOKEN',
-  'SOCS',
-  'AEC',
-  'NID',
-  'DV',
-  'OTZ',
-])
+const YTMUSIC_DOMAINS = ['music.youtube.com', 'youtube.com']
 
 const storeIds = async () => {
   try {
@@ -123,8 +95,7 @@ const getFullCookieHeader = async (needles) => {
     const all = await ext.cookies.getAll(opts)
     checked.push(storeId || 'default')
     for (const c of all) {
-      if (!matchesAny(c, needles)) continue
-      if (!YTMUSIC_COOKIES.has(c.name)) continue
+      if (!matchesDomain(c, needles)) continue
       const v = String(c.value || '')
       if (v.includes('…') || v.includes('...')) {
         dropped.push(c.name)

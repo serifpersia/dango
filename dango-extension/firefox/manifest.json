@@ -1,11 +1,20 @@
 {
   "manifest_version": 2,
-  "name": "Dango Helper",
-  "version": "0.3.0",
-  "description": "Supplies provider verification cookies (cf_clearance and site cookies) and YouTube Music cookies to Dango.",
+  "name": "dango",
+  "version": "0.4.2",
+  "description": "Supplies provider verification cookies (cf_clearance and site cookies) and YouTube Music cookies to dango.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "cookies",
     "webRequest",
+    "scripting",
+    "http://*/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://*/*",
@@ -23,12 +32,25 @@
       "run_at": "document_idle"
     }
   ],
+  "browser_action": {
+    "default_title": "dango",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    }
+  },
   "background": {
     "scripts": ["background.js"]
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "dango-pahe-helper@dango.local"
+      "id": "dango-pahe-helper@dango.local",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   }
 }
