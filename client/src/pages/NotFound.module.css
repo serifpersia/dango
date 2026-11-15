@@ -1,0 +1,43 @@
+.page {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  text-align: center;
+  padding: var(--space-16) var(--space-4);
+}
+
+.title {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.copy {
+  max-width: 420px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}

@@ -1,24 +1,27 @@
 import React from 'react'
-import { THEMES, useTheme } from '../../contexts/ThemeContext'
+import { THEMES, seasonForDate, seasonalThemeForDate, useTheme } from '../../contexts/ThemeContext'
+import styles from './ThemeSettings.module.css'
+
+const SEASON_LABEL: Record<ReturnType<typeof seasonForDate>, string> = {
+  spring: 'Spring',
+  summer: 'Summer',
+  autumn: 'Autumn',
+  winter: 'Winter',
+}
 
 const ThemeSettings: React.FC = () => {
   const { theme, setTheme, loading } = useTheme()
+  const season = seasonForDate()
+  const seasonalId = seasonalThemeForDate()
+  const seasonal = THEMES.find((item) => item.id === seasonalId)
 
   return (
     <div>
-      <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>Palette</h4>
+      <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>Theme</h4>
       <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-        Taro is the default. Pick a palette that suits you.
+        Choose a color theme.
       </p>
-      <div
-        role="radiogroup"
-        aria-label="Palette"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '0.6rem',
-        }}
-      >
+      <div role="radiogroup" aria-label="Theme" className={styles.grid}>
         {THEMES.map((t) => {
           const active = theme === t.id
           return (
@@ -28,50 +31,30 @@ const ThemeSettings: React.FC = () => {
               aria-checked={active}
               disabled={loading}
               onClick={() => setTheme(t.id)}
-              style={{
-                display: 'flex',
-                gap: '0.6rem',
-                alignItems: 'center',
-                textAlign: 'left',
-                padding: '0.65rem 0.75rem',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                background: active ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-                border: active ? '1px solid var(--accent)' : '1px solid var(--border-primary)',
-                color: 'var(--text-primary)',
-              }}
+              className={`${styles.option} ${active ? styles.optionActive : ''}`}
             >
-              <span
-                aria-hidden
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '50%',
-                  flex: 'none',
-                  background: t.swatch,
-                  border: '1px solid rgba(0,0,0,0.35)',
-                }}
-              />
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700 }}>
-                  {t.label}
-                </span>
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {t.blurb}
-                </span>
-              </span>
+              <span className={styles.swatch} style={{ background: t.color }} aria-hidden="true" />
+              <span className={styles.label}>{t.label}</span>
             </button>
           )
         })}
+      </div>
+
+      <div className={styles.seasonal}>
+        <span className={styles.seasonalText}>
+          <span className={styles.seasonalTitle}>Seasonal theme</span>
+          <span className={styles.seasonalCopy}>
+            Current season: {SEASON_LABEL[season]}. Suggested: {seasonal?.label ?? 'Sakura'}.
+          </span>
+        </span>
+        <button
+          type="button"
+          className={styles.seasonalBtn}
+          onClick={() => setTheme(seasonalId)}
+          disabled={loading || theme === seasonalId}
+        >
+          {theme === seasonalId ? 'Already set' : `Use ${seasonal?.label ?? 'Sakura'}`}
+        </button>
       </div>
     </div>
   )

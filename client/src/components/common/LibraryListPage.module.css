@@ -63,7 +63,7 @@
 
 .filterBtn.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text);
   border-color: var(--accent);
   box-shadow: 0 4px 15px var(--accent-glow);
 }
@@ -347,7 +347,7 @@
 .manageBtn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--accent-text);
   box-shadow: 0 4px 15px var(--accent-glow);
 }
 
@@ -511,6 +511,7 @@
 .itemWrapper.selected .selectBadge {
   background: var(--accent);
   border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .applyBtn {

@@ -214,7 +214,7 @@
   }
 }
 
-/* ===== THEMES - default is Taro (:root, top ball). Mochi (middle) + Sakura (bottom). ===== */
+/* ===== THEMES - default is Taro (:root). Each palette is a dango flavor. ===== */
 
 /* Mochi: middle ball (#f0f0f0) - monochrome pearl on neutral charcoal, flat (no glow) */
 html[data-theme='mochi'] {
@@ -222,7 +222,7 @@ html[data-theme='mochi'] {
   --accent-light: #f4f3fa;
   --accent-lighter: #ffffff;
   --accent-dark: #b3b1c6;
-  --accent-text: #17171c;
+  --accent-text: #131316;
   --accent-subtle: rgba(227, 225, 238, 0.12);
   --accent-glow: rgba(227, 225, 238, 0);
   --accent-h: 248;
@@ -269,7 +269,7 @@ html[data-theme='sakura'] {
   --accent-light: #eccbec;
   --accent-lighter: #f9e8f9;
   --accent-dark: #a978a9;
-  --accent-text: #fff;
+  --accent-text: #2d1a2d;
   --accent-subtle: rgba(217, 163, 217, 0.12);
   --accent-glow: rgba(217, 163, 217, 0);
   --accent-h: 300;
@@ -308,4 +308,192 @@ html[data-theme='sakura'] {
 
   --focus-ring-color: var(--accent);
   --focus-ring-glow: 0 0 0 3px rgba(217, 163, 217, 0.25);
+}
+
+/* Matcha: green ball - matcha dango, soft garden green on deep tea */
+html[data-theme='matcha'] {
+  --accent: #8fcf7a;
+  --accent-light: #b6e39e;
+  --accent-lighter: #d7f0c7;
+  --accent-dark: #5f9448;
+  --accent-text: #10200d;
+  --accent-subtle: rgba(143, 207, 122, 0.12);
+  --accent-glow: rgba(143, 207, 122, 0);
+  --accent-h: 102;
+  --accent-s: 50%;
+  --accent-l: 65%;
+
+  --bg-main: #0e120d;
+  --bg-primary: #151b14;
+  --bg-secondary: #151b14;
+  --bg-tertiary: #1c241b;
+  --bg-elevated: #243024;
+  --header-bg: rgba(14, 18, 13, 0.88);
+
+  --text-primary: #eef6e9;
+  --text-secondary: #aab8a4;
+  --text-tertiary: #86947f;
+  --text-muted: #aab8a4;
+
+  --border-primary: #2a3628;
+  --border-secondary: #394735;
+
+  --control-border: #4d5f4a;
+  --control-border-hover: #657a61;
+  --control-text: #eef6e9;
+
+  --glass-bg: rgba(21, 27, 20, 0.96);
+
+  --badge-info-bg: var(--accent-dark);
+  --badge-info-text: #ffffff;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(143, 207, 122, 0.25);
+}
+
+/* Mitarashi: amber ball - soy-glazed dango, warm Kyoto street stall */
+html[data-theme='mitarashi'] {
+  --accent: #d9a05b;
+  --accent-light: #f0c88f;
+  --accent-lighter: #ffe7c4;
+  --accent-dark: #a97434;
+  --accent-text: #201408;
+  --accent-subtle: rgba(217, 160, 91, 0.12);
+  --accent-glow: rgba(217, 160, 91, 0);
+  --accent-h: 32;
+  --accent-s: 63%;
+  --accent-l: 60%;
+
+  --bg-main: #140f0b;
+  --bg-primary: #1c1611;
+  --bg-secondary: #1c1611;
+  --bg-tertiary: #241c16;
+  --bg-elevated: #2e241b;
+  --header-bg: rgba(20, 15, 11, 0.88);
+
+  --text-primary: #f6efe6;
+  --text-secondary: #b8a795;
+  --text-tertiary: #93816e;
+  --text-muted: #b8a795;
+
+  --border-primary: #342a21;
+  --border-secondary: #453830;
+
+  --control-border: #5c4a3a;
+  --control-border-hover: #755f4b;
+  --control-text: #f6efe6;
+
+  --glass-bg: rgba(28, 22, 17, 0.96);
+
+  --badge-info-bg: var(--accent-dark);
+  --badge-info-text: #ffffff;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(217, 160, 91, 0.25);
+}
+
+/* Kinako: tan ball - roasted soy flour, warm and nutty */
+html[data-theme='kinako'] {
+  --accent: #d8b56b;
+  --accent-light: #ecd29a;
+  --accent-lighter: #f8e8c6;
+  --accent-dark: #a9823d;
+  --accent-text: #201808;
+  --accent-subtle: rgba(216, 181, 107, 0.12);
+  --accent-glow: rgba(216, 181, 107, 0);
+  --accent-h: 40;
+  --accent-s: 58%;
+  --accent-l: 63%;
+
+  --bg-main: #12100b;
+  --bg-primary: #1a1711;
+  --bg-secondary: #1a1711;
+  --bg-tertiary: #221e16;
+  --bg-elevated: #2c271c;
+  --header-bg: rgba(18, 16, 11, 0.88);
+
+  --text-primary: #f7f2e6;
+  --text-secondary: #b9ae97;
+  --text-tertiary: #968b74;
+  --text-muted: #b9ae97;
+
+  --border-primary: #332d22;
+  --border-secondary: #453d2e;
+
+  --control-border: #5c523e;
+  --control-border-hover: #756848;
+  --control-text: #f7f2e6;
+
+  --glass-bg: rgba(26, 23, 17, 0.96);
+
+  --badge-info-bg: var(--accent-dark);
+  --badge-info-text: #ffffff;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(216, 181, 107, 0.25);
+}
+
+/* Azuki: red bean ball - anko dango and a red bean latte */
+html[data-theme='azuki'] {
+  --accent: #c96b7b;
+  --accent-light: #e6a1ac;
+  --accent-lighter: #f4cdd3;
+  --accent-dark: #9a4455;
+  --accent-text: #ffffff;
+  --accent-subtle: rgba(201, 107, 123, 0.12);
+  --accent-glow: rgba(201, 107, 123, 0);
+  --accent-h: 351;
+  --accent-s: 47%;
+  --accent-l: 60%;
+
+  --bg-main: #130e10;
+  --bg-primary: #1b1417;
+  --bg-secondary: #1b1417;
+  --bg-tertiary: #241a1e;
+  --bg-elevated: #2e2126;
+  --header-bg: rgba(19, 14, 16, 0.88);
+
+  --text-primary: #f7ecef;
+  --text-secondary: #bda7ad;
+  --text-tertiary: #9a858b;
+  --text-muted: #bda7ad;
+
+  --border-primary: #34262b;
+  --border-secondary: #46343a;
+
+  --control-border: #5c4650;
+  --control-border-hover: #755a66;
+  --control-text: #f7ecef;
+
+  --glass-bg: rgba(27, 20, 23, 0.96);
+
+  --badge-info-bg: var(--accent-dark);
+  --badge-info-text: #ffffff;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-active: 0 0 0 1px var(--border-secondary);
+  --shadow-xl: none;
+
+  --focus-ring-color: var(--accent);
+  --focus-ring-glow: 0 0 0 3px rgba(201, 107, 123, 0.25);
 }

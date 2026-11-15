@@ -5,6 +5,7 @@ import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import { useDiscordPageStatus } from './hooks/useDiscordRPC'
+import { useDangoAnimation } from './hooks/useDangoAnimation'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { fetchApi } from './lib/fetchApi'
@@ -30,6 +31,7 @@ const Trackers = lazy(() => import('./pages/Trackers'))
 const Insights = lazy(() => import('./pages/Insights'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 const PlayerRedirect = lazy(() => import('./pages/PlayerRedirect'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 const VirtualKeyboard = lazy(() => import('./components/common/VirtualKeyboard'))
 
 import { useSidebar } from './contexts/SidebarContext'
@@ -58,6 +60,7 @@ function App() {
   const [navigationPending, setNavigationPending] = useState(false)
   const virtualKeyboard = useVirtualKeyboard()
   useDiscordPageStatus()
+  useDangoAnimation()
   const { data: frozenSetting } = useSetting('frozenMode')
   const frozen = frozenSetting === 'true' || frozenSetting === true
 
@@ -292,7 +295,7 @@ function App() {
               <Route path="/watch-along" element={<WatchAlong />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
               <Route path="/player/:id/:episodeNumber?" element={<PlayerRedirect />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

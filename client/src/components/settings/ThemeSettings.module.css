@@ -1,0 +1,125 @@
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.15rem;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.option:hover {
+  color: var(--text-primary);
+}
+
+.optionActive {
+  color: var(--text-primary);
+}
+
+.option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border-secondary);
+  box-shadow:
+    inset -4px -4px 8px rgba(0, 0, 0, 0.18),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.25);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.option:hover .swatch {
+  transform: scale(1.05);
+}
+
+.optionActive .swatch {
+  border-color: var(--accent-light);
+  box-shadow:
+    0 0 0 3px var(--accent-subtle),
+    inset -4px -4px 8px rgba(0, 0, 0, 0.18),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.25);
+}
+
+.label {
+  text-align: center;
+}
+
+.seasonal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+}
+
+.seasonalText {
+  min-width: 0;
+}
+
+.seasonalTitle {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.seasonalCopy {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.seasonalBtn {
+  flex: none;
+  border: 1px solid var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-light);
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.seasonalBtn:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+@media (max-width: 520px) {
+  .seasonal {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+}

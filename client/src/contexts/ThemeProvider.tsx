@@ -6,10 +6,18 @@ interface ThemeProviderProps {
   children: React.ReactNode
 }
 
-const VALID_THEMES: ThemeId[] = ['iris', 'mochi', 'sakura']
+const VALID_THEMES: ThemeId[] = [
+  'taro',
+  'mochi',
+  'sakura',
+  'matcha',
+  'mitarashi',
+  'kinako',
+  'azuki',
+]
 
 function applyTheme(theme: ThemeId) {
-  if (theme === 'iris') {
+  if (theme === 'taro') {
     document.documentElement.removeAttribute('data-theme')
   } else {
     document.documentElement.setAttribute('data-theme', theme)
@@ -19,7 +27,7 @@ function applyTheme(theme: ThemeId) {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const { data: themeSetting, isLoading } = useSetting('theme')
   const updateSetting = useUpdateSetting()
-  const [theme, setThemeState] = useState<ThemeId>('iris')
+  const [theme, setThemeState] = useState<ThemeId>('taro')
 
   useEffect(() => {
     if (typeof themeSetting === 'string' && VALID_THEMES.includes(themeSetting as ThemeId)) {

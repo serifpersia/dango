@@ -1,0 +1,50 @@
+.loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 4px;
+}
+
+.ball {
+  position: relative;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset -2px -2px 4px rgba(0, 0, 0, 0.2),
+    inset 2px 2px 3px rgba(255, 255, 255, 0.32);
+  animation: dangoBob 1.1s ease-in-out infinite;
+}
+
+.ball:nth-child(1) {
+  background: #f5a9cf;
+}
+
+.ball:nth-child(2) {
+  background: #f1ead7;
+  animation-delay: 0.14s;
+}
+
+.ball:nth-child(3) {
+  background: #a8ddb5;
+  animation-delay: 0.28s;
+}
+
+@keyframes dangoBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ball {
+    animation: none;
+  }
+}

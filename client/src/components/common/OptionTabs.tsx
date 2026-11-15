@@ -33,10 +33,11 @@ interface OptionTabsProps<T extends string> {
   onChange: (value: T) => void
   ariaLabel?: string
   variant?: 'pill' | 'underline' | 'dango'
+  className?: string
 }
 
 function OptionTabsInner<T extends string>(
-  { options, value, onChange, ariaLabel, variant = 'pill' }: OptionTabsProps<T>,
+  { options, value, onChange, ariaLabel, variant = 'pill', className }: OptionTabsProps<T>,
   ref?: React.Ref<HTMLDivElement>
 ) {
   const barRef = useRef<HTMLDivElement | null>(null)
@@ -92,15 +93,16 @@ function OptionTabsInner<T extends string>(
     }
   }, [value, options.length, updateIndicator])
 
+  const barClass =
+    variant === 'dango'
+      ? styles.dangoBar
+      : variant === 'underline'
+        ? styles.underlineBar
+        : styles.tabBar
+
   return (
     <div
-      className={
-        variant === 'dango'
-          ? styles.dangoBar
-          : variant === 'underline'
-            ? styles.underlineBar
-            : styles.tabBar
-      }
+      className={className ? `${barClass} ${className}` : barClass}
       ref={(el) => {
         barRef.current = el
         if (typeof ref === 'function') ref(el)

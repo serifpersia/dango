@@ -1,7 +1,6 @@
 import { profileStorage } from '../lib/profileStorage'
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import { useDangoAnimation } from '../hooks/useDangoAnimation'
 import Pagination from '../components/common/Pagination'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
@@ -54,7 +53,6 @@ const CONTENT_OPTIONS: TabOption<ContentType>[] = [
 ]
 
 const Home: React.FC = () => {
-  useDangoAnimation()
   const queryClient = useQueryClient()
   const trpc = useTRPC()
   const [page, setPage] = React.useState(1)

@@ -7,6 +7,7 @@ import styles from '../components/player/Player.module.css'
 import layoutStyles from '../components/player/PlayerPageLayout.module.css'
 import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import Icon from '../components/common/Icon'
+import DangoLoader from '../components/common/DangoLoader'
 import FadeImage from '../components/common/FadeImage'
 import { fixThumbnailUrl, formatTime } from '../lib/utils'
 import {
@@ -917,11 +918,7 @@ const Player: React.FC = () => {
             <>
               {isVideoLoading && (
                 <div className={styles.loadingOverlay}>
-                  <div className={styles.loadingDots}>
-                    <div className={styles.dot}></div>
-                    <div className={styles.dot}></div>
-                    <div className={styles.dot}></div>
-                  </div>
+                  <DangoLoader />
                 </div>
               )}
 
@@ -929,7 +926,7 @@ const Player: React.FC = () => {
                 !isVideoLoading &&
                 state.selectedSource?.type !== 'iframe' && (
                   <div className={styles.bufferingOverlay}>
-                    <div className={styles.bufferingSpinner}></div>
+                    <DangoLoader />
                   </div>
                 )}
 
@@ -1156,7 +1153,7 @@ const Player: React.FC = () => {
 
               {isVideoLoading ? (
                 <div className={styles.sourceLoader}>
-                  <div className={styles.spinner}></div>
+                  <DangoLoader />
                 </div>
               ) : !followingHost ? (
                 <SourceSelector

@@ -142,6 +142,14 @@
   padding: var(--dango-pad) 10px 6px;
   margin: 0 0 2.5rem;
   isolation: isolate;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dangoBar::-webkit-scrollbar {
+  display: none;
 }
 
 .dangoStick {

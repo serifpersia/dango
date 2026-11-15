@@ -1,0 +1,25 @@
+.mascot {
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+  user-select: none;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+  animation: dangoPeek 3.4s ease-in-out infinite;
+}
+
+@keyframes dangoPeek {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot {
+    animation: none;
+  }
+}
