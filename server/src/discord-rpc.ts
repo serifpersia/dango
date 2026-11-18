@@ -416,7 +416,7 @@ class DiscordRPCService {
     }
 
     if (!this.client || !this.client.user) {
-      log.warn('Discord client not connected, skipping idle status update')
+      log.debug('Discord client not connected, skipping idle status update')
       return
     }
 
@@ -450,7 +450,7 @@ class DiscordRPCService {
 
     try {
       if (!this.client || !this.client.user) {
-        log.warn('Discord client not connected, skipping idle status update')
+        log.debug('Discord client not connected, skipping idle status update')
         return
       }
       await this.client.user.setActivity({
@@ -470,7 +470,7 @@ class DiscordRPCService {
       this.hasPagePresence = page in pageLabels
     } catch (err) {
       if ((err as Error).message === 'Closed by Discord') {
-        log.warn('Discord connection ended, skipping idle status update')
+        log.debug('Discord connection ended, skipping idle status update')
       } else {
         log.error({ err }, 'Failed to set Discord idle status')
       }

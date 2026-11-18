@@ -162,6 +162,7 @@ const syncState = profileService(() => ({
     Object.keys(KIND_SYNC).map((kind) => [kind, new Mutex()])
   ) as Record<MediaKind, Mutex>,
   isSyncingMap: {} as Record<MediaKind, boolean>,
+  idleLogged: {} as Record<MediaKind, boolean>,
   activeProvider: 'none' as 'github' | 'google' | 'rclone' | 'none',
 }))
 
@@ -322,7 +323,7 @@ export async function syncDownOnBoot(
     const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName, kind)
     notifySyncEnd()
 
-    log.info(
+    log.debug(
       `${withLabel(label, 'Sync Check')}: Local v${localVersion} vs Remote v${remoteVersion}`
     )
 
@@ -338,7 +339,7 @@ export async function syncDownOnBoot(
       return remoteVersion
     }
 
-    log.info(`Local ${withLabel(label, 'DB is up to date.')}`)
+    log.debug(`Local ${withLabel(label, 'DB is up to date.')}`)
     return remoteVersion
   } catch (err) {
     notifySyncEnd()
@@ -384,7 +385,9 @@ export async function syncUp(
 
       notifySyncEnd()
       log.info(`${cap(withLabel(label, 'sync up complete.'))}`)
-    } else {
+      syncState().idleLogged[kind] = false
+    } else if (!syncState().idleLogged[kind]) {
+      syncState().idleLogged[kind] = true
       log.info(`No ${withLabel(label, 'changes to sync up or remote is newer.')}`)
     }
   } catch (err) {

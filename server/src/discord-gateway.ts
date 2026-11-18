@@ -28,6 +28,8 @@ class DiscordGatewayService {
   private lastActivity: PresenceData | null = null
   private isEnabled = false
   private readonly RECONNECT_DELAY = 15000
+  private readonly MAX_RECONNECT_DELAY = 300000
+  private retryCount = 0
   private externalAssetCache = new Map<string, string>()
   private logoAssetId: string | null = null
   private logoAssetChecked = false
@@ -335,6 +337,7 @@ class DiscordGatewayService {
   }
 
   public disconnect() {
+    this.retryCount = 0
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout)
       this.reconnectTimeout = null
@@ -427,6 +430,7 @@ class DiscordGatewayService {
         } else if (msg.op === 0) {
           if (msg.t === 'READY') {
             log.info(`Gateway READY as ${msg.d.user?.username || 'unknown'}`)
+            this.retryCount = 0
             this.logoAssetChecked = false
             if (this.lastActivity) {
               void this.updatePresence(this.lastActivity).catch((err) =>
@@ -447,12 +451,15 @@ class DiscordGatewayService {
     })
 
     this.gateway.on('close', (code, reason) => {
-      log.warn(`Gateway closed ${code} ${reason.toString().slice(0, 100)}`)
+      const line = `Gateway closed ${code} ${reason.toString().slice(0, 100)}`
+      if (this.retryCount === 0) log.warn(line)
+      else log.debug(line)
       this.handleDisconnect()
     })
 
     this.gateway.on('error', (err) => {
-      log.error(err, 'Gateway WebSocket error')
+      if (this.retryCount === 0) log.error(err, 'Gateway WebSocket error')
+      else log.debug({ err }, 'Gateway WebSocket error')
       this.handleDisconnect()
     })
   }
@@ -465,10 +472,15 @@ class DiscordGatewayService {
     this.gateway = null
 
     if (this.isEnabled && this.token) {
+      const delay = Math.min(
+        this.RECONNECT_DELAY * Math.pow(2, Math.min(this.retryCount, 5)),
+        this.MAX_RECONNECT_DELAY
+      )
+      this.retryCount++
       this.reconnectTimeout = setTimeout(() => {
         this.reconnectTimeout = null
         this.connect()
-      }, this.RECONNECT_DELAY)
+      }, delay)
     }
   }
 }
