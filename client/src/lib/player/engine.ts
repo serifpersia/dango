@@ -13,6 +13,8 @@ import { subscribeFullscreen, toggleFullscreen, getFullscreenElement } from '../
 
 let activeMedia: HTMLMediaElement | null = null
 
+const SPEED_BOOST_RATES = [2, 4, 8]
+
 function stored(key: string | undefined): string | null {
   try {
     return key ? profileStorage.getItem(key) : null
@@ -31,6 +33,8 @@ function persist(key: string | undefined, value: number | boolean) {
 
 export function createPlayerEngine(preferences: PlayerPreferences = {}) {
   const savedVolume = Number.parseFloat(stored(preferences.volumeKey) ?? '')
+  const savedBoost = Number.parseFloat(stored('playerSpeedBoostRate') ?? '')
+  let speedBoostRate = SPEED_BOOST_RATES.includes(savedBoost) ? savedBoost : 2
   let state: PlayerState = {
     isPlaying: false,
     isBuffering: false,
@@ -42,6 +46,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     isFullscreen: false,
     showControls: true,
     isSpeedBoostActive: false,
+    speedBoostRate,
     audioTracks: [],
     subtitleTracks: [],
     qualities: [],
@@ -300,7 +305,7 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     if (state.playbackLocked && !applyingRemote) return
     if (!Number.isFinite(rate) || rate < 0.25 || rate > 4) return
     basePlaybackRate = rate
-    const playbackRate = state.isSpeedBoostActive ? 2 : rate
+    const playbackRate = state.isSpeedBoostActive ? speedBoostRate : rate
     update({ playbackRate })
     if (mediaRef.current) mediaRef.current.playbackRate = playbackRate
   }
@@ -504,7 +509,13 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
     setVolume,
     toggleMute,
     setPlaybackRate,
-    setPlaybackLocked: (playbackLocked: boolean) => update({ playbackLocked }),
+    setPlaybackLocked: (playbackLocked: boolean) => {
+      if (playbackLocked && state.isSpeedBoostActive) {
+        update({ isSpeedBoostActive: false, playbackRate: basePlaybackRate })
+        if (mediaRef.current) mediaRef.current.playbackRate = basePlaybackRate
+      }
+      update({ playbackLocked })
+    },
     applyRemotePlayback: (position: number | undefined, playing: boolean, rate: number) => {
       applyingRemote = true
       try {
@@ -539,10 +550,22 @@ export function createPlayerEngine(preferences: PlayerPreferences = {}) {
       }
     },
     setSpeedBoost: (isSpeedBoostActive: boolean) => {
-      if (state.playbackLocked) return
-      const playbackRate = isSpeedBoostActive ? 2 : basePlaybackRate
+      if (isSpeedBoostActive && state.playbackLocked) return
+      if (state.isSpeedBoostActive === isSpeedBoostActive) return
+      const playbackRate = isSpeedBoostActive ? speedBoostRate : basePlaybackRate
       update({ isSpeedBoostActive, playbackRate })
       if (mediaRef.current) mediaRef.current.playbackRate = playbackRate
+    },
+    setSpeedBoostRate: (rate: number) => {
+      if (!SPEED_BOOST_RATES.includes(rate) || rate === speedBoostRate) return
+      speedBoostRate = rate
+      persist('playerSpeedBoostRate', rate)
+      if (state.isSpeedBoostActive) {
+        update({ speedBoostRate: rate, playbackRate: rate })
+        if (mediaRef.current) mediaRef.current.playbackRate = rate
+      } else {
+        update({ speedBoostRate: rate })
+      }
     },
     setShowControls: (showControls: boolean) => update({ showControls }),
     startScrubbing,

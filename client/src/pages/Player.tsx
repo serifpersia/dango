@@ -905,7 +905,7 @@ const Player: React.FC = () => {
               <>
                 {player.state.isSpeedBoostActive && (
                   <div className={styles.speedBoostBadge} aria-hidden="true">
-                    <span>2x</span>
+                    <span>{player.state.speedBoostRate}x</span>
                     <Icon name="forward" size={12} />
                   </div>
                 )}

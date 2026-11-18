@@ -56,6 +56,7 @@ const useVideoPlayer = ({
     isBuffering,
     isFullscreen,
     isSpeedBoostActive,
+    speedBoostRate,
     showControls,
     playbackLocked,
   } = usePlayerState(engine)
@@ -464,6 +465,7 @@ const useVideoPlayer = ({
       showVolumeSlider,
       isBuffering,
       isSpeedBoostActive,
+      speedBoostRate,
       useNativeControls,
     },
     actions: actions,

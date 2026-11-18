@@ -45,6 +45,8 @@ interface PlayerSettingsProps {
   onAutoSkipChange: (value: boolean) => void
   isAutoplayEnabled: boolean
   onAutoplayChange: (value: boolean) => void
+  speedBoostRate: number
+  onSpeedBoostRateChange: (rate: number) => void
   fallbackChoice: FallbackChoice
   onFallbackChoiceChange: (value: FallbackChoice) => void
   isTheaterMode?: boolean
@@ -94,6 +96,8 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onAutoSkipChange,
     isAutoplayEnabled,
     onAutoplayChange,
+    speedBoostRate,
+    onSpeedBoostRateChange,
     fallbackChoice,
     onFallbackChoiceChange,
     isTheaterMode,
@@ -325,6 +329,16 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
 
   const renderPlayback = () => (
     <div className={styles.menuContent}>
+      <div className={styles.menuNote}>Speed boost multiplier (hold Space or press and hold)</div>
+      <OptionListMenu
+        classes={{ item: styles.menuItem, active: styles.selected }}
+        options={[2, 4, 8].map((rate) => ({
+          key: String(rate),
+          label: `${rate}x`,
+          selected: speedBoostRate === rate,
+        }))}
+        onSelect={(key) => onSpeedBoostRateChange(Number(key))}
+      />
       <button
         type="button"
         className={`${styles.menuItem} ${isAutoSkipEnabled ? styles.selected : ''}`}

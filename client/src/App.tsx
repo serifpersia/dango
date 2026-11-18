@@ -181,7 +181,6 @@ function App() {
   useEffect(() => {
     if (prevLocationKey.current === location.key) return
     prevLocationKey.current = location.key
-    if (!navigationPending) return
     if (navigationProgressTimer.current !== null) {
       window.clearTimeout(navigationProgressTimer.current)
     }
@@ -189,7 +188,7 @@ function App() {
       setNavigationPending(false)
       navigationProgressTimer.current = null
     }, 500)
-  }, [location.key, navigationPending])
+  }, [location.key])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

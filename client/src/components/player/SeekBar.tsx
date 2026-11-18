@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface SeekBarClasses {
   container: string
@@ -49,6 +49,8 @@ const SeekBar: React.FC<SeekBarProps> = ({
   isScrubbingRef.current = isScrubbing
   const callbacksRef = useRef({ onScrubMove, onScrubEnd })
   callbacksRef.current = { onScrubMove, onScrubEnd }
+  const durationRef = useRef(duration)
+  durationRef.current = duration
   const [hover, setHover] = useState<{ time: number; position: number | null }>({
     time: 0,
     position: null,
@@ -71,7 +73,7 @@ const SeekBar: React.FC<SeekBarProps> = ({
       }
     }
     const handleTimeUpdate = () => {
-      if (isScrubbing) return
+      if (isScrubbingRef.current) return
       paint(video.currentTime)
     }
     const handleProgress = () => {
@@ -90,7 +92,7 @@ const SeekBar: React.FC<SeekBarProps> = ({
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('progress', handleProgress)
     }
-  }, [videoRef, duration, isScrubbing, buffered, formatTime, timeLabelRef])
+  }, [videoRef, duration, buffered, formatTime, timeLabelRef])
 
   const percentAt = (clientX: number) => {
     if (!containerRef.current) return 0
@@ -99,33 +101,9 @@ const SeekBar: React.FC<SeekBarProps> = ({
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
   }
 
-  const paintPreview = (percent: number) => {
-    const time = percent * duration
-    containerRef.current?.setAttribute('aria-valuenow', String(Math.round(time)))
-    containerRef.current?.setAttribute(
-      'aria-valuetext',
-      `${formatTime(time)} of ${formatTime(duration)}`
-    )
-    const pct100 = (time / duration) * 100 || 0
-    if (watchedRef.current) watchedRef.current.style.width = `${pct100}%`
-    if (thumbRef.current) thumbRef.current.style.left = `${pct100}%`
-    if (timeLabelRef?.current) {
-      timeLabelRef.current.innerText = `${formatTime(time)} / ${formatTime(duration)}`
-    }
-    const rect = containerRef.current?.getBoundingClientRect()
-    setHover({ time, position: rect ? percent * rect.width : null })
-  }
-
-  useEffect(() => {
-    if (!isScrubbing) {
-      scrubPointerIdRef.current = null
-      return
-    }
-    const handleMove = (e: PointerEvent) => {
-      if (scrubPointerIdRef.current !== null && e.pointerId !== scrubPointerIdRef.current) return
-      if (!duration) return
-      const percent = percentAt(e.clientX)
-      callbacksRef.current.onScrubMove(percent)
+  const paintPreview = useCallback(
+    (percent: number) => {
+      const duration = durationRef.current
       const time = percent * duration
       containerRef.current?.setAttribute('aria-valuenow', String(Math.round(time)))
       containerRef.current?.setAttribute(
@@ -140,23 +118,59 @@ const SeekBar: React.FC<SeekBarProps> = ({
       }
       const rect = containerRef.current?.getBoundingClientRect()
       setHover({ time, position: rect ? percent * rect.width : null })
-    }
-    const handleEnd = (e: PointerEvent) => {
-      if (scrubPointerIdRef.current !== null && e.pointerId !== scrubPointerIdRef.current) return
+    },
+    [formatTime, timeLabelRef]
+  )
+
+  useEffect(() => {
+    const releaseScrub = (pointerId?: number, pointerType?: string) => {
+      if (
+        pointerId !== undefined &&
+        scrubPointerIdRef.current !== null &&
+        pointerId !== scrubPointerIdRef.current
+      )
+        return
+      if (!isScrubbingRef.current) return
       scrubPointerIdRef.current = null
+      isScrubbingRef.current = false
       justScrubbedRef.current = true
-      if (e.pointerType !== 'mouse') setHover({ time: 0, position: null })
+      window.setTimeout(() => {
+        justScrubbedRef.current = false
+      }, 250)
+      if (pointerType && pointerType !== 'mouse') setHover({ time: 0, position: null })
       callbacksRef.current.onScrubEnd()
     }
+
+    if (!isScrubbing) {
+      scrubPointerIdRef.current = null
+      isScrubbingRef.current = false
+      return
+    }
+
+    const handleMove = (e: PointerEvent) => {
+      if (scrubPointerIdRef.current !== null && e.pointerId !== scrubPointerIdRef.current) return
+      if (!durationRef.current) return
+      const percent = percentAt(e.clientX)
+      callbacksRef.current.onScrubMove(percent)
+      paintPreview(percent)
+    }
+    const handleEnd = (e: PointerEvent) => releaseScrub(e.pointerId, e.pointerType)
+    const handleLost = () => releaseScrub()
+
     document.addEventListener('pointermove', handleMove)
     document.addEventListener('pointerup', handleEnd)
     document.addEventListener('pointercancel', handleEnd)
+    window.addEventListener('blur', handleLost)
+    document.addEventListener('visibilitychange', handleLost)
     return () => {
       document.removeEventListener('pointermove', handleMove)
       document.removeEventListener('pointerup', handleEnd)
       document.removeEventListener('pointercancel', handleEnd)
+      window.removeEventListener('blur', handleLost)
+      document.removeEventListener('visibilitychange', handleLost)
+      if (isScrubbingRef.current) releaseScrub()
     }
-  }, [isScrubbing, duration, formatTime, timeLabelRef])
+  }, [isScrubbing, paintPreview])
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -192,7 +206,11 @@ const SeekBar: React.FC<SeekBarProps> = ({
     if (scrubPointerIdRef.current !== null && e.pointerId !== scrubPointerIdRef.current) return
     if (!isScrubbingRef.current) return
     scrubPointerIdRef.current = null
+    isScrubbingRef.current = false
     justScrubbedRef.current = true
+    window.setTimeout(() => {
+      justScrubbedRef.current = false
+    }, 250)
     if (e.pointerType !== 'mouse') setHover({ time: 0, position: null })
     try {
       if (containerRef.current?.hasPointerCapture(e.pointerId)) {
@@ -221,12 +239,23 @@ const SeekBar: React.FC<SeekBarProps> = ({
           return
         }
         if (!videoRef.current || isNaN(duration) || duration === 0) return
+        if (isScrubbingRef.current) return
         onSeek(percentAt(e.clientX))
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onLostPointerCapture={() => {
+        if (!isScrubbingRef.current) return
+        scrubPointerIdRef.current = null
+        isScrubbingRef.current = false
+        justScrubbedRef.current = true
+        window.setTimeout(() => {
+          justScrubbedRef.current = false
+        }, 250)
+        callbacksRef.current.onScrubEnd()
+      }}
       onMouseMove={(e) => {
         if (isScrubbing || !duration) return
         const percent = percentAt(e.clientX)

@@ -248,6 +248,24 @@ describe('player engine', () => {
     expect(media.paused).toBe(true)
   })
 
+  it('applies the chosen speed boost multiplier and restores the base rate', () => {
+    const { engine, media } = setup()
+    expect(engine.getState().speedBoostRate).toBe(2)
+    engine.setSpeedBoost(true)
+    expect(media.playbackRate).toBe(2)
+    engine.setSpeedBoostRate(8)
+    expect(media.playbackRate).toBe(8)
+    expect(engine.getState()).toMatchObject({ speedBoostRate: 8, isSpeedBoostActive: true })
+    expect(localStorage.setItem).toHaveBeenCalledWith('playerSpeedBoostRate', '8')
+    engine.setSpeedBoost(false)
+    expect(media.playbackRate).toBe(1)
+    engine.setPlaybackRate(1.5)
+    engine.setSpeedBoost(true)
+    engine.setPlaybackLocked(true)
+    expect(media.playbackRate).toBe(1.5)
+    expect(engine.getState().isSpeedBoostActive).toBe(false)
+  })
+
   it('cancels lazy HLS setup when another source replaces it', async () => {
     const { engine, media } = setup()
     let resolve!: (value: Awaited<ReturnType<typeof loadHls>>) => void

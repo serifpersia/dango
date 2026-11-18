@@ -19,6 +19,7 @@ export interface PlayerState {
   isFullscreen: boolean
   showControls: boolean
   isSpeedBoostActive: boolean
+  speedBoostRate: number
   audioTracks: PlayerTrack[]
   subtitleTracks: PlayerTrack[]
   qualities: PlayerTrack[]

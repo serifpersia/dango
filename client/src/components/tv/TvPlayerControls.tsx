@@ -372,7 +372,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       )}
       {state.isSpeedBoostActive && (
         <div className={styles.speedBoostBadge} aria-hidden="true">
-          <span>2x</span>
+          <span>{state.speedBoostRate}x</span>
           <Icon name="forward" size={12} />
         </div>
       )}

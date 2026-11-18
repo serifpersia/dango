@@ -19,6 +19,7 @@ export type TvSettingsView =
   | 'subtitle-font'
   | 'subtitle-timing'
   | 'audio'
+  | 'speed-boost'
   | 'av-sync'
   | 'ambient'
   | 'opensub-langs'
@@ -136,6 +137,10 @@ const TvSettings: React.FC<TvSettingsProps> = ({
           </span>
         </button>
       )}
+      <button className={styles.menuItem} onClick={() => onSelectView('speed-boost')}>
+        <span>Speed Boost</span>
+        <span className={styles.currentValue}>{state.speedBoostRate}x</span>
+      </button>
       <button className={styles.menuItem} onClick={() => onSelectView('av-sync')}>
         <span>A/V Sync</span>
         <span className={styles.currentValue}>
@@ -283,6 +288,21 @@ const TvSettings: React.FC<TvSettingsProps> = ({
     />
   )
 
+  const renderSpeedBoostSettings = () => (
+    <>
+      <div className={styles.menuNote}>Speed boost multiplier (press and hold to boost)</div>
+      <OptionListMenu
+        classes={{ item: styles.menuItem, active: styles.active }}
+        options={[2, 4, 8].map((rate) => ({
+          key: String(rate),
+          label: `${rate}x`,
+          selected: state.speedBoostRate === rate,
+        }))}
+        onSelect={(key) => player.engine.setSpeedBoostRate(Number(key))}
+      />
+    </>
+  )
+
   const renderAvSyncSettings = () => (
     <AvSyncMenu
       classes={{ item: styles.menuItem, active: styles.active, note: styles.menuNote }}
@@ -328,13 +348,15 @@ const TvSettings: React.FC<TvSettingsProps> = ({
                       ? 'Resolution'
                       : view === 'av-sync'
                         ? 'A/V Sync'
-                        : view === 'ambient'
-                          ? 'Ambient Light'
-                          : view === 'opensub-langs'
-                            ? 'Open Subtitles'
-                            : view === 'opensub-files'
-                              ? 'Select File'
-                              : view.charAt(0).toUpperCase() + view.slice(1)
+                        : view === 'speed-boost'
+                          ? 'Speed Boost'
+                          : view === 'ambient'
+                            ? 'Ambient Light'
+                            : view === 'opensub-langs'
+                              ? 'Open Subtitles'
+                              : view === 'opensub-files'
+                                ? 'Select File'
+                                : view.charAt(0).toUpperCase() + view.slice(1)
         }
         onBack={() => {
           if (view === 'main') return onClose()
@@ -350,6 +372,7 @@ const TvSettings: React.FC<TvSettingsProps> = ({
         {view === 'subtitle-font' && renderSubtitleFontSettings()}
         {view === 'subtitle-timing' && renderSubtitleTimingSettings()}
         {view === 'audio' && renderAudioSettings()}
+        {view === 'speed-boost' && renderSpeedBoostSettings()}
         {view === 'av-sync' && renderAvSyncSettings()}
         {view === 'ambient' && renderAmbientSettings()}
         {view === 'opensub-langs' && renderOpenSubLangs()}

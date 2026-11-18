@@ -223,6 +223,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         }}
         isAutoplayEnabled={isAutoplayEnabled}
         onAutoplayChange={onAutoplayChange}
+        speedBoostRate={state.speedBoostRate}
+        onSpeedBoostRateChange={player.engine.setSpeedBoostRate}
         fallbackChoice={fallbackChoice}
         onFallbackChoiceChange={onFallbackChoiceChange}
         isTheaterMode={isTheaterMode}
