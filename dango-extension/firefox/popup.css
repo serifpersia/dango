@@ -552,9 +552,22 @@ footer {
 @media (pointer: coarse) {
   body {
     width: 100%;
-    max-width: none;
-    max-height: none;
+    min-width: 0;
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
     font-size: 14px;
+  }
+
+  header,
+  footer {
+    flex: none;
+  }
+
+  main {
+    min-height: 0;
   }
 
   h1 {
