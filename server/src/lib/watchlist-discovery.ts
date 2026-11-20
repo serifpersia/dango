@@ -105,6 +105,8 @@ export function getWatchlistDiscoveryStatus(): {
 }
 
 export function startWatchlistDiscovery(getDb: () => DatabaseWrapper): void {
+  void NotificationsRepository.clearDismissed(getDb()).catch(() => {})
+  void NotificationsRepository.clearDismissedInfo(getDb()).catch(() => {})
   const anilistIdCache = new Map<string, number | null>()
 
   const getAnilistId = async (showId: string): Promise<number | null> => {

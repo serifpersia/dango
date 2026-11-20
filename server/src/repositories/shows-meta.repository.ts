@@ -23,6 +23,19 @@ export const ShowsMetaRepository = {
     return rows[0]?.anilistId ?? null
   },
 
+  getAnilistIdMap: async (db: DatabaseWrapper, ids: string[]) => {
+    if (ids.length === 0) return new Map<string, number>()
+    const rows = await getDrizzle(db)
+      .select({ id: showsMeta.id, anilistId: showsMeta.anilistId })
+      .from(showsMeta)
+      .where(inArray(showsMeta.id, ids))
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      if (row.anilistId) map.set(row.id, row.anilistId)
+    }
+    return map
+  },
+
   getByAnilistId: async (db: DatabaseWrapper, anilistId: number) => {
     const rows = await getDrizzle(db).all<{ id: string; name: string }>(
       sql`SELECT id, name FROM shows_meta WHERE anilistId = ${anilistId}`

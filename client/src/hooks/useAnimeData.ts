@@ -147,6 +147,7 @@ export const useAddToQueue = () => {
           toast.success('Removed from queue')
         }
         void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
         queryClient.invalidateQueries({ queryKey: [qk.queueRemaining] })
       },
       onError: (error) => {
@@ -164,6 +165,7 @@ export const useRemoveFromQueue = () => {
       onSuccess: () => {
         toast.success('Removed from queue')
         void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
         queryClient.invalidateQueries({ queryKey: [qk.queueRemaining] })
         queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
       },
@@ -192,6 +194,7 @@ export const useAddToQueueBatch = () => {
         const count = data.added ?? variables.episodeNumbers.length
         toast.success(`${count} ${count === 1 ? 'episode' : 'episodes'} added to queue`)
         void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
         queryClient.invalidateQueries({ queryKey: [qk.queueRemaining] })
       },
       onError: (error) => {
@@ -209,6 +212,7 @@ export const useRemoveFromQueueBatch = () => {
       onSuccess: () => {
         toast.success('Removed from queue')
         void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
         queryClient.invalidateQueries({ queryKey: [qk.queueRemaining] })
         queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
       },
@@ -227,6 +231,7 @@ export const useClearQueue = () => {
       onSuccess: () => {
         toast.success('Queue cleared')
         void queryClient.invalidateQueries(trpc.queue.pathFilter())
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
         queryClient.invalidateQueries({ queryKey: [qk.queueRemaining] })
         queryClient.invalidateQueries({ queryKey: [qk.continueWatching] })
       },
@@ -453,6 +458,8 @@ export interface Notification {
   englishName?: string
   thumbnail: string
   episodeNumber: string
+  latestEpisodeNumber: string
+  pendingCount: number
   id: string
 }
 
@@ -463,6 +470,50 @@ export const useNotifications = (enabled: boolean = true) => {
     enabled,
     refetchInterval: 30000,
   })
+}
+
+export interface InfoNotification {
+  showId: string
+  name: string
+  nativeName?: string
+  englishName?: string
+  thumbnail: string
+  episodeNumber: string
+  airingAt: number
+  id: string
+}
+
+export const useInfoNotifications = (enabled: boolean = true) => {
+  const trpc = useTRPC()
+  return useQuery({
+    ...trpc.notifications.info.queryOptions(),
+    enabled,
+    refetchInterval: 60000,
+  })
+}
+
+export const useDismissInfoNotification = () => {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  return useMutation(
+    trpc.notifications.dismissInfo.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+      },
+    })
+  )
+}
+
+export const useClearAllInfoNotifications = () => {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  return useMutation(
+    trpc.notifications.clearInfo.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.notifications.pathFilter())
+      },
+    })
+  )
 }
 
 export const useSystemNotifications = (enabled: boolean = true) => {

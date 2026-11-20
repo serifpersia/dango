@@ -19,7 +19,12 @@ const MANGA_LIBRARY_TABLES = ['manga_library', 'manga_progress'] as const
 
 export type MangaLibraryCounts = Record<(typeof MANGA_LIBRARY_TABLES)[number], number>
 
-const TV_LIBRARY_TABLES = ['tv_library', 'tv_progress'] as const
+const TV_LIBRARY_TABLES = [
+  'tv_library',
+  'tv_progress',
+  'dismissed_tv_notifications',
+  'dismissed_tv_info_notifications',
+] as const
 
 export type TvLibraryCounts = Record<(typeof TV_LIBRARY_TABLES)[number], number>
 

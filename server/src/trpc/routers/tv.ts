@@ -15,12 +15,7 @@ import {
   type TmdbSearchItem,
   type TmdbSeason,
 } from '../../lib/tmdb.js'
-import {
-  pickNextAiring,
-  resolveEpisodesWithTvMaze,
-  tvmazeShowByImdb,
-  type TvMazeData,
-} from '../../lib/tvmaze.js'
+import { getTvMazeByTmdbId, pickNextAiring, resolveEpisodesWithTvMaze } from '../../lib/tvmaze.js'
 import { fetchWithRetry, parseJsonBody } from '../../utils/http.utils.js'
 import { buildTvMediaRequest } from '../../lib/tv-media.js'
 import { rankByTitleMatch } from '../../providers/title-matching.js'
@@ -41,17 +36,6 @@ async function resolveTvMeta(
     if (mediaType === 'tv' && d.number_of_seasons) meta.totalSeasons = String(d.number_of_seasons)
   }
   return meta
-}
-
-async function getTvMazeByTmdbId(numericTmdbId: number): Promise<TvMazeData | null> {
-  try {
-    const meta = await tmdbMediaMeta('tv', numericTmdbId)
-    const imdbId = meta?.external_ids?.imdb_id || meta?.imdb_id
-    if (!imdbId) return null
-    return await tvmazeShowByImdb(imdbId)
-  } catch {
-    return null
-  }
 }
 
 type SearchResultItem = {

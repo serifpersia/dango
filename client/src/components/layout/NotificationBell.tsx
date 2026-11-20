@@ -9,6 +9,8 @@ import {
   useTriggerDiscovery,
   useSystemNotifications,
 } from '../../hooks/useAnimeData'
+import { useTvNotifications } from '../../hooks/useTv'
+import { useContentType } from '../../contexts/ContentTypeContext'
 import { qk } from '../../lib/queryKeys'
 import styles from './Notification.module.css'
 
@@ -20,11 +22,17 @@ const NotificationBell: React.FC = () => {
   const queryClient = useQueryClient()
   const trpc = useTRPC()
   const triggerDiscovery = useTriggerDiscovery()
+  const { contentType } = useContentType()
+  const isTv = contentType === 'tv'
+  const isAnime = contentType === 'anime'
+  const notificationsEnabled = isAnime || isTv
 
-  const { data: notifications = [] } = useNotifications()
-  const { data: systemNotifications = [] } = useSystemNotifications()
-  const { data: discoveryStatus } = useDiscoveryStatus()
-  const count = notifications.length + systemNotifications.length
+  const { data: animeNotifications = [] } = useNotifications(isAnime)
+  const { data: tvNotifications = [] } = useTvNotifications(isTv)
+  const { data: systemNotifications = [] } = useSystemNotifications(notificationsEnabled)
+  const { data: discoveryStatus } = useDiscoveryStatus(isAnime)
+  const releases = isTv ? tvNotifications : animeNotifications
+  const count = releases.length + systemNotifications.length
 
   const displayCount = count > 9 ? '9+' : count
 
@@ -56,10 +64,12 @@ const NotificationBell: React.FC = () => {
   const handleToggle = () => {
     const nextOpen = !isOpen
     setIsOpen(nextOpen)
-    if (nextOpen) {
+    if (nextOpen && isAnime) {
       triggerDiscovery.mutate()
     }
   }
+
+  if (!notificationsEnabled) return null
 
   return (
     <div className={styles.container} ref={bellRef}>

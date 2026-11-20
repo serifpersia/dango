@@ -1,6 +1,7 @@
 import { protectedProcedure, router } from '../index.js'
 import { QueueRepository } from '../../repositories/queue.repository.js'
 import { ShowsMetaRepository } from '../../repositories/shows-meta.repository.js'
+import { NotificationsRepository } from '../../repositories/notifications.repository.js'
 import { performWriteTransactionAsync } from '../../db/transaction.js'
 import { getMigratedId } from '../../lib/migration.js'
 import {
@@ -44,8 +45,10 @@ export const queueRouter = router({
       }
       if (existing) {
         await QueueRepository.removeEpisode(tx, showId, episodeNumber)
+        await NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
       } else {
         await QueueRepository.addToEnd(tx, showId, episodeNumber)
+        await NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
       }
     })
     return { success: true, queued: !existing }
@@ -69,6 +72,7 @@ export const queueRouter = router({
         tx,
         normalized.map((episodeNumber) => ({ showId, episodeNumber }))
       )
+      await NotificationsRepository.deleteDismissedMany(tx, showId, normalized)
     })
     return { success: true, added: normalized.length }
   }),
@@ -77,26 +81,32 @@ export const queueRouter = router({
     const showId = await getMigratedId(ctx.db, input.showId)
     await performWriteTransactionAsync(ctx.db, async (tx) => {
       await QueueRepository.removeEpisode(tx, showId, input.episodeNumber)
+      await NotificationsRepository.deleteSpecificDismissed(tx, showId, input.episodeNumber)
     })
     return { success: true }
   }),
 
   removeMany: protectedProcedure.input(queueRemoveManyInput()).mutation(async ({ ctx, input }) => {
     const showId = await getMigratedId(ctx.db, input.showId)
-    let removed: string[] = []
+    let removedCount = 0
     await performWriteTransactionAsync(ctx.db, async (tx) => {
-      removed = ((await QueueRepository.getByShow(tx, showId)) || []).map((ep) => ep.episodeNumber)
+      const current = ((await QueueRepository.getByShow(tx, showId)) || []).map(
+        (ep) => ep.episodeNumber
+      )
       const toRemove =
         Array.isArray(input.episodeNumbers) && input.episodeNumbers.length
           ? [...new Set(input.episodeNumbers)]
-          : removed
+          : current
       await QueueRepository.removeMany(tx, showId, toRemove)
+      await NotificationsRepository.deleteDismissedMany(tx, showId, toRemove)
+      removedCount = toRemove.length
     })
-    return { success: true, removed: removed.length }
+    return { success: true, removed: removedCount }
   }),
 
   clear: protectedProcedure.mutation(async ({ ctx }) => {
     await performWriteTransactionAsync(ctx.db, async (tx) => {
+      await NotificationsRepository.deleteDismissedForAllQueued(tx)
       await QueueRepository.clear(tx)
     })
     return { success: true }

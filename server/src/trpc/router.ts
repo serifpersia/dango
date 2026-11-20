@@ -5,6 +5,7 @@ import { queueRouter } from './routers/queue.js'
 import { watchlistRouter } from './routers/watchlist.js'
 import { progressRouter } from './routers/progress.js'
 import { notificationsRouter } from './routers/notifications.js'
+import { tvNotificationsRouter } from './routers/tv-notifications.js'
 import { continueWatchingRouter } from './routers/continue-watching.js'
 import { discoveryRouter } from './routers/discovery.js'
 import { mangaLibraryRouter } from './routers/manga-library.js'
@@ -28,6 +29,7 @@ export const appRouter = router({
   watchlist: watchlistRouter,
   progress: progressRouter,
   notifications: notificationsRouter,
+  tvNotifications: tvNotificationsRouter,
   continueWatching: continueWatchingRouter,
   discovery: discoveryRouter,
   mangaLibrary: mangaLibraryRouter,

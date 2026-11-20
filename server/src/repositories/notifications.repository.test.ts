@@ -62,3 +62,15 @@ test('getThisWeekDiscovered skips episodes that were already watched', async () 
 
   assert.deepEqual(await NotificationsRepository.getThisWeekDiscovered(db), [])
 })
+
+test('dismissed info notifications persist until cleared', async () => {
+  await NotificationsRepository.addDismissedInfo(db, 'a', '5')
+  await NotificationsRepository.addDismissedInfo(db, 'a', '5')
+
+  assert.deepEqual(await NotificationsRepository.getAllDismissedInfo(db), [
+    { showId: 'a', episodeNumber: '5' },
+  ])
+
+  await NotificationsRepository.clearDismissedInfo(db)
+  assert.deepEqual(await NotificationsRepository.getAllDismissedInfo(db), [])
+})

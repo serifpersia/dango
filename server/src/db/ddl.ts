@@ -38,6 +38,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(
+      `CREATE TABLE IF NOT EXISTS dismissed_info_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
+    )
+    db.run(
       `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
@@ -80,6 +83,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(`CREATE INDEX IF NOT EXISTS idx_queue_order ON queue(queue_order)`)
 
     db.run('DELETE FROM dismissed_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
+    db.run(
+      'DELETE FROM dismissed_info_notifications WHERE showId NOT IN (SELECT id FROM watchlist)'
+    )
     db.run('DELETE FROM discovered_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
     db.run(
       'DELETE FROM legacy_id_mapping WHERE legacyId NOT IN (SELECT id FROM watchlist) AND numericId NOT IN (SELECT id FROM watchlist)'
@@ -189,6 +195,12 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
     db.run(
       `CREATE TABLE IF NOT EXISTS tv_progress (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0, updatedAt INTEGER, PRIMARY KEY (mediaId, season, episode))`
     )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS dismissed_tv_notifications (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (mediaId, season, episode))`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS dismissed_tv_info_notifications (mediaId TEXT NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (mediaId, season, episode))`
+    )
     db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
     db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
 
@@ -254,6 +266,15 @@ export async function initializeTvDatabase(dbPath: string): Promise<DatabaseWrap
       `UPDATE OR IGNORE tv_progress SET mediaId = REPLACE(mediaId, '-', ':') WHERE mediaId LIKE 'tv-%' OR mediaId LIKE 'movie-%'`
     )
     db.run(`DELETE FROM tv_progress WHERE mediaId LIKE 'tv-%' OR mediaId LIKE 'movie-%'`)
+
+    db.run(
+      `DELETE FROM dismissed_tv_notifications WHERE mediaId NOT IN (SELECT id FROM tv_library)`
+    )
+    db.run(
+      `DELETE FROM dismissed_tv_info_notifications WHERE mediaId NOT IN (SELECT id FROM tv_library)`
+    )
+    db.run(`DELETE FROM dismissed_tv_notifications`)
+    db.run(`DELETE FROM dismissed_tv_info_notifications`)
 
     return db
   } catch (err) {

@@ -7,6 +7,7 @@ import { test } from 'node:test'
 import { getTableColumns } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import {
+  dismissedInfoNotifications,
   dismissedNotifications,
   discoveredNotifications,
   queue,
@@ -17,7 +18,12 @@ import {
   watchedEpisodes,
 } from './schema-anime.js'
 import { mangaLibrary, mangaProgress } from './schema-manga.js'
-import { tvLibrary, tvProgress } from './schema-tv.js'
+import {
+  dismissedTvInfoNotifications,
+  dismissedTvNotifications,
+  tvLibrary,
+  tvProgress,
+} from './schema-tv.js'
 import { asmrLibrary, asmrProgress } from './schema-asmr.js'
 import {
   initializeAsmrDatabase,
@@ -42,6 +48,7 @@ const CASES: { name: string; init: Init; tables: Record<string, SQLiteTable> }[]
       shows_meta: showsMeta,
       discovered_notifications: discoveredNotifications,
       dismissed_notifications: dismissedNotifications,
+      dismissed_info_notifications: dismissedInfoNotifications,
       temp_show_ids: tempShowIds,
     },
   },
@@ -53,7 +60,12 @@ const CASES: { name: string; init: Init; tables: Record<string, SQLiteTable> }[]
   {
     name: 'tv',
     init: initializeTvDatabase,
-    tables: { tv_library: tvLibrary, tv_progress: tvProgress },
+    tables: {
+      tv_library: tvLibrary,
+      tv_progress: tvProgress,
+      dismissed_tv_notifications: dismissedTvNotifications,
+      dismissed_tv_info_notifications: dismissedTvInfoNotifications,
+    },
   },
   {
     name: 'asmr',

@@ -1,7 +1,11 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { DatabaseWrapper } from '../db.js'
 import { getDrizzle } from '../db/drizzle.js'
-import { discoveredNotifications, dismissedNotifications } from '../db/schema-anime.js'
+import {
+  discoveredNotifications,
+  dismissedInfoNotifications,
+  dismissedNotifications,
+} from '../db/schema-anime.js'
 
 export const NotificationsRepository = {
   getDismissedByShow: (db: DatabaseWrapper, showId: string) =>
@@ -65,6 +69,49 @@ export const NotificationsRepository = {
         )
       ),
 
+  deleteDismissedMany: (db: DatabaseWrapper, showId: string, episodeNumbers: string[]) => {
+    if (episodeNumbers.length === 0) return Promise.resolve()
+    return getDrizzle(db).run(sql`
+      DELETE FROM dismissed_notifications WHERE showId = ${showId} AND episodeNumber IN (${sql.join(
+        episodeNumbers.map((e) => sql`${e}`),
+        sql`, `
+      )})`)
+  },
+
+  deleteDismissedForAllQueued: (db: DatabaseWrapper) =>
+    getDrizzle(db).run(sql`
+      DELETE FROM dismissed_notifications WHERE EXISTS (
+        SELECT 1 FROM queue q WHERE q.showId = dismissed_notifications.showId AND q.episodeNumber = dismissed_notifications.episodeNumber
+      )`),
+
+  clearDismissed: (db: DatabaseWrapper) => getDrizzle(db).delete(dismissedNotifications),
+
+  getDismissedInfoByShow: (db: DatabaseWrapper, showId: string) =>
+    getDrizzle(db).all<{ episodeNumber: string }>(
+      sql`SELECT episodeNumber FROM dismissed_info_notifications WHERE showId = ${showId}`
+    ),
+
+  getAllDismissedInfo: (db: DatabaseWrapper) =>
+    getDrizzle(db).all<{ showId: string; episodeNumber: string }>(
+      sql`SELECT showId, episodeNumber FROM dismissed_info_notifications`
+    ),
+
+  addDismissedInfo: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
+    getDrizzle(db)
+      .insert(dismissedInfoNotifications)
+      .values({ showId, episodeNumber })
+      .onConflictDoNothing(),
+
+  addDismissedInfoMany: (
+    db: DatabaseWrapper,
+    rows: { showId: string; episodeNumber: string }[]
+  ) => {
+    if (rows.length === 0) return Promise.resolve()
+    return getDrizzle(db).insert(dismissedInfoNotifications).values(rows).onConflictDoNothing()
+  },
+
+  clearDismissedInfo: (db: DatabaseWrapper) => getDrizzle(db).delete(dismissedInfoNotifications),
+
   cleanupWatchedNotifications: (db: DatabaseWrapper) =>
     Promise.all([
       getDrizzle(db).run(sql`
@@ -90,6 +137,10 @@ export const NotificationsRepository = {
     AND NOT EXISTS (
       SELECT 1 FROM watched_episodes we
       WHERE we.showId = dn.showId AND we.episodeNumber = dn.episodeNumber
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM queue q
+      WHERE q.showId = dn.showId AND q.episodeNumber = dn.episodeNumber
     )`)
     return (rows[0]?.count || 0) > 0
   },

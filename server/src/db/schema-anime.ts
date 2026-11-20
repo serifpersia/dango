@@ -83,6 +83,16 @@ export const dismissedNotifications = sqliteTable(
   (t) => [primaryKey({ columns: [t.showId, t.episodeNumber] })]
 )
 
+export const dismissedInfoNotifications = sqliteTable(
+  'dismissed_info_notifications',
+  {
+    showId: text('showId').notNull(),
+    episodeNumber: text('episodeNumber').notNull(),
+    dismissedAt: text('dismissedAt').default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [primaryKey({ columns: [t.showId, t.episodeNumber] })]
+)
+
 export const tempShowIds = sqliteTable(
   'temp_show_ids',
   {

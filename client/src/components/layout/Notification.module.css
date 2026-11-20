@@ -129,6 +129,44 @@
   cursor: pointer;
 }
 
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.tab {
+  flex: 1;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.tabActive {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .sectionHeading {
   margin: 0;
   padding: var(--space-3) var(--space-4) var(--space-2);
@@ -314,6 +352,21 @@
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   font-weight: 600;
+}
+
+.infoMeta {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .systemItemMeta {

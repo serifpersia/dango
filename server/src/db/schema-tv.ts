@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const tvLibrary = sqliteTable(
@@ -38,6 +39,28 @@ export const tvProgress = sqliteTable(
     mediaType: text('mediaType'),
     adult: integer('adult'),
     completed: integer('completed'),
+  },
+  (t) => [primaryKey({ columns: [t.mediaId, t.season, t.episode] })]
+)
+
+export const dismissedTvNotifications = sqliteTable(
+  'dismissed_tv_notifications',
+  {
+    mediaId: text('mediaId').notNull(),
+    season: integer('season').notNull(),
+    episode: integer('episode').notNull(),
+    dismissedAt: text('dismissedAt').default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [primaryKey({ columns: [t.mediaId, t.season, t.episode] })]
+)
+
+export const dismissedTvInfoNotifications = sqliteTable(
+  'dismissed_tv_info_notifications',
+  {
+    mediaId: text('mediaId').notNull(),
+    season: integer('season').notNull(),
+    episode: integer('episode').notNull(),
+    dismissedAt: text('dismissedAt').default(sql`CURRENT_TIMESTAMP`),
   },
   (t) => [primaryKey({ columns: [t.mediaId, t.season, t.episode] })]
 )

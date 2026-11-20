@@ -1,5 +1,5 @@
 import { fetchWithRetry, parseJsonBody } from '../utils/http.utils.js'
-import type { TmdbEpisode } from './tmdb.js'
+import { tmdbMediaMeta, type TmdbEpisode } from './tmdb.js'
 
 const TVMAZE_BASE = 'https://api.tvmaze.com'
 
@@ -26,6 +26,7 @@ export interface TvMazeData {
 
 const TTL_MS = 30 * 60 * 1000
 const cache = new Map<string, { exp: number; value: TvMazeData | null }>()
+const tmdbCache = new Map<number, { exp: number; value: TvMazeData | null }>()
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -55,6 +56,22 @@ export async function tvmazeShowByImdb(imdbId: string): Promise<TvMazeData | nul
     if (episodes) value = { show, episodes }
   }
   cache.set(key, { exp: Date.now() + TTL_MS, value })
+  return value
+}
+
+export async function getTvMazeByTmdbId(tmdbId: number): Promise<TvMazeData | null> {
+  const hit = tmdbCache.get(tmdbId)
+  if (hit && hit.exp > Date.now()) return hit.value
+
+  let value: TvMazeData | null = null
+  try {
+    const meta = await tmdbMediaMeta('tv', tmdbId)
+    const imdbId = meta?.external_ids?.imdb_id || meta?.imdb_id
+    if (imdbId) value = await tvmazeShowByImdb(imdbId)
+  } catch {
+    value = null
+  }
+  tmdbCache.set(tmdbId, { exp: Date.now() + TTL_MS, value })
   return value
 }
 

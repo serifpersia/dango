@@ -18,6 +18,7 @@ const ANIME_TABLES = [
   'settings',
   'shows_meta',
   'dismissed_notifications',
+  'dismissed_info_notifications',
   'discovered_notifications',
   'sync_metadata',
   'legacy_id_mapping',
@@ -76,6 +77,8 @@ test('initializeTvDatabase creates the tv tables', async () => {
       const tables = tableNames(db)
       assert.ok(tables.includes('tv_library'))
       assert.ok(tables.includes('tv_progress'))
+      assert.ok(tables.includes('dismissed_tv_notifications'))
+      assert.ok(tables.includes('dismissed_tv_info_notifications'))
       assert.ok(tables.includes('sync_metadata'))
     } finally {
       db.close()

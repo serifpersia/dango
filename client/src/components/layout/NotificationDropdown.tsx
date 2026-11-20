@@ -1,14 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Icon from '../common/Icon'
 import Modal from '../common/Modal'
-import NotificationItem from './NotificationItem'
+import NotificationItem, {
+  InfoNotificationItem,
+  TvInfoNotificationItem,
+  TvNotificationItem,
+} from './NotificationItem'
 import NotificationSkeleton from './NotificationSkeleton'
 import {
   useNotifications,
   useDiscoveryStatus,
   useClearAllNotifications,
+  useClearAllInfoNotifications,
+  useInfoNotifications,
   useSystemNotifications,
 } from '../../hooks/useAnimeData'
+import {
+  useClearAllTvInfoNotifications,
+  useClearAllTvNotifications,
+  useTvInfoNotifications,
+  useTvNotifications,
+} from '../../hooks/useTv'
+import { useContentType } from '../../contexts/ContentTypeContext'
 import { useQueryClient } from '@tanstack/react-query'
 import styles from './Notification.module.css'
 import { qk } from '../../lib/queryKeys'
@@ -19,11 +32,24 @@ interface NotificationDropdownProps {
 }
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) => {
-  const { data: notifications = [], isLoading } = useNotifications()
+  const { contentType } = useContentType()
+  const isTv = contentType === 'tv'
+  const { data: animeNotifications = [], isLoading: animeLoading } = useNotifications(!isTv)
+  const { data: tvNotifications = [], isLoading: tvLoading } = useTvNotifications(isTv)
+  const { data: animeInfo = [], isLoading: animeInfoLoading } = useInfoNotifications(!isTv)
+  const { data: tvInfo = [], isLoading: tvInfoLoading } = useTvInfoNotifications(isTv)
+  const notifications = isTv ? tvNotifications : animeNotifications
+  const infoNotifications = isTv ? tvInfo : animeInfo
+  const isLoading = isTv ? tvLoading : animeLoading
+  const infoLoading = isTv ? tvInfoLoading : animeInfoLoading
   const { data: systemNotifications = [] } = useSystemNotifications()
   const { data: status } = useDiscoveryStatus()
   const clearAllMutation = useClearAllNotifications()
+  const clearInfoMutation = useClearAllInfoNotifications()
+  const clearAllTvMutation = useClearAllTvNotifications()
+  const clearInfoTvMutation = useClearAllTvInfoNotifications()
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<'releases' | 'info'>('releases')
   const [fullMessageId, setFullMessageId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -42,6 +68,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) 
 
   const fullNotification = systemNotifications.find((sn) => sn.id === fullMessageId) ?? null
   const updateCount = notifications.length + systemNotifications.length
+  const releaseTab = activeTab === 'releases'
   const statusMessage = status?.running
     ? status.total > 0
       ? `Checking ${Math.min(status.done, status.total)}/${status.total} shows...`
@@ -71,10 +98,22 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) 
           <span className={styles.headerSubtitle}>{updateCount} updates</span>
         </div>
         <div className={styles.headerActions}>
-          {notifications.length > 0 && (
+          {releaseTab && notifications.length > 0 && (
             <button
               className={styles.clearAllBtn}
-              onClick={() => clearAllMutation.mutate(undefined)}
+              onClick={() =>
+                isTv ? clearAllTvMutation.mutate(undefined) : clearAllMutation.mutate(undefined)
+              }
+            >
+              Clear all
+            </button>
+          )}
+          {!releaseTab && infoNotifications.length > 0 && (
+            <button
+              className={styles.clearAllBtn}
+              onClick={() =>
+                isTv ? clearInfoTvMutation.mutate(undefined) : clearInfoMutation.mutate(undefined)
+              }
             >
               Clear all
             </button>
@@ -91,16 +130,64 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) 
         </div>
       </div>
 
-      <div className={styles.discoveryStatusRow}>
-        <span
-          className={`${styles.statusDot} ${status?.running ? styles.statusDotRunning : status?.state === 'complete' ? styles.statusDotOk : status?.state === 'error' ? styles.statusDotError : styles.statusDotIdle}`}
-          aria-hidden="true"
-        />
-        <span>{statusMessage}</span>
+      <div className={styles.tabs} role="tablist" aria-label="Notification types">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={releaseTab}
+          className={`${styles.tab} ${releaseTab ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('releases')}
+        >
+          Releases{updateCount > 0 ? ` (${updateCount})` : ''}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!releaseTab}
+          className={`${styles.tab} ${!releaseTab ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('info')}
+        >
+          Info{infoNotifications.length > 0 ? ` (${infoNotifications.length})` : ''}
+        </button>
       </div>
 
+      {releaseTab && !isTv && (
+        <div className={styles.discoveryStatusRow}>
+          <span
+            className={`${styles.statusDot} ${status?.running ? styles.statusDotRunning : status?.state === 'complete' ? styles.statusDotOk : status?.state === 'error' ? styles.statusDotError : styles.statusDotIdle}`}
+            aria-hidden="true"
+          />
+          <span>{statusMessage}</span>
+        </div>
+      )}
+
       <div className={styles.list}>
-        {isLoading && updateCount === 0 ? (
+        {!releaseTab ? (
+          infoLoading && infoNotifications.length === 0 ? (
+            <NotificationSkeleton count={3} />
+          ) : infoNotifications.length > 0 ? (
+            <section aria-labelledby="info-notifications-heading">
+              <h5 id="info-notifications-heading" className={styles.sectionHeading}>
+                Upcoming episodes
+              </h5>
+              {isTv
+                ? tvInfo.map((notification) => (
+                    <TvInfoNotificationItem key={notification.id} notification={notification} />
+                  ))
+                : animeInfo.map((notification) => (
+                    <InfoNotificationItem key={notification.id} notification={notification} />
+                  ))}
+            </section>
+          ) : (
+            <div className={styles.emptyState}>
+              <span className={styles.emptyIcon}>
+                <Icon name="clock" size={22} />
+              </span>
+              <strong>No upcoming episodes</strong>
+              <span>Next air times for shows you’re watching will appear here.</span>
+            </div>
+          )
+        ) : isLoading && updateCount === 0 ? (
           <NotificationSkeleton count={4} />
         ) : (
           <>
@@ -135,9 +222,13 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onClose }) 
                 <h5 id="new-episodes-heading" className={styles.sectionHeading}>
                   New episodes
                 </h5>
-                {notifications.map((notification) => (
-                  <NotificationItem key={notification.id} notification={notification} />
-                ))}
+                {isTv
+                  ? tvNotifications.map((notification) => (
+                      <TvNotificationItem key={notification.id} notification={notification} />
+                    ))
+                  : animeNotifications.map((notification) => (
+                      <NotificationItem key={notification.id} notification={notification} />
+                    ))}
               </section>
             )}
 
