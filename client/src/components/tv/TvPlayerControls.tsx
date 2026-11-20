@@ -42,6 +42,7 @@ interface TvPlayerControlsProps {
   ambientSettings?: AmbientLightSettings
   onAmbientChange?: (patch: Partial<AmbientLightSettings>) => void
   hideChrome?: boolean
+  className?: string
   onOpenSubtitles?: () => void
   openSubLanguages?: { id: string; language?: string; label?: string; count?: number }[]
   openSubFiles?: { id: string; language?: string; label: string; url: string }[]
@@ -82,6 +83,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
   ambientSettings,
   onAmbientChange,
   hideChrome = false,
+  className,
   onOpenSubtitles,
   openSubLanguages,
   openSubFiles,
@@ -390,7 +392,7 @@ const TvPlayerControls: React.FC<TvPlayerControlsProps> = ({
       isInteracting={!!settingsView || state.showVolumeSlider}
       nativeControls={state.useNativeControls}
       onStageClick={closeSettings}
-      className={state.isFullscreen ? styles.fullscreenFlat : ''}
+      className={`${state.isFullscreen ? styles.fullscreenFlat : ''} ${className ?? ''}`}
       chromeDisabled={hideChrome}
     >
       {children}

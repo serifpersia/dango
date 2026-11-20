@@ -68,6 +68,7 @@ import type { SkipInterval } from '../types/player'
 import styles from './Tv.module.css'
 import layoutStyles from '../components/player/PlayerPageLayout.module.css'
 import playerStyles from '../components/player/Player.module.css'
+import shellStyles from '../components/player/UnifiedPlayer.module.css'
 import { useWatchAlong } from '../contexts/WatchAlongContext'
 import { useWatchAlongPlayer } from '../hooks/useWatchAlongPlayer'
 import WatchAlongPanel from '../components/player/WatchAlongPanel'
@@ -2373,7 +2374,10 @@ const Tv: React.FC = () => {
                 allowFullScreen
               />
             ) : !isEmbedProvider && (streams.length > 0 || streamLoading) ? (
-              <>
+              <div
+                className={!player.state.isFullscreen ? layoutStyles.videoPlayerWrapper : ''}
+                style={player.state.isFullscreen ? { height: '100%' } : undefined}
+              >
                 {streamError && <TvStreamError error={streamError} onRetry={loadStreams} />}
                 <TvPlayerControls
                   player={player}
@@ -2424,6 +2428,7 @@ const Tv: React.FC = () => {
                   openSubError={openSubError}
                   onOpenSubLangSelect={handleOpenSubLangSelect}
                   onOpenSubFileSelect={handleOpenSubFileSelect}
+                  className={!player.state.isFullscreen ? shellStyles.shellFill : ''}
                 >
                   <>
                     <PlayerVideo
@@ -2547,7 +2552,7 @@ const Tv: React.FC = () => {
                     )}
                   </>
                 </TvPlayerControls>
-              </>
+              </div>
             ) : streamError && !isEmbedProvider ? (
               <TvStreamError error={streamError} onRetry={loadStreams} />
             ) : null}
