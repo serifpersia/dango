@@ -1,50 +1,140 @@
 .loader {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 4px;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 14px 2px 2px;
 }
 
 .ball {
-  position: relative;
-  z-index: 1;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  box-shadow:
-    inset -2px -2px 4px rgba(0, 0, 0, 0.2),
-    inset 2px 2px 3px rgba(255, 255, 255, 0.32);
-  animation: dangoBob 1.1s ease-in-out infinite;
-}
-
-.ball:nth-child(1) {
-  background: #f5a9cf;
+  width: 38px;
+  height: 28px;
+  display: block;
+  animation: dango-wave 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
 }
 
 .ball:nth-child(2) {
-  background: #f1ead7;
-  animation-delay: 0.14s;
+  animation-delay: 0.18s;
 }
 
 .ball:nth-child(3) {
-  background: #a8ddb5;
-  animation-delay: 0.28s;
+  animation-delay: 0.36s;
 }
 
-@keyframes dangoBob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.18));
+}
 
-  50% {
-    transform: translateY(-5px);
+.body {
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.ball:nth-child(1) .body {
+  fill: color-mix(in srgb, #f5a9cf 88%, var(--bg-primary, #fff));
+  stroke: #d97fb0;
+}
+
+.ball:nth-child(2) .body {
+  fill: color-mix(in srgb, #f1ead7 90%, var(--bg-primary, #fff));
+  stroke: #d6ccb0;
+}
+
+.ball:nth-child(3) .body {
+  fill: color-mix(in srgb, #a8ddb5 88%, var(--bg-primary, #fff));
+  stroke: #7bbd8e;
+}
+
+.eye {
+  fill: #1a1820;
+}
+
+.line {
+  fill: none;
+  stroke: #1a1820;
+  stroke-width: 0.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.face {
+  opacity: 0;
+}
+
+.faceNormal {
+  animation: face-normal 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.facePet {
+  animation: face-pet 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.ball:nth-child(2) .faceNormal,
+.ball:nth-child(2) .facePet {
+  animation-delay: 0.18s;
+}
+
+.ball:nth-child(3) .faceNormal,
+.ball:nth-child(3) .facePet {
+  animation-delay: 0.36s;
+}
+
+@keyframes dango-wave {
+  0%,
+  55%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  12% {
+    transform: translateY(-10px) scale(0.95, 1.06);
+  }
+  26% {
+    transform: translateY(1px) scale(1.06, 0.94);
+  }
+  38% {
+    transform: translateY(-2px) scale(0.99, 1.02);
+  }
+}
+
+@keyframes face-normal {
+  0%,
+  10%,
+  34%,
+  100% {
+    opacity: 1;
+  }
+  13%,
+  28% {
+    opacity: 0;
+  }
+}
+
+@keyframes face-pet {
+  0%,
+  10%,
+  34%,
+  100% {
+    opacity: 0;
+  }
+  13%,
+  28% {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ball {
+  .ball,
+  .faceNormal,
+  .facePet {
     animation: none;
+  }
+
+  .faceNormal {
+    opacity: 1;
   }
 }

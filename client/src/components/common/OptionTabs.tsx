@@ -45,29 +45,37 @@ function OptionTabsInner<T extends string>(
   const prevValueRef = useRef<T | null>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
 
-  const updateIndicator = useCallback(
-    (activeKey: string, scroll: boolean) => {
-      if (variant === 'dango') return
-      const el = btnRefs.current.get(activeKey)
-      const bar = barRef.current
-      if (el && bar) {
-        const barRect = bar.getBoundingClientRect()
-        const elRect = el.getBoundingClientRect()
-        setIndicator({
-          left: elRect.left - barRect.left + bar.scrollLeft,
-          width: elRect.width,
-        })
-        if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  const updateIndicator = useCallback((activeKey: string, scroll: boolean, dir = 0) => {
+    const el = btnRefs.current.get(activeKey)
+    const bar = barRef.current
+    if (el && bar) {
+      const barRect = bar.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      setIndicator({
+        left: elRect.left - barRect.left + bar.scrollLeft,
+        width: elRect.width,
+      })
+      if (scroll) {
+        const margin = 12
+        const target =
+          dir < 0
+            ? el.offsetLeft + el.offsetWidth + margin - bar.clientWidth
+            : el.offsetLeft - margin
+        const left = Math.max(0, Math.min(target, bar.scrollWidth - bar.clientWidth))
+        bar.scrollTo({ left, behavior: 'smooth' })
       }
-    },
-    [variant]
-  )
+    }
+  }, [])
 
   useLayoutEffect(() => {
-    const changed = prevValueRef.current !== null && prevValueRef.current !== value
+    const prev = prevValueRef.current
+    const changed = prev !== null && prev !== value
+    const prevIdx = prev !== null ? options.findIndex((o) => o.value === prev) : -1
+    const nextIdx = options.findIndex((o) => o.value === value)
+    const dir = prevIdx === -1 || nextIdx === -1 ? 0 : Math.sign(nextIdx - prevIdx)
     prevValueRef.current = value
-    updateIndicator(value, changed)
-  }, [value, options.length, updateIndicator])
+    updateIndicator(value, changed, dir)
+  }, [value, options, updateIndicator])
 
   useEffect(() => {
     updateIndicator(value, false)
@@ -112,15 +120,11 @@ function OptionTabsInner<T extends string>(
       role={variant === 'pill' ? undefined : 'group'}
       {...(variant === 'dango' ? { 'data-dango-origin': '' } : {})}
     >
-      {variant === 'dango' ? (
-        <span className={styles.dangoStick} aria-hidden="true" />
-      ) : (
-        <div
-          className={variant === 'underline' ? styles.underlineIndicator : styles.tabIndicator}
-          style={{ left: indicator.left, width: indicator.width }}
-          aria-hidden="true"
-        />
-      )}
+      <div
+        className={variant === 'underline' ? styles.underlineIndicator : styles.tabIndicator}
+        style={{ left: indicator.left, width: indicator.width }}
+        aria-hidden="true"
+      />
       {options.map((opt, index) =>
         variant === 'dango' ? (
           <button
